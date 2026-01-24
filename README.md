@@ -1,5 +1,6 @@
 
-<img width="1280" height="640" alt="aisigner-banner" src="https://github.com/user-attachments/assets/755d1acf-3334-447d-85e4-567b39424878" /> 
+<img width="1280" height="320" alt="aisigner-banner" src="https://github.com/user-attachments/assets/52bd9b7a-6182-48d7-860c-02c8abd5aa33" />
+
 
 ## AISigner
 
