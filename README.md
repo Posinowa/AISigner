@@ -1,4 +1,7 @@
-# AISigner 
+
+<img width="1280" height="640" alt="aisigner-banner" src="https://github.com/user-attachments/assets/755d1acf-3334-447d-85e4-567b39424878" /> 
+
+## AISigner
 
 AISigner, stajyer/öğrencilerin kısa bir anketle güçlü yönlerini ve seviyelerini belirleyip uygun mentörle eşleştiren; proje havuzundan uygun bir proje atandıktan sonra AI destekli bir öğrenme yol haritası (roadmap) oluşturan açık kaynak bir platformdur.
 
