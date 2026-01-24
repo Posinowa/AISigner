@@ -148,6 +148,75 @@ model Session {
 }
 ```
 
+* **StudentProfile Modeli**
+```prisma
+model StudentProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation("StudentUser", fields: [userId], references: [id], onDelete: Cascade)
+  birthYear       Int?
+  experienceLevel String
+  interests       String[]
+  goals           String?
+  availability    String?
+
+  mentorId        String?
+  mentor          User?    @relation("StudentMentor", fields: [mentorId], references: [id])
+
+ assignedProjects AssignedProject[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+}
+```
+
+
+* **ProjectTemplate Modeli**
+```prisma
+model ProjectTemplate{
+  id             String @id @default(cuid())
+  title          String
+  description    String     //md formatı
+  track          String[]   //["web" , "mobile"]
+  difficulty     Difficulty
+  
+  assignedProjects AssignedProject[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+}
+
+enum Difficulty{
+  HARD
+  MEDIUM
+  EASY
+}
+
+```
+
+* **AssignedProject Modeli**
+```prisma
+model AssignedProject {
+  id                String   @id @default(cuid())
+  studentProfileId  String
+  projectTemplateId String
+  status            AssignmentStatus @default(PENDING)
+
+  studentProfile    StudentProfile @relation(fields: [studentProfileId], references: [id])
+  projectTemplate   ProjectTemplate @relation(fields: [projectTemplateId], references: [id])
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+enum AssignmentStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+```
 ### 3. Migration Çalıştır
 
 İlk migration'ı oluştur ve uygula ve Prisma Client'i generate et 
@@ -339,6 +408,161 @@ Onboarding sonrası veriyi doğrulamak için ``` npx prisma studio```  komutuyla
 >`getMockProfileSummary()` fonksiyonu şu an sahte veri döndürmektedir. İleride gerçek OpenAI entegrasyonu ile kolayca değiştirilebilir.
 
 ---
+## M3 - Admin & Mentor Temelleri
+ Bu modül, admin ve mentor rollerinin temel işlevlerini kapsar: kullanıcı yönetimi, proje şablonu kontrolü ve öğrenci–proje eşleşmesi.
+
+ ---
+ ### 1. Yeni Modeller ve İlişkiler (Prisma)
+
+- **User**
+  - Roller: `ADMIN`, `MENTOR`, `STUDENT`
+  - Mentor–öğrenci ilişkisi:
+    - Bir mentorun birden fazla öğrencisi olabilir (`StudentProfile.mentorId` üzerinden).
+    - Bir öğrencinin tek mentor ilişkisi vardır.
+
+- **StudentProfile** *(M2’de tanımlandı, M3 ile genişletildi)*
+  - Yeni ilişkiler:
+    - `mentorId` → Mentor ile bağlantı.
+    - `assignedProjects` → Öğrenciye atanmış projeler listesi.
+
+- **ProjectTemplate**
+  - Admin tarafından tanımlanan proje şablonları.
+  - Alanlar: `id`, `title`, `description (md)`, `difficulty (enum: LOW, MEDIUM, HIGH)`, `track (string[])`.
+  - İlişki: `assignedProjects` ile bağlantılı.
+
+- **AssignedProject**
+  - Mentorun, öğrencisine atadığı projeleri tutar.
+  - Alanlar: `id`, `studentProfileId`, `projectTemplateId`, `status`.
+  - Statü enum: `PENDING`, `IN_PROGRESS`, `COMPLETED`.
+  - İlişkiler:
+    - `studentProfile` → Öğrenciye bağlı.
+    - `projectTemplate` → Proje şablonuna bağlı.
+
+---
+
+### 2. Admin Paneli
+
+**Amaç**  
+Admin tüm kullanıcıları görüntüleyebilir, rollerini değiştirebilir ve mentor ataması yapabilir.
+
+**Dosya Yapısı**  
+- Dosya:`src/features/admin/server/users.ts`  
+  - `getAllUsers()` → Tüm kullanıcıları ve ilişkili profil bilgilerini döndürür.  
+  - `getMentors()` → Sadece mentor rolündeki kullanıcıları listeler.  
+  - `updateUserRole(userId, role)` → Kullanıcının rolünü günceller.  
+  - `assignMentor(studentId, mentorId)` → Öğrenciye mentor atar.  
+- Dosya:`app/(admin)/admin-dashboard/page.tsx` → Admin UI  
+
+
+**Gerçekleştirilenler**
+- Kullanıcı listesi tablosu.
+- Rol değiştirme butonu.
+- Mentor atama dropdown.
+- Değişiklikler Prisma üzerinden anında DB’ye yansır.
+
+---
+
+### 3. Admin – Proje Şablon Yönetimi
+
+**Amaç**  
+Admin proje şablonu ekleyebilir, güncelleyebilir, silebilir, listeleyebilir.
+
+**Dosya Yapısı**
+- Dosya: `src/features/projects/server/templates.ts`
+- Fonksiyonlar:
+  - `listTemplates()` → Tüm şablonları listeler (createdAt desc).
+  - `createTemplate(data)` → Yeni şablon oluşturur.
+  - `updateTemplate(id, data)` → Şablonu günceller.
+  - `deleteTemplate(id)` → Şablonu siler.
+  - `getTemplateById(id)` → Şablonu id ile getirir.
+- Alanlar:
+  - `difficulty`: `EASY | MEDIUM | HARD`
+  - `track`: `string[]`
+  - `description`: Markdown destekli içerik
+`
+- Dosya: `app/(admin)/admin-dashboard/projects/page.tsx` → UI
+
+**Gerçekleştirilenler**
+- Yeni proje ekleme formu.
+- Listeleme tablosu.
+- Düzenleme & silme işlemleri.
+- Açıklama MD formatında saklanır.
+- `track` alanı çoklu seçim olarak oluşturuldu.
+
+
+---
+
+### 4. Mentor Paneli
+
+**Amaç**  
+Mentor yalnızca kendi öğrencilerini görebilir ve onlara proje atayabilir.
+
+**Dosya Yapısı**
+- Dosya:  `app/(mentor)/mentor-dashboard/page.tsx` → Öğrenci listesi
+- Dosya: `app/(mentor)/mentor-dashboard/[studentId]/page.tsx` → Öğrenci profili + proje atama
+- Dosya: `features/mentor/server/actions.ts` → `getMentorStudents()`, `getStudentDetail()`, `assignProjectToStudent()`, `updateProjectStatus()`
+
+**Gerçekleştirilenler**
+- Mentor dashboard’da yalnızca kendi öğrencileri listelenir.
+- Öğrenci detay sayfasında profil bilgileri ve proje şablonları gösterilir.
+- “Projeyi Ata” butonu → `AssignedProject` kaydı oluşturur.
+- Öğrencinin dashboard’unda proje listesi görünür.
+
+
+
+### Süreç Akışı
+
+1. Admin dashboard üzerinden tüm kullanıcıları görür.  
+2. Kullanıcının rolünü veya mentorunu güncelleyebilir.  
+3. Admin proje şablonlarını ekleyip düzenleyebilir.  
+4. Mentor dashboard’da sadece kendisine atanmış öğrencileri görür.  
+5. Öğrenci detayına girip uygun projeyi seçer ve atar.  
+6. Atanan proje öğrencinin dashboard’unda görünür.  
+
+
+---
+
+### M3 – Uygulama Rehberi
+
+Yeni gelen bir geliştirici aşağıdaki adımları izleyerek M3 sürecini uçtan uca test edebilir:
+
+1. `npm run dev` ile projeyi başlat.  
+2. [http://localhost:3000/signin](http://localhost:3000/signin) üzerinden **admin** veya **mentor** hesabı ile giriş yap.  
+
+#### Admin için:
+- [http://localhost:3000/admin-dashboard](http://localhost:3000/admin-dashboard)  
+  - Kullanıcı listesi tablosunu görüntüle.  
+  - Rol değiştirme butonunu test et.  
+  - Öğrenciler için mentor atama dropdown’unu kullan.  
+ 
+![Admin Paneli](public/admin-dashboard.png)
+
+- [http://localhost:3000/admin-dashboard/projects](http://localhost:3000/admin-dashboard/projects)  
+  - Yeni proje şablonu ekleme formunu doldur ve kaydet.  
+  - Listeleme tablosunda eklenen şablonun göründüğünü doğrula.  
+  - Düzenleme ve silme işlemlerini test et.  
+  - Markdown açıklamasının DB’de saklandığını ve UI’da render edildiğini kontrol et.  
+
+![Admin Paneli](public/admin-dashboardProjects.png)
+
+
+#### Mentor için:
+- [http://localhost:3000/mentor-dashboard](http://localhost:3000/mentor-dashboard)  
+  - Yalnızca kendisine atanmış öğrencilerin listelendiğini doğrula.  
+  - Öğrenci detay sayfasına git:  
+    - Örn. [http://localhost:3000/mentor-dashboard/{studentId}](http://localhost:3000/mentor-dashboard/{studentId})  
+  - Öğrenci profil özetini görüntüle.  
+  - Proje şablonları listesinden seçim yap ve “Projeyi Ata” butonuna bas.  
+  - Atanan projenin öğrencinin dashboard’unda göründüğünü doğrula.  
+
+![Mentor Paneli](public/mentor-dashboard.png)
+![Mentor Paneli](public/mentor-dashboardStudentID.png)
+#### Öğrenci için:
+- [http://localhost:3000/student-dashboard](http://localhost:3000/student-dashboard)  
+  - Onboarding sonrası profil özetini görüntüle.  
+  - Mentor tarafından atanmış projelerin listelendiğini kontrol et.  
+
+---
 
 
 
@@ -433,11 +657,16 @@ Uygulama Next.js App Router mimarisiyle yapılandırılmıştır. Dosya sistemi 
 │   ├── app/
 │   │   ├── (admin)/          # Admin'e özel route grubu
 │   │   │   ├── admin-dashboard/
+|   |   |   ├   |── projects/  # Proje şablonu yönetim ekranları
 │   │   │   └── layout.tsx    # Admin layout guard (RBAC kontrolü)
 │   │   ├── (mentor)/         # Mentör'e özel route grubu
 │   │   │   ├── mentor-dashboard/
+|   |   |   |   ├──[studentId]
 │   │   │   └── layout.tsx
 │   │   ├── (student)/        # Öğrenci'ye özel route grubu
+|   |   |   ├── student-dashboard/
+|   |   |   |
+|   |   |   ├── student-onboarding/# Öğrenci kayıt/karşılama süreci
 │   │   │   └── layout.tsx
 │   │   ├── (auth)/           # Giriş / Kayıt / Çıkış sayfaları
 │   │   │   ├── signin/
