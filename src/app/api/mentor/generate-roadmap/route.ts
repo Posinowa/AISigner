@@ -1,19 +1,38 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db"; // Projendeki prisma bağlantı dosyası (önceki düzeltmemiz)
+import { prisma } from "@/lib/db";
 import { generateRoadmap } from "@/features/ai/server/generate-roadmap";
+import { requireAuth } from "@/lib/auth/guard";
+import { generateRoadmapSchema } from "@/lib/validations/api";
+import { createRateLimiter } from "@/lib/rate-limit";
+
+const limiter = createRateLimiter("generate-roadmap", {
+  maxRequests: 5,
+  windowSeconds: 60,
+});
 
 export async function POST(req: Request) {
-  try {
-    // 1. Frontend'den gelen isteği alıyoruz
-    const body = await req.json();
-    const { assignedProjectId } = body;
+  const auth = await requireAuth("MENTOR");
+  if (!auth.authorized) return auth.response;
 
-    if (!assignedProjectId) {
+  const rl = limiter.check(auth.session.user.id ?? "anonymous");
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Çok fazla istek. Lütfen biraz bekleyin." },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
+    );
+  }
+
+  try {
+    const body = await req.json();
+    const parsed = generateRoadmapSchema.safeParse(body);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Atanmış Proje ID'si gerekli!" }, 
+        { error: parsed.error.flatten().fieldErrors },
         { status: 400 }
       );
     }
+
+    const { assignedProjectId } = parsed.data;
 
     // 2. Veritabanından atanmış projeyi ve ona bağlı öğrenci ile şablonu çekiyoruz
     const assignedProject = await prisma.assignedProject.findUnique({

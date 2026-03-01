@@ -119,14 +119,20 @@ npx prisma init
 ```prisma
  model User {
 
-  id        Int      @id @default(autoincrement())  
+  id        String   @id @default(cuid())  
   email     String   @unique                        
-  name      String?                                 
+  name      String?    
+  lastName  String?                                
   password  String  //hashed password
-  phone     String?                                 
-  role      Role     @default(STUDENT)                 
+  phone     String?                                        
+  role      Role     @default(STUDENT)                
   createdAt DateTime @default(now())                
-  updatedAt DateTime @updatedAt                     
+  updatedAt DateTime @updatedAt    
+
+  emailVerified DateTime?
+  sessions      Session[]
+  studentProfile  StudentProfile?  @relation("StudentUser")
+  menteeProfiles StudentProfile[] @relation("StudentMentor")
 }
 
 enum Role {
@@ -139,9 +145,9 @@ enum Role {
 * **Session Modeli**
 ```prisma
 model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       Int
+  id           String    @id @default(cuid())
+  sessionToken String    @unique
+  userId       String
   expires      DateTime
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -207,6 +213,8 @@ model AssignedProject {
   studentProfile    StudentProfile @relation(fields: [studentProfileId], references: [id])
   projectTemplate   ProjectTemplate @relation(fields: [projectTemplateId], references: [id])
 
+  roadmap           Roadmap?
+
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 }
@@ -215,6 +223,34 @@ enum AssignmentStatus {
   PENDING
   IN_PROGRESS
   COMPLETED
+}
+```
+
+* **Roadmap Modeli**
+```prisma
+model Roadmap {
+  id                String        @id @default(cuid())
+  assignedProjectId String        @unique
+  assignedProject   AssignedProject @relation(fields: [assignedProjectId], references: [id], onDelete: Cascade)
+  title             String
+  status            RoadmapStatus @default(DRAFT)
+  steps             RoadmapStep[]
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+}
+
+model RoadmapStep {
+  id             String     @id @default(cuid())
+  roadmapId      String
+  roadmap        Roadmap    @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
+  order          Int
+  title          String
+  description    String
+  resources      String[]
+  estimatedHours Int?
+  status         StepStatus @default(TODO)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
 }
 ```
 ### 3. Migration Çalıştır
@@ -367,7 +403,7 @@ Bu modül, öğrencinin kayıt sonrası onboarding sürecini ve profil özetini 
 - `features/student/ui/OnboardingForm.tsx` → Çok adımlı form bileşeni
 - `features/student/models/onboarding.ts` → Zod doğrulama şemaları
 - `features/student/server/onboarding.ts` → `saveOnboarding(data)` server action
-- `features/student/server/profileSummary.ts` → Mock AI fonksiyonu (`getMockProfileSummary`)
+- `features/student/server/profileSummary.ts` → AI profil analizi (`getProfileSummary`) + yedek mock fonksiyonu (`getMockProfileSummary`)
 - `features/student/ui/ProfileSummaryCard.tsx` → Profil özeti bileşeni
 - `app/(student)/student-dashboard/page.tsx` → Öğrenci dashboard sayfası
 
@@ -375,7 +411,7 @@ Bu modül, öğrencinin kayıt sonrası onboarding sürecini ve profil özetini 
 
 1. Öğrenci `OnboardingForm` üzerinden kişisel bilgilerini, deneyim seviyesini ve hedeflerini girer.
 2. Form submit edildiğinde `saveOnboarding()` ile veritabanına `StudentProfile` olarak kaydedilir.
-3. Ardından `getMockProfileSummary()` ile sahte AI özeti oluşturulur.
+3. Ardından `getProfileSummary()` ile Gemini AI özeti oluşturulur (hata durumunda mock fallback kullanılır).
 4. Öğrenci `student-dashboard` sayfasına yönlendirilir ve profil özeti + proje durumu gösterilir.
 
 ###  M2 – Uygulama Rehberi
@@ -405,7 +441,7 @@ Onboarding sonrası veriyi doğrulamak için ``` npx prisma studio```  komutuyla
 
 ### **Mock AI Notu**
 
->`getMockProfileSummary()` fonksiyonu şu an sahte veri döndürmektedir. İleride gerçek OpenAI entegrasyonu ile kolayca değiştirilebilir.
+>`getProfileSummary()` fonksiyonu Gemini AI ile profil analizi yapar. Hata durumunda `getMockProfileSummary()` yedek fonksiyonu devreye girer.
 
 ---
 ## M3 - Admin & Mentor Temelleri
@@ -427,7 +463,7 @@ Onboarding sonrası veriyi doğrulamak için ``` npx prisma studio```  komutuyla
 
 - **ProjectTemplate**
   - Admin tarafından tanımlanan proje şablonları.
-  - Alanlar: `id`, `title`, `description (md)`, `difficulty (enum: LOW, MEDIUM, HIGH)`, `track (string[])`.
+  - Alanlar: `id`, `title`, `description (md)`, `difficulty (enum: EASY, MEDIUM, HARD)`, `track (string[])`.
   - İlişki: `assignedProjects` ile bağlantılı.
 
 - **AssignedProject**
@@ -446,7 +482,7 @@ Onboarding sonrası veriyi doğrulamak için ``` npx prisma studio```  komutuyla
 Admin tüm kullanıcıları görüntüleyebilir, rollerini değiştirebilir ve mentor ataması yapabilir.
 
 **Dosya Yapısı**  
-- Dosya:`src/features/admin/server/users.ts`  
+- Dosya:`src/features/admin/server/user.ts`  
   - `getAllUsers()` → Tüm kullanıcıları ve ilişkili profil bilgilerini döndürür.  
   - `getMentors()` → Sadece mentor rolündeki kullanıcıları listeler.  
   - `updateUserRole(userId, role)` → Kullanıcının rolünü günceller.  
@@ -500,7 +536,7 @@ Mentor yalnızca kendi öğrencilerini görebilir ve onlara proje atayabilir.
 **Dosya Yapısı**
 - Dosya:  `app/(mentor)/mentor-dashboard/page.tsx` → Öğrenci listesi
 - Dosya: `app/(mentor)/mentor-dashboard/[studentId]/page.tsx` → Öğrenci profili + proje atama
-- Dosya: `features/mentor/server/actions.ts` → `getMentorStudents()`, `getStudentDetail()`, `assignProjectToStudent()`, `updateProjectStatus()`
+- Dosya: `features/mentors/server/actions.ts` → `getMentorStudents()`, `getStudentDetail()`, `assignProjectToStudent()`, `updateProjectStatus()`
 
 **Gerçekleştirilenler**
 - Mentor dashboard’da yalnızca kendi öğrencileri listelenir.
@@ -579,17 +615,16 @@ Yeni gelen bir geliştirici aşağıdaki adımları izleyerek M3 sürecini uçta
 5. AI, proje + öğrenci profiline göre bir roadmap üretir (mentör onaylar/düzenler).
 6. Roadmap adımları GitHub issue/PR döngüsü ile yürütülür.
 
-## Teknik (v0)
+## Teknik Altyapı
 - **Uygulama**: Next.js 15 (App Router), TypeScript, TailwindCSS
-- **Sunucu uçları**: Next.js Route Handlers (REST)
-- **Kimlik doğrulama**: (MVP’de belirlenecek — örn. Lucia veya NextAuth)
-- **Veritabanı**: PostgreSQL + Prisma
-- **AI servisi**: OpenAI-uyumlu bir endpoint (server-side)
-- **UI**: shadcn/ui tercih edilebilir
-
-> Not: Bu repo başlangıçta **yalın Next.js iskeleti** içerir. Veritabanı, Prisma, auth, AI ve GitHub entegrasyonları ilk görev(ler) kapsamında eklenecektir.
+- **Sunucu uçları**: Next.js Route Handlers (REST) + Server Actions
+- **Kimlik doğrulama**: NextAuth (Credentials provider, JWT strategy)
+- **Veritabanı**: PostgreSQL + Prisma ORM
+- **AI servisi**: Google Vertex AI (Gemini) — profil analizi, proje önerisi ve roadmap üretimi
+- **UI**: shadcn/ui + Radix UI
 
 ## Katkı
+Detaylı katkı rehberi için [CONTRIBUTING.md](CONTRIBUTING.md) dosyasına bakın.
 - Fork → branch → PR akışı ile katkı verin.
 - Küçük ve odaklı PR’lar tercih edilir.
 
@@ -693,18 +728,19 @@ Uygulama Next.js App Router mimarisiyle yapılandırılmıştır. Dosya sistemi 
 │   |    └── user.ts           # Auth işlemleri ve Zod şemaları
 │   ├── student/ui/
 │   │   ├── OnboardingForm.tsx       # Çok adımlı öğrenci onboarding formu
-│   │   └── ProfileSummaryCard.tsx   # Profil özeti bileşeni (mock AI çıktısı)
+│   │   └── ProfileSummaryCard.tsx   # Profil özeti bileşeni (AI + mock fallback)
 │   ├── student/models/
 │   │   └── onboarding.ts           # Zod doğrulama şemaları (kişisel, deneyim, hedef)
 │   ├── student/server/
 │   │   ├── onboarding.ts           # `saveOnboarding(data)` server action
-│   │   └── profileSummary.ts       # `getMockProfileSummary()` fonksiyonu
+│   │   └── profileSummary.ts       # `getProfileSummary()` + `getMockProfileSummary()` fonksiyonu
 |
 ├── lib/
 │   ├── auth/
 │   │   ├── nextauth.ts       # NextAuth konfigürasyonu
+│   │   ├── guard.ts          # API route auth guard fonksiyonu
 │   │   ├── prisma.ts         # Prisma client instance
-│   └── db.ts                 # Alternatif veritabanı erişimi
+│   └── db.ts                 # Prisma veritabanı erişimi
 ├── types/
 │   └── next-auth.d.ts        # NextAuth tip genişletmeleri (Session, JWT, User)
 ```
@@ -760,11 +796,10 @@ Uygulama Next.js App Router mimarisiyle yapılandırılmıştır. Dosya sistemi 
 - Idempotent kayıt: aynı kullanıcıya tekrar çalıştırıldığında veri güncellenir  
 - Başarılı işlem sonrası redirect: `/app/(student)/student-dashboard`
 
-***Profil özeti (Mock AI)***:  
-- `features/student/server/profileSummary.ts` → `getMockProfileSummary()` fonksiyonu  
-- Örnek response: `{ level, tracks, summary }`  
+***Profil özeti (Gemini AI)***:  
+- `features/student/server/profileSummary.ts` → `getProfileSummary()` fonksiyonu (Gemini AI ile analiz, hata durumunda mock fallback)  
+- Örnek response: `{ level, tracks, summary, recommendations }`  
 - UI: `features/student/ui/ProfileSummaryCard.tsx` bileşeni ile gösterilir  
-- Not: Bu mock fonksiyon ileride gerçek OpenAI entegrasyonu ile kolayca değiştirilebilir
 
 ***Dashboard entegrasyonu***:  
 - `app/(student)/student-dashboard/page.tsx` → Öğrenci verisi veritabanından çekilir  

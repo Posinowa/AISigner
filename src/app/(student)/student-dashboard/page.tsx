@@ -1,18 +1,15 @@
 import LogoutButton from "@/components/LogoutButton";
 import { getProfileSummary } from "@/features/student/server/profileSummary";
 import { ProfileSummaryCard } from "@/features/student/ui/ProfileSummaryCard";
+import { RoadmapSteps } from "@/features/student/ui/RoadmapSteps";
 import { prisma } from "@/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/nextauth";
-import { BookOpen, Clock, CheckCircle2, Circle, Lock, Rocket, Target, Briefcase, PlayCircle, ExternalLink } from "lucide-react";
+import { Clock, Briefcase, Target } from "lucide-react";
 import Link from "next/link";
 import { Progress } from "@/components/ui/progress";
 
-const statusConfig = {
-  PENDING: { label: "Bekliyor", color: "bg-slate-100 text-slate-600", icon: Clock },
-  IN_PROGRESS: { label: "Geliştiriliyor", color: "bg-blue-100 text-blue-700", icon: PlayCircle },
-  COMPLETED: { label: "Tamamlandı", color: "bg-emerald-100 text-emerald-700", icon: CheckCircle2 }
-};
+export const dynamic = "force-dynamic";
 
 export default async function StudentDashboardPage() {
   const session = await getServerSession(authOptions);
@@ -179,91 +176,7 @@ export default async function StudentDashboardPage() {
                         <p className="text-slate-500 text-sm">İş akışı oluşturuluyor...</p>
                       </div>
                     ) : (
-                      <div className="relative pl-4 md:pl-0">
-                        {/* Dikey Çizgi (Timeline) */}
-                        <div className="absolute left-[1.35rem] top-2 bottom-2 w-px bg-slate-200 hidden md:block"></div>
-
-                        <div className="space-y-6">
-                          {steps.map((step, index) => {
-                            const isCompleted = step.status === "COMPLETED";
-                            const isInProgress = step.status === "IN_PROGRESS";
-                            const isLocked = step.status === "TODO";
-
-                            return (
-                              <div key={step.id} className="relative flex items-start gap-4">
-                                
-                                {/* Status Icon / Timeline Node */}
-                                <div className="hidden md:flex relative z-10 items-center justify-center w-11 h-11 rounded-full bg-white border-2 shrink-0 mt-1
-                                  ${isCompleted ? 'border-emerald-500' : isInProgress ? 'border-blue-600' : 'border-slate-200'}">
-                                  {isCompleted ? (
-                                    <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                                  ) : isInProgress ? (
-                                    <PlayCircle className="w-5 h-5 text-blue-600" />
-                                  ) : (
-                                    <div className="w-2.5 h-2.5 rounded-full bg-slate-200" />
-                                  )}
-                                </div>
-
-                                {/* Step Card */}
-                                <div className={`flex-1 rounded-xl p-5 transition-all border
-                                  ${isCompleted ? "bg-white border-slate-200/60" : 
-                                    isInProgress ? "bg-white border-blue-200 ring-1 ring-blue-100 shadow-sm" : 
-                                    "bg-slate-50/50 border-slate-200 opacity-75"}
-                                `}>
-                                  
-                                  <div className="flex items-center justify-between mb-1.5">
-                                    <span className={`text-xs font-semibold tracking-wider uppercase
-                                      ${isCompleted ? "text-emerald-600" : isInProgress ? "text-blue-600" : "text-slate-500"}
-                                    `}>
-                                      Aşama {step.order}
-                                    </span>
-                                    
-                                    {/* Durum Badge */}
-                                    {isInProgress && (
-                                      <span className="flex items-center text-[10px] font-bold uppercase tracking-wider text-blue-700 bg-blue-50 px-2 py-1 rounded">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse mr-1.5"></span>
-                                        Şu Anki Odak
-                                      </span>
-                                    )}
-                                  </div>
-
-                                  <h5 className={`font-semibold text-base mb-2
-                                    ${isCompleted ? "text-slate-500 line-through decoration-slate-300" : "text-slate-900"}
-                                  `}>
-                                    {step.title}
-                                  </h5>
-                                  
-                                  {(!isLocked || isInProgress) && step.description && (
-                                    <p className={`text-sm leading-relaxed ${isCompleted ? "text-slate-400" : "text-slate-600"}`}>
-                                      {step.description}
-                                    </p>
-                                  )}
-
-                                  {isLocked && !isCompleted && !isInProgress && (
-                                    <div className="flex items-center text-sm text-slate-400 mt-2">
-                                      <Lock className="w-3.5 h-3.5 mr-1.5" />
-                                      <span>Önceki aşamanın tamamlanması bekleniyor</span>
-                                    </div>
-                                  )}
-                                  
-                                  {/* Profesyonel Kaynak Gösterimi */}
-                                  {!isLocked && step.resources && step.resources.length > 0 && (
-                                    <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap gap-3">
-                                      {step.resources.map((link, i) => (
-                                        <a key={i} href={link} target="_blank" rel="noreferrer" 
-                                           className="inline-flex items-center text-xs font-medium text-slate-600 hover:text-blue-600 transition-colors">
-                                          <ExternalLink className="w-3.5 h-3.5 mr-1" />
-                                          İlgili Doküman / Kaynak {i + 1}
-                                        </a>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
+                      <RoadmapSteps steps={steps} isDraft={isDraft} />
                     )}
                   </div>
 

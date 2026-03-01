@@ -1,22 +1,39 @@
 import { NextResponse } from "next/server";
 import {prisma} from "@/lib/db"; 
 import { recommendProjects } from "@/features/ai/server/project-recommendations";
+import { requireAuth } from "@/lib/auth/guard";
+import { recommendProjectsSchema } from "@/lib/validations/api";
+import { createRateLimiter } from "@/lib/rate-limit";
+
+const limiter = createRateLimiter("ai-recommend-projects", {
+  maxRequests: 10,
+  windowSeconds: 60,
+});
 
 export async function POST(req: Request) {
-  try {
-    // 1. Frontend'den gelen isteği (body) alıyoruz
-    const body = await req.json();
-    const { studentProfileId } = body;
+  const auth = await requireAuth("MENTOR");
+  if (!auth.authorized) return auth.response;
 
-    if (!studentProfileId) {
+  const rl = limiter.check(auth.session.user.id ?? "anonymous");
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Çok fazla istek. Lütfen biraz bekleyin." },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
+    );
+  }
+
+  try {
+    const body = await req.json();
+    const parsed = recommendProjectsSchema.safeParse(body);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Öğrenci Profil ID'si gerekli!" }, 
+        { error: parsed.error.flatten().fieldErrors },
         { status: 400 }
       );
     }
 
-    // 2. Öğrencinin profilini veritabanından çekiyoruz
-    // Not: Şemana göre burada 'id' yerine 'userId' kullanman gerekebilir
+    const { studentProfileId } = parsed.data;
+
     const studentProfile = await prisma.studentProfile.findUnique({
       where: { id: studentProfileId }, 
     });

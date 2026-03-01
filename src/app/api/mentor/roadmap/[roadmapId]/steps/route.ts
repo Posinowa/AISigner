@@ -1,19 +1,23 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { requireAuth } from "@/lib/auth/guard";
+import { createStepSchema } from "@/lib/validations/api";
 
 // POST: Roadmap'e yeni adım ekle
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ roadmapId: string }> }
 ) {
+  const auth = await requireAuth("MENTOR");
+  if (!auth.authorized) return auth.response;
+
   try {
     const { roadmapId } = await params;
     const body = await req.json();
-    const { title, description, estimatedHours, resources } = body;
-
-    if (!title || !description) {
+    const parsed = createStepSchema.safeParse(body);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Başlık ve açıklama zorunludur." },
+        { error: parsed.error.flatten().fieldErrors },
         { status: 400 }
       );
     }
@@ -30,10 +34,10 @@ export async function POST(
       data: {
         roadmapId,
         order: newOrder,
-        title,
-        description,
-        estimatedHours: estimatedHours || null,
-        resources: resources || [],
+        title: parsed.data.title,
+        description: parsed.data.description,
+        estimatedHours: parsed.data.estimatedHours || null,
+        resources: parsed.data.resources || [],
         status: "TODO",
       },
     });

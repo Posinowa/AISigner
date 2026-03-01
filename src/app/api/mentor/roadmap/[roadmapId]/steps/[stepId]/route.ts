@@ -1,29 +1,27 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { requireAuth } from "@/lib/auth/guard";
+import { updateStepSchema } from "@/lib/validations/api";
 
 // PUT: Adımı güncelle
 export async function PUT(
   req: Request,
   { params }: { params: Promise<{ roadmapId: string; stepId: string }> }
 ) {
+  const auth = await requireAuth("MENTOR");
+  if (!auth.authorized) return auth.response;
+
   try {
     const { stepId } = await params;
     const body = await req.json();
-    const { title, description, estimatedHours, resources, order, status } = body;
-
-    const updateData: Record<string, unknown> = {};
-    if (title !== undefined) updateData.title = title;
-    if (description !== undefined) updateData.description = description;
-    if (estimatedHours !== undefined) updateData.estimatedHours = estimatedHours;
-    if (resources !== undefined) updateData.resources = resources;
-    if (order !== undefined) updateData.order = order;
-    if (status !== undefined && ["TODO", "IN_PROGRESS", "COMPLETED"].includes(status)) {
-      updateData.status = status;
+    const parsed = updateStepSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
     }
 
     const step = await prisma.roadmapStep.update({
       where: { id: stepId },
-      data: updateData,
+      data: parsed.data,
     });
 
     return NextResponse.json(step);
@@ -41,6 +39,9 @@ export async function DELETE(
   req: Request,
   { params }: { params: Promise<{ roadmapId: string; stepId: string }> }
 ) {
+  const auth = await requireAuth("MENTOR");
+  if (!auth.authorized) return auth.response;
+
   try {
     const { roadmapId, stepId } = await params;
 

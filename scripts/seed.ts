@@ -1,6 +1,5 @@
 import { PrismaClient } from "@prisma/client";
 import { hash } from "@node-rs/argon2";
-import { log } from "console";
 
 const prisma = new PrismaClient();
 

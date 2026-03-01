@@ -1,18 +1,16 @@
 
 import type { AuthOptions } from "next-auth";
-import Credentials from "next-auth/providers/credentials" // NextAuth için Credentials provider (email & password ile giriş)
-import { prisma } from "@/lib/auth/prisma" // Prisma Client instance (db erişimi için)
-import { verify } from "@node-rs/argon2"; // Şifreleri doğrulamak için argon2 verify metodu
-import { PrismaAdapter } from "@next-auth/prisma-adapter"; // Prisma ile NextAuth’u bağlayan adapter
+import Credentials from "next-auth/providers/credentials"
+import { prisma } from "@/lib/auth/prisma"
+import { verify } from "@node-rs/argon2";
 
 
 // NextAuth konfigürasyonu
 export const authOptions : AuthOptions = {
-     adapter: PrismaAdapter(prisma),  // Kullanıcı, session, account, verificationToken tablolarını Prisma üzerinden yönetmek için adapter
   session: { strategy: "jwt"},
 
   
-  secret: process.env.AUTH_SECRET, // Session ve JWT tokenleri imzalamak için kullanılacak secret
+  secret: process.env.AUTH_SECRET,
   providers: [
     Credentials({
       name: "Credentials", // Login ekranında provider adı
@@ -52,21 +50,11 @@ export const authOptions : AuthOptions = {
   
  
 callbacks: {
-  // JWT oluşturulurken çalışır
-   // Amaç: Kullanıcı giriş yaptığında, onun bilgilerini token içine eklemek
-   
     async jwt({ token, user }) {
       if (user) {
-        // Kullanıcı giriş yaptıysa, token içine email ve rolünü ekliyoruz
         token.id = user.id
         token.email = user.email
         token.role = user.role
-        
-        // Prisma ile kullanıcıya ait en son session token'ını alıp token içine ekliyoruz
-        token.sessionToken = (await prisma.session.findFirst({
-          where: { userId: user.id },
-          orderBy: { expires: "desc" }
-        }))?.sessionToken
       }
       return token
     },

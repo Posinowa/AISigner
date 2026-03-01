@@ -1,11 +1,16 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { requireAuth } from "@/lib/auth/guard";
+import { updateRoadmapSchema } from "@/lib/validations/api";
 
 // GET: Roadmap detayını getir
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ roadmapId: string }> }
 ) {
+  const auth = await requireAuth("MENTOR");
+  if (!auth.authorized) return auth.response;
+
   try {
     const { roadmapId } = await params;
 
@@ -50,16 +55,20 @@ export async function PUT(
   req: Request,
   { params }: { params: Promise<{ roadmapId: string }> }
 ) {
+  const auth = await requireAuth("MENTOR");
+  if (!auth.authorized) return auth.response;
+
   try {
     const { roadmapId } = await params;
     const body = await req.json();
-    const { title, status } = body;
+    const parsed = updateRoadmapSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
+    }
 
     const updateData: Record<string, string> = {};
-    if (title) updateData.title = title;
-    if (status && ["DRAFT", "PUBLISHED"].includes(status)) {
-      updateData.status = status;
-    }
+    if (parsed.data.title) updateData.title = parsed.data.title;
+    if (parsed.data.status) updateData.status = parsed.data.status;
 
     const roadmap = await prisma.roadmap.update({
       where: { id: roadmapId },
