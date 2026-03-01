@@ -2,10 +2,11 @@
 import { NextResponse } from "next/server";
 import { updateTemplate, deleteTemplate } from "@/features/projects/server/templates";
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const body = await req.json();
-    const updated = await updateTemplate(params.id, body);
+    const updated = await updateTemplate(id, body);
     return NextResponse.json(updated);
   } catch (error) {
     console.error("PATCH /api/admin/project-templates/[id] error:", error);
@@ -13,9 +14,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   }
 }
 
-export async function DELETE(_: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await deleteTemplate(params.id);
+    const { id } = await params;
+    await deleteTemplate(id);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("DELETE /api/admin/project-templates/[id] error:", error);

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { ArrowLeft, User, Calendar, Target, Clock, BookOpen, Plus, CheckCircle, AlertCircle,Trash2 } from "lucide-react";
+import { ArrowLeft, User, Calendar, Target, Clock, BookOpen, Plus, CheckCircle, AlertCircle, Trash2, Sparkles, Map } from "lucide-react"; // Map ikonu eklendi
 import Link from "next/link";
 
 type ProjectTemplate = {
@@ -11,6 +11,27 @@ type ProjectTemplate = {
   description: string;
   difficulty: "EASY" | "MEDIUM" | "HARD";
   track: string[];
+};
+
+type AIRecommendation = {
+  projectId: string;
+  matchScore: number;
+  reason: string;
+};
+
+// 🚀 SPRINT 3: Roadmap tipleri eklendi
+type RoadmapStep = {
+  id: string;
+  order: number;
+  title: string;
+  status: string;
+};
+
+type Roadmap = {
+  id: string;
+  title: string;
+  status: string;
+  steps: RoadmapStep[];
 };
 
 type StudentDetail = {
@@ -30,6 +51,7 @@ type StudentDetail = {
       status: string;
       projectTemplate: ProjectTemplate;
       createdAt: string;
+      roadmap?: Roadmap | null; // 🚀 SPRINT 3: Roadmap eklendi
     }[];
   } | null;
 };
@@ -55,9 +77,14 @@ export default function StudentDetailPage() {
   const [student, setStudent] = useState<StudentDetail | null>(null);
   const [projectTemplates, setProjectTemplates] = useState<ProjectTemplate[]>([]);
   const [loading, setLoading] = useState(true);
- // const [assigning, setAssigning] = useState(false);
-  const [assigningId, setAssigningId] = useState<string | null>(null)
+  const [assigningId, setAssigningId] = useState<string | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
+
+  const [isAIThinking, setIsAIThinking] = useState(false);
+  const [aiRecommendations, setAiRecommendations] = useState<AIRecommendation[]>([]);
+  
+  // 🚀 SPRINT 3: Roadmap üretimi için yükleniyor state'i
+  const [generatingRoadmapId, setGeneratingRoadmapId] = useState<string | null>(null);
 
   useEffect(() => {
     loadStudentDetail();
@@ -69,7 +96,6 @@ export default function StudentDetailPage() {
 
   async function loadStudentDetail() {
     try {
-      // Bu API endpoint'ini oluşturmanız gerekecek
       const res = await fetch(`/api/mentor/students/${studentId}`);
       if (res.ok) {
         const data = await res.json();
@@ -94,11 +120,39 @@ export default function StudentDetailPage() {
     }
   }
 
+  async function handleAIRecommend() {
+    if (!student?.studentProfile?.id) return;
+    
+    setIsAIThinking(true);
+    setAiRecommendations([]);
+    
+    try {
+      const res = await fetch("/api/mentor/ai-recommend-projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ studentProfileId: student.studentProfile.id }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setAiRecommendations(data.recommendations || []);
+      } else {
+        const err = await res.json();
+        alert(err.error || "AI önerisi alınamadı.");
+      }
+    } catch (error) {
+      console.error("AI Error:", error);
+      alert("AI ile iletişim kurarken bir hata oluştu.");
+    } finally {
+      setIsAIThinking(false);
+    }
+  }
+
   async function assignProject(projectTemplateId: string) {
     if (!student?.studentProfile) return;
 
     try {
-     setAssigningId(projectTemplateId);
+      setAssigningId(projectTemplateId);
       const res = await fetch("/api/mentor/assign-project", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -111,6 +165,7 @@ export default function StudentDetailPage() {
       if (res.ok) {
         await loadStudentDetail();
         setShowAssignModal(false);
+        setAiRecommendations([]); 
         alert("Proje başarıyla atandı!");
       } else {
         const error = await res.json();
@@ -123,8 +178,9 @@ export default function StudentDetailPage() {
       setAssigningId(null);
     }
   }
+
   async function handleDeleteAssignment(assignedProjectId: string) {
-    if (!confirm("Bu proje atamasını kaldırmak istediğinizden emin misiniz?")) return;
+    if (!confirm("Bu proje atamasını kaldırmak istediğinizden emin misiniz? (Bağlı yol haritası da silinir)")) return;
 
     try {
       const res = await fetch("/api/mentor/unassign-project", {
@@ -134,7 +190,6 @@ export default function StudentDetailPage() {
       });
 
       if (res.ok) {
-        // Listeyi yenile
         await loadStudentDetail();
       } else {
         alert("Silme işlemi başarısız oldu.");
@@ -142,6 +197,31 @@ export default function StudentDetailPage() {
     } catch (error) {
       console.error("Silme hatası:", error);
       alert("Bir hata oluştu.");
+    }
+  }
+
+  // 🚀 SPRINT 3: YENİ FONKSİYON - AI Yol Haritası Üret
+  async function handleGenerateRoadmap(assignedProjectId: string) {
+    try {
+      setGeneratingRoadmapId(assignedProjectId);
+      const res = await fetch("/api/mentor/generate-roadmap", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assignedProjectId }),
+      });
+
+      if (res.ok) {
+        await loadStudentDetail(); // Harita üretilince listeyi yenile
+        alert("🎉 AI Yol Haritası başarıyla oluşturuldu!");
+      } else {
+        const error = await res.json();
+        alert(error.error || "Yol haritası oluşturulamadı.");
+      }
+    } catch (error) {
+      console.error("Roadmap Error:", error);
+      alert("AI ile iletişim kurarken bir hata oluştu.");
+    } finally {
+      setGeneratingRoadmapId(null);
     }
   }
 
@@ -153,6 +233,16 @@ export default function StudentDetailPage() {
   const getAssignedProjectIds = () => {
     return student?.studentProfile?.assignedProjects?.map(p => p.projectTemplate.id) || [];
   };
+
+  const sortedProjectTemplates = [...projectTemplates].sort((a, b) => {
+    const recA = aiRecommendations.find(r => r.projectId === a.id);
+    const recB = aiRecommendations.find(r => r.projectId === b.id);
+    
+    if (recA && !recB) return -1;
+    if (!recA && recB) return 1;
+    if (recA && recB) return recB.matchScore - recA.matchScore;
+    return 0; 
+  });
 
   if (loading) {
     return (
@@ -295,19 +385,17 @@ export default function StudentDetailPage() {
                     const StatusIcon = statusInfo.icon;
                     
                     return (
-                      <div key={project.id} className="border rounded-lg p-4 relative group">
-      
- 
-                       <button 
-                       onClick={() => handleDeleteAssignment(project.id)}
-                        className="absolute top-2 right-2 p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors opacity-0 group-hover:opacity-100 z-10"
+                      <div key={project.id} className="border rounded-lg p-5 relative group bg-white hover:shadow-md transition-all">
+                        <button 
+                         onClick={() => handleDeleteAssignment(project.id)}
+                         className="absolute top-3 right-3 p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors opacity-0 group-hover:opacity-100 z-10"
                          title="Atamayı Kaldır"
                           >
                            <Trash2 className="w-4 h-4" />
                         </button>
                       
-                        <div className="flex justify-between items-start mb-2">
-                          <h3 className="font-medium text-gray-900">{project.projectTemplate.title}</h3>
+                        <div className="flex justify-between items-start mb-2 pr-8">
+                          <h3 className="font-semibold text-gray-900 text-lg">{project.projectTemplate.title}</h3>
                           <div className="flex gap-2">
                             <span className={`px-2 py-1 text-xs rounded-full ${statusInfo.color}`}>
                               <StatusIcon className="w-3 h-3 inline mr-1" />
@@ -319,27 +407,66 @@ export default function StudentDetailPage() {
                           </div>
                         </div>
                         
-                        <p className="text-gray-600 text-sm mb-3 line-clamp-2">
+                        <p className="text-gray-600 text-sm mb-4 line-clamp-2">
                           {project.projectTemplate.description}
                         </p>
                         
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between mb-4">
                           <div className="flex flex-wrap gap-1">
                             {project.projectTemplate.track.slice(0, 3).map((tag, index) => (
-                              <span key={index} className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded">
+                              <span key={index} className="px-2 py-1 text-[11px] font-medium bg-gray-100 text-gray-600 rounded-md">
                                 {tag}
                               </span>
                             ))}
-                            {project.projectTemplate.track.length > 3 && (
-                              <span className="px-2 py-1 text-xs bg-gray-100 text-gray-500 rounded">
-                                +{project.projectTemplate.track.length - 3}
-                              </span>
-                            )}
                           </div>
-                          <span className="text-xs text-gray-500">
+                          <span className="text-xs text-gray-400">
                             {new Date(project.createdAt).toLocaleDateString("tr-TR")}
                           </span>
                         </div>
+
+                        {/* 🚀 SPRINT 3: YOL HARİTASI ALANI EKLENDİ */}
+                        <div className="pt-4 border-t border-gray-100 flex items-center justify-between bg-gray-50/50 -mx-5 -mb-5 p-4 rounded-b-lg">
+                          {project.roadmap ? (
+                            <div className="flex items-center justify-between w-full">
+                              <span className="text-sm font-medium text-gray-700 flex items-center">
+                                <Map className="w-4 h-4 mr-2 text-purple-600" />
+                                AI Rotası {project.roadmap.status === "PUBLISHED" ? "Yayında" : "Hazır"} ({project.roadmap.steps?.length || 0} Adım)
+                              </span>
+                              <Link
+                                href={`/mentor-dashboard/roadmap/${project.roadmap.id}`}
+                                className="text-sm font-semibold text-purple-600 hover:text-purple-800 transition-colors"
+                              >
+                                İncele ve Onayla →
+                              </Link>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-between w-full">
+                              <span className="text-sm text-gray-500">Öğrenci için rota çizilmemiş.</span>
+                              <button
+                                onClick={() => handleGenerateRoadmap(project.id)}
+                                disabled={generatingRoadmapId === project.id}
+                                className={`text-sm font-medium flex items-center transition-all px-3 py-1.5 rounded-md ${
+                                  generatingRoadmapId === project.id 
+                                    ? "bg-purple-100 text-purple-600 cursor-wait" 
+                                    : "bg-purple-50 text-purple-700 hover:bg-purple-100"
+                                }`}
+                              >
+                                {generatingRoadmapId === project.id ? (
+                                  <>
+                                    <div className="animate-spin w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full mr-2" /> 
+                                    Harita Çiziliyor...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Sparkles className="w-4 h-4 mr-1.5" /> 
+                                    Yol Haritası Üret
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
                       </div>
                     );
                   })}
@@ -350,73 +477,115 @@ export default function StudentDetailPage() {
         </div>
       )}
 
-      {/* Project Assignment Modal */}
+      {/* Project Assignment Modal (Aynı Kaldı) */}
       {showAssignModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center p-6 border-b">
-              <h2 className="text-xl font-semibold">Proje Ata - {getStudentName()}</h2>
-              <button
-                onClick={() => setShowAssignModal(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                ×
-              </button>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            
+            <div className="flex justify-between items-center p-6 border-b bg-gray-50/80">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Proje Ata - {getStudentName()}</h2>
+                <p className="text-sm text-gray-500 mt-1">Öğrencinin profiline en uygun projeyi seçin.</p>
+              </div>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={handleAIRecommend}
+                  disabled={isAIThinking || projectTemplates.length === 0}
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold transition-all shadow-sm ${
+                    isAIThinking
+                      ? "bg-purple-100 text-purple-600 cursor-wait"
+                      : "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-purple-200/50"
+                  }`}
+                >
+                  {isAIThinking ? (
+                    <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full" />
+                  ) : (
+                    <Sparkles className="w-4 h-4" />
+                  )}
+                  {isAIThinking ? "AI Analiz Ediyor..." : "🤖 AI Öner"}
+                </button>
+
+                <button
+                  onClick={() => setShowAssignModal(false)}
+                  className="text-gray-400 hover:text-gray-900 p-2 hover:bg-gray-200 rounded-full transition-colors"
+                >
+                  ×
+                </button>
+              </div>
             </div>
 
-            <div className="p-6">
-              {projectTemplates.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-gray-600">Proje şablonu bulunamadı</p>
+            <div className="p-6 overflow-y-auto">
+              {sortedProjectTemplates.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-gray-500 text-lg">Proje şablonu bulunamadı</p>
                 </div>
               ) : (
-                <div className="grid gap-4 md:grid-cols-2">
-                  {projectTemplates.map(template => {
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  {sortedProjectTemplates.map(template => {
                     const isAssigned = getAssignedProjectIds().includes(template.id);
                     const difficultyInfo = difficultyConfig[template.difficulty];
-                    
-                    const isLoadingThis = assigningId === template.id; //'isLoading' durumu sadece o anki proje ID'si 'assigningId' ile eşleşiyorsa true olur.
+                    const isLoadingThis = assigningId === template.id;
+                    const aiRec = aiRecommendations.find(r => r.projectId === template.id);
+
                     return (
-                      <div key={template.id} className={`border rounded-lg p-4 ${isAssigned ? 'bg-gray-50 border-gray-300' : 'hover:shadow-md transition-shadow'}`}>
-                        <div className="flex justify-between items-start mb-2">
-                          <h3 className="font-medium text-gray-900">{template.title}</h3>
-                          <span className={`px-2 py-1 text-xs rounded-full ${difficultyInfo.color}`}>
-                            {difficultyInfo.label}
-                          </span>
-                        </div>
-                        
-                        <p className="text-gray-600 text-sm mb-3 line-clamp-2">
-                          {template.description}
-                        </p>
-                        
-                        <div className="flex flex-wrap gap-1 mb-3">
-                          {template.track.slice(0, 3).map((tag, index) => (
-                            <span key={index} className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded">
-                              {tag}
+                      <div 
+                        key={template.id} 
+                        className={`flex flex-col border rounded-2xl overflow-hidden transition-all duration-300 ${
+                          isAssigned ? 'bg-gray-50 border-gray-200 opacity-60' : 
+                          aiRec ? 'border-purple-300 shadow-lg shadow-purple-100 bg-purple-50/10 scale-[1.02]' : 
+                          'hover:shadow-lg border-gray-200 bg-white hover:-translate-y-1'
+                        }`}
+                      >
+                        {aiRec && !isAssigned && (
+                          <div className="bg-gradient-to-r from-purple-100 to-indigo-50 border-b border-purple-100 p-3.5">
+                            <div className="flex justify-between items-center mb-1.5">
+                              <span className="flex items-center text-[11px] font-bold text-purple-800 uppercase tracking-wider">
+                                <Sparkles className="w-3 h-3 mr-1" /> En İyi Eşleşme
+                              </span>
+                              <span className="text-[10px] font-bold text-white bg-purple-600 px-2 py-0.5 rounded-full shadow-sm">
+                                %{aiRec.matchScore} Uyum
+                              </span>
+                            </div>
+                            <p className="text-xs text-purple-700/90 font-medium leading-relaxed">
+                              "{aiRec.reason}"
+                            </p>
+                          </div>
+                        )}
+
+                        <div className="p-5 flex-1 flex flex-col">
+                          <div className="flex justify-between items-start mb-3 gap-2">
+                            <h3 className="font-bold text-gray-900 leading-snug">{template.title}</h3>
+                            <span className={`px-2.5 py-1 text-[10px] uppercase font-bold tracking-wider rounded-lg ${difficultyInfo.color} shrink-0`}>
+                              {difficultyInfo.label}
                             </span>
-                          ))}
-                          {template.track.length > 3 && (
-                            <span className="px-2 py-1 text-xs bg-gray-100 text-gray-500 rounded">
-                              +{template.track.length - 3} daha
-                            </span>
-                          )}
+                          </div>
+                          
+                          <p className="text-gray-600 text-sm mb-4 line-clamp-3 flex-1">
+                            {template.description}
+                          </p>
+                          
+                          <div className="flex flex-wrap gap-1.5 mb-5">
+                            {template.track.slice(0, 3).map((tag, index) => (
+                              <span key={index} className="px-2 py-1 text-[11px] font-semibold bg-gray-100 text-gray-600 rounded-md">
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                          
+                          <button
+                           onClick={() => assignProject(template.id)}
+                           disabled={isAssigned || assigningId !== null}
+                           className={`w-full py-3 px-4 rounded-xl font-bold transition-all duration-200 ${
+                             isAssigned 
+                               ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                               : aiRec 
+                                 ? 'bg-purple-600 hover:bg-purple-700 text-white shadow-md hover:shadow-lg' 
+                                 : 'bg-gray-900 hover:bg-black text-white shadow-md'
+                           }`}
+                          >
+                            {isAssigned ? 'Zaten Atanmış' : (isLoadingThis ? 'Atanıyor...' : 'Projeyi Ata')}
+                          </button>
                         </div>
-                        
-                        <button
-                        onClick={() => assignProject(template.id)}
-                          // Eğer bu proje zaten atanmışsa disable et
-                          // VEYA şu an HERHANGİ bir proje atanıyorsa (assigningId !== null) da butonu kilitle.
-                          // (Bu, aynı anda birden fazla projeye basılmasını engeller)
-                          disabled={isAssigned || assigningId !== null}
-                         
-                          className={`w-full py-2 px-4 rounded-lg font-medium transition-colors ${
-                            isAssigned 
-                              ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                              : 'bg-green-600 hover:bg-green-700 text-white'
-                          }`}
-                        >
-                         {isAssigned ? 'Zaten Atanmış' : (isLoadingThis ? 'Atanıyor...' : 'Projeyi Ata')}
-                        </button>
                       </div>
                     );
                   })}

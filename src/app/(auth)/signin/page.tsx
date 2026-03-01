@@ -1,19 +1,18 @@
-
 //AMAÇ:Kullanıcının giriş bilgilerini doğrulayıp NextAuth üzerinden oturum başlatmak ve hataları kullanıcıya göstermek için hazırlanmış client-side form bileşenidir.
 "use client"
 
 import { useState } from "react"
 import { validateUser } from "./actions"
-import { signIn } from "next-auth/react"
-import { Eye, EyeOff } from "lucide-react";
-import { Lock } from "lucide-react"
-
+import { signIn, getSession } from "next-auth/react" // getSession eklendi
+import { Eye, EyeOff, Lock } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 const initialState = { error: {} as Record<string, string[]> }
 
 export default function SigninPage() {
   const [state, setState] = useState(initialState)
   const [showPassword, setShowPassword] = useState(false)
+  const router = useRouter()
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -34,8 +33,26 @@ export default function SigninPage() {
         redirect: false,
       })
 
-      if (result?.ok) window.location.href = "/"
-      else setState({ error: { general: ["Giriş yapılamadı"] } })
+      // Başarı ve Hata durumlarının Next.js router ile yönetimi
+      if (result?.error) {
+        setState({ error: { general: ["E-posta veya şifre hatalı! Lütfen tekrar deneyin."] } })
+      } else if (result?.ok) {
+        
+        // 🚀 DİNAMİK YÖNLENDİRME (ROUTING) BAŞLANGICI
+        const session = await getSession()
+        const userRole = session?.user?.role
+
+        if (userRole === "MENTOR") {
+          router.push("/mentor-dashboard")
+        } else if (userRole === "ADMIN") {
+          router.push("/admin-dashboard")
+        } else {
+          router.push("/student-dashboard") // Varsayılan/Öğrenci
+        }
+        
+        router.refresh() 
+        // 🚀 DİNAMİK YÖNLENDİRME BİTİŞİ
+      }
     } catch (err: any) {
       setState({
         error: { general: [err.message || "Bilinmeyen bir hata oluştu"] },

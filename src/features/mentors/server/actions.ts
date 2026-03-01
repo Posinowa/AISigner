@@ -1,4 +1,3 @@
-// src/features/mentor/server/actions.ts
 import { prisma } from "@/lib/db";
 
 export type StudentWithProfile = {
@@ -68,7 +67,7 @@ export async function getMentorStudents(mentorId: string): Promise<StudentWithPr
   }
 }
 
-// Tek öğrenci detayını getir
+// Tek öğrenci detayını getir (🚀 YOL HARİTASI İLİŞKİSİ BURAYA EKLENDİ)
 export async function getStudentDetail(studentId: string, mentorId: string) {
   try {
     const student = await prisma.user.findFirst({
@@ -85,6 +84,16 @@ export async function getStudentDetail(studentId: string, mentorId: string) {
             assignedProjects: {
               include: {
                 projectTemplate: true,
+                // 🚀 Bura Eklendi: Artık proje gelirken yol haritası ve adımları da gelecek
+                roadmap: {
+                  include: {
+                    steps: {
+                      orderBy: {
+                        order: 'asc' // Adımları sırasına (1,2,3...) göre diz
+                      }
+                    }
+                  }
+                }
               },
               orderBy: {
                 createdAt: "desc",
@@ -177,7 +186,6 @@ export async function assignProjectToStudent(
   }
 }
 
-
 // Proje durumunu güncelle
 export async function updateProjectStatus(
   assignedProjectId: string,
@@ -215,6 +223,7 @@ export async function updateProjectStatus(
     throw error;
   }
 }
+
 // Proje atamasını sil (Geri al)
 export async function unassignProject(assignedProjectId: string) {
   try {
