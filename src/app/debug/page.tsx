@@ -34,7 +34,6 @@ export default function DebugPage() {
         <>
           <p><strong>Kullanıcı:</strong> {session.user?.email}</p>
           <p><strong>Rol:</strong> {session.user?.role ?? "Tanımsız"}</p>
-          <p><strong>SessionToken:</strong> {session.sessionToken?? "Yok"}</p>
           <button onClick={() => signOut({ callbackUrl: "/signin" })}>
             Çıkış Yap
           </button>

@@ -59,7 +59,7 @@ export default function SignupPage() {
               name="lastName"
               className="w-full rounded-2xl border border-gray-300 bg-gray-50 px-4 py-3 text-gray-800 shadow-sm focus:border-green-500 focus:bg-white focus:ring-4 focus:ring-green-100 outline-none transition"
             />
-            {state.error?.name && (
+            {state.error?.lastName && (
               <p className="mt-2 text-sm text-red-500">{state.error.lastName[0]}</p>
             )}
           </div>
@@ -91,8 +91,8 @@ export default function SignupPage() {
                className="w-full rounded-2xl border border-gray-300 bg-gray-50 px-4 py-3 text-gray-800 shadow-sm focus:border-green-500 focus:bg-white focus:ring-4 focus:ring-green-100 outline-none transition"
                placeholder="05xx xxx xx xx"
             />
-        {state.error?.phoneNumber && (
-         <p className="mt-2 text-sm text-red-500">{state.error.phoneNumber[0]}</p>
+        {state.error?.phone && (
+         <p className="mt-2 text-sm text-red-500">{state.error.phone[0]}</p>
         )}
         </div>
 

@@ -1,11 +1,21 @@
 // src/app/api/admin/project-templates/[id]/route.ts
 import { NextResponse } from "next/server";
 import { updateTemplate, deleteTemplate } from "@/features/projects/server/templates";
+import { requireAuth } from "@/lib/auth/guard";
+import { updateTemplateSchema } from "@/lib/validations/api";
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireAuth("ADMIN");
+  if (!auth.authorized) return auth.response;
+
   try {
+    const { id } = await params;
     const body = await req.json();
-    const updated = await updateTemplate(params.id, body);
+    const parsed = updateTemplateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
+    }
+    const updated = await updateTemplate(id, parsed.data);
     return NextResponse.json(updated);
   } catch (error) {
     console.error("PATCH /api/admin/project-templates/[id] error:", error);
@@ -13,9 +23,13 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   }
 }
 
-export async function DELETE(_: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireAuth("ADMIN");
+  if (!auth.authorized) return auth.response;
+
   try {
-    await deleteTemplate(params.id);
+    const { id } = await params;
+    await deleteTemplate(id);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("DELETE /api/admin/project-templates/[id] error:", error);

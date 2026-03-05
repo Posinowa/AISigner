@@ -1,8 +1,13 @@
 // src/app/api/admin/project-templates/route.ts
 import { NextResponse } from "next/server";
 import { listTemplates, createTemplate } from "@/features/projects/server/templates";
+import { requireAuth } from "@/lib/auth/guard";
+import { createTemplateSchema } from "@/lib/validations/api";
 
 export async function GET() {
+  const auth = await requireAuth(["ADMIN", "MENTOR"]);
+  if (!auth.authorized) return auth.response;
+
   try {
     const templates = await listTemplates();
     return NextResponse.json(templates);
@@ -16,32 +21,20 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const auth = await requireAuth("ADMIN");
+  if (!auth.authorized) return auth.response;
+
   try {
     const body = await req.json();
-    
-    // Validation
-    if (!body.title || !body.description) {
+    const parsed = createTemplateSchema.safeParse(body);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Title and description are required" },
+        { error: parsed.error.flatten().fieldErrors },
         { status: 400 }
       );
     }
 
-    if (!["EASY", "MEDIUM", "HARD"].includes(body.difficulty)) {
-      return NextResponse.json(
-        { error: "Invalid difficulty level" },
-        { status: 400 }
-      );
-    }
-
-    const templateData = {
-      title: body.title,
-      description: body.description,
-      difficulty: body.difficulty,
-      track: Array.isArray(body.track) ? body.track : [],
-    };
-
-    const newTemplate = await createTemplate(templateData);
+    const newTemplate = await createTemplate(parsed.data);
     return NextResponse.json(newTemplate, { status: 201 });
   } catch (error) {
     console.error("POST /api/admin/project-templates error:", error);

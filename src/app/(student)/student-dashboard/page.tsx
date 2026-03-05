@@ -1,132 +1,185 @@
-import { getMockProfileSummary } from "@/features/student/server/profileSummary";
+import LogoutButton from "@/components/LogoutButton";
+import { getProfileSummary } from "@/features/student/server/profileSummary";
 import { ProfileSummaryCard } from "@/features/student/ui/ProfileSummaryCard";
+import { RoadmapSteps } from "@/features/student/ui/RoadmapSteps";
 import { prisma } from "@/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/nextauth";
-import { BookOpen, Clock, CheckCircle, AlertCircle } from "lucide-react";
+import { Clock, Briefcase, Target } from "lucide-react";
+import Link from "next/link";
+import { Progress } from "@/components/ui/progress";
 
-// Durumlar için renk ve ikon yapılandırması
-const statusConfig = {
-  PENDING: { label: "Bekliyor", color: "bg-yellow-100 text-yellow-800", icon: Clock },
-  IN_PROGRESS: { label: "Devam Ediyor", color: "bg-blue-100 text-blue-800", icon: AlertCircle },
-  COMPLETED: { label: "Tamamlandı", color: "bg-green-100 text-green-800", icon: CheckCircle }
-};
+export const dynamic = "force-dynamic";
 
 export default async function StudentDashboardPage() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return <p>Oturum açmanız gerekiyor.</p>;
 
- 
   const profile = await prisma.studentProfile.findUnique({
     where: { userId: session.user.id },
     include: {
       assignedProjects: {
         include: {
-          projectTemplate: true, // Projenin başlık, açıklama vb. detaylarını almak için
+          projectTemplate: true,
+          roadmap: {
+            include: {
+              steps: {
+                orderBy: { order: "asc" }
+              }
+            }
+          }
         },
-        orderBy: {
-          createdAt: "desc",
-        },
+        orderBy: { createdAt: "desc" },
       },
     },
   });
 
   if (!profile) {
     return (
-      <div className="max-w-2xl mx-auto mt-10 space-y-4">
-        <h1 className="text-2xl font-bold">Hoş geldin 👋</h1>
-        <p className="text-gray-700">
-          Onboarding verin bulunamadı. Lütfen formu tamamlayarak profilini oluştur.
-        </p>
+      <div className="min-h-[80vh] flex flex-col items-center justify-center p-6 text-center relative">
+        <div className="absolute top-4 right-4">
+            <LogoutButton />
+        </div>
+        <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-10 max-w-lg w-full space-y-6">
+          <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-2">
+            <Briefcase className="w-10 h-10 text-blue-600" />
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900">Kariyer Yolculuğunuz Başlıyor</h1>
+          <p className="text-slate-600 leading-relaxed">
+            Sizi doğru mentörle eşleştirebilmemiz ve sektörel yetkinliklerinize uygun projeler atayabilmemiz için profesyonel profilinizi tamamlamanız gerekmektedir.
+          </p>
+          <div className="pt-4">
+            <Link
+              href="/profile-setup"
+              className="inline-flex items-center justify-center w-full h-12 px-8 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-medium transition-all"
+            >
+              Profilimi Oluştur
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }
 
-  const summaryData = await getMockProfileSummary({
+  const summaryData = await getProfileSummary({
     experienceLevel: profile.experienceLevel,
     interests: profile.interests,
     goals: profile.goals ?? "Henüz hedef belirtilmemiş",
+    availability: profile.availability ?? undefined,
   });
 
   const firstName = session.user.name?.split(" ")[0] ?? "Öğrenci";
 
   return (
-    <div className="max-w-3xl mx-auto mt-10 p-6 space-y-8">
+    <div className="max-w-5xl mx-auto mt-8 p-6 space-y-8">
       
-      {/* Başlık ve Karşılama */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Hoş geldin, {firstName} 👋</h1>
-        <p className="text-gray-600 mt-2">
-          {profile.mentorId 
-            ? "Mentörün senin için bir yol haritası hazırlıyor." 
-            : "Profilin başarıyla oluşturuldu. Mentor eşleşmesini bekliyoruz."}
-        </p>
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Hoş geldin, {firstName}</h1>
+          <p className="text-slate-500 mt-2 text-sm">
+            {profile.assignedProjects.length > 0 
+              ? "Çalışma masan hazır. Odaklanman gereken güncel görevler aşağıda listelenmiştir." 
+              : profile.mentorId 
+                ? "Mentörün gelişim planını hazırlıyor. Lütfen beklemede kal." 
+                : "Profilin inceleniyor. Yakında bir mentör ile eşleştirileceksin."}
+          </p>
+        </div>
+        <LogoutButton />
       </div>
 
-      {/* AI Profil Özeti */}
       <ProfileSummaryCard
         level={summaryData.level}
         tracks={summaryData.tracks}
         summary={summaryData.summary}
+        recommendations={summaryData.recommendations}
       />
 
+      {/* Projeler ve Yol Haritası */}
       <div>
-        <h2 className="text-xl font-semibold mb-4 flex items-center">
-          <BookOpen className="w-6 h-6 mr-2 text-blue-600" />
-          Proje Durumu
+        <h2 className="text-xl font-bold mb-6 flex items-center text-slate-900 border-b border-slate-200 pb-3">
+          <Target className="w-5 h-5 mr-2 text-slate-700" />
+          Aktif Projeler ve İş Akışı
         </h2>
 
         {profile.assignedProjects.length === 0 ? (
-          // 🔸 DURUM A: Hiç proje yoksa gösterilecek kısım (Sizin eski mesajınızın olduğu yer)
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
-            <div className="inline-flex items-center justify-center w-12 h-12 bg-gray-100 rounded-full mb-3">
-              <Clock className="w-6 h-6 text-gray-400" />
-            </div>
-            <h3 className="text-gray-900 font-medium">Henüz Proje Atanmadı</h3>
-            <p className="text-gray-500 mt-1 text-sm">
-              Mentörün profilini inceliyor. Yakında senin için uygun bir proje atayacaktır.
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-10 text-center">
+            <Clock className="w-10 h-10 text-slate-400 mx-auto mb-4" />
+            <h3 className="text-slate-900 font-semibold text-lg">Bekleyen Görev Yok</h3>
+            <p className="text-slate-500 mt-2 max-w-md mx-auto text-sm">
+              Şu anda aktif bir proje atamanız bulunmuyor. Mentörünüz teknik gelişiminize uygun bir yol haritası oluşturduğunda burada görünecektir.
             </p>
           </div>
         ) : (
-          // 🔸 DURUM B: Proje varsa listelenecek kartlar
-          <div className="grid gap-4">
+          <div className="space-y-8">
             {profile.assignedProjects.map((project) => {
-              // Tip güvenliği için status kontrolü
-              const statusKey = project.status as keyof typeof statusConfig;
-              const statusInfo = statusConfig[statusKey] || statusConfig.PENDING;
-              const StatusIcon = statusInfo.icon;
+              
+              const steps = project.roadmap?.steps || [];
+              const totalSteps = steps.length;
+              const completedSteps = steps.filter(s => s.status === "COMPLETED").length;
+              const progressPercentage = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
+              const isDraft = project.roadmap?.status === "DRAFT";
 
               return (
-                <div key={project.id} className="bg-white border rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <h3 className="font-semibold text-lg text-gray-900">
-                        {project.projectTemplate.title}
-                      </h3>
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {project.projectTemplate.track.map((tag, i) => (
-                          <span key={i} className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-md font-medium">
-                            {tag}
+                <div key={project.id} className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                  
+                  {/* Proje Üst Bilgi (Header) */}
+                  <div className="p-6 md:p-8 border-b border-slate-100">
+                    <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-4">
+                      <div>
+                        <div className="flex items-center gap-3 mb-3">
+                          <span className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-md text-xs font-semibold tracking-wide">
+                            ANA PROJE
                           </span>
-                        ))}
+                          <span className="text-xs text-slate-500 flex items-center">
+                            <Clock className="w-3.5 h-3.5 mr-1" />
+                            Atanma: {new Date(project.createdAt).toLocaleDateString("tr-TR")}
+                          </span>
+                        </div>
+                        <h3 className="font-bold text-2xl text-slate-900 tracking-tight">
+                          {project.projectTemplate.title}
+                        </h3>
+                        <p className="text-slate-600 mt-2 text-sm max-w-3xl leading-relaxed">
+                          {project.projectTemplate.description}
+                        </p>
                       </div>
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${statusInfo.color}`}>
-                      <StatusIcon className="w-3 h-3" />
-                      {statusInfo.label}
-                    </span>
-                  </div>
-                  
-                  <div className="prose prose-sm text-gray-600 mb-4 line-clamp-3">
-                    {project.projectTemplate.description}
+
+                    {/* Minimal İlerleme Çubuğu */}
+                    <div className="mt-6 max-w-md">
+                      <div className="flex items-center justify-between text-xs font-medium text-slate-600 mb-2">
+                        <span>Tamamlanma Oranı</span>
+                        <span>{progressPercentage}%</span>
+                      </div>
+                      <Progress value={progressPercentage} className="h-2 bg-slate-100" />
+                    </div>
                   </div>
 
-                  <div className="flex items-center justify-between pt-4 border-t">
-                    <span className="text-xs text-gray-500">
-                      Atanma Tarihi: {new Date(project.createdAt).toLocaleDateString("tr-TR")}
-                    </span>
-                 
+                  {/* İş Akışı (Roadmap Steps) */}
+                  <div className="p-6 md:p-8 bg-slate-50/50">
+                    <div className="flex items-center justify-between mb-6">
+                      <h4 className="font-semibold text-slate-900 flex items-center">
+                        Proje Aşamaları
+                        <span className="ml-3 text-sm font-normal text-slate-500">
+                          ({completedSteps}/{totalSteps} tamamlandı)
+                        </span>
+                      </h4>
+                      {isDraft && (
+                        <span className="px-3 py-1 bg-amber-50 text-amber-700 text-xs font-medium border border-amber-200 rounded-md">
+                          Taslak (Mentör Onayı Bekliyor)
+                        </span>
+                      )}
+                    </div>
+
+                    {totalSteps === 0 ? (
+                      <div className="text-center py-10 bg-white rounded-lg border border-dashed border-slate-300">
+                        <p className="text-slate-500 text-sm">İş akışı oluşturuluyor...</p>
+                      </div>
+                    ) : (
+                      <RoadmapSteps steps={steps} isDraft={isDraft} />
+                    )}
                   </div>
+
                 </div>
               );
             })}

@@ -32,6 +32,11 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env
+.env.local
+.env.development
+.env.production
+.env*.local
+AISigner-main.env
 
 # vercel
 .vercel
@@ -41,3 +46,11 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+
+# Google Cloud Service Account (gizli dosya)
+service-account.json
+gcp-credentials.json
+*.json.bak
+
+# Claude temp files
+tmpclaude-*

@@ -1,41 +1,35 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth/nextauth";
-import { assignProjectToStudent } from "@/features/mentors/server/actions"; 
+import { assignProjectToStudent } from "@/features/mentors/server/actions";
+import { requireAuth } from "@/lib/auth/guard";
+import { assignProjectSchema } from "@/lib/validations/api";
 
 export async function POST(req: Request) {
+  const auth = await requireAuth("MENTOR");
+  if (!auth.authorized) return auth.response;
+
   try {
-    // 1. Oturum ve Yetki Kontrolü
-    const session = await getServerSession(authOptions);
-
-    if (!session || session.user.role !== "MENTOR" || !session.user.id) {
-      return NextResponse.json({ error: "Yetkisiz işlem" }, { status: 401 });
-    }
-
-    // 2. Body'den verileri al
     const body = await req.json();
-    const { studentProfileId, projectTemplateId } = body;
-
-    if (!studentProfileId || !projectTemplateId) {
+    const parsed = assignProjectSchema.safeParse(body);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Eksik veri: Öğrenci veya Proje seçilmedi." },
+        { error: parsed.error.flatten().fieldErrors },
         { status: 400 }
       );
     }
 
-    // 3. Server action ile projeyi veritabanına kaydet
     const result = await assignProjectToStudent(
-      studentProfileId,
-      projectTemplateId,
-      session.user.id
+      parsed.data.studentProfileId,
+      parsed.data.projectTemplateId,
+      auth.session.user.id!
     );
 
     return NextResponse.json(result, { status: 201 });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Proje atama hatası:", error);
+    const message = error instanceof Error ? error.message : "Proje atanırken bir hata oluştu";
     return NextResponse.json(
-      { error: error.message || "Proje atanırken bir hata oluştu" },
+      { error: message },
       { status: 500 }
     );
   }

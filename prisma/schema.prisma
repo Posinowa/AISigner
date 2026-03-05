@@ -23,14 +23,12 @@ model User {
   id        String    @id @default(cuid())
   email     String   @unique                        
   name      String?    
-  lastName  String?                            
+  lastName  String?                                
   password  String  //hashed password
-  phone     String?                                 
-  role      Role     @default(STUDENT)                 
+  phone     String?                                        
+  role      Role     @default(STUDENT)                
   createdAt DateTime @default(now())                
-  updatedAt DateTime @updatedAt     
-
-
+  updatedAt DateTime @updatedAt    
 
   emailVerified DateTime?
   sessions      Session[]
@@ -38,9 +36,6 @@ model User {
   
   // mentorun eşleştiği öğrencileri tutar
   menteeProfiles StudentProfile[] @relation("StudentMentor")
-  
-  
-
 }
 
 model Session {
@@ -71,7 +66,6 @@ model StudentProfile {
   updatedAt       DateTime @updatedAt
 }
 
-
 model ProjectTemplate{
   id             String @id @default(cuid())
   title          String
@@ -83,7 +77,6 @@ model ProjectTemplate{
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
-
 }
 
 enum Difficulty{
@@ -91,7 +84,6 @@ enum Difficulty{
   MEDIUM
   EASY
 }
-
 
 model AssignedProject {
   id                String   @id @default(cuid())
@@ -102,6 +94,9 @@ model AssignedProject {
   studentProfile    StudentProfile @relation(fields: [studentProfileId], references: [id])
   projectTemplate   ProjectTemplate @relation(fields: [projectTemplateId], references: [id])
 
+  // 🚀 SPRINT 3: Bu atanan projenin yol haritası (1-to-1 ilişki)
+  roadmap           Roadmap?
+
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 }
@@ -110,4 +105,52 @@ enum AssignmentStatus {
   PENDING
   IN_PROGRESS
   COMPLETED
+}
+
+// ==========================================
+// 🚀 SPRINT 3: ROADMAP (YOL HARİTASI) MODELLERİ
+// ==========================================
+
+enum RoadmapStatus {
+  DRAFT       // AI taslak olarak oluşturdu, mentor henüz onaylamadı
+  PUBLISHED   // Mentor onayladı, öğrenci görebilir
+}
+
+enum StepStatus {
+  TODO
+  IN_PROGRESS
+  COMPLETED
+}
+
+model Roadmap {
+  id                String        @id @default(cuid())
+  
+  // Hangi atanmış projeye ait?
+  assignedProjectId String        @unique
+  assignedProject   AssignedProject @relation(fields: [assignedProjectId], references: [id], onDelete: Cascade)
+  
+  title             String
+  status            RoadmapStatus @default(DRAFT)
+  
+  // Yol haritasının adımları (1-to-many ilişki)
+  steps             RoadmapStep[]
+  
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+}
+
+model RoadmapStep {
+  id             String     @id @default(cuid())
+  roadmapId      String
+  roadmap        Roadmap    @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
+  
+  order          Int        // Adımın sırası (1, 2, 3...)
+  title          String     // Örn: "React Router Kurulumu"
+  description    String     // Adımın detayı
+  resources      String[]   // Faydalı linkler, makaleler (URL dizisi)
+  estimatedHours Int?       // Tahmini efor (saat)
+  status         StepStatus @default(TODO)
+
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
 }

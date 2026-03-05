@@ -45,14 +45,20 @@ AUTH_SECRET=change_me
 ```
  model User {
 
-  id        Int      @id @default(autoincrement())  
+  id        String   @id @default(cuid())  
   email     String   @unique                        
-  name      String?                                 
+  name      String?    
+  lastName  String?                                
   password  String  //hashed password
-  phone     String?                                 
-  role      Role     @default(STUDENT)                 
+  phone     String?                                        
+  role      Role     @default(STUDENT)                
   createdAt DateTime @default(now())                
-  updatedAt DateTime @updatedAt                     
+  updatedAt DateTime @updatedAt    
+
+  emailVerified DateTime?
+  sessions      Session[]
+  studentProfile  StudentProfile?  @relation("StudentUser")
+  menteeProfiles StudentProfile[] @relation("StudentMentor")
 }
 
 enum Role {

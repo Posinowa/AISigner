@@ -1,19 +1,40 @@
 import { NextResponse } from "next/server";
 import { getAllUsers, updateUserRole, assignMentor } from "@/features/admin/server/user";
+import { requireAuth } from "@/lib/auth/guard";
+import { updateRoleSchema, assignMentorSchema } from "@/lib/validations/api";
 
 export async function GET() {
+  const auth = await requireAuth("ADMIN");
+  if (!auth.authorized) return auth.response;
+
   const users = await getAllUsers();
   return NextResponse.json(users);
 }
 
 export async function PATCH(req: Request) {
-  const { userId, role } = await req.json();
-  const updated = await updateUserRole(userId, role);
+  const auth = await requireAuth("ADMIN");
+  if (!auth.authorized) return auth.response;
+
+  const body = await req.json();
+  const parsed = updateRoleSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
+  }
+
+  const updated = await updateUserRole(parsed.data.userId, parsed.data.role);
   return NextResponse.json(updated);
 }
 
 export async function POST(req: Request) {
-  const { studentId, mentorId } = await req.json();
-  const updated = await assignMentor(studentId, mentorId);
+  const auth = await requireAuth("ADMIN");
+  if (!auth.authorized) return auth.response;
+
+  const body = await req.json();
+  const parsed = assignMentorSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
+  }
+
+  const updated = await assignMentor(parsed.data.studentId, parsed.data.mentorId);
   return NextResponse.json(updated);
 }

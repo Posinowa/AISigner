@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Users, BookOpen, Clock, CheckCircle, AlertCircle } from "lucide-react";
 import Link from "next/link";
+import LogoutButton from "@/components/LogoutButton"; // 🚀 Çıkış Butonumuzu import ettik
 
 type StudentWithProfile = {
   id: string;
@@ -91,10 +92,14 @@ export default function MentorDashboardPage() {
 
   return (
     <div className="max-w-6xl mx-auto p-6">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Mentor Dashboard</h1>
-        <p className="text-gray-600 mt-1">Size atanmış öğrencileri yönetin ve proje atayın</p>
+      
+      {/* 🚀 BAŞLIK VE ÇIKIŞ BUTONU YAN YANA EKLENDİ */}
+      <div className="flex items-start justify-between mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Mentor Dashboard</h1>
+          <p className="text-gray-600 mt-1">Size atanmış öğrencileri yönetin ve proje atayın</p>
+        </div>
+        <LogoutButton />
       </div>
 
       {/* Stats */}
