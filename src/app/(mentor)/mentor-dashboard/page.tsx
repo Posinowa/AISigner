@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Users, BookOpen, Clock, CheckCircle, AlertCircle } from "lucide-react";
+import { Users, BookOpen, Clock, CheckCircle, AlertCircle, MessageSquare } from "lucide-react";
 import Link from "next/link";
-import LogoutButton from "@/components/LogoutButton"; // 🚀 Çıkış Butonumuzu import ettik
+import LogoutButton from "@/components/LogoutButton";
+import { UnreadBadge } from "@/features/messaging/ui/UnreadBadge";
 
 type StudentWithProfile = {
   id: string;
@@ -99,7 +100,17 @@ export default function MentorDashboardPage() {
           <h1 className="text-3xl font-bold text-gray-900">Mentor Dashboard</h1>
           <p className="text-gray-600 mt-1">Size atanmış öğrencileri yönetin ve proje atayın</p>
         </div>
-        <LogoutButton />
+        <div className="flex items-center gap-3">
+          <Link
+            href="/mentor-dashboard/messages"
+            className="relative inline-flex items-center gap-2 px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-sm font-medium transition-colors"
+          >
+            <MessageSquare className="w-4 h-4" />
+            Mesajlar
+            <UnreadBadge />
+          </Link>
+          <LogoutButton />
+        </div>
       </div>
 
       {/* Stats */}

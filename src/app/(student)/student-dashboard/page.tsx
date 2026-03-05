@@ -5,9 +5,11 @@ import { RoadmapSteps } from "@/features/student/ui/RoadmapSteps";
 import { prisma } from "@/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/nextauth";
-import { Clock, Briefcase, Target } from "lucide-react";
+import { Clock, Briefcase, Target, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { Progress } from "@/components/ui/progress";
+import { UnreadBadge } from "@/features/messaging/ui/UnreadBadge";
+import { SecurityQuestionsSetup } from "@/features/auth/ui/SecurityQuestionsSetup";
 
 export const dynamic = "force-dynamic";
 
@@ -85,8 +87,21 @@ export default async function StudentDashboardPage() {
                 : "Profilin inceleniyor. Yakında bir mentör ile eşleştirileceksin."}
           </p>
         </div>
-        <LogoutButton />
+        <div className="flex items-center gap-3">
+          <Link
+            href="/student-dashboard/messages"
+            className="relative inline-flex items-center gap-2 px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-sm font-medium transition-colors"
+          >
+            <MessageSquare className="w-4 h-4" />
+            Mesajlar
+            <UnreadBadge />
+          </Link>
+          <LogoutButton />
+        </div>
       </div>
+
+      {/* Güvenlik Soruları Kurulumu */}
+      <SecurityQuestionsSetup />
 
       <ProfileSummaryCard
         level={summaryData.level}
@@ -176,7 +191,7 @@ export default async function StudentDashboardPage() {
                         <p className="text-slate-500 text-sm">İş akışı oluşturuluyor...</p>
                       </div>
                     ) : (
-                      <RoadmapSteps steps={steps} isDraft={isDraft} />
+                      <RoadmapSteps steps={steps} isDraft={isDraft} currentUserId={session.user.id} currentUserRole={session.user.role} />
                     )}
                   </div>
 

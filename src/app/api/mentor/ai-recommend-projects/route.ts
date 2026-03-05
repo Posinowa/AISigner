@@ -34,13 +34,16 @@ export async function POST(req: Request) {
 
     const { studentProfileId } = parsed.data;
 
-    const studentProfile = await prisma.studentProfile.findUnique({
-      where: { id: studentProfileId }, 
+    const studentProfile = await prisma.studentProfile.findFirst({
+      where: {
+        id: studentProfileId,
+        mentorId: auth.session.user.id,
+      },
     });
 
     if (!studentProfile) {
       return NextResponse.json(
-        { error: "Öğrenci profili bulunamadı!" }, 
+        { error: "Öğrenci profili bulunamadı veya bu öğrenci size atanmamış!" }, 
         { status: 404 }
       );
     }

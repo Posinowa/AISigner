@@ -14,7 +14,7 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
     }
 
-    await unassignProject(parsed.data.assignedProjectId);
+    await unassignProject(parsed.data.assignedProjectId, auth.session.user.id!);
 
     return NextResponse.json({ success: true });
   } catch (error) {

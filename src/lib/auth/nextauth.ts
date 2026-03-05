@@ -5,6 +5,11 @@ import { prisma } from "@/lib/auth/prisma"
 import { verify } from "@node-rs/argon2";
 
 
+// AUTH_SECRET kontrolü - üretim ortamında eksikse hata fırlat
+if (!process.env.AUTH_SECRET && process.env.NODE_ENV === "production") {
+  throw new Error("AUTH_SECRET ortam değişkeni üretim ortamında tanımlanmalıdır!");
+}
+
 // NextAuth konfigürasyonu
 export const authOptions : AuthOptions = {
   session: { strategy: "jwt"},

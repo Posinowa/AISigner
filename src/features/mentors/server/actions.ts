@@ -225,8 +225,22 @@ export async function updateProjectStatus(
 }
 
 // Proje atamasını sil (Geri al)
-export async function unassignProject(assignedProjectId: string) {
+export async function unassignProject(assignedProjectId: string, mentorId: string) {
   try {
+    // Mentor ownership kontrolü
+    const assignedProject = await prisma.assignedProject.findFirst({
+      where: {
+        id: assignedProjectId,
+        studentProfile: {
+          mentorId: mentorId,
+        },
+      },
+    });
+
+    if (!assignedProject) {
+      throw new Error("Bu projeyi silme yetkiniz yok veya proje bulunamadı");
+    }
+
     return await prisma.assignedProject.delete({
       where: {
         id: assignedProjectId,

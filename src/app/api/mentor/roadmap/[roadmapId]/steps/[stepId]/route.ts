@@ -12,16 +12,42 @@ export async function PUT(
   if (!auth.authorized) return auth.response;
 
   try {
-    const { stepId } = await params;
+    const { roadmapId, stepId } = await params;
+
+    // Mentor ownership kontrolü
+    const roadmap = await prisma.roadmap.findUnique({
+      where: { id: roadmapId },
+      include: {
+        assignedProject: {
+          include: { studentProfile: true },
+        },
+      },
+    });
+
+    if (!roadmap) {
+      return NextResponse.json({ error: "Yol haritası bulunamadı!" }, { status: 404 });
+    }
+
+    if (roadmap.assignedProject.studentProfile.mentorId !== auth.session.user.id) {
+      return NextResponse.json(
+        { error: "Bu adımı güncelleme yetkiniz yok." },
+        { status: 403 }
+      );
+    }
+
     const body = await req.json();
     const parsed = updateStepSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
     }
 
+    // Status alanını mentor tarafından güncellenebilir alanlardan çıkar
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { status: _status, ...safeData } = parsed.data;
+
     const step = await prisma.roadmapStep.update({
       where: { id: stepId },
-      data: parsed.data,
+      data: safeData,
     });
 
     return NextResponse.json(step);
@@ -44,6 +70,27 @@ export async function DELETE(
 
   try {
     const { roadmapId, stepId } = await params;
+
+    // Mentor ownership kontrolü
+    const roadmap = await prisma.roadmap.findUnique({
+      where: { id: roadmapId },
+      include: {
+        assignedProject: {
+          include: { studentProfile: true },
+        },
+      },
+    });
+
+    if (!roadmap) {
+      return NextResponse.json({ error: "Yol haritası bulunamadı!" }, { status: 404 });
+    }
+
+    if (roadmap.assignedProject.studentProfile.mentorId !== auth.session.user.id) {
+      return NextResponse.json(
+        { error: "Bu adımı silme yetkiniz yok." },
+        { status: 403 }
+      );
+    }
 
     await prisma.roadmapStep.delete({
       where: { id: stepId },

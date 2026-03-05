@@ -27,9 +27,8 @@ export async function POST(req: Request) {
 
   } catch (error: unknown) {
     console.error("Proje atama hatası:", error);
-    const message = error instanceof Error ? error.message : "Proje atanırken bir hata oluştu";
     return NextResponse.json(
-      { error: message },
+      { error: "Proje atanırken bir hata oluştu." },
       { status: 500 }
     );
   }

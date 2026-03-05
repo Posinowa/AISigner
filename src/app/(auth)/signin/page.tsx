@@ -139,7 +139,15 @@ export default function SigninPage() {
         </form>
 
         {/* Alt linkler */}
-        <div className="mt-6 text-center text-sm text-gray-500">
+        <div className="mt-6 text-center text-sm text-gray-500 space-y-2">
+          <p>
+            <a
+              href="/forgot-password"
+              className="font-medium text-amber-600 hover:text-amber-700"
+            >
+              Şifremi Unuttum
+            </a>
+          </p>
           <p>
             Hesabınız yok mu?{" "}
             <a

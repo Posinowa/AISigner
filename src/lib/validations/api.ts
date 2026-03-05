@@ -81,3 +81,42 @@ export const unassignProjectSchema = z.object({
 export const updateStepStatusSchema = z.object({
   status: z.enum(["IN_PROGRESS", "COMPLETED"]),
 });
+
+// ==========================================
+// 💬 Mesajlaşma ve Yorum Şemaları
+// ==========================================
+
+// Mesaj gönderme
+export const sendMessageSchema = z.object({
+  receiverId: z.string().min(1, "Alıcı ID gerekli"),
+  content: z
+    .string()
+    .min(1, "Mesaj boş olamaz")
+    .max(2000, "Mesaj en fazla 2000 karakter olabilir")
+    .transform((val) => val.trim()),
+});
+
+// Mesaj listesi sorgusu
+export const getMessagesSchema = z.object({
+  conversationWith: z.string().min(1, "Konuşma partneri ID gerekli"),
+  cursor: z.string().optional(),
+  limit: z.number().int().min(1).max(50).default(30),
+});
+
+// Adıma yorum ekleme
+export const createStepCommentSchema = z.object({
+  content: z
+    .string()
+    .min(1, "Yorum boş olamaz")
+    .max(1000, "Yorum en fazla 1000 karakter olabilir")
+    .transform((val) => val.trim()),
+});
+
+// Yorum güncelleme
+export const updateStepCommentSchema = z.object({
+  content: z
+    .string()
+    .min(1, "Yorum boş olamaz")
+    .max(1000, "Yorum en fazla 1000 karakter olabilir")
+    .transform((val) => val.trim()),
+});

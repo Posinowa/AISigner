@@ -13,6 +13,28 @@ export async function POST(
 
   try {
     const { roadmapId } = await params;
+
+    // Mentor ownership kontrolü
+    const roadmap = await prisma.roadmap.findUnique({
+      where: { id: roadmapId },
+      include: {
+        assignedProject: {
+          include: { studentProfile: true },
+        },
+      },
+    });
+
+    if (!roadmap) {
+      return NextResponse.json({ error: "Yol haritası bulunamadı!" }, { status: 404 });
+    }
+
+    if (roadmap.assignedProject.studentProfile.mentorId !== auth.session.user.id) {
+      return NextResponse.json(
+        { error: "Bu yol haritasına adım ekleme yetkiniz yok." },
+        { status: 403 }
+      );
+    }
+
     const body = await req.json();
     const parsed = createStepSchema.safeParse(body);
     if (!parsed.success) {

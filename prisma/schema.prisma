@@ -36,6 +36,19 @@ model User {
   
   // mentorun eşleştiği öğrencileri tutar
   menteeProfiles StudentProfile[] @relation("StudentMentor")
+
+  // Mesajlaşma ilişkileri
+  sentMessages     Message[]      @relation("SentMessages")
+  receivedMessages Message[]      @relation("ReceivedMessages")
+  
+  // Adım yorumları
+  stepComments     StepComment[]  @relation("StepComments")
+
+  // Güvenlik soruları (şifremi unuttum için)
+  securityAnswers  SecurityAnswer[] @relation("SecurityAnswers")
+
+  // Adım dosya yüklemeleri
+  stepFiles        StepFile[]       @relation("StepFiles")
 }
 
 model Session {
@@ -151,6 +164,87 @@ model RoadmapStep {
   estimatedHours Int?       // Tahmini efor (saat)
   status         StepStatus @default(TODO)
 
+  // Adıma ait yorumlar (mentor-öğrenci)
+  comments       StepComment[]
+
+  // Adıma yüklenen dosyalar
+  files          StepFile[]
+
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
+}
+
+// ==========================================
+// 💬 MESAJLAŞMA VE YORUM SİSTEMİ
+// ==========================================
+
+model Message {
+  id         String   @id @default(cuid())
+  senderId   String
+  receiverId String
+  content    String   @db.VarChar(2000)
+  isRead     Boolean  @default(false)
+
+  sender     User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  createdAt  DateTime @default(now())
+
+  @@index([senderId, receiverId])
+  @@index([receiverId, isRead])
+}
+
+model StepComment {
+  id        String   @id @default(cuid())
+  stepId    String
+  authorId  String
+  content   String   @db.VarChar(1000)
+
+  step      RoadmapStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  author    User        @relation("StepComments", fields: [authorId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([stepId])
+}
+
+// ==========================================
+// 🔐 GÜVENLİK SORULARI (ŞİFREMİ UNUTTUM)
+// ==========================================
+
+model SecurityAnswer {
+  id         String @id @default(cuid())
+  userId     String
+  questionId Int       // Önceden tanımlı soru index'i
+  answer     String    // Hashlenmiş cevap
+
+  user       User   @relation("SecurityAnswers", fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, questionId])
+  @@index([userId])
+}
+
+// ==========================================
+// 📁 DOSYA YÜKLEME SİSTEMİ
+// ==========================================
+
+model StepFile {
+  id           String   @id @default(cuid())
+  stepId       String
+  uploaderId   String
+  fileName     String           // Orijinal dosya adı
+  storedName   String   @unique // Sunucudaki benzersiz ad
+  mimeType     String
+  fileSize     Int              // Byte cinsinden
+  
+  step         RoadmapStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  uploader     User        @relation("StepFiles", fields: [uploaderId], references: [id], onDelete: Cascade)
+
+  createdAt    DateTime @default(now())
+
+  @@index([stepId])
+  @@index([uploaderId])
 }

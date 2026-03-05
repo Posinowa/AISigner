@@ -4,6 +4,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import LogoutButton from "@/components/LogoutButton";
 
 type User = {
   id: string;
@@ -127,7 +128,10 @@ export default function AdminDashboard() {
 
   return (
     <div className="p-6">
-      <h1 className="text-3xl font-bold mb-6">Admin Dashboard</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+        <LogoutButton />
+      </div>
       
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200">
