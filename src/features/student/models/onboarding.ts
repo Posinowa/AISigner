@@ -9,8 +9,13 @@ export const personalSchema = z.object({
 }),
     phoneNumber: z
   .string()
-  .min(10, "Telefon numarası gerekli")
-  .regex(/^\+?\d{10,15}$/, "Telefon numarası geçerli formatta olmalı"),
+  .min(1, "Telefon numarası gerekli")
+  .transform((val) => val.replace(/[\s\-().]/g, "")) // boşluk/tire/parantez sil
+  .pipe(
+    z
+      .string()
+      .regex(/^\+?\d{10,15}$/, "Telefon numarası geçerli formatta olmalı (10-15 rakam)")
+  ),
 
    
 });

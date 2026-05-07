@@ -43,10 +43,16 @@ export async function updateUserRole(userId: string, role: "ADMIN" | "MENTOR" | 
 }
 
 // ------------------------------------
-// Öğrenciye mentor atama
-export async function assignMentor(studentId: string, mentorId: string) {
-  return prisma.studentProfile.update({
+// Öğrenciye mentor atama (profil yoksa otomatik oluştur)
+export async function assignMentor(studentId: string, mentorId: string | null) {
+  return prisma.studentProfile.upsert({
     where: { userId: studentId },
-    data: { mentorId },
+    update: { mentorId },
+    create: {
+      userId: studentId,
+      mentorId,
+      experienceLevel: "BEGINNER",
+      interests: [],
+    },
   });
 }

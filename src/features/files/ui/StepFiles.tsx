@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Paperclip,
   Upload,
@@ -79,7 +79,7 @@ export function StepFiles({ stepId, currentUserId, currentUserRole }: Props) {
     });
   }
 
-  async function loadFiles() {
+  const loadFiles = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -93,7 +93,7 @@ export function StepFiles({ stepId, currentUserId, currentUserRole }: Props) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [stepId]);
 
   async function handleUpload(file: File) {
     setUploading(true);
@@ -162,8 +162,7 @@ export function StepFiles({ stepId, currentUserId, currentUserRole }: Props) {
     if (isOpen && files.length === 0) {
       loadFiles();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
+  }, [isOpen, files.length, loadFiles]);
 
   return (
     <div className="mt-3 pt-3 border-t border-slate-100">

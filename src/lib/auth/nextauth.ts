@@ -24,18 +24,17 @@ export const authOptions : AuthOptions = {
         password: { label: "Password", type: "password" },// Form input: Password
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null // Eğer kullanıcı email veya password göndermediyse null dön
- 
-        // DB’den user bul (email ile arama)
+        if (!credentials?.email || !credentials?.password) return null
+
+        // Email normalizasyonu — signup ile aynı kuralı uygula (case-insensitive)
+        const normalizedEmail = credentials.email.toLowerCase().trim()
+
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
+          where: { email: normalizedEmail },
         })
         if (!user) return null
-        
-        // Argon2 ile hash’lenmiş şifreyi kontrol et
-                // verify(hash, plainPassword) şeklinde çalışır
 
-        const isValid = await verify(user.password, credentials.password); // ✅ verify(hash, plain)
+        const isValid = await verify(user.password, credentials.password)
 
         return isValid ? user : null
       },

@@ -21,6 +21,14 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
   }
 
+  // Admin kendi rolünü değiştiremez — panel erişimini kaybeder
+  if (parsed.data.userId === auth.session.user.id) {
+    return NextResponse.json(
+      { error: "Kendi rolünüzü değiştiremezsiniz." },
+      { status: 403 }
+    );
+  }
+
   const updated = await updateUserRole(parsed.data.userId, parsed.data.role);
   return NextResponse.json(updated);
 }

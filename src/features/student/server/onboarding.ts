@@ -1,6 +1,6 @@
 "use server"
 
-import { redirect } from "next/navigation"
+import { revalidateTag } from "next/cache"
 import { z } from "zod"
 import { personalSchema, experienceSchema, goalsSchema } from "../models/onboarding"
 import { prisma } from "@/lib/auth/prisma"
@@ -29,29 +29,41 @@ export async function saveOnboarding(rawData: unknown) {
   }
   const data = parse.data
 
-  // 3. DB kaydetme (idempotent update)
-  await prisma.studentProfile.upsert({
-    where: { userId: session.user.id },
-    update: {
-      experienceLevel: data.experience.level,
-      interests: data.experience.interest,
-      goals: data.goals.goal,
-      availability: data.goals.availability,
-      birthYear: data.personal.birthYear,
+  // 3. User + StudentProfile'ı atomik güncelle (firstName/lastName/phone User'da, profil alanları StudentProfile'da)
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: session.user.id },
+      data: {
+        name: data.personal.firstName,
+        lastName: data.personal.lastName,
+        phone: data.personal.phoneNumber,
+      },
+    }),
+    prisma.studentProfile.upsert({
+      where: { userId: session.user.id },
+      update: {
+        experienceLevel: data.experience.level,
+        interests: data.experience.interest,
+        goals: data.goals.goal,
+        availability: data.goals.availability,
+        birthYear: data.personal.birthYear,
+      },
+      create: {
+        userId: session.user.id,
+        experienceLevel: data.experience.level,
+        interests: data.experience.interest,
+        goals: data.goals.goal,
+        availability: data.goals.availability,
+        birthYear: data.personal.birthYear,
+      },
+    }),
+  ])
 
-      
-    },
-    create: {
-      userId: session.user.id,
-      experienceLevel: data.experience.level,
-      interests: data.experience.interest,
-      goals: data.goals.goal,
-      availability: data.goals.availability,
-    birthYear: data.personal.birthYear,
+  // 4. Profil değişti → AI özet cache'ini invalidate et
+  revalidateTag(`profile-summary-${session.user.id}`)
 
-    },
-  })
-
-  // 4. Başarılı işlem → redirect
-  redirect("/student-dashboard")
+  // Client component zaten window.location.href ile yönlendiriyor,
+  // burada redirect() çağırmıyoruz — server action'dan programatik
+  // çağrılınca NEXT_REDIRECT, client catch bloğu tarafından Error: aborted
+  // olarak yakalanıp yanlış alert gösteriyordu.
 }

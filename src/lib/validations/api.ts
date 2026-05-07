@@ -8,10 +8,10 @@ export const updateRoleSchema = z.object({
   }),
 });
 
-// Admin: Mentor atama
+// Admin: Mentor atama (mentorId null → atamayı kaldır)
 export const assignMentorSchema = z.object({
   studentId: z.string().min(1, "Öğrenci ID gerekli"),
-  mentorId: z.string().min(1, "Mentor ID gerekli"),
+  mentorId: z.string().nullable(),
 });
 
 // Admin: Proje şablonu oluşturma
@@ -75,6 +75,7 @@ export const updateStepSchema = z.object({
 // Mentor: Proje kaldırma
 export const unassignProjectSchema = z.object({
   assignedProjectId: z.string().min(1, "Atanmış proje ID gerekli"),
+  force: z.boolean().optional(),
 });
 
 // Student: Adım durumu güncelleme

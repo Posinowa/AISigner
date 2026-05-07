@@ -14,10 +14,17 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
     }
 
-    await unassignProject(parsed.data.assignedProjectId, auth.session.user.id!);
+    const force = (parsed.data as { force?: boolean }).force === true;
+    await unassignProject(parsed.data.assignedProjectId, auth.session.user.id!, force);
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (error instanceof Error && (error as Error & { code?: string }).code === "REQUIRES_CONFIRMATION") {
+      return NextResponse.json(
+        { error: error.message, requiresConfirmation: true },
+        { status: 409 }
+      );
+    }
     console.error("Unassign error:", error);
     return NextResponse.json({ error: "Silme işlemi başarısız" }, { status: 500 });
   }

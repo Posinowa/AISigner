@@ -41,8 +41,7 @@ export async function PUT(
       return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
     }
 
-    // Status alanını mentor tarafından güncellenebilir alanlardan çıkar
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    // Status alanını mentor tarafından güncellenebilir alanlardan çıkar (_status kasıtlı kullanılmıyor)
     const { status: _status, ...safeData } = parsed.data;
 
     const step = await prisma.roadmapStep.update({
@@ -89,6 +88,30 @@ export async function DELETE(
       return NextResponse.json(
         { error: "Bu adımı silme yetkiniz yok." },
         { status: 403 }
+      );
+    }
+
+    // Öğrenci ilerlemesi koruması: aktif/tamamlanmış adımlar ?force=true olmadan silinemez
+    const url = new URL(req.url);
+    const force = url.searchParams.get("force") === "true";
+    const step = await prisma.roadmapStep.findUnique({
+      where: { id: stepId },
+      select: { status: true },
+    });
+
+    if (!step) {
+      return NextResponse.json({ error: "Adım bulunamadı." }, { status: 404 });
+    }
+
+    if (!force && (step.status === "IN_PROGRESS" || step.status === "COMPLETED")) {
+      return NextResponse.json(
+        {
+          error:
+            "Bu adımda öğrenci ilerlemesi var. Silmek için onay gerekiyor.",
+          requiresConfirmation: true,
+          stepStatus: step.status,
+        },
+        { status: 409 }
       );
     }
 

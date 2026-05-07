@@ -68,6 +68,7 @@ export default async function StudentDashboardPage() {
     interests: profile.interests,
     goals: profile.goals ?? "Henüz hedef belirtilmemiş",
     availability: profile.availability ?? undefined,
+    userId: session.user.id, // Cache invalidation için userId gerekli
   });
 
   const firstName = session.user.name?.split(" ")[0] ?? "Öğrenci";

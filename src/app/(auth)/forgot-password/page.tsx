@@ -11,11 +11,20 @@ type Question = {
 
 type Step = "email" | "questions" | "newPassword" | "success";
 
+const passwordRules = [
+  { test: (p: string) => p.length >= 8, label: "En az 8 karakter" },
+  { test: (p: string) => /[A-Z]/.test(p), label: "En az bir büyük harf" },
+  { test: (p: string) => /[a-z]/.test(p), label: "En az bir küçük harf" },
+  { test: (p: string) => /[0-9]/.test(p), label: "En az bir rakam" },
+  { test: (p: string) => /[^A-Za-z0-9]/.test(p), label: "En az bir özel karakter" },
+];
+
 export default function ForgotPasswordPage() {
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [resetToken, setResetToken] = useState<string>("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -32,7 +41,7 @@ export default function ForgotPasswordPage() {
       const res = await fetch("/api/auth/forgot-password/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim() }),
+        body: JSON.stringify({ email: email.toLowerCase().trim() }),
       });
 
       const data = await res.json();
@@ -43,7 +52,6 @@ export default function ForgotPasswordPage() {
 
       if (data.step === "questions" && data.questions) {
         setQuestions(data.questions);
-        // Cevapları boş olarak hazırla
         const emptyAnswers: Record<number, string> = {};
         data.questions.forEach((q: Question) => {
           emptyAnswers[q.questionId] = "";
@@ -58,7 +66,7 @@ export default function ForgotPasswordPage() {
     }
   }
 
-  // ADIM 2: Güvenlik sorularını doğrula
+  // ADIM 2: Güvenlik sorularını doğrula → resetToken al
   async function handleAnswersSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -73,7 +81,7 @@ export default function ForgotPasswordPage() {
       const res = await fetch("/api/auth/forgot-password/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), answers: answerPayload }),
+        body: JSON.stringify({ email: email.toLowerCase().trim(), answers: answerPayload }),
       });
 
       const data = await res.json();
@@ -82,8 +90,11 @@ export default function ForgotPasswordPage() {
         return;
       }
 
-      if (data.step === "verified") {
+      if (data.step === "verified" && data.resetToken) {
+        setResetToken(data.resetToken);
         setStep("newPassword");
+      } else {
+        setError("Doğrulama tamamlanamadı. Lütfen tekrar deneyin.");
       }
     } catch {
       setError("Bağlantı hatası. Lütfen tekrar deneyin.");
@@ -92,7 +103,7 @@ export default function ForgotPasswordPage() {
     }
   }
 
-  // ADIM 3: Yeni şifre belirle
+  // ADIM 3: Yeni şifre belirle (resetToken ile)
   async function handlePasswordSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -102,20 +113,26 @@ export default function ForgotPasswordPage() {
       return;
     }
 
-    setLoading(true);
+    if (!resetToken) {
+      setError("Doğrulama tokenı eksik. Sıfırlamayı baştan başlat.");
+      return;
+    }
 
-    const answerPayload = questions.map((q) => ({
-      questionId: q.questionId,
-      answer: answers[q.questionId] || "",
-    }));
+    setLoading(true);
 
     try {
       const res = await fetch("/api/auth/forgot-password/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: email.trim(),
-          answers: answerPayload,
+          email: email.toLowerCase().trim(),
+          // Backend step3'te answers'ı yine bekliyor (kontrolden geçmesi için),
+          // ama asıl yetki resetToken ile veriliyor.
+          answers: questions.map((q) => ({
+            questionId: q.questionId,
+            answer: answers[q.questionId] || "",
+          })),
+          resetToken,
           newPassword,
         }),
       });
@@ -136,211 +153,253 @@ export default function ForgotPasswordPage() {
     }
   }
 
+  // Adım göstergesi (1-2-3)
+  const stepNumber =
+    step === "email" ? 1 : step === "questions" ? 2 : step === "newPassword" ? 3 : 3;
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 px-4">
-      <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-2xl ring-1 ring-gray-200">
-        {/* Başlık */}
-        <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 h-14 w-14 rounded-full bg-amber-500 flex items-center justify-center shadow-md">
-            {step === "success" ? (
-              <CheckCircle2 className="w-6 h-6 text-white" />
-            ) : step === "questions" ? (
-              <ShieldCheck className="w-6 h-6 text-white" />
-            ) : (
-              <KeyRound className="w-6 h-6 text-white" />
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 px-4 py-12">
+      <div className="w-full max-w-md">
+        <div className="bg-white rounded-3xl shadow-2xl ring-1 ring-slate-200/60 overflow-hidden">
+          {/* Üst şerit */}
+          <div className="h-1.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
+
+          <div className="p-8 sm:p-10">
+            {/* Başlık */}
+            <div className="mb-6 text-center">
+              <div className="mx-auto mb-4 h-14 w-14 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-200">
+                {step === "success" ? (
+                  <CheckCircle2 className="w-6 h-6 text-white" />
+                ) : step === "questions" ? (
+                  <ShieldCheck className="w-6 h-6 text-white" />
+                ) : (
+                  <KeyRound className="w-6 h-6 text-white" />
+                )}
+              </div>
+              <h1 className="text-2xl font-bold text-slate-900">
+                {step === "email" && "Şifremi Unuttum"}
+                {step === "questions" && "Güvenlik Soruları"}
+                {step === "newPassword" && "Yeni Şifre Belirle"}
+                {step === "success" && "Şifre Değiştirildi"}
+              </h1>
+              <p className="mt-1.5 text-sm text-slate-500">
+                {step === "email" && "Kayıtlı e-posta adresini gir"}
+                {step === "questions" && "Kimliğini doğrulamak için soruları cevapla"}
+                {step === "newPassword" && "Yeni şifreni belirle"}
+                {step === "success" && "Artık yeni şifrenle giriş yapabilirsin"}
+              </p>
+            </div>
+
+            {/* Adım göstergesi */}
+            {step !== "success" && (
+              <div className="flex items-center justify-center gap-2 mb-6">
+                {[1, 2, 3].map((n) => (
+                  <div
+                    key={n}
+                    className={`h-1.5 rounded-full transition-all ${
+                      n <= stepNumber
+                        ? "w-10 bg-gradient-to-r from-blue-500 to-indigo-500"
+                        : "w-6 bg-slate-200"
+                    }`}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Hata mesajı */}
+            {error && (
+              <div className="mb-4 rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-600">
+                {error}
+              </div>
+            )}
+
+            {/* ADIM 1: Email */}
+            {step === "email" && (
+              <form onSubmit={handleEmailSubmit} className="space-y-5">
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                    E-posta Adresi
+                  </label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-slate-800 text-sm shadow-sm focus:border-blue-500 focus:bg-white focus:ring-3 focus:ring-blue-100 outline-none transition"
+                    placeholder="ornek@email.com"
+                    required
+                    autoComplete="email"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-4 py-3 font-semibold text-white shadow-md shadow-blue-200 transition-all focus:outline-none focus:ring-3 focus:ring-blue-300 disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {loading ? "Kontrol Ediliyor..." : "Devam Et"}
+                </button>
+
+                <div className="text-center">
+                  <Link
+                    href="/signin"
+                    className="inline-flex items-center text-sm text-slate-500 hover:text-slate-700 transition-colors"
+                  >
+                    <ArrowLeft className="w-4 h-4 mr-1" />
+                    Giriş sayfasına dön
+                  </Link>
+                </div>
+              </form>
+            )}
+
+            {/* ADIM 2: Güvenlik Soruları */}
+            {step === "questions" && (
+              <form onSubmit={handleAnswersSubmit} className="space-y-5">
+                {questions.map((q, index) => (
+                  <div key={q.questionId}>
+                    <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                      {index + 1}. {q.question}
+                    </label>
+                    <input
+                      type="text"
+                      value={answers[q.questionId] || ""}
+                      onChange={(e) =>
+                        setAnswers((prev) => ({
+                          ...prev,
+                          [q.questionId]: e.target.value,
+                        }))
+                      }
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-slate-800 text-sm shadow-sm focus:border-blue-500 focus:bg-white focus:ring-3 focus:ring-blue-100 outline-none transition"
+                      placeholder="Cevabın..."
+                      required
+                    />
+                  </div>
+                ))}
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-4 py-3 font-semibold text-white shadow-md shadow-blue-200 transition-all focus:outline-none focus:ring-3 focus:ring-blue-300 disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {loading ? "Doğrulanıyor..." : "Cevapları Doğrula"}
+                </button>
+
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStep("email");
+                      setError("");
+                    }}
+                    className="inline-flex items-center text-sm text-slate-500 hover:text-slate-700 transition-colors"
+                  >
+                    <ArrowLeft className="w-4 h-4 mr-1" />
+                    Geri dön
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* ADIM 3: Yeni Şifre */}
+            {step === "newPassword" && (
+              <form onSubmit={handlePasswordSubmit} className="space-y-5">
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                    Yeni Şifre
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 pr-11 text-slate-800 text-sm shadow-sm focus:border-blue-500 focus:bg-white focus:ring-3 focus:ring-blue-100 outline-none transition"
+                      placeholder="En az 8 karakter"
+                      required
+                      minLength={8}
+                      autoComplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 right-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                    >
+                      {showPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                    </button>
+                  </div>
+
+                  {newPassword.length > 0 && (
+                    <div className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-1">
+                      {passwordRules.map((rule) => {
+                        const ok = rule.test(newPassword);
+                        return (
+                          <p
+                            key={rule.label}
+                            className={`flex items-center text-[11px] gap-1 ${
+                              ok ? "text-emerald-600" : "text-slate-400"
+                            }`}
+                          >
+                            <CheckCircle2
+                              className={`w-3 h-3 shrink-0 ${
+                                ok ? "text-emerald-500" : "text-slate-300"
+                              }`}
+                            />
+                            {rule.label}
+                          </p>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                    Şifreyi Tekrar Gir
+                  </label>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-slate-800 text-sm shadow-sm focus:border-blue-500 focus:bg-white focus:ring-3 focus:ring-blue-100 outline-none transition"
+                    placeholder="Şifreni tekrar gir"
+                    required
+                    autoComplete="new-password"
+                  />
+                  {confirmPassword && newPassword !== confirmPassword && (
+                    <p className="mt-1 text-xs text-red-500">Şifreler eşleşmiyor</p>
+                  )}
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading || newPassword !== confirmPassword}
+                  className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-4 py-3 font-semibold text-white shadow-md shadow-blue-200 transition-all focus:outline-none focus:ring-3 focus:ring-blue-300 disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {loading ? "Kaydediliyor..." : "Şifreyi Değiştir"}
+                </button>
+              </form>
+            )}
+
+            {/* ADIM 4: Başarılı */}
+            {step === "success" && (
+              <div className="text-center space-y-5">
+                <div className="mx-auto h-16 w-16 rounded-2xl bg-emerald-100 flex items-center justify-center">
+                  <CheckCircle2 className="w-8 h-8 text-emerald-600" />
+                </div>
+                <p className="text-slate-600 text-sm">
+                  Şifren başarıyla güncellendi. Artık yeni şifrenle giriş yapabilirsin.
+                </p>
+                <Link
+                  href="/signin"
+                  className="block w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-4 py-3 font-semibold text-white shadow-md shadow-blue-200 transition-all text-center"
+                >
+                  Giriş Yap
+                </Link>
+              </div>
             )}
           </div>
-          <h1 className="text-2xl font-bold text-gray-800">
-            {step === "email" && "Şifremi Unuttum"}
-            {step === "questions" && "Güvenlik Soruları"}
-            {step === "newPassword" && "Yeni Şifre Belirle"}
-            {step === "success" && "Şifre Değiştirildi!"}
-          </h1>
-          <p className="mt-2 text-sm text-gray-500">
-            {step === "email" && "Kayıtlı email adresinizi girin"}
-            {step === "questions" && "Kimliğinizi doğrulamak için soruları cevaplayın"}
-            {step === "newPassword" && "Yeni şifrenizi belirleyin"}
-            {step === "success" && "Artık yeni şifrenizle giriş yapabilirsiniz"}
-          </p>
         </div>
-
-        {/* Hata mesajı */}
-        {error && (
-          <div className="mb-4 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-600 shadow-inner">
-            {error}
-          </div>
-        )}
-
-        {/* ADIM 1: Email */}
-        {step === "email" && (
-          <form onSubmit={handleEmailSubmit} className="space-y-6">
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">
-                Email Adresiniz
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-2xl border border-gray-300 bg-gray-50 px-4 py-3 text-gray-800 shadow-sm focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-100 outline-none transition"
-                placeholder="ornek@email.com"
-                required
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-2xl bg-amber-500 px-4 py-3 font-semibold text-white shadow-md transition hover:bg-amber-600 hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-amber-200 disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
-              {loading ? "Kontrol Ediliyor..." : "Devam Et"}
-            </button>
-
-            <div className="text-center">
-              <Link href="/signin" className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700">
-                <ArrowLeft className="w-4 h-4 mr-1" />
-                Giriş sayfasına dön
-              </Link>
-            </div>
-          </form>
-        )}
-
-        {/* ADIM 2: Güvenlik Soruları */}
-        {step === "questions" && (
-          <form onSubmit={handleAnswersSubmit} className="space-y-5">
-            {questions.map((q, index) => (
-              <div key={q.questionId}>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
-                  {index + 1}. {q.question}
-                </label>
-                <input
-                  type="text"
-                  value={answers[q.questionId] || ""}
-                  onChange={(e) =>
-                    setAnswers((prev) => ({
-                      ...prev,
-                      [q.questionId]: e.target.value,
-                    }))
-                  }
-                  className="w-full rounded-2xl border border-gray-300 bg-gray-50 px-4 py-3 text-gray-800 shadow-sm focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-100 outline-none transition"
-                  placeholder="Cevabınız..."
-                  required
-                />
-              </div>
-            ))}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-2xl bg-amber-500 px-4 py-3 font-semibold text-white shadow-md transition hover:bg-amber-600 hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-amber-200 disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
-              {loading ? "Doğrulanıyor..." : "Cevapları Doğrula"}
-            </button>
-
-            <div className="text-center">
-              <button
-                type="button"
-                onClick={() => { setStep("email"); setError(""); }}
-                className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700"
-              >
-                <ArrowLeft className="w-4 h-4 mr-1" />
-                Geri dön
-              </button>
-            </div>
-          </form>
-        )}
-
-        {/* ADIM 3: Yeni Şifre */}
-        {step === "newPassword" && (
-          <form onSubmit={handlePasswordSubmit} className="space-y-5">
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">
-                Yeni Şifre
-              </label>
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full rounded-2xl border border-gray-300 bg-gray-50 px-4 py-3 pr-10 text-gray-800 shadow-sm focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-100 outline-none transition"
-                  placeholder="En az 8 karakter"
-                  required
-                  minLength={8}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-3 flex items-center text-gray-500 hover:text-gray-700"
-                >
-                  {showPassword ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
-                </button>
-              </div>
-              <div className="mt-2 space-y-1 text-xs">
-                <p className={newPassword.length >= 8 ? "text-green-600" : "text-gray-400"}>
-                  ✓ En az 8 karakter
-                </p>
-                <p className={/[A-Z]/.test(newPassword) ? "text-green-600" : "text-gray-400"}>
-                  ✓ En az bir büyük harf
-                </p>
-                <p className={/[a-z]/.test(newPassword) ? "text-green-600" : "text-gray-400"}>
-                  ✓ En az bir küçük harf
-                </p>
-                <p className={/[0-9]/.test(newPassword) ? "text-green-600" : "text-gray-400"}>
-                  ✓ En az bir rakam
-                </p>
-                <p className={/[^A-Za-z0-9]/.test(newPassword) ? "text-green-600" : "text-gray-400"}>
-                  ✓ En az bir özel karakter
-                </p>
-              </div>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">
-                Şifreyi Tekrar Girin
-              </label>
-              <input
-                type={showPassword ? "text" : "password"}
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full rounded-2xl border border-gray-300 bg-gray-50 px-4 py-3 text-gray-800 shadow-sm focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-100 outline-none transition"
-                placeholder="Şifrenizi tekrar girin"
-                required
-              />
-              {confirmPassword && newPassword !== confirmPassword && (
-                <p className="mt-1 text-xs text-red-500">Şifreler eşleşmiyor</p>
-              )}
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading || newPassword !== confirmPassword}
-              className="w-full rounded-2xl bg-amber-500 px-4 py-3 font-semibold text-white shadow-md transition hover:bg-amber-600 hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-amber-200 disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
-              {loading ? "Kaydediliyor..." : "Şifreyi Değiştir"}
-            </button>
-          </form>
-        )}
-
-        {/* ADIM 4: Başarılı */}
-        {step === "success" && (
-          <div className="text-center space-y-6">
-            <div className="mx-auto h-16 w-16 rounded-full bg-green-100 flex items-center justify-center">
-              <CheckCircle2 className="w-8 h-8 text-green-600" />
-            </div>
-            <p className="text-gray-600">
-              Şifreniz başarıyla güncellendi. Artık yeni şifrenizle giriş yapabilirsiniz.
-            </p>
-            <Link
-              href="/signin"
-              className="inline-block w-full rounded-2xl bg-blue-600 px-4 py-3 font-semibold text-white shadow-md transition hover:bg-blue-700 hover:shadow-lg text-center"
-            >
-              Giriş Yap
-            </Link>
-          </div>
-        )}
       </div>
     </div>
   );

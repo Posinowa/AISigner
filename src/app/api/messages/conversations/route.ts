@@ -7,18 +7,24 @@ import { requireAuth } from "@/lib/auth/guard";
  * Kullanıcının tüm konuşma listesini döner (her konuşma partneri + son mesaj + okunmamış sayısı).
  */
 export async function GET() {
-  const auth = await requireAuth(["MENTOR", "STUDENT"]);
+  const auth = await requireAuth(["MENTOR", "STUDENT", "ADMIN"]);
   if (!auth.authorized) return auth.response;
 
   const userId = auth.session.user.id!;
 
   try {
-    // Kullanıcının mesajlaşabileceği kişileri bul (mentor ↔ öğrenci eşleşmesi)
     const userRole = auth.session.user.role;
     let conversationPartners: { id: string; name: string | null; lastName: string | null; role: string }[] = [];
 
-    if (userRole === "MENTOR") {
-      // Mentorun öğrencileri
+    if (userRole === "ADMIN") {
+      // Admin: tüm kullanıcılar (kendisi hariç)
+      const users = await prisma.user.findMany({
+        where: { id: { not: userId } },
+        select: { id: true, name: true, lastName: true, role: true },
+        orderBy: { createdAt: "desc" },
+      });
+      conversationPartners = users;
+    } else if (userRole === "MENTOR") {
       const profiles = await prisma.studentProfile.findMany({
         where: { mentorId: userId },
         include: {
@@ -28,8 +34,14 @@ export async function GET() {
         },
       });
       conversationPartners = profiles.map((p) => p.user);
+
+      // ADMIN'lerle de mesajlaşabilir
+      const admins = await prisma.user.findMany({
+        where: { role: "ADMIN" },
+        select: { id: true, name: true, lastName: true, role: true },
+      });
+      conversationPartners = [...conversationPartners, ...admins];
     } else if (userRole === "STUDENT") {
-      // Öğrencinin mentoru
       const profile = await prisma.studentProfile.findUnique({
         where: { userId },
         include: {
@@ -41,6 +53,13 @@ export async function GET() {
       if (profile?.mentor) {
         conversationPartners = [profile.mentor];
       }
+
+      // ADMIN'lerle de mesajlaşabilir
+      const admins = await prisma.user.findMany({
+        where: { role: "ADMIN" },
+        select: { id: true, name: true, lastName: true, role: true },
+      });
+      conversationPartners = [...conversationPartners, ...admins];
     }
 
     // Her partner için son mesaj ve okunmamış sayısı

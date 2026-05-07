@@ -1,5 +1,7 @@
-import OnboardingForm from "@/features/student/ui/OnboardingForm"
+import { redirect } from "next/navigation";
 
-export default function Page() {
-  return <OnboardingForm />
+// /student-onboarding eski isimdi; tek doğru sayfa /profile-setup.
+// Eski URL'lere gelen kullanıcıları kalıcı olarak yönlendir.
+export default function StudentOnboardingRedirect() {
+  redirect("/profile-setup");
 }

@@ -82,7 +82,9 @@ export default function StudentDetailPage() {
 
   const [isAIThinking, setIsAIThinking] = useState(false);
   const [aiRecommendations, setAiRecommendations] = useState<AIRecommendation[]>([]);
-  
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+
   // 🚀 SPRINT 3: Roadmap üretimi için yükleniyor state'i
   const [generatingRoadmapId, setGeneratingRoadmapId] = useState<string | null>(null);
 
@@ -109,6 +111,7 @@ export default function StudentDetailPage() {
   }
 
   async function loadProjectTemplates() {
+    setTemplatesLoading(true);
     try {
       const res = await fetch("/api/admin/project-templates");
       if (res.ok) {
@@ -117,15 +120,21 @@ export default function StudentDetailPage() {
       }
     } catch (error) {
       console.error("Failed to load project templates:", error);
+    } finally {
+      setTemplatesLoading(false);
     }
   }
 
   async function handleAIRecommend() {
-    if (!student?.studentProfile?.id) return;
-    
+    if (!student?.studentProfile?.id) {
+      setAiError("Öğrenci profili henüz yüklenemedi. Sayfayı yenileyip tekrar deneyin.");
+      return;
+    }
+
     setIsAIThinking(true);
     setAiRecommendations([]);
-    
+    setAiError(null);
+
     try {
       const res = await fetch("/api/mentor/ai-recommend-projects", {
         method: "POST",
@@ -138,11 +147,12 @@ export default function StudentDetailPage() {
         setAiRecommendations(data.recommendations || []);
       } else {
         const err = await res.json();
-        alert(err.error || "AI önerisi alınamadı.");
+        const msg = typeof err.error === "string" ? err.error : JSON.stringify(err.error);
+        setAiError(msg || "AI önerisi alınamadı.");
       }
     } catch (error) {
       console.error("AI Error:", error);
-      alert("AI ile iletişim kurarken bir hata oluştu.");
+      setAiError("AI ile iletişim kurarken bir hata oluştu. Sunucu loglarını kontrol edin.");
     } finally {
       setIsAIThinking(false);
     }
@@ -180,19 +190,43 @@ export default function StudentDetailPage() {
   }
 
   async function handleDeleteAssignment(assignedProjectId: string) {
-    if (!confirm("Bu proje atamasını kaldırmak istediğinizden emin misiniz? (Bağlı yol haritası da silinir)")) return;
+    if (
+      !confirm(
+        "Bu proje atamasını kaldırmak istediğinizden emin misiniz? (Bağlı yol haritası da silinir)",
+      )
+    )
+      return;
 
-    try {
+    async function doDelete(force: boolean) {
       const res = await fetch("/api/mentor/unassign-project", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assignedProjectId }),
+        body: JSON.stringify({ assignedProjectId, force }),
       });
+      return res;
+    }
+
+    try {
+      let res = await doDelete(false);
+
+      // Backend öğrenci ilerlemesi varsa 409 döner — ek onay iste
+      if (res.status === 409) {
+        const data = await res.json().catch(() => ({}));
+        const msg =
+          data?.error ||
+          "Bu projede öğrenci ilerlemesi var.";
+        const confirmed = confirm(
+          `${msg}\n\nYine de silmek istediğinden EMİN misin? Tüm ilerleme ve yol haritası kaybolacak.`,
+        );
+        if (!confirmed) return;
+        res = await doDelete(true);
+      }
 
       if (res.ok) {
         await loadStudentDetail();
       } else {
-        alert("Silme işlemi başarısız oldu.");
+        const data = await res.json().catch(() => ({}));
+        alert(data?.error || "Silme işlemi başarısız oldu.");
       }
     } catch (error) {
       console.error("Silme hatası:", error);
@@ -260,7 +294,7 @@ export default function StudentDetailPage() {
           <h3 className="text-lg font-medium text-gray-900 mb-2">Öğrenci bulunamadı</h3>
           <p className="text-gray-600 mb-4">Bu öğrenci size atanmamış olabilir.</p>
           <Link href="/mentor-dashboard" className="text-blue-600 hover:text-blue-800">
-            ← Dashboard'a dön
+            ← Dashboard&apos;a dön
           </Link>
         </div>
       </div>
@@ -490,19 +524,19 @@ export default function StudentDetailPage() {
               <div className="flex items-center gap-4">
                 <button
                   onClick={handleAIRecommend}
-                  disabled={isAIThinking || projectTemplates.length === 0}
+                  disabled={isAIThinking || templatesLoading}
                   className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold transition-all shadow-sm ${
-                    isAIThinking
+                    isAIThinking || templatesLoading
                       ? "bg-purple-100 text-purple-600 cursor-wait"
                       : "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-purple-200/50"
                   }`}
                 >
-                  {isAIThinking ? (
+                  {isAIThinking || templatesLoading ? (
                     <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full" />
                   ) : (
                     <Sparkles className="w-4 h-4" />
                   )}
-                  {isAIThinking ? "AI Analiz Ediyor..." : "🤖 AI Öner"}
+                  {isAIThinking ? "AI Analiz Ediyor..." : templatesLoading ? "Yükleniyor..." : "🤖 AI Öner"}
                 </button>
 
                 <button
@@ -515,6 +549,16 @@ export default function StudentDetailPage() {
             </div>
 
             <div className="p-6 overflow-y-auto">
+              {aiError && (
+                <div className="mb-4 flex items-start gap-3 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
+                  <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="font-semibold">AI Önerisi Başarısız</p>
+                    <p className="mt-0.5 text-red-600">{aiError}</p>
+                  </div>
+                  <button onClick={() => setAiError(null)} className="ml-auto text-red-400 hover:text-red-600">×</button>
+                </div>
+              )}
               {sortedProjectTemplates.length === 0 ? (
                 <div className="text-center py-12">
                   <p className="text-gray-500 text-lg">Proje şablonu bulunamadı</p>

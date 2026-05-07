@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ShieldCheck, Loader2, CheckCircle2 } from "lucide-react";
 
 type Props = {
@@ -17,11 +17,7 @@ export function SecurityQuestionsSetup({ onComplete }: Props) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
-  useEffect(() => {
-    loadStatus();
-  }, []);
-
-  async function loadStatus() {
+  const loadStatus = useCallback(async () => {
     try {
       const res = await fetch("/api/auth/security-questions");
       if (res.ok) {
@@ -37,7 +33,11 @@ export function SecurityQuestionsSetup({ onComplete }: Props) {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    loadStatus();
+  }, [loadStatus]);
 
   function toggleQuestion(qId: number) {
     setSelectedQuestions((prev) => {

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { hash, verify } from "@node-rs/argon2";
 import { SECURITY_QUESTIONS, REQUIRED_ANSWERS } from "@/lib/security-questions";
 import { createRateLimiter } from "@/lib/rate-limit";
+import crypto from "crypto";
 
 const limiter = createRateLimiter("forgot-password", {
   maxRequests: 5,
@@ -14,6 +15,25 @@ const accountLimiter = createRateLimiter("forgot-password-account", {
   maxRequests: 10,
   windowSeconds: 3600, // 1 saatte max 10 deneme per email
 });
+
+/**
+ * Kısa ömürlü doğrulama tokenleri (step2→step3 arası).
+ * token → { userId, expiresAt }
+ * Güvenlik açığını kapatır: saldırgan step2'yi atlayıp step3'e gidemez.
+ */
+interface ResetToken {
+  userId: string;
+  expiresAt: number; // ms
+}
+const resetTokens = new Map<string, ResetToken>();
+
+// Süresi dolan tokenleri temizle (her 5 dakikada bir)
+setInterval(() => {
+  const now = Date.now();
+  for (const [token, data] of resetTokens) {
+    if (now > data.expiresAt) resetTokens.delete(token);
+  }
+}, 5 * 60 * 1000);
 
 /**
  * POST /api/auth/forgot-password/verify
@@ -37,10 +57,11 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { email, answers, newPassword } = body as {
+    const { email, answers, newPassword, resetToken } = body as {
       email: string;
       answers?: { questionId: number; answer: string }[];
       newPassword?: string;
+      resetToken?: string;
     };
 
     if (!email || typeof email !== "string") {
@@ -125,8 +146,26 @@ export async function POST(req: Request) {
       );
     }
 
-    // ADIM 3: Cevaplar doğru + yeni şifre geldi → Şifreyi güncelle
+    // ADIM 3: Token + yeni şifre → doğrula ve şifreyi güncelle
+    // NOT: Artık answers tekrar doğrulanmıyor — resetToken yeterli kanıt
     if (newPassword) {
+      // Token olmadan step 3'e geçiş engellenir
+      if (!resetToken) {
+        return NextResponse.json(
+          { error: "Geçersiz istek. Lütfen sıfırlama işlemini baştan başlatın." },
+          { status: 400 }
+        );
+      }
+      const tokenData = resetTokens.get(resetToken);
+      if (!tokenData || Date.now() > tokenData.expiresAt || tokenData.userId !== user.id) {
+        resetTokens.delete(resetToken);
+        return NextResponse.json(
+          { error: "Doğrulama süresi doldu veya geçersiz. Lütfen tekrar deneyin." },
+          { status: 400 }
+        );
+      }
+      // Token tek kullanımlık: hemen sil
+      resetTokens.delete(resetToken);
       // Şifre politikası kontrolü
       if (newPassword.length < 8) {
         return NextResponse.json(
@@ -177,9 +216,16 @@ export async function POST(req: Request) {
       });
     }
 
-    // Cevaplar doğru ama yeni şifre yok → Onay döndür
+    // Cevaplar doğru: kısa ömürlü reset tokeni oluştur (5 dakika geçerli)
+    const token = crypto.randomBytes(32).toString("hex");
+    resetTokens.set(token, {
+      userId: user.id,
+      expiresAt: Date.now() + 5 * 60 * 1000,
+    });
+
     return NextResponse.json({
       step: "verified",
+      resetToken: token,
       message: "Güvenlik soruları doğrulandı. Yeni şifrenizi belirleyin.",
     });
   } catch (error) {

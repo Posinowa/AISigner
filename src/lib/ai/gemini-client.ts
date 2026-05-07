@@ -30,10 +30,17 @@ export function getVertexAI(): VertexAI {
   return vertexAIInstance;
 }
 
+/** JSON döndüren modeller için (response_mime_type=application/json). */
 export function getModel(modelName: string = "gemini-2.0-flash-001") {
   const vertexAI = getVertexAI();
   return vertexAI.getGenerativeModel({
     model: modelName,
     generationConfig: { responseMimeType: "application/json" },
   });
+}
+
+/** Düz metin döndüren modeller için (chat vb.). */
+export function getTextModel(modelName: string = "gemini-2.0-flash-001") {
+  const vertexAI = getVertexAI();
+  return vertexAI.getGenerativeModel({ model: modelName });
 }

@@ -225,29 +225,51 @@ export async function updateProjectStatus(
 }
 
 // Proje atamasını sil (Geri al)
-export async function unassignProject(assignedProjectId: string, mentorId: string) {
-  try {
-    // Mentor ownership kontrolü
-    const assignedProject = await prisma.assignedProject.findFirst({
-      where: {
-        id: assignedProjectId,
-        studentProfile: {
-          mentorId: mentorId,
+// İlerlemeyi sessizce silmemek için: aktif/tamamlanmış proje veya
+// PUBLISHED roadmap varsa force=true gelmeden silmez.
+export async function unassignProject(
+  assignedProjectId: string,
+  mentorId: string,
+  force = false
+) {
+  // Mentor ownership + ilerleme bilgisi
+  const assignedProject = await prisma.assignedProject.findFirst({
+    where: {
+      id: assignedProjectId,
+      studentProfile: { mentorId },
+    },
+    include: {
+      roadmap: {
+        select: {
+          status: true,
+          steps: { select: { status: true } },
         },
       },
-    });
+    },
+  });
 
-    if (!assignedProject) {
-      throw new Error("Bu projeyi silme yetkiniz yok veya proje bulunamadı");
-    }
-
-    return await prisma.assignedProject.delete({
-      where: {
-        id: assignedProjectId,
-      },
-    });
-  } catch (error) {
-    console.error("Error unassigning project:", error);
-    throw error;
+  if (!assignedProject) {
+    throw new Error("Bu projeyi silme yetkiniz yok veya proje bulunamadı");
   }
+
+  if (!force) {
+    const hasProgress = assignedProject.status !== "PENDING";
+    const roadmapPublished = assignedProject.roadmap?.status === "PUBLISHED";
+    const hasStepProgress =
+      assignedProject.roadmap?.steps.some(
+        (s) => s.status === "IN_PROGRESS" || s.status === "COMPLETED"
+      ) ?? false;
+
+    if (hasProgress || roadmapPublished || hasStepProgress) {
+      const err = new Error(
+        "Bu projede öğrenci ilerlemesi var. Silmek için onay gerekiyor."
+      ) as Error & { code?: string };
+      err.code = "REQUIRES_CONFIRMATION";
+      throw err;
+    }
+  }
+
+  return prisma.assignedProject.delete({
+    where: { id: assignedProjectId },
+  });
 }

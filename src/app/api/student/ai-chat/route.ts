@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth/guard";
 import { createRateLimiter } from "@/lib/rate-limit";
-import { getVertexAI } from "@/lib/ai/gemini-client";
+import { getTextModel } from "@/lib/ai/gemini-client";
 import { prisma } from "@/lib/db";
 
 const limiter = createRateLimiter("ai-chat", {
@@ -113,10 +113,7 @@ export async function POST(req: Request) {
       }
     }
 
-    const vertexAI = getVertexAI();
-    const model = vertexAI.getGenerativeModel({
-      model: "gemini-2.0-flash-001",
-    });
+    const model = getTextModel();
 
     // Chat geçmişini oluştur (sadece user/assistant rolleri kabul et - prompt injection önleme)
     const safeHistory = (history || [])

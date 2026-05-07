@@ -1,10 +1,21 @@
-// 🧭 Bu sayfa sadece admin kullanıcılar tarafından görülebilir.
-// Amaç: Admin paneli için başlangıç noktası
-
+// 🧭 Admin paneli — kullanıcı/rol yönetimi ve mentor atama
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import {
+  Users,
+  GraduationCap,
+  ShieldCheck,
+  UserCog,
+  Search,
+  AlertCircle,
+  Loader2,
+  FolderKanban,
+  MessageSquare,
+} from "lucide-react";
 import LogoutButton from "@/components/LogoutButton";
+import { UnreadBadge } from "@/features/messaging/ui/UnreadBadge";
 
 type User = {
   id: string;
@@ -25,32 +36,33 @@ type Mentor = {
   email: string;
 };
 
+const roleConfig: Record<User["role"], { label: string; color: string }> = {
+  ADMIN: { label: "Yönetici", color: "bg-purple-50 text-purple-700 border-purple-200" },
+  MENTOR: { label: "Mentor", color: "bg-blue-50 text-blue-700 border-blue-200" },
+  STUDENT: { label: "Öğrenci", color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+};
+
 export default function AdminDashboard() {
   const [users, setUsers] = useState<User[]>([]);
   const [mentors, setMentors] = useState<Mentor[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState<"ALL" | User["role"]>("ALL");
 
   useEffect(() => {
     async function loadData() {
       try {
         const [usersRes, mentorsRes] = await Promise.all([
           fetch("/api/admin/users"),
-          fetch("/api/admin/mentors")
+          fetch("/api/admin/mentors"),
         ]);
-
         const usersData = usersRes.ok ? await usersRes.json() : [];
         const mentorsData = mentorsRes.ok ? await mentorsRes.json() : [];
-
         setUsers(usersData);
         setMentors(mentorsData);
-        
-        console.log("Users loaded:", usersData.length);
-        console.log("Mentors loaded:", mentorsData.length);
       } catch (err) {
         console.error("Fetch error:", err);
-        setUsers([]);
-        setMentors([]);
       } finally {
         setLoading(false);
       }
@@ -66,13 +78,8 @@ export default function AdminDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, role }),
       });
-
       if (response.ok) {
-        setUsers(prev =>
-          prev.map(u => (u.id === userId ? { ...u, role } : u))
-        );
-      } else {
-        console.error("Failed to update role");
+        setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role } : u)));
       }
     } catch (error) {
       console.error("Error updating role:", error);
@@ -87,29 +94,25 @@ export default function AdminDashboard() {
       const response = await fetch("/api/admin/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          studentId, 
-          mentorId: mentorId === "" ? null : mentorId // Boş string'i null'a çevir
+        body: JSON.stringify({
+          studentId,
+          mentorId: mentorId === "" ? null : mentorId,
         }),
       });
-
       if (response.ok) {
-        setUsers(prev =>
-          prev.map(u =>
+        setUsers((prev) =>
+          prev.map((u) =>
             u.id === studentId && u.studentProfile
-              ? { 
-                  ...u, 
-                  studentProfile: { 
-                    ...u.studentProfile, 
-                    mentorId: mentorId === "" ? null : mentorId 
-                  } 
+              ? {
+                  ...u,
+                  studentProfile: {
+                    ...u.studentProfile,
+                    mentorId: mentorId === "" ? null : mentorId,
+                  },
                 }
-              : u
-          )
+              : u,
+          ),
         );
-        console.log(`Mentor assigned: Student ${studentId} -> Mentor ${mentorId}`);
-      } else {
-        console.error("Failed to assign mentor");
       }
     } catch (error) {
       console.error("Error assigning mentor:", error);
@@ -118,118 +121,249 @@ export default function AdminDashboard() {
     }
   }
 
-  if (loading) return (
-    <div className="p-6">
-      <div className="flex items-center justify-center">
-        <p className="text-lg">Loading...</p>
+  const filteredUsers = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return users.filter((u) => {
+      if (roleFilter !== "ALL" && u.role !== roleFilter) return false;
+      if (!q) return true;
+      const fullName = `${u.name ?? ""} ${u.lastName ?? ""}`.toLowerCase();
+      return u.email.toLowerCase().includes(q) || fullName.includes(q);
+    });
+  }, [users, search, roleFilter]);
+
+  const stats = useMemo(() => {
+    const total = users.length;
+    const studentCount = users.filter((u) => u.role === "STUDENT").length;
+    const mentorCount = users.filter((u) => u.role === "MENTOR").length;
+    const adminCount = users.filter((u) => u.role === "ADMIN").length;
+    const studentsWithProfile = users.filter(
+      (u) => u.role === "STUDENT" && u.studentProfile,
+    ).length;
+    const studentsWithoutMentor = users.filter(
+      (u) => u.role === "STUDENT" && u.studentProfile && !u.studentProfile.mentorId,
+    ).length;
+    return { total, studentCount, mentorCount, adminCount, studentsWithProfile, studentsWithoutMentor };
+  }, [users]);
+
+  const getDisplayName = (u: { name: string | null; lastName: string | null; email: string }) => {
+    const full = `${u.name ?? ""} ${u.lastName ?? ""}`.trim();
+    return full || u.email.split("@")[0];
+  };
+
+  const getInitials = (u: { name: string | null; lastName: string | null; email: string }) => {
+    const parts = [u.name, u.lastName].filter(Boolean) as string[];
+    if (parts.length > 0) return parts.map((p) => p[0].toUpperCase()).join("");
+    return u.email[0]?.toUpperCase() ?? "?";
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-slate-50">
+        <Loader2 className="animate-spin h-7 w-7 text-blue-600 mr-3" />
+        <span className="text-slate-600 font-medium">Kullanıcılar yükleniyor...</span>
       </div>
-    </div>
-  );
+    );
+  }
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-        <LogoutButton />
-      </div>
-      
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Name
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Email
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Role
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Mentor
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {users.map(user => (
-              <tr key={user.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  {user.name || user.lastName ? `${user.name || ''} ${user.lastName || ''}`.trim() : 'İsim belirtilmemiş'}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {user.email}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  <select
-                    value={user.role}
-                    onChange={e =>
-                      handleRoleChange(user.id, e.target.value as User["role"])
-                    }
-                    disabled={updating === user.id}
-                    className="border border-gray-300 rounded-md px-3 py-2 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    style={{ minWidth: '120px' }}
-                  >
-                    <option value="ADMIN">ADMIN</option>
-                    <option value="MENTOR">MENTOR</option>
-                    <option value="STUDENT">STUDENT</option>
-                  </select>
-                  {updating === user.id && <span className="ml-2 text-xs text-blue-500">Updating...</span>}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {user.role === "STUDENT" && user.studentProfile ? (
-                    <div className="flex flex-col">
-                      <select
-                        value={user.studentProfile.mentorId || ""}
-                        onChange={e => {
-                          console.log(`Changing mentor for student ${user.id} to ${e.target.value}`);
-                          handleAssignMentor(user.id, e.target.value);
-                        }}
-                        disabled={updating === user.id}
-                        className="border border-gray-300 rounded-md px-3 py-2 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        style={{ minWidth: '180px' }}
-                      >
-                        <option value="">Mentor Seçilmedi</option>
-                        {mentors.map(mentor => (
-                          <option key={mentor.id} value={mentor.id}>
-                            {mentor.name || mentor.lastName 
-                              ? `${mentor.name || ''} ${mentor.lastName || ''}`.trim()
-                              : mentor.email
-                            }
-                          </option>
-                        ))}
-                      </select>
-                      {updating === user.id && <span className="text-xs text-blue-500 mt-1">Updating...</span>}
-                      {user.studentProfile.mentorId && (
-                        <span className="text-xs text-gray-400 mt-1">
-                          Current: {mentors.find(m => m.id === user.studentProfile?.mentorId)?.name || 'Unknown'}
-                        </span>
-                      )}
-                    </div>
-                  ) : (
-                    <span className="text-gray-400 italic">
-                      {user.role === "STUDENT" ? "No Student Profile" : "Not Student"}
-                    </span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        
-        {users.length === 0 && (
-          <div className="text-center py-8">
-            <p className="text-gray-500">No users found</p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/30">
+      <div className="max-w-7xl mx-auto p-6">
+        {/* Header */}
+        <div className="flex items-start justify-between mb-8 pt-2 gap-4 flex-wrap">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Yönetici Paneli</h1>
+            <p className="text-slate-500 mt-1.5 text-sm">
+              Kullanıcı rollerini düzenle ve öğrencilere mentor ata
+            </p>
+          </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            <Link
+              href="/admin-dashboard/messages"
+              className="relative inline-flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-blue-50 text-blue-700 rounded-xl text-sm font-medium transition-colors border border-blue-100 shadow-sm"
+            >
+              <MessageSquare className="w-4 h-4" />
+              Mesajlar
+              <UnreadBadge />
+            </Link>
+            <Link
+              href="/admin-dashboard/projects"
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-medium transition-colors border border-slate-200 shadow-sm"
+            >
+              <FolderKanban className="w-4 h-4" />
+              Proje Şablonları
+            </Link>
+            <LogoutButton />
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          {[
+            { icon: Users, color: "text-blue-600 bg-blue-50", label: "Toplam Kullanıcı", value: stats.total },
+            { icon: GraduationCap, color: "text-emerald-600 bg-emerald-50", label: "Öğrenci", value: stats.studentCount },
+            { icon: UserCog, color: "text-indigo-600 bg-indigo-50", label: "Mentor", value: stats.mentorCount },
+            { icon: ShieldCheck, color: "text-purple-600 bg-purple-50", label: "Yönetici", value: stats.adminCount },
+          ].map(({ icon: Icon, color, label, value }) => (
+            <div
+              key={label}
+              className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm flex items-center gap-4"
+            >
+              <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${color} shrink-0`}>
+                <Icon className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-slate-500 leading-tight">{label}</p>
+                <p className="text-2xl font-bold text-slate-900 mt-0.5">{value}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Uyarı banner — mentor atanmamış öğrenciler */}
+        {stats.studentsWithoutMentor > 0 && (
+          <div className="mb-6 flex items-start gap-3 rounded-2xl bg-amber-50 border border-amber-200 px-5 py-4">
+            <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+            <div className="text-sm">
+              <p className="font-semibold text-amber-900">
+                {stats.studentsWithoutMentor} öğrencinin mentoru yok
+              </p>
+              <p className="text-amber-700 mt-0.5">
+                Profilini tamamlamış ancak henüz mentor atanmamış öğrenciler var. Aşağıdaki listeden atama yapabilirsin.
+              </p>
+            </div>
           </div>
         )}
-      </div>
-      
-      {/* Debug Info */}
-      <div className="mt-8 p-4 bg-gray-100 rounded-lg">
-        <h3 className="font-semibold mb-2">Debug Info:</h3>
-        <p>Total Users: {users.length}</p>
-        <p>Total Mentors: {mentors.length}</p>
-        <p>Students with Profile: {users.filter(u => u.role === "STUDENT" && u.studentProfile).length}</p>
+
+        {/* Search + Filter */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 mb-5 flex flex-wrap gap-3 items-center">
+          <div className="relative flex-1 min-w-[240px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="İsim veya e-posta ile ara..."
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-blue-500 focus:ring-3 focus:ring-blue-100 outline-none transition"
+            />
+          </div>
+          <div className="flex gap-1.5">
+            {(["ALL", "STUDENT", "MENTOR", "ADMIN"] as const).map((r) => (
+              <button
+                key={r}
+                onClick={() => setRoleFilter(r)}
+                className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-colors ${
+                  roleFilter === r
+                    ? "bg-slate-900 text-white"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                {r === "ALL" ? "Tümü" : roleConfig[r].label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Users List */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+          {filteredUsers.length === 0 ? (
+            <div className="text-center py-16">
+              <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                <Users className="w-6 h-6 text-slate-400" />
+              </div>
+              <p className="text-slate-500 text-sm font-medium">
+                {search || roleFilter !== "ALL"
+                  ? "Filtreyle eşleşen kullanıcı yok"
+                  : "Henüz kullanıcı yok"}
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {/* Header row (desktop) */}
+              <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3 bg-slate-50/60 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                <div className="col-span-4">Kullanıcı</div>
+                <div className="col-span-3">Rol</div>
+                <div className="col-span-5">Mentor Ataması</div>
+              </div>
+
+              {filteredUsers.map((user) => {
+                const isUpdating = updating === user.id;
+                const role = roleConfig[user.role];
+                return (
+                  <div
+                    key={user.id}
+                    className="grid grid-cols-1 md:grid-cols-12 gap-4 px-6 py-4 hover:bg-slate-50/60 transition-colors"
+                  >
+                    {/* Kullanıcı */}
+                    <div className="md:col-span-4 flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-semibold text-sm flex items-center justify-center shrink-0 shadow-sm">
+                        {getInitials(user)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-slate-900 truncate">
+                          {getDisplayName(user)}
+                        </p>
+                        <p className="text-xs text-slate-500 truncate">{user.email}</p>
+                      </div>
+                      <span
+                        className={`md:hidden shrink-0 px-2 py-1 text-[10px] font-semibold rounded-lg border ${role.color}`}
+                      >
+                        {role.label}
+                      </span>
+                    </div>
+
+                    {/* Rol */}
+                    <div className="md:col-span-3 flex items-center gap-2">
+                      <select
+                        value={user.role}
+                        onChange={(e) =>
+                          handleRoleChange(user.id, e.target.value as User["role"])
+                        }
+                        disabled={isUpdating}
+                        className="border border-slate-200 rounded-xl px-3 py-2 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
+                      >
+                        <option value="ADMIN">Yönetici</option>
+                        <option value="MENTOR">Mentor</option>
+                        <option value="STUDENT">Öğrenci</option>
+                      </select>
+                      {isUpdating && <Loader2 className="animate-spin w-3.5 h-3.5 text-blue-600" />}
+                    </div>
+
+                    {/* Mentor Atama */}
+                    <div className="md:col-span-5 flex items-center">
+                      {user.role === "STUDENT" ? (
+                        user.studentProfile ? (
+                          <div className="flex items-center gap-2 w-full">
+                            <select
+                              value={user.studentProfile.mentorId || ""}
+                              onChange={(e) => handleAssignMentor(user.id, e.target.value)}
+                              disabled={isUpdating}
+                              className="flex-1 border border-slate-200 rounded-xl px-3 py-2 bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
+                            >
+                              <option value="">— Mentor seçilmedi —</option>
+                              {mentors.map((mentor) => (
+                                <option key={mentor.id} value={mentor.id}>
+                                  {getDisplayName(mentor)} ({mentor.email})
+                                </option>
+                              ))}
+                            </select>
+                            {isUpdating && <Loader2 className="animate-spin w-3.5 h-3.5 text-blue-600" />}
+                          </div>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 rounded-lg">
+                            <AlertCircle className="w-3 h-3" />
+                            Profil tamamlanmamış
+                          </span>
+                        )
+                      ) : (
+                        <span className="text-slate-400 text-xs italic">—</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

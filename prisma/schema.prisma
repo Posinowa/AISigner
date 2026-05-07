@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -13,105 +7,172 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  ADMIN  
-  MENTOR
-  STUDENT
-}
-
 model User {
-  id        String    @id @default(cuid())
-  email     String   @unique                        
-  name      String?    
-  lastName  String?                                
-  password  String  //hashed password
-  phone     String?                                        
-  role      Role     @default(STUDENT)                
-  createdAt DateTime @default(now())                
-  updatedAt DateTime @updatedAt    
-
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  lastName      String?
+  password      String
+  phone         String?
+  role          Role      @default(STUDENT)
   emailVerified DateTime?
-  sessions      Session[]
-  studentProfile  StudentProfile?  @relation("StudentUser") // Öğrenci profili ilişkisi
-  
-  // mentorun eşleştiği öğrencileri tutar
-  menteeProfiles StudentProfile[] @relation("StudentMentor")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  // Mesajlaşma ilişkileri
-  sentMessages     Message[]      @relation("SentMessages")
-  receivedMessages Message[]      @relation("ReceivedMessages")
-  
-  // Adım yorumları
-  stepComments     StepComment[]  @relation("StepComments")
-
-  // Güvenlik soruları (şifremi unuttum için)
-  securityAnswers  SecurityAnswer[] @relation("SecurityAnswers")
-
-  // Adım dosya yüklemeleri
-  stepFiles        StepFile[]       @relation("StepFiles")
+  // Relations
+  sessions        Session[]
+  studentProfile  StudentProfile? @relation("StudentProfile_userIdToUser")
+  mentoredStudents StudentProfile[] @relation("StudentProfile_mentorIdToUser")
+  sentMessages    Message[]       @relation("Message_senderIdToUser")
+  receivedMessages Message[]      @relation("Message_receiverIdToUser")
+  stepComments    StepComment[]
+  stepFiles       StepFile[]
+  securityAnswers SecurityAnswer[]
 }
 
 model Session {
-  id           String    @id @default(cuid())
-  sessionToken String    @unique
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
   userId       String
   expires      DateTime
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model StudentProfile {
   id              String   @id @default(cuid())
   userId          String   @unique
-  user            User     @relation("StudentUser", fields: [userId], references: [id], onDelete: Cascade)
-  birthYear       Int?
   experienceLevel String
   interests       String[]
   goals           String?
   availability    String?
-
+  birthYear       Int?
   mentorId        String?
-  mentor          User?    @relation("StudentMentor", fields: [mentorId], references: [id])
-
- assignedProjects AssignedProject[]
-
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
-}
 
-model ProjectTemplate{
-  id             String @id @default(cuid())
-  title          String
-  description    String     //md formatı
-  track          String[]   //["web" , "mobile"]
-  difficulty     Difficulty
-  
+  // Relations
+  user             User              @relation("StudentProfile_userIdToUser", fields: [userId], references: [id], onDelete: Cascade)
+  mentor           User?             @relation("StudentProfile_mentorIdToUser", fields: [mentorId], references: [id])
   assignedProjects AssignedProject[]
-
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
 }
 
-enum Difficulty{
-  HARD
-  MEDIUM
-  EASY
+model ProjectTemplate {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  track       String[]
+  difficulty  Difficulty
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  assignedProjects AssignedProject[]
 }
 
 model AssignedProject {
-  id                String   @id @default(cuid())
-  studentProfileId  String
+  id               String           @id @default(cuid())
+  studentProfileId String
   projectTemplateId String
-  status            AssignmentStatus @default(PENDING)
+  status           AssignmentStatus @default(PENDING)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
-  studentProfile    StudentProfile @relation(fields: [studentProfileId], references: [id])
-  projectTemplate   ProjectTemplate @relation(fields: [projectTemplateId], references: [id])
+  studentProfile  StudentProfile  @relation(fields: [studentProfileId], references: [id])
+  projectTemplate ProjectTemplate @relation(fields: [projectTemplateId], references: [id])
+  roadmap         Roadmap?
+}
 
-  // 🚀 SPRINT 3: Bu atanan projenin yol haritası (1-to-1 ilişki)
-  roadmap           Roadmap?
+model Roadmap {
+  id                String        @id @default(cuid())
+  assignedProjectId String        @unique
+  title             String
+  status            RoadmapStatus @default(DRAFT)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  assignedProject AssignedProject @relation(fields: [assignedProjectId], references: [id], onDelete: Cascade)
+  steps           RoadmapStep[]
+}
+
+model RoadmapStep {
+  id             String     @id @default(cuid())
+  roadmapId      String
+  order          Int
+  title          String
+  description    String
+  resources      String[]
+  estimatedHours Int?
+  status         StepStatus @default(TODO)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  roadmap   Roadmap       @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
+  comments  StepComment[]
+  files     StepFile[]
+}
+
+model Message {
+  id         String   @id @default(cuid())
+  senderId   String
+  receiverId String
+  content    String   @db.VarChar(2000)
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  sender   User @relation("Message_senderIdToUser", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User @relation("Message_receiverIdToUser", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@index([receiverId, isRead])
+  @@index([senderId, receiverId])
+}
+
+model StepComment {
+  id        String   @id @default(cuid())
+  stepId    String
+  authorId  String
+  content   String   @db.VarChar(1000)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  step   RoadmapStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  author User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([stepId])
+}
+
+model StepFile {
+  id         String   @id @default(cuid())
+  stepId     String
+  uploaderId String
+  fileName   String
+  storedName String   @unique
+  mimeType   String
+  fileSize   Int
+  createdAt  DateTime @default(now())
+
+  step     RoadmapStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  uploader User        @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+
+  @@index([stepId])
+  @@index([uploaderId])
+}
+
+model SecurityAnswer {
+  id         String   @id @default(cuid())
+  userId     String
+  questionId Int
+  answer     String
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, questionId])
+  @@index([userId])
+}
+
+enum Role {
+  ADMIN
+  MENTOR
+  STUDENT
 }
 
 enum AssignmentStatus {
@@ -120,131 +181,19 @@ enum AssignmentStatus {
   COMPLETED
 }
 
-// ==========================================
-// 🚀 SPRINT 3: ROADMAP (YOL HARİTASI) MODELLERİ
-// ==========================================
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
 
 enum RoadmapStatus {
-  DRAFT       // AI taslak olarak oluşturdu, mentor henüz onaylamadı
-  PUBLISHED   // Mentor onayladı, öğrenci görebilir
+  DRAFT
+  PUBLISHED
 }
 
 enum StepStatus {
   TODO
   IN_PROGRESS
   COMPLETED
-}
-
-model Roadmap {
-  id                String        @id @default(cuid())
-  
-  // Hangi atanmış projeye ait?
-  assignedProjectId String        @unique
-  assignedProject   AssignedProject @relation(fields: [assignedProjectId], references: [id], onDelete: Cascade)
-  
-  title             String
-  status            RoadmapStatus @default(DRAFT)
-  
-  // Yol haritasının adımları (1-to-many ilişki)
-  steps             RoadmapStep[]
-  
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-}
-
-model RoadmapStep {
-  id             String     @id @default(cuid())
-  roadmapId      String
-  roadmap        Roadmap    @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
-  
-  order          Int        // Adımın sırası (1, 2, 3...)
-  title          String     // Örn: "React Router Kurulumu"
-  description    String     // Adımın detayı
-  resources      String[]   // Faydalı linkler, makaleler (URL dizisi)
-  estimatedHours Int?       // Tahmini efor (saat)
-  status         StepStatus @default(TODO)
-
-  // Adıma ait yorumlar (mentor-öğrenci)
-  comments       StepComment[]
-
-  // Adıma yüklenen dosyalar
-  files          StepFile[]
-
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
-}
-
-// ==========================================
-// 💬 MESAJLAŞMA VE YORUM SİSTEMİ
-// ==========================================
-
-model Message {
-  id         String   @id @default(cuid())
-  senderId   String
-  receiverId String
-  content    String   @db.VarChar(2000)
-  isRead     Boolean  @default(false)
-
-  sender     User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
-  receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
-
-  createdAt  DateTime @default(now())
-
-  @@index([senderId, receiverId])
-  @@index([receiverId, isRead])
-}
-
-model StepComment {
-  id        String   @id @default(cuid())
-  stepId    String
-  authorId  String
-  content   String   @db.VarChar(1000)
-
-  step      RoadmapStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
-  author    User        @relation("StepComments", fields: [authorId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([stepId])
-}
-
-// ==========================================
-// 🔐 GÜVENLİK SORULARI (ŞİFREMİ UNUTTUM)
-// ==========================================
-
-model SecurityAnswer {
-  id         String @id @default(cuid())
-  userId     String
-  questionId Int       // Önceden tanımlı soru index'i
-  answer     String    // Hashlenmiş cevap
-
-  user       User   @relation("SecurityAnswers", fields: [userId], references: [id], onDelete: Cascade)
-
-  createdAt  DateTime @default(now())
-
-  @@unique([userId, questionId])
-  @@index([userId])
-}
-
-// ==========================================
-// 📁 DOSYA YÜKLEME SİSTEMİ
-// ==========================================
-
-model StepFile {
-  id           String   @id @default(cuid())
-  stepId       String
-  uploaderId   String
-  fileName     String           // Orijinal dosya adı
-  storedName   String   @unique // Sunucudaki benzersiz ad
-  mimeType     String
-  fileSize     Int              // Byte cinsinden
-  
-  step         RoadmapStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
-  uploader     User        @relation("StepFiles", fields: [uploaderId], references: [id], onDelete: Cascade)
-
-  createdAt    DateTime @default(now())
-
-  @@index([stepId])
-  @@index([uploaderId])
 }

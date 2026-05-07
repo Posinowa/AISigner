@@ -13,10 +13,14 @@ const signupLimiter = createRateLimiter("signup", {
   windowSeconds: 300, // 5 dakikada max 5 kayıt denemesi
 });
 
+// Başarılı durumda function redirect() ile NEXT_REDIRECT throw eder, asla return etmez.
+// Bu yüzden state sadece error tutar.
+export type SignupState = { error: Record<string, string[]> };
+
 export async function signupAction(
-  prevState: any,
+  _prevState: SignupState,
   formData: FormData
-): Promise<any> {
+): Promise<SignupState> {
   // Rate limiting
   const headersList = await headers();
   const ip =
@@ -32,27 +36,51 @@ export async function signupAction(
   const lastName = formData.get("lastName") as string
   const email = formData.get("email") as string
   const password = formData.get("password") as string
-  const phone = formData.get("phone") as string
+  // Telefon opsiyonel: boşsa undefined gönder
+  const phoneRaw = formData.get("phone") as string | null
+  const phone = phoneRaw?.trim() || undefined
 
-
-  const parsed = signupSchema.safeParse({ name,lastName, email, password , phone })
+  const parsed = signupSchema.safeParse({ name, lastName, email, password, phone })
 
   if (!parsed.success) {
-    // Zod hata objesi döndür
-    return { error: parsed.error.flatten().fieldErrors }
+    return { error: parsed.error.flatten().fieldErrors as Record<string, string[]> }
   }
 
   // Email normalizasyonu (enumeration önleme)
   const normalizedEmail = email.toLowerCase().trim();
 
-  const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } })
-  if (existing) return { error: { email: ["Bu email zaten kayıtlı"] } }
+  // DB işlemlerini try/catch ile sarmal — beklenmeyen hatalarda kullanıcıya
+  // dump edilen Prisma stack yerine düzgün bir mesaj göster.
+  try {
+    const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } })
+    if (existing) return { error: { email: ["Bu email zaten kayıtlı"] } }
 
-  const hashedPassword = await hash(password)
-  await prisma.user.create({
-    data: { name , lastName , email: normalizedEmail, password: hashedPassword, phone,  role: "STUDENT" },
-  })
+    const hashedPassword = await hash(password)
+    await prisma.user.create({
+      data: {
+        name: parsed.data.name.trim(),
+        lastName: parsed.data.lastName.trim(),
+        email: normalizedEmail,
+        password: hashedPassword,
+        phone: parsed.data.phone ?? null,
+        role: "STUDENT",
+      },
+    })
+  } catch (err) {
+    // redirect() Next.js'te NEXT_REDIRECT throw eder — onu yakalayıp swallow etmemeliyiz
+    if (err instanceof Error && err.message.includes("NEXT_REDIRECT")) {
+      throw err;
+    }
+    console.error("signupAction failed:", err)
+    return {
+      error: {
+        general: [
+          "Kayıt sırasında bir hata oluştu. Lütfen daha sonra tekrar deneyin.",
+        ],
+      },
+    }
+  }
 
-  // Başarılı -> redirect
-  redirect("/signin")
+  // Başarılı -> redirect (try/catch dışında, NEXT_REDIRECT throw etsin)
+  redirect("/signin?registered=true")
 }

@@ -65,9 +65,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ recommendations }, { status: 200 });
 
   } catch (error) {
-    console.error("AI Öneri API Hatası:", error);
+    const err = error as Error & { cause?: Error; status?: number; httpError?: { statusCode?: number } };
+    const rootCause = err.cause?.message || err.message || String(error);
+    console.error("AI Öneri API Hatası:", rootCause);
+    console.error("Tam hata:", error);
     return NextResponse.json(
-      { error: "Projeler analiz edilirken sunucu tarafında bir hata oluştu." }, 
+      { error: rootCause },
       { status: 500 }
     );
   }

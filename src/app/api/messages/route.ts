@@ -14,7 +14,7 @@ const limiter = createRateLimiter("messages", {
  * Mentor-öğrenci arasındaki mesajları listeler (cursor-based pagination).
  */
 export async function GET(req: Request) {
-  const auth = await requireAuth(["MENTOR", "STUDENT"]);
+  const auth = await requireAuth(["MENTOR", "STUDENT", "ADMIN"]);
   if (!auth.authorized) return auth.response;
 
   const { searchParams } = new URL(req.url);
@@ -30,9 +30,10 @@ export async function GET(req: Request) {
   }
 
   const userId = auth.session.user.id!;
+  const userRole = auth.session.user.role;
 
   // Kullanıcının bu kişiyle konuşma yetkisi var mı kontrol et
-  const isAllowed = await verifyConversationAccess(userId, conversationWith);
+  const isAllowed = await verifyConversationAccess(userId, conversationWith, userRole);
   if (!isAllowed) {
     return NextResponse.json(
       { error: "Bu kişiyle mesajlaşma yetkiniz yok." },
@@ -91,10 +92,11 @@ export async function GET(req: Request) {
  * Yeni mesaj gönder (mentor ↔ öğrenci arası).
  */
 export async function POST(req: Request) {
-  const auth = await requireAuth(["MENTOR", "STUDENT"]);
+  const auth = await requireAuth(["MENTOR", "STUDENT", "ADMIN"]);
   if (!auth.authorized) return auth.response;
 
   const userId = auth.session.user.id!;
+  const userRole = auth.session.user.role;
 
   const rl = limiter.check(userId);
   if (!rl.allowed) {
@@ -124,8 +126,8 @@ export async function POST(req: Request) {
       );
     }
 
-    // Yetki kontrolü: mentor ↔ öğrenci ilişkisi var mı?
-    const isAllowed = await verifyConversationAccess(userId, receiverId);
+    // Yetki kontrolü: mentor ↔ öğrenci ilişkisi (veya ADMIN)
+    const isAllowed = await verifyConversationAccess(userId, receiverId, userRole);
     if (!isAllowed) {
       return NextResponse.json(
         { error: "Bu kişiyle mesajlaşma yetkiniz yok." },
@@ -157,28 +159,37 @@ export async function POST(req: Request) {
 }
 
 /**
- * Mentor-öğrenci eşleşmesi kontrolü.
- * Sadece birbirine atanmış mentor/öğrenci çiftleri mesajlaşabilir.
+ * Konuşma erişim kontrolü.
+ * - ADMIN: herkesle mesajlaşabilir (sadece otherUserId var olmalı).
+ * - MENTOR/STUDENT: sadece birbirine atanmış mentor/öğrenci çiftleri mesajlaşabilir.
  */
 async function verifyConversationAccess(
   userId: string,
-  otherUserId: string
+  otherUserId: string,
+  userRole?: string
 ): Promise<boolean> {
-  // userId'nin mentor, otherUserId'nin öğrenci olduğu durum
+  if (userRole === "ADMIN") {
+    const exists = await prisma.user.findUnique({
+      where: { id: otherUserId },
+      select: { id: true },
+    });
+    return !!exists;
+  }
+
+  // Karşı taraf ADMIN ise (admin → user mesajına yanıt) izin ver
+  const other = await prisma.user.findUnique({
+    where: { id: otherUserId },
+    select: { role: true },
+  });
+  if (other?.role === "ADMIN") return true;
+
   const asMentor = await prisma.studentProfile.findFirst({
-    where: {
-      userId: otherUserId,
-      mentorId: userId,
-    },
+    where: { userId: otherUserId, mentorId: userId },
   });
   if (asMentor) return true;
 
-  // userId'nin öğrenci, otherUserId'nin mentor olduğu durum
   const asStudent = await prisma.studentProfile.findFirst({
-    where: {
-      userId,
-      mentorId: otherUserId,
-    },
+    where: { userId, mentorId: otherUserId },
   });
   if (asStudent) return true;
 

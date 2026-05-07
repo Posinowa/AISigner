@@ -7,7 +7,7 @@ import { requireAuth } from "@/lib/auth/guard";
  * Toplam okunmamış mesaj sayısını döner (badge/bildirim için).
  */
 export async function GET() {
-  const auth = await requireAuth(["MENTOR", "STUDENT"]);
+  const auth = await requireAuth(["MENTOR", "STUDENT", "ADMIN"]);
   if (!auth.authorized) return auth.response;
 
   try {
