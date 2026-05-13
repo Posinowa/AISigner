@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { ArrowLeft, User, Calendar, Target, Clock, BookOpen, Plus, CheckCircle, AlertCircle, Trash2, Sparkles, Map } from "lucide-react"; // Map ikonu eklendi
 import Link from "next/link";
+import { toast } from "sonner";
 
 type ProjectTemplate = {
   id: string;
@@ -176,14 +177,14 @@ export default function StudentDetailPage() {
         await loadStudentDetail();
         setShowAssignModal(false);
         setAiRecommendations([]); 
-        alert("Proje başarıyla atandı!");
+        toast.success("Proje başarıyla atandı!");
       } else {
         const error = await res.json();
-        alert(error.error || "Proje atama başarısız");
+        toast.error(error.error || "Proje atama başarısız");
       }
     } catch (error) {
       console.error("Failed to assign project:", error);
-      alert("Proje atama başarısız");
+      toast.error("Proje atama başarısız");
     } finally {
       setAssigningId(null);
     }
@@ -226,11 +227,11 @@ export default function StudentDetailPage() {
         await loadStudentDetail();
       } else {
         const data = await res.json().catch(() => ({}));
-        alert(data?.error || "Silme işlemi başarısız oldu.");
+        toast.error(data?.error || "Silme işlemi başarısız oldu.");
       }
     } catch (error) {
       console.error("Silme hatası:", error);
-      alert("Bir hata oluştu.");
+      toast.error("Bir hata oluştu.");
     }
   }
 
@@ -246,14 +247,14 @@ export default function StudentDetailPage() {
 
       if (res.ok) {
         await loadStudentDetail(); // Harita üretilince listeyi yenile
-        alert("🎉 AI Yol Haritası başarıyla oluşturuldu!");
+        toast.success("AI Yol Haritası başarıyla oluşturuldu!");
       } else {
         const error = await res.json();
-        alert(error.error || "Yol haritası oluşturulamadı.");
+        toast.error(error.error || "Yol haritası oluşturulamadı.");
       }
     } catch (error) {
       console.error("Roadmap Error:", error);
-      alert("AI ile iletişim kurarken bir hata oluştu.");
+      toast.error("AI ile iletişim kurarken bir hata oluştu.");
     } finally {
       setGeneratingRoadmapId(null);
     }

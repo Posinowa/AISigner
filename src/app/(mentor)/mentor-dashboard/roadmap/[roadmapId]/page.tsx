@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
+import { toast } from "sonner";
 import {
   ArrowLeft,
   Save,
@@ -230,7 +231,7 @@ export default function RoadmapReviewPage() {
   /* ─── Yeni Adım Ekleme ─── */
   async function handleAddStep() {
     if (!newStepForm.title.trim() || !newStepForm.description.trim()) {
-      alert("Başlık ve açıklama zorunludur.");
+      toast.error("Başlık ve açıklama zorunludur.");
       return;
     }
     setSaving(true);

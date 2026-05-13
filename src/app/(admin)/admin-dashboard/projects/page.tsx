@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Plus, Pencil, Trash2, X, ArrowLeft, FolderKanban } from "lucide-react";
 import Link from "next/link";
+import { toast } from "sonner";
 
 type ProjectTemplate = {
   id: string;
@@ -130,7 +131,7 @@ export default function ProjectsPage() {
       setTemplates(prev => prev.filter(t => t.id !== id));
     } catch (error) {
       console.error("Failed to delete template:", error);
-      alert("Silme işlemi başarısız oldu. Lütfen tekrar deneyin.");
+      toast.error("Silme işlemi başarısız oldu. Lütfen tekrar deneyin.");
       // Hata durumunda listeyi yeniden yükle
       loadTemplates();
     }

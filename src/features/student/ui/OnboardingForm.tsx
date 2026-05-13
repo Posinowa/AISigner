@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { saveOnboarding } from "@/features/student/server/onboarding";
 import { CheckCircle, User, Target, Award, ArrowRight, ArrowLeft, Rocket, Terminal, BookOpen, Clock } from "lucide-react";
+import { toast } from "sonner";
 
 import type { FieldPath } from "react-hook-form";
 
@@ -159,7 +160,7 @@ export default function OnboardingForm({
       
     } catch (err) {
       console.error("Onboarding kaydı başarısız:", err);
-      alert("Kayıt sırasında bir hata oluştu.");
+      toast.error("Kayıt sırasında bir hata oluştu.");
     } finally {
       setIsSubmitting(false);
     }

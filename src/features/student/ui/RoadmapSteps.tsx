@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { CheckCircle2, PlayCircle, Lock, ExternalLink, Loader2 } from "lucide-react";
 import { StepComments } from "@/features/messaging/ui/StepComments";
 import { StepFiles } from "@/features/files/ui/StepFiles";
+import { toast } from "sonner";
 
 type Step = {
   id: string;
@@ -39,7 +40,7 @@ export function RoadmapSteps({ steps, isDraft, currentUserId, currentUserRole }:
 
       if (!res.ok) {
         const err = await res.json();
-        alert(err.error || "Bir hata oluştu.");
+        toast.error(err.error || "Bir hata oluştu.");
         return;
       }
 
@@ -48,7 +49,7 @@ export function RoadmapSteps({ steps, isDraft, currentUserId, currentUserRole }:
         router.refresh();
       });
     } catch {
-      alert("Bağlantı hatası. Lütfen tekrar deneyin.");
+      toast.error("Bağlantı hatası. Lütfen tekrar deneyin.");
     } finally {
       setUpdatingId(null);
     }

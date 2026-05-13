@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { MessageSquare, Send, Loader2, Trash2, Pencil, X, User } from "lucide-react";
+import { toast } from "sonner";
 
 type Comment = {
   id: string;
@@ -78,10 +79,10 @@ export function StepComments({ stepId, currentUserId, currentUserRole }: Props) 
         setNewComment("");
       } else {
         const err = await res.json();
-        alert(err.error || "Yorum gönderilemedi.");
+        toast.error(err.error || "Yorum gönderilemedi.");
       }
     } catch {
-      alert("Bağlantı hatası.");
+      toast.error("Bağlantı hatası.");
     } finally {
       setSending(false);
     }
@@ -106,10 +107,10 @@ export function StepComments({ stepId, currentUserId, currentUserRole }: Props) 
         setEditContent("");
       } else {
         const err = await res.json();
-        alert(err.error || "Yorum güncellenemedi.");
+        toast.error(err.error || "Yorum güncellenemedi.");
       }
     } catch {
-      alert("Bağlantı hatası.");
+      toast.error("Bağlantı hatası.");
     }
   }
 
@@ -125,10 +126,10 @@ export function StepComments({ stepId, currentUserId, currentUserRole }: Props) 
         setComments((prev) => prev.filter((c) => c.id !== commentId));
       } else {
         const err = await res.json();
-        alert(err.error || "Yorum silinemedi.");
+        toast.error(err.error || "Yorum silinemedi.");
       }
     } catch {
-      alert("Bağlantı hatası.");
+      toast.error("Bağlantı hatası.");
     }
   }
 

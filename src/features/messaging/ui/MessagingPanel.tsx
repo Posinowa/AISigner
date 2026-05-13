@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Send, ArrowLeft, Loader2, MessageCircle } from "lucide-react";
+import { toast } from "sonner";
 
 type Message = {
   id: string;
@@ -136,10 +137,10 @@ export function MessagingPanel({ currentUserId }: Props) {
         loadConversations();
       } else {
         const err = await res.json();
-        alert(err.error || "Mesaj gönderilemedi.");
+        toast.error(err.error || "Mesaj gönderilemedi.");
       }
     } catch {
-      alert("Bağlantı hatası. Lütfen tekrar deneyin.");
+      toast.error("Bağlantı hatası. Lütfen tekrar deneyin.");
     } finally {
       setSending(false);
     }
