@@ -55,6 +55,64 @@ Projeyi kurmadan önce sisteminizde aşağıdaki yazılımların kurulu olduğun
 
 ---
 
+## Outplane Deploy
+
+### 1) Outplane'de PostgreSQL oluştur
+
+- `Create Database` -> `PostgreSQL`
+- Örnek ad: `aisigner-db`
+- Bölge: kullanıcı kitlene en yakın bölge (TR için Frankfurt uygun)
+- Oluşan connection string'i kopyala
+
+### 2) Uygulamayı repo'dan deploy et
+
+- Outplane `Deploy New Application` ekranında `Public Repo` seç
+- Repo URL'sini gir (kendi fork'un veya ana repo)
+- Build yöntemi olarak `Dockerfile` seç
+- Port: `3000`
+
+Bu repo Outplane için gerekli Docker dosyalarıyla birlikte gelir:
+
+- `Dockerfile`
+- `.dockerignore`
+
+Container başlangıcında migration otomatik uygulanır:
+
+- `npx prisma migrate deploy`
+
+### 3) Environment Variables
+
+Outplane uygulamasına aşağıdaki değişkenleri ekle:
+
+```bash
+DATABASE_URL=<outplane-postgres-connection-string>
+AUTH_SECRET=<uzun-rastgele-string>
+NEXT_PUBLIC_APP_URL=<outplane-app-url>
+NODE_ENV=production
+PORT=3000
+```
+
+AI özelliklerini de production'da kullanacaksan ek olarak:
+
+```bash
+GOOGLE_CLOUD_PROJECT=<gcp-project-id>
+GOOGLE_CLOUD_LOCATION=us-central1
+GOOGLE_APPLICATION_CREDENTIALS=gcp-credentials.json
+```
+
+ve `gcp-credentials.json` dosyasını Outplane tarafında güvenli dosya/secret olarak mount etmen gerekir.
+
+### 4) İlk doğrulama
+
+- Deploy tamamlanınca `/api/health` endpointini kontrol et
+- Gerekirse Outplane terminalinden seed çalıştır:
+
+```bash
+npm run seed
+```
+
+---
+
 > **NOT:** Seed sonrası test kullanıcıları
  
 > | Rol     | Email               | Şifre           |
