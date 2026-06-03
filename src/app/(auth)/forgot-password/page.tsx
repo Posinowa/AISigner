@@ -217,10 +217,11 @@ export default function ForgotPasswordPage() {
             {step === "email" && (
               <form onSubmit={handleEmailSubmit} className="space-y-5">
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                  <label htmlFor="fp-email" className="mb-1.5 block text-sm font-medium text-slate-700">
                     E-posta Adresi
                   </label>
                   <input
+                    id="fp-email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -257,10 +258,11 @@ export default function ForgotPasswordPage() {
               <form onSubmit={handleAnswersSubmit} className="space-y-5">
                 {questions.map((q, index) => (
                   <div key={q.questionId}>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                    <label htmlFor={`fp-q-${q.questionId}`} className="mb-1.5 block text-sm font-medium text-slate-700">
                       {index + 1}. {q.question}
                     </label>
                     <input
+                      id={`fp-q-${q.questionId}`}
                       type="text"
                       value={answers[q.questionId] || ""}
                       onChange={(e) =>
@@ -305,11 +307,12 @@ export default function ForgotPasswordPage() {
             {step === "newPassword" && (
               <form onSubmit={handlePasswordSubmit} className="space-y-5">
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                  <label htmlFor="fp-new-password" className="mb-1.5 block text-sm font-medium text-slate-700">
                     Yeni Şifre
                   </label>
                   <div className="relative">
                     <input
+                      id="fp-new-password"
                       type={showPassword ? "text" : "password"}
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
@@ -322,6 +325,7 @@ export default function ForgotPasswordPage() {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? "Şifreyi gizle" : "Şifreyi göster"}
                       className="absolute inset-y-0 right-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
                     >
                       {showPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
@@ -353,10 +357,11 @@ export default function ForgotPasswordPage() {
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                  <label htmlFor="fp-confirm-password" className="mb-1.5 block text-sm font-medium text-slate-700">
                     Şifreyi Tekrar Gir
                   </label>
                   <input
+                    id="fp-confirm-password"
                     type={showPassword ? "text" : "password"}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}

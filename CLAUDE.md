@@ -103,44 +103,58 @@ src/
 | 5 | Signin `err: any` ESLint hatası | `app/(auth)/signin/page.tsx` | `unknown` + `instanceof Error` guard |
 | 6 | Signup sayfası isPending yoktu | `app/(auth)/signup/page.tsx` | useActionState'in isPending kullanılıyor |
 
-### 🔴 Kritik — Henüz Düzeltilmedi
+### 🟠 Kritik — Deploy-bağımlı (tek-instance'ta çözüldü, ölçeklemede dikkat)
 
-| # | Sorun | Dosya | Açıklama |
+| # | Sorun | Dosya | Durum |
 |---|---|---|---|
-| S3 | Dosya yükleme disk'e yazıyor | `api/steps/[stepId]/files/route.ts` | `process.cwd()/uploads/` deploy'da sıfırlanır. GCS/S3 entegrasyonu gerekiyor |
-| S4 | Rate limiter process-local | `lib/rate-limit.ts` | Multi-instance/serverless'ta işlevsiz. Redis gerekiyor |
+| S3 | Dosya yükleme yerel disk'e yazıyor | `api/steps/[stepId]/files/route.ts` | Tek-instance: `uploads_data` volume ile kalıcı (`docker-compose.yml`). Çok-instance: GCS/S3 → `DEPLOYMENT.md` |
+| S4 | Rate limiter + resetTokens process-local | `lib/rate-limit.ts`, `forgot-password/verify` | Tek-instance: çalışır. Çok-instance/serverless: Redis → `DEPLOYMENT.md` |
 
 ### ✅ Kritik — Düzeltildi
 
 | # | Sorun | Dosya | Düzeltme |
 |---|---|---|---|
-| S1 | Şifre sıfırlama token eksikliği | `api/auth/forgot-password/verify/route.ts` | `resetTokens` Map + `crypto.randomBytes(32)` token + 5dk TTL eklendi |
-| S2 | Admin öz-rol değişikliği | `api/admin/users/route.ts` | `userId === session.user.id` guard, 403 döner |
-
-### 🟡 Orta Önem — Henüz Düzeltilmedi
-
-| # | Sorun | Dosya | Açıklama |
-|---|---|---|---|
-| M2 | Onboarding şema uyumsuzluğu | `features/student/models/onboarding.ts` | `personalSchema`'daki `phoneNumber` DB'ye kaydedilmiyor, `firstName/lastName` da User'a yazılmıyor |
-| M4 | Roadmap overwrite koruması yok | `api/mentor/generate-roadmap/route.ts` | Mevcut roadmap üzerine yenisi yazılabilir, öğrenci ilerlemesi silinebilir |
-| M6 | ADMIN mesajlaşma erişimi yok | `api/messages/route.ts` | requireAuth(["MENTOR","STUDENT"]) — ADMIN mesaj gönderemiyor |
+| S1 | Şifre sıfırlama token eksikliği | `api/auth/forgot-password/verify/route.ts` | `resetTokens` Map + `crypto.randomBytes(32)` token + 5dk TTL |
+| S2 | Admin öz-rol değişikliği | `api/admin/users/route.ts` | `userId === session.user.id` guard, 403 |
+| G1 | Login'de brute-force koruması yoktu | `lib/auth/nextauth.ts` | `authorize`'a IP+email rate-limit (`peek`/`check`/`reset`); yalnızca başarısız denemeler sayılır |
+| G3 | Kullanıcı enumerasyonu (timing) | `lib/auth/nextauth.ts` | Kullanıcı yoksa dummy argon2 `verify` → sabit zamanlı yanıt |
+| G4 | CSP header yoktu | `next.config.ts` | Content-Security-Policy eklendi (Next.js uyumlu) |
 
 ### ✅ Orta Önem — Düzeltildi
 
 | # | Sorun | Düzeltme |
 |---|---|---|
-| M1 | Student dashboard her yüklemede AI çağrısı | `unstable_cache` 24saat TTL + `revalidateTag` onboarding'de |
-| M3 | signinSchema min(6) vs signupSchema min(8) | `passwordSchema` export edildi, her iki şema da kullanıyor |
-| M5 | Mentor dashboard `useEffect` + fetch | `useCallback` + proper deps ile düzeltildi |
+| M1 | Student dashboard her yüklemede AI çağrısı | `unstable_cache` 24s TTL + `revalidateTag` |
+| M2 | Onboarding şema-DB uyumsuzluğu | `saveOnboarding` artık firstName/lastName→`User`, phoneNumber→`User.phone` yazıyor (`$transaction`) |
+| M3 | signinSchema min(6) vs signupSchema min(8) | `passwordSchema` export, ikisi de kullanıyor |
+| M4 | Roadmap overwrite koruması | `generate-roadmap` mevcut roadmap varsa 400 + mentor ownership kontrolü |
+| M5 | Mentor dashboard `useEffect`+fetch | `useCallback` + doğru deps |
+| M6 | ADMIN mesajlaşma erişimi | `messages/route` artık `["MENTOR","STUDENT","ADMIN"]` + `verifyConversationAccess` ADMIN dalı |
 
 ### 🟢 Düşük Önem
 
-| # | Sorun | Açıklama |
+| # | Sorun | Durum |
 |---|---|---|
-| ~~L1~~ | ~~ESLint 25 hata~~ | ✅ Düzeltildi: `as any` → tip-güvenli cast, `useCallback` ile exhaustive-deps, `&apos;` escape |
-| L2 | AI chat getModel() vs getVertexAI() | `ai-chat/route.ts` `responseMimeType` olmadan farklı model init kullanıyor |
-| L3 | alert() çağrıları | Birçok sayfada `alert()` — toast/snackbar ile değiştirilmeli |
-| L4 | N+1 query riski | `getMentorStudents` her öğrenci için ayrı query değil ama assignedProjects include zinciri dikkat gerektiriyor |
+| ~~L1~~ | ~~ESLint hataları~~ | ✅ `any` sıfır; kalan `no-unescaped-entities` + `seed.ts any` temizlendi → `next build` lint'siz bayrak OLMADAN geçer |
+| ~~L2~~ | ~~AI chat getModel vs getVertexAI~~ | ✅ `getTextModel()` (düz metin) + `getModel()` (JSON) ayrıldı; chat `getTextModel` kullanıyor |
+| ~~L3~~ | ~~alert() çağrıları~~ | ✅ Tümü `sonner` toast'a taşındı (kodda `alert(` yok) |
+| L4 | N+1 query riski | `getMentorStudents` tek sorgu (include zinciri) — sorun gözlenmedi, düşük |
+
+### ✨ Haziran 2026 oturumu — Tasarım / Güvenlik / Kalite taraması
+
+**Güvenlik:** G1/G3/G4 (yukarıda). `DEPLOYMENT.md` ile ölçekleme yol haritası (Redis/GCS).
+
+**Tasarım / UX (a11y):**
+- Tüm auth + onboarding formlarında `htmlFor`/`id` eşleşmesi + şifre toggle `aria-label`.
+- shadcn tema tokenları `globals.css` `@theme` ile tanımlandı → `ui/button` & `ui/input` artık çalışıyor; ölü `tailwind.config.ts` v4 stub'una indirildi (tokenlar artık `@theme`'de).
+- `app/error.tsx`, `app/not-found.tsx`, `app/loading.tsx` boundary'leri eklendi; mentor dashboard'a error+retry state'i.
+
+**Kod kalitesi:**
+- `mentors/server/actions.ts` DB hatasını artık yutmuyor (rethrow) → API 500 döner, UI error state'i tetiklenir.
+- `lib/logger.ts` (seviyeli, ortam-farkında) eklendi; `mentors/actions.ts` ona geçirildi.
+- `vitest` + `lib/rate-limit.test.ts` (7 test) → `npm test`.
+
+**Açık notlar:** Ölü kod `getAvailableProjects` kaldırıldı. `npm audit` zafiyetleri transitive bağımlılıklardan (çoğu dev araç zinciri); kırıcı major bump riski nedeniyle `--force` uygulanmadı.
 
 ---
 
@@ -154,9 +168,9 @@ src/
 
 ### AI Entegrasyonu
 - Singleton: `lib/ai/gemini-client.ts:getVertexAI()` — proses başına bir kez init
-- `getModel()` → `responseMimeType: "application/json"` ile JSON döndürür
-- **Dikkat**: `ai-chat/route.ts` `getVertexAI()` kullanıyor, `getModel()` değil — JSON MIME type yok
-- Credentials: `gcp-credentials.json` (repo'ya eklenmemeli), `GOOGLE_CLOUD_PROJECT` env gerekli
+- `getModel()` → JSON döndürür (`responseMimeType: "application/json"`); `getTextModel()` → düz metin (chat)
+- `ai-chat/route.ts` `getTextModel()` kullanır (doğru). AI hata verirse `analyzeStudentProfile`/`getProfileSummary` mock'a düşer (graceful degradation)
+- Credentials: `gcp-credentials.json` (repo'ya eklenmemeli, gitignore'da), `GOOGLE_CLOUD_PROJECT` env gerekli
 
 ### Şifre Sıfırlama Akışı (3 adım, tek endpoint)
 ```
@@ -165,7 +179,7 @@ POST /api/auth/forgot-password/verify
   { email, answers[] }                   → step: "verified" + resetToken (5dk TTL, tek kullanımlık)
   { email, resetToken, newPassword }     → step: "success" (token doğrulama + şifre güncelleme)
 ```
-⚠️ Frontend'in de bu akışı desteklemesi gerekiyor: step 2 yanıtındaki `resetToken`'ı step 3'e göndermeli.
+✅ Frontend (`forgot-password/page.tsx`) bu akışı destekliyor: step 3'te `resetToken` + `answers` birlikte gönderiliyor (token asıl yetki, answers ek kontrol).
 
 ### Dosya Yükleme
 - `POST /api/steps/[stepId]/files` → `process.cwd()/uploads/steps/` (ephemeral disk)

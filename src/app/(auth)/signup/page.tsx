@@ -48,8 +48,9 @@ export default function SignupPage() {
               {/* İsim + Soyad */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-700">Ad</label>
+                  <label htmlFor="signup-name" className="mb-1.5 block text-sm font-medium text-slate-700">Ad</label>
                   <input
+                    id="signup-name"
                     type="text"
                     name="name"
                     autoComplete="given-name"
@@ -61,8 +62,9 @@ export default function SignupPage() {
                   )}
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-700">Soyad</label>
+                  <label htmlFor="signup-lastName" className="mb-1.5 block text-sm font-medium text-slate-700">Soyad</label>
                   <input
+                    id="signup-lastName"
                     type="text"
                     name="lastName"
                     autoComplete="family-name"
@@ -77,8 +79,9 @@ export default function SignupPage() {
 
               {/* Email */}
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-700">E-posta</label>
+                <label htmlFor="signup-email" className="mb-1.5 block text-sm font-medium text-slate-700">E-posta</label>
                 <input
+                  id="signup-email"
                   type="email"
                   name="email"
                   autoComplete="email"
@@ -92,10 +95,11 @@ export default function SignupPage() {
 
               {/* Telefon (opsiyonel) */}
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                <label htmlFor="signup-phone" className="mb-1.5 block text-sm font-medium text-slate-700">
                   Telefon <span className="text-slate-400 font-normal">(opsiyonel)</span>
                 </label>
                 <input
+                  id="signup-phone"
                   type="tel"
                   name="phone"
                   autoComplete="tel"
@@ -109,9 +113,10 @@ export default function SignupPage() {
 
               {/* Şifre */}
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-700">Şifre</label>
+                <label htmlFor="signup-password" className="mb-1.5 block text-sm font-medium text-slate-700">Şifre</label>
                 <div className="relative">
                   <input
+                    id="signup-password"
                     type={showPassword ? "text" : "password"}
                     name="password"
                     autoComplete="new-password"
@@ -123,6 +128,7 @@ export default function SignupPage() {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? "Şifreyi gizle" : "Şifreyi göster"}
                     className="absolute inset-y-0 right-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
                   >
                     {showPassword ? <Eye className="w-4.5 h-4.5" /> : <EyeOff className="w-4.5 h-4.5" />}

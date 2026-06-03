@@ -52,17 +52,22 @@ const experienceLevelMap: Record<string, string> = {
 export default function MentorDashboardPage() {
   const [students, setStudents] = useState<StudentWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   const loadStudents = useCallback(async () => {
     try {
       setLoading(true);
+      setError(false);
       const res = await fetch("/api/mentor/students");
       if (res.ok) {
         const data = await res.json();
         setStudents(data);
+      } else {
+        setError(true);
       }
     } catch (error) {
       console.error("Failed to load students:", error);
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -92,6 +97,26 @@ export default function MentorDashboardPage() {
       <div className="flex items-center justify-center min-h-screen bg-slate-50">
         <Loader2 className="animate-spin h-7 w-7 text-blue-600 mr-3" />
         <span className="text-slate-600 font-medium">Öğrenciler yükleniyor...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 px-4 text-center">
+        <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mb-4">
+          <AlertCircle className="w-7 h-7 text-red-500" />
+        </div>
+        <h2 className="text-lg font-semibold text-slate-900">Öğrenciler yüklenemedi</h2>
+        <p className="text-slate-500 text-sm mt-1 mb-5">
+          Bağlantıda bir sorun oluştu. Lütfen tekrar deneyin.
+        </p>
+        <button
+          onClick={loadStudents}
+          className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-5 py-2.5 transition-colors"
+        >
+          Tekrar Dene
+        </button>
       </div>
     );
   }

@@ -1,23 +1,55 @@
 @import "tailwindcss";
 
 /*
+  Tasarım tokenları (Tailwind v4 @theme).
+  shadcn/ui bileşenleri bg-primary, border-input, ring-ring gibi yardımcı
+  sınıflara güvenir; bunlar buradaki --color-* tokenlarından üretilir.
+  Palet CLAUDE.md tasarım sistemine uygundur (slate nötr, blue-600 primary).
+*/
+@theme {
+  --color-background: #f8fafc;        /* slate-50  */
+  --color-foreground: #0f172a;        /* slate-900 */
+
+  --color-card: #ffffff;
+  --color-card-foreground: #0f172a;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #0f172a;
+
+  --color-primary: #2563eb;           /* blue-600  */
+  --color-primary-foreground: #ffffff;
+
+  --color-secondary: #f1f5f9;         /* slate-100 */
+  --color-secondary-foreground: #0f172a;
+
+  --color-muted: #f1f5f9;             /* slate-100 */
+  --color-muted-foreground: #64748b;  /* slate-500 */
+
+  --color-accent: #eef2ff;            /* indigo-50 */
+  --color-accent-foreground: #1e293b; /* slate-800 */
+
+  --color-destructive: #dc2626;       /* red-600   */
+  --color-destructive-foreground: #ffffff;
+
+  --color-border: #e2e8f0;            /* slate-200 */
+  --color-input: #e2e8f0;             /* slate-200 */
+  --color-ring: #3b82f6;              /* blue-500  */
+
+  --radius: 0.5rem;
+}
+
+/*
   Tema: Şu an tüm sayfalar açık temalı (slate/blue palette) olarak tasarlandı.
   Sistem dark mode'a göre body rengini değiştirirsek, açık zeminli kartlardaki
   varsayılan koyu metin renklerini bozar. Bu yüzden light theme sabitlenir.
   İleride dark mode istenirse her sayfanın `dark:` varyantı eklenmeli.
 */
-:root {
-  --background: #f8fafc;   /* slate-50 */
-  --foreground: #0f172a;   /* slate-900 */
-}
-
 html {
   color-scheme: light;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--color-background);
+  color: var(--color-foreground);
   /* next/font/google ile yüklenen Geist'i kullan, fallback olarak sistem fontları */
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;

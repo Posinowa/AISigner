@@ -14,5 +14,29 @@ services:
     volumes:
       - db_data:/var/lib/postgresql/data
 
+  # Uygulama (tek instance). Yüklenen dosyalar kalıcı volume'da tutulur,
+  # böylece container yeniden başlatılınca/yeniden deploy edilince silinmez.
+  # ÖLÇEKLEME NOTU: Birden fazla instance çalıştırılacaksa rate-limit ve
+  # şifre-sıfırlama token'ları Redis'e, dosya depolama GCS/S3'e taşınmalı.
+  # Detaylar: DEPLOYMENT.md
+  app:
+    build: .
+    container_name: aisigner_app
+    restart: always
+    depends_on:
+      - db
+    env_file:
+      - .env
+    environment:
+      # Compose ağı içinde DB host'u "db" servis adıdır (localhost değil)
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/aisigner?schema=public
+    ports:
+      - "3000:3000"
+    volumes:
+      - uploads_data:/app/uploads
+      # GCP servis hesabı anahtarını salt-okunur bağla (repoya commit edilmez)
+      - ./gcp-credentials.json:/app/gcp-credentials.json:ro
+
 volumes:
   db_data:
+  uploads_data:

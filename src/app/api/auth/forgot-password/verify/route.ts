@@ -20,6 +20,9 @@ const accountLimiter = createRateLimiter("forgot-password-account", {
  * Kısa ömürlü doğrulama tokenleri (step2→step3 arası).
  * token → { userId, expiresAt }
  * Güvenlik açığını kapatır: saldırgan step2'yi atlayıp step3'e gidemez.
+ *
+ * ⚠️ ÖLÇEKLEME: Bu Map proses-yereldir. Çok instance/serverless'ta step2 ve
+ * step3 farklı instance'a düşerse token bulunamaz → Redis'e taşıyın (bkz. DEPLOYMENT.md).
  */
 interface ResetToken {
   userId: string;

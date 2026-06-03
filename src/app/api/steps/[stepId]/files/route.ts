@@ -43,6 +43,8 @@ const SAFE_MIME_MAP: Record<string, string> = {
 const ALLOWED_EXTENSIONS = Object.keys(SAFE_MIME_MAP);
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+// ⚠️ ÖLÇEKLEME: Yerel disk. Tek instance'ta kalıcı volume ile çalışır; çok
+// instance/serverless'ta GCS/S3'e taşıyın (bkz. DEPLOYMENT.md).
 const UPLOAD_DIR = path.join(process.cwd(), "uploads", "steps");
 
 /**

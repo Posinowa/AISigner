@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { logger } from "@/lib/logger";
 
 export type StudentWithProfile = {
   id: string;
@@ -62,8 +63,10 @@ export async function getMentorStudents(mentorId: string): Promise<StudentWithPr
 
     return students;
   } catch (error) {
-    console.error("Error fetching mentor students:", error);
-    return [];
+    // Hatayı yutup [] DÖNMÜYORUZ: aksi halde DB hatası "öğrenci yok" gibi
+    // görünür. Çağıran API route'u yakalayıp 500 döner.
+    logger.error("Error fetching mentor students:", error);
+    throw error;
   }
 }
 
@@ -106,22 +109,10 @@ export async function getStudentDetail(studentId: string, mentorId: string) {
 
     return student;
   } catch (error) {
-    console.error("Error fetching student detail:", error);
-    return null;
-  }
-}
-
-// Mevcut proje şablonlarını getir
-export async function getAvailableProjects() {
-  try {
-    return await prisma.projectTemplate.findMany({
-      orderBy: {
-        title: "asc",
-      },
-    });
-  } catch (error) {
-    console.error("Error fetching project templates:", error);
-    return [];
+    // "Bulunamadı" durumunu findFirst zaten null ile döner (exception atmaz);
+    // buraya yalnızca gerçek DB hatasında düşülür → yutmak yerine rethrow.
+    logger.error("Error fetching student detail:", error);
+    throw error;
   }
 }
 
@@ -181,7 +172,7 @@ export async function assignProjectToStudent(
 
     return assignedProject;
   } catch (error) {
-    console.error("Error assigning project:", error);
+    logger.error("Error assigning project:", error);
     throw error;
   }
 }
@@ -219,7 +210,7 @@ export async function updateProjectStatus(
       },
     });
   } catch (error) {
-    console.error("Error updating project status:", error);
+    logger.error("Error updating project status:", error);
     throw error;
   }
 }

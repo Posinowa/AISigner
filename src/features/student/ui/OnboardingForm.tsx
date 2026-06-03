@@ -223,25 +223,25 @@ export default function OnboardingForm({
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="block text-sm font-semibold text-gray-700">Adınız</label>
-                    <Input {...register("personal.firstName")} className="h-12 bg-gray-50" placeholder="Örn: Ali" />
+                    <label htmlFor="ob-firstName" className="block text-sm font-semibold text-gray-700">Adınız</label>
+                    <Input id="ob-firstName" {...register("personal.firstName")} className="h-12 bg-gray-50" placeholder="Örn: Ali" />
                     {stepAttempted[0] && errors.personal?.firstName && <p className="text-red-500 text-xs">{errors.personal.firstName.message}</p>}
                   </div>
                   <div className="space-y-2">
-                    <label className="block text-sm font-semibold text-gray-700">Soyadınız</label>
-                    <Input {...register("personal.lastName")} className="h-12 bg-gray-50" placeholder="Örn: Yılmaz" />
+                    <label htmlFor="ob-lastName" className="block text-sm font-semibold text-gray-700">Soyadınız</label>
+                    <Input id="ob-lastName" {...register("personal.lastName")} className="h-12 bg-gray-50" placeholder="Örn: Yılmaz" />
                     {stepAttempted[0] && errors.personal?.lastName && <p className="text-red-500 text-xs">{errors.personal.lastName.message}</p>}
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="block text-sm font-semibold text-gray-700">Doğum Yılı</label>
-                    <Input type="number" {...register("personal.birthYear", { valueAsNumber: true })} className="h-12 bg-gray-50" placeholder="Örn: 2002" />
+                    <label htmlFor="ob-birthYear" className="block text-sm font-semibold text-gray-700">Doğum Yılı</label>
+                    <Input id="ob-birthYear" type="number" {...register("personal.birthYear", { valueAsNumber: true })} className="h-12 bg-gray-50" placeholder="Örn: 2002" />
                     {stepAttempted[0] && errors.personal?.birthYear && <p className="text-red-500 text-xs">{errors.personal.birthYear.message}</p>}
                   </div>
                   <div className="space-y-2">
-                    <label className="block text-sm font-semibold text-gray-700">Telefon Numaranız</label>
-                    <Input {...register("personal.phoneNumber")} className="h-12 bg-gray-50" placeholder="Örn: 0555 123 45 67" />
+                    <label htmlFor="ob-phone" className="block text-sm font-semibold text-gray-700">Telefon Numaranız</label>
+                    <Input id="ob-phone" {...register("personal.phoneNumber")} className="h-12 bg-gray-50" placeholder="Örn: 0555 123 45 67" />
                     {stepAttempted[0] && errors.personal?.phoneNumber && <p className="text-red-500 text-xs">{errors.personal.phoneNumber.message}</p>}
                   </div>
                 </div>
@@ -270,13 +270,14 @@ export default function OnboardingForm({
                 </div>
 
                 <div className="space-y-3">
-                  <label className="block text-sm font-semibold text-gray-700">
+                  <label htmlFor="ob-knownTech" className="block text-sm font-semibold text-gray-700">
                     Şu ana kadar neler öğrendiniz / denediniz? (AI için çok önemli 🤖)
                   </label>
                   <p className="text-xs text-gray-500 mb-2">
-                    Lütfen bildiğiniz dilleri, araçları veya kendi başınıza denediğiniz şeyleri dürüstçe yazın. (Örn: "Üniversitede C++ gördüm, HTML/CSS ile basit bir site yaptım ama JavaScript'te zorlanıyorum.")
+                    {`Lütfen bildiğiniz dilleri, araçları veya kendi başınıza denediğiniz şeyleri dürüstçe yazın. (Örn: "Üniversitede C++ gördüm, HTML/CSS ile basit bir site yaptım ama JavaScript'te zorlanıyorum.")`}
                   </p>
                   <textarea
+                    id="ob-knownTech"
                     {...register("experience.knownTech")}
                     rows={4}
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none resize-none transition-all"
@@ -309,13 +310,14 @@ export default function OnboardingForm({
                 </div>
 
                 <div className="space-y-3">
-                  <label className="block text-sm font-semibold text-gray-700">
+                  <label htmlFor="ob-futureGoal" className="block text-sm font-semibold text-gray-700">
                     Gelecekte ne tür projeler yapmak istiyorsunuz?
                   </label>
                   <p className="text-xs text-gray-500 mb-2">
-                    Önümüzdeki 1 yıl içinde neleri başarmak istersiniz? (Örn: "Kendi e-ticaret sitemi kurmak istiyorum" veya "Bir yapay zeka modelini mobil uygulamaya entegre etmek istiyorum.")
+                    {`Önümüzdeki 1 yıl içinde neleri başarmak istersiniz? (Örn: "Kendi e-ticaret sitemi kurmak istiyorum" veya "Bir yapay zeka modelini mobil uygulamaya entegre etmek istiyorum.")`}
                   </p>
                   <textarea
+                    id="ob-futureGoal"
                     {...register("vision.futureGoal")}
                     rows={4}
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none resize-none transition-all"
@@ -330,13 +332,14 @@ export default function OnboardingForm({
             {step === 3 && (
               <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="space-y-3">
-                  <label className="block text-sm font-semibold text-gray-700">
+                  <label htmlFor="ob-learningStyle" className="block text-sm font-semibold text-gray-700">
                     Sizin için en iyi öğrenme yöntemi nedir?
                   </label>
                   <p className="text-xs text-gray-500 mb-2">
-                    Size bir proje verildiğinde nasıl ilerlemeyi seversiniz? (Örn: "Adım adım, doküman okuyarak ilerlemeyi severim" veya "Hata yapa yapa, direkt kod yazarak öğrenmek isterim.")
+                    {`Size bir proje verildiğinde nasıl ilerlemeyi seversiniz? (Örn: "Adım adım, doküman okuyarak ilerlemeyi severim" veya "Hata yapa yapa, direkt kod yazarak öğrenmek isterim.")`}
                   </p>
                   <textarea
+                    id="ob-learningStyle"
                     {...register("workingStyle.learningStyle")}
                     rows={4}
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none resize-none transition-all"

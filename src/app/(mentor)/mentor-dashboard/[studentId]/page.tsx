@@ -592,7 +592,7 @@ export default function StudentDetailPage() {
                               </span>
                             </div>
                             <p className="text-xs text-purple-700/90 font-medium leading-relaxed">
-                              "{aiRec.reason}"
+                              {`"${aiRec.reason}"`}
                             </p>
                           </div>
                         )}

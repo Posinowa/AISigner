@@ -114,8 +114,9 @@ function SigninForm() {
             <form onSubmit={handleSubmit} className="space-y-5">
               {/* Email */}
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-700">E-posta</label>
+                <label htmlFor="signin-email" className="mb-1.5 block text-sm font-medium text-slate-700">E-posta</label>
                 <input
+                  id="signin-email"
                   type="email"
                   name="email"
                   autoComplete="email"
@@ -131,13 +132,14 @@ function SigninForm() {
               {/* Şifre */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-sm font-medium text-slate-700">Şifre</label>
+                  <label htmlFor="signin-password" className="text-sm font-medium text-slate-700">Şifre</label>
                   <Link href="/forgot-password" className="text-xs font-medium text-amber-600 hover:text-amber-700">
                     Şifremi Unuttum
                   </Link>
                 </div>
                 <div className="relative">
                   <input
+                    id="signin-password"
                     type={showPassword ? "text" : "password"}
                     name="password"
                     autoComplete="current-password"
@@ -148,6 +150,7 @@ function SigninForm() {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? "Şifreyi gizle" : "Şifreyi göster"}
                     className="absolute inset-y-0 right-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
                   >
                     {showPassword ? <Eye className="w-4.5 h-4.5" /> : <EyeOff className="w-4.5 h-4.5" />}
