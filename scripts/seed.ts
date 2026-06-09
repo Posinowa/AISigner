@@ -5,7 +5,7 @@ const prisma = new PrismaClient();
 
 async function main() {
   // Örnek kullanıcılar - roller: ADMIN, MENTOR, STUDENT
-  const users = [
+  const users: { email: string; name: string; role: "ADMIN" | "MENTOR" | "STUDENT" }[] = [
     { email: "admin@example.com", name: "Admin User", role: "ADMIN" },
     { email: "mentor@example.com", name: "Mentor User", role: "MENTOR" },
     { email: "student@example.com", name: "Student User", role: "STUDENT" },
@@ -28,7 +28,7 @@ async function main() {
       create: {
         email: user.email,
         name: user.name,
-        role: user.role as any, // schema.prisma'daki Role enum'una göre
+        role: user.role, // schema.prisma'daki Role enum'una göre
         password: hashedPassword, // string hash
       },
     });

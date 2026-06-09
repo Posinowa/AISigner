@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { saveOnboarding } from "@/features/student/server/onboarding";
 import { CheckCircle, User, Target, Award, ArrowRight, ArrowLeft, Rocket, Terminal, BookOpen, Clock } from "lucide-react";
+import { toast } from "sonner";
 
 import type { FieldPath } from "react-hook-form";
 
@@ -64,15 +65,35 @@ const interests = [
   { id: "Cybersecurity", label: "Siber Güvenlik", emoji: "🛡️" }
 ];
 
-export default function OnboardingForm() {
+type OnboardingInitialValues = {
+  firstName?: string;
+  lastName?: string;
+  phoneNumber?: string;
+};
+
+export default function OnboardingForm({
+  initial,
+}: { initial?: OnboardingInitialValues } = {}) {
   const [step, setStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Her adım için "kullanıcı bu adımda Sonraki Adım'a bastı mı?" flag'i.
+  // zodResolver tüm form'u parse ettiği için trigger() çağrılmasa bile
+  // errors objesi diğer adımların alanlarıyla dolar; bu flag ile sadece
+  // ilgilendiği adımda Sonraki/Tamamla'ya bastıktan sonra hata gösteririz.
+  const [stepAttempted, setStepAttempted] = useState<boolean[]>([
+    false, false, false, false,
+  ]);
 
-  const { register, handleSubmit, trigger, formState: { errors } } = useForm<EnhancedFormData>({
+  const { register, handleSubmit, trigger, clearErrors, formState: { errors } } = useForm<EnhancedFormData>({
     resolver: zodResolver(enhancedSchema),
-    mode: "onChange",
+    mode: "onSubmit",
     defaultValues: {
-      personal: { firstName: "", lastName: "", birthYear: undefined, phoneNumber: "" },
+      personal: {
+        firstName: initial?.firstName ?? "",
+        lastName: initial?.lastName ?? "",
+        birthYear: undefined,
+        phoneNumber: initial?.phoneNumber ?? "",
+      },
       experience: { level: "", knownTech: "" },
       vision: { interest: [], futureGoal: "" },
       workingStyle: { learningStyle: "", availability: "" },
@@ -87,10 +108,24 @@ export default function OnboardingForm() {
   ];
 
   const onNext = async () => {
+    // Bu adımda Sonraki'ye basıldı — artık hatalar gösterilebilir
+    setStepAttempted((prev) => {
+      const next = [...prev];
+      next[step] = true;
+      return next;
+    });
     const valid = await trigger(stepFields[step]);
     if (!valid) return;
+    // Bir sonraki adıma geçmeden önce tüm hataları temizle.
+    // zodResolver tüm şemayı parse ettiğinden trigger() sonraki adımların
+    // hatalarını da errors objesine yazabilir; clearErrors() bunu engeller.
+    clearErrors();
     setStep((s) => s + 1);
   };
+
+  // Submit denemesinde tüm adımlar için hata göster
+  const markAllStepsAttempted = () =>
+    setStepAttempted([true, true, true, true]);
 
   const onBack = () => setStep((s) => s - 1);
 
@@ -118,14 +153,14 @@ export default function OnboardingForm() {
         }
       };
 
-      await saveOnboarding(backendPayload as any);
+      await saveOnboarding(backendPayload);
       
       // Başarılı olursa yönlendirme yapılabilir.
       window.location.href = "/student-dashboard"; 
       
     } catch (err) {
       console.error("Onboarding kaydı başarısız:", err);
-      alert("Kayıt sırasında bir hata oluştu.");
+      toast.error("Kayıt sırasında bir hata oluştu.");
     } finally {
       setIsSubmitting(false);
     }
@@ -170,7 +205,10 @@ export default function OnboardingForm() {
 
         {/* Form Card */}
         <div className="bg-white rounded-2xl shadow-xl p-8 sm:p-10 border border-gray-100">
-          <form onSubmit={handleSubmit(onFinalSubmit)} className="space-y-6">
+          <form
+            onSubmit={handleSubmit(onFinalSubmit, () => markAllStepsAttempted())}
+            className="space-y-6"
+          >
             
             <div className="text-center mb-10 pb-6 border-b border-gray-100">
               <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-50 rounded-2xl mb-4 shadow-sm">
@@ -185,26 +223,26 @@ export default function OnboardingForm() {
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="block text-sm font-semibold text-gray-700">Adınız</label>
-                    <Input {...register("personal.firstName")} className="h-12 bg-gray-50" placeholder="Örn: Ali" />
-                    {errors.personal?.firstName && <p className="text-red-500 text-xs">{errors.personal.firstName.message}</p>}
+                    <label htmlFor="ob-firstName" className="block text-sm font-semibold text-gray-700">Adınız</label>
+                    <Input id="ob-firstName" {...register("personal.firstName")} className="h-12 bg-gray-50" placeholder="Örn: Ali" />
+                    {stepAttempted[0] && errors.personal?.firstName && <p className="text-red-500 text-xs">{errors.personal.firstName.message}</p>}
                   </div>
                   <div className="space-y-2">
-                    <label className="block text-sm font-semibold text-gray-700">Soyadınız</label>
-                    <Input {...register("personal.lastName")} className="h-12 bg-gray-50" placeholder="Örn: Yılmaz" />
-                    {errors.personal?.lastName && <p className="text-red-500 text-xs">{errors.personal.lastName.message}</p>}
+                    <label htmlFor="ob-lastName" className="block text-sm font-semibold text-gray-700">Soyadınız</label>
+                    <Input id="ob-lastName" {...register("personal.lastName")} className="h-12 bg-gray-50" placeholder="Örn: Yılmaz" />
+                    {stepAttempted[0] && errors.personal?.lastName && <p className="text-red-500 text-xs">{errors.personal.lastName.message}</p>}
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="block text-sm font-semibold text-gray-700">Doğum Yılı</label>
-                    <Input type="number" {...register("personal.birthYear", { valueAsNumber: true })} className="h-12 bg-gray-50" placeholder="Örn: 2002" />
-                    {errors.personal?.birthYear && <p className="text-red-500 text-xs">{errors.personal.birthYear.message}</p>}
+                    <label htmlFor="ob-birthYear" className="block text-sm font-semibold text-gray-700">Doğum Yılı</label>
+                    <Input id="ob-birthYear" type="number" {...register("personal.birthYear", { valueAsNumber: true })} className="h-12 bg-gray-50" placeholder="Örn: 2002" />
+                    {stepAttempted[0] && errors.personal?.birthYear && <p className="text-red-500 text-xs">{errors.personal.birthYear.message}</p>}
                   </div>
                   <div className="space-y-2">
-                    <label className="block text-sm font-semibold text-gray-700">Telefon Numaranız</label>
-                    <Input {...register("personal.phoneNumber")} className="h-12 bg-gray-50" placeholder="Örn: 0555 123 45 67" />
-                    {errors.personal?.phoneNumber && <p className="text-red-500 text-xs">{errors.personal.phoneNumber.message}</p>}
+                    <label htmlFor="ob-phone" className="block text-sm font-semibold text-gray-700">Telefon Numaranız</label>
+                    <Input id="ob-phone" {...register("personal.phoneNumber")} className="h-12 bg-gray-50" placeholder="Örn: 0555 123 45 67" />
+                    {stepAttempted[0] && errors.personal?.phoneNumber && <p className="text-red-500 text-xs">{errors.personal.phoneNumber.message}</p>}
                   </div>
                 </div>
               </div>
@@ -228,23 +266,24 @@ export default function OnboardingForm() {
                       </label>
                     ))}
                   </div>
-                  {errors.experience?.level && <p className="text-red-500 text-xs">{errors.experience.level.message}</p>}
+                  {stepAttempted[1] && errors.experience?.level && <p className="text-red-500 text-xs">{errors.experience.level.message}</p>}
                 </div>
 
                 <div className="space-y-3">
-                  <label className="block text-sm font-semibold text-gray-700">
+                  <label htmlFor="ob-knownTech" className="block text-sm font-semibold text-gray-700">
                     Şu ana kadar neler öğrendiniz / denediniz? (AI için çok önemli 🤖)
                   </label>
                   <p className="text-xs text-gray-500 mb-2">
-                    Lütfen bildiğiniz dilleri, araçları veya kendi başınıza denediğiniz şeyleri dürüstçe yazın. (Örn: "Üniversitede C++ gördüm, HTML/CSS ile basit bir site yaptım ama JavaScript'te zorlanıyorum.")
+                    {`Lütfen bildiğiniz dilleri, araçları veya kendi başınıza denediğiniz şeyleri dürüstçe yazın. (Örn: "Üniversitede C++ gördüm, HTML/CSS ile basit bir site yaptım ama JavaScript'te zorlanıyorum.")`}
                   </p>
                   <textarea
+                    id="ob-knownTech"
                     {...register("experience.knownTech")}
                     rows={4}
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none resize-none transition-all"
                     placeholder="Bildiğiniz teknolojileri ve mevcut durumunuzu anlatın..."
                   />
-                  {errors.experience?.knownTech && <p className="text-red-500 text-xs">{errors.experience.knownTech.message}</p>}
+                  {stepAttempted[1] && errors.experience?.knownTech && <p className="text-red-500 text-xs">{errors.experience.knownTech.message}</p>}
                 </div>
               </div>
             )}
@@ -267,23 +306,24 @@ export default function OnboardingForm() {
                       </label>
                     ))}
                   </div>
-                  {errors.vision?.interest && <p className="text-red-500 text-xs">{errors.vision.interest.message}</p>}
+                  {stepAttempted[2] && errors.vision?.interest && <p className="text-red-500 text-xs">{errors.vision.interest.message}</p>}
                 </div>
 
                 <div className="space-y-3">
-                  <label className="block text-sm font-semibold text-gray-700">
+                  <label htmlFor="ob-futureGoal" className="block text-sm font-semibold text-gray-700">
                     Gelecekte ne tür projeler yapmak istiyorsunuz?
                   </label>
                   <p className="text-xs text-gray-500 mb-2">
-                    Önümüzdeki 1 yıl içinde neleri başarmak istersiniz? (Örn: "Kendi e-ticaret sitemi kurmak istiyorum" veya "Bir yapay zeka modelini mobil uygulamaya entegre etmek istiyorum.")
+                    {`Önümüzdeki 1 yıl içinde neleri başarmak istersiniz? (Örn: "Kendi e-ticaret sitemi kurmak istiyorum" veya "Bir yapay zeka modelini mobil uygulamaya entegre etmek istiyorum.")`}
                   </p>
                   <textarea
+                    id="ob-futureGoal"
                     {...register("vision.futureGoal")}
                     rows={4}
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none resize-none transition-all"
                     placeholder="Hayalinizdeki projeleri ve hedeflerinizi detaylandırın..."
                   />
-                  {errors.vision?.futureGoal && <p className="text-red-500 text-xs">{errors.vision.futureGoal.message}</p>}
+                  {stepAttempted[2] && errors.vision?.futureGoal && <p className="text-red-500 text-xs">{errors.vision.futureGoal.message}</p>}
                 </div>
               </div>
             )}
@@ -292,19 +332,20 @@ export default function OnboardingForm() {
             {step === 3 && (
               <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="space-y-3">
-                  <label className="block text-sm font-semibold text-gray-700">
+                  <label htmlFor="ob-learningStyle" className="block text-sm font-semibold text-gray-700">
                     Sizin için en iyi öğrenme yöntemi nedir?
                   </label>
                   <p className="text-xs text-gray-500 mb-2">
-                    Size bir proje verildiğinde nasıl ilerlemeyi seversiniz? (Örn: "Adım adım, doküman okuyarak ilerlemeyi severim" veya "Hata yapa yapa, direkt kod yazarak öğrenmek isterim.")
+                    {`Size bir proje verildiğinde nasıl ilerlemeyi seversiniz? (Örn: "Adım adım, doküman okuyarak ilerlemeyi severim" veya "Hata yapa yapa, direkt kod yazarak öğrenmek isterim.")`}
                   </p>
                   <textarea
+                    id="ob-learningStyle"
                     {...register("workingStyle.learningStyle")}
                     rows={4}
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none resize-none transition-all"
                     placeholder="Nasıl bir çalışma tarzı sizi daha verimli yapar?"
                   />
-                  {errors.workingStyle?.learningStyle && <p className="text-red-500 text-xs">{errors.workingStyle.learningStyle.message}</p>}
+                  {stepAttempted[3] && errors.workingStyle?.learningStyle && <p className="text-red-500 text-xs">{errors.workingStyle.learningStyle.message}</p>}
                 </div>
 
                 <div className="space-y-4">
@@ -323,7 +364,7 @@ export default function OnboardingForm() {
                       </label>
                     ))}
                   </div>
-                  {errors.workingStyle?.availability && <p className="text-red-500 text-xs">{errors.workingStyle.availability.message}</p>}
+                  {stepAttempted[3] && errors.workingStyle?.availability && <p className="text-red-500 text-xs">{errors.workingStyle.availability.message}</p>}
                 </div>
               </div>
             )}

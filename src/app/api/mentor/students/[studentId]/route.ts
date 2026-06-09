@@ -1,7 +1,6 @@
 
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth/nextauth"
+import { requireAuth } from "@/lib/auth/guard";
 import { getStudentDetail } from "@/features/mentors/server/actions";
 
 export async function GET(
@@ -9,32 +8,16 @@ export async function GET(
   { params }: { params:Promise< { studentId: string } >}
 ) {
   try {
-    // Session’dan mentor bilgisi al
-    const session = await getServerSession(authOptions);
+    const auth = await requireAuth("MENTOR");
+    if (!auth.authorized) return auth.response;
 
-    if (!session || session.user.role !== "MENTOR") {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-
-    const mentorId = session.user.id; // 🔑 artık gerçek mentor ID
+    const mentorId = auth.session.user.id!;
     const { studentId } = await params;
 
-    // ensure studentId is provided and mentorId is present (narrows types)
-   
     if (!studentId) {
       return NextResponse.json(
         { error: "Student ID is required" },
         { status: 400 }
-      );
-    }
-
-    if (!mentorId) {
-      return NextResponse.json(
-        { error: "Mentor ID missing in session" },
-        { status: 401 }
       );
     }
 

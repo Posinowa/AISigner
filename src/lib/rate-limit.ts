@@ -72,5 +72,43 @@ export function createRateLimiter(name: string, options: RateLimiterOptions) {
         retryAfterSeconds: Math.ceil((entry.resetAt - now) / 1000),
       };
     },
+
+    /**
+     * Like `check`, but does NOT increment the counter — only reports the
+     * current state. Use this to reject an already-blocked identifier before
+     * doing expensive work, and call `check` only to record a real attempt
+     * (e.g. a failed login). This lets callers count failures only.
+     */
+    peek(identifier: string): {
+      allowed: boolean;
+      remaining: number;
+      retryAfterSeconds: number;
+    } {
+      const now = Date.now();
+      const entry = store.get(identifier);
+
+      if (!entry || now > entry.resetAt) {
+        return { allowed: true, remaining: options.maxRequests, retryAfterSeconds: 0 };
+      }
+
+      if (entry.count < options.maxRequests) {
+        return {
+          allowed: true,
+          remaining: options.maxRequests - entry.count,
+          retryAfterSeconds: 0,
+        };
+      }
+
+      return {
+        allowed: false,
+        remaining: 0,
+        retryAfterSeconds: Math.ceil((entry.resetAt - now) / 1000),
+      };
+    },
+
+    /** Reset the counter for an identifier (e.g. after a successful login). */
+    reset(identifier: string): void {
+      store.delete(identifier);
+    },
   };
 }

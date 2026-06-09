@@ -6,13 +6,13 @@
 import { signinSchema } from "@/features/auth/models/user"
 
 export async function validateUser(formData: FormData) {
-  const email = formData.get("email") as string
+  const emailRaw = formData.get("email") as string
   const password = formData.get("password") as string
+  const email = emailRaw?.toLowerCase().trim() ?? ""
 
-  // Zod ile form verisini doğrula (eksik/geçersiz alanları erken yakala)
   const parsed = signinSchema.safeParse({ email, password })
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
-  
-  return { ok: true }
+
+  return { ok: true, email }
 }
 

@@ -11,57 +11,67 @@ export async function recommendProjects(
   studentProfile: StudentProfile,
   availableProjects: ProjectTemplate[]
 ): Promise<RankedProject[]> {
-  try {
-    const model = getModel();
+  const model = getModel();
 
-    const interestsText = Array.isArray(studentProfile.interests)
-      ? studentProfile.interests.join(", ")
-      : String(studentProfile.interests);
+  const interestsText = Array.isArray(studentProfile.interests)
+    ? studentProfile.interests.join(", ")
+    : String(studentProfile.interests);
 
-    const prompt = `
-      Sen kıdemli bir yazılım mentörüsün. Görevin, bir öğrencinin profiline en uygun projeleri seçmektir.
+  const prompt = `
+    Sen kıdemli bir yazılım mentörüsün. Görevin, bir öğrencinin profiline en uygun projeleri seçmektir.
 
-      ÖĞRENCİ PROFİLİ:
-      - Seviye: ${studentProfile.experienceLevel}
-      - İlgi Alanları: ${interestsText}
-      - Hedefler: ${studentProfile.goals}
+    ÖĞRENCİ PROFİLİ:
+    - Seviye: ${studentProfile.experienceLevel}
+    - İlgi Alanları: ${interestsText}
+    - Hedefler: ${studentProfile.goals ?? "(belirtilmemiş)"}
 
-      MEVCUT PROJE ŞABLONLARI:
-      ${JSON.stringify(availableProjects.map(p => ({
-        id: p.id,
-        title: p.title,
-        description: p.description,
-        track: p.track,
-        difficulty: p.difficulty
-      })), null, 2)}
+    MEVCUT PROJE ŞABLONLARI:
+    ${JSON.stringify(availableProjects.map(p => ({
+      id: p.id,
+      title: p.title,
+      description: p.description,
+      track: p.track,
+      difficulty: p.difficulty
+    })), null, 2)}
 
-      GÖREV:
-      Yukarıdaki projelere bakarak, bu öğrenci için en uygun 3 projeyi seç ve uyumluluklarına göre sırala.
-      Yanıtın ŞU FORMATTA BİR JSON DİZİSİ olmalıdır: [{"projectId": "projenin_gercek_idsi", "matchScore": 95, "reason": "kısa açıklama"}]
-    `;
+    GÖREV:
+    Yukarıdaki projelere bakarak, bu öğrenci için en uygun 3 projeyi seç ve uyumluluklarına göre sırala.
+    Yanıtın ŞU FORMATTA BİR JSON DİZİSİ olmalıdır: [{"projectId": "projenin_gercek_idsi", "matchScore": 95, "reason": "kısa açıklama"}]
+  `;
 
-    const request = {
-      contents: [{ role: 'user' as const, parts: [{ text: prompt }] }],
-    };
+  const result = await model.generateContent({
+    contents: [{ role: "user" as const, parts: [{ text: prompt }] }],
+  });
 
-    const result = await model.generateContent(request);
-    let text = result.response.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  let text = result.response.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  console.log("Proje Önerisi Yanıtı (raw):", text);
 
-    console.log("Proje Önerisi Yanıtı:", text);
-
-    text = text.replace(/```json/gi, "").replace(/```/g, "").trim();
-    const startIndex = text.indexOf('[');
-    const endIndex = text.lastIndexOf(']');
-
-    if (startIndex !== -1 && endIndex !== -1) {
-      text = text.substring(startIndex, endIndex + 1);
-    }
-
-    const recommendations: RankedProject[] = JSON.parse(text);
-    return recommendations;
-
-  } catch (error) {
-    console.error("Proje önerisi hatası:", error);
-    throw new Error("Projeler analiz edilemedi. Lütfen daha sonra tekrar deneyin.");
+  if (!text.trim()) {
+    throw new Error("AI boş yanıt döndürdü.");
   }
+
+  text = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+  const startIndex = text.indexOf("[");
+  const endIndex = text.lastIndexOf("]");
+
+  if (startIndex === -1 || endIndex === -1) {
+    throw new Error(`AI yanıtı JSON dizisi içermiyor. Yanıt: ${text.slice(0, 200)}`);
+  }
+
+  text = text.substring(startIndex, endIndex + 1);
+
+  let recommendations: RankedProject[];
+  try {
+    recommendations = JSON.parse(text);
+  } catch (parseError) {
+    throw new Error(
+      `AI yanıtı JSON olarak parse edilemedi: ${(parseError as Error).message}. Yanıt: ${text.slice(0, 200)}`
+    );
+  }
+
+  if (!Array.isArray(recommendations) || recommendations.length === 0) {
+    throw new Error("AI öneri listesi boş veya geçersiz.");
+  }
+
+  return recommendations;
 }

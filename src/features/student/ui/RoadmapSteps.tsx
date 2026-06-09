@@ -3,6 +3,9 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, PlayCircle, Lock, ExternalLink, Loader2 } from "lucide-react";
+import { StepComments } from "@/features/messaging/ui/StepComments";
+import { StepFiles } from "@/features/files/ui/StepFiles";
+import { toast } from "sonner";
 
 type Step = {
   id: string;
@@ -17,9 +20,11 @@ type Step = {
 type Props = {
   steps: Step[];
   isDraft: boolean;
+  currentUserId?: string;
+  currentUserRole?: string;
 };
 
-export function RoadmapSteps({ steps, isDraft }: Props) {
+export function RoadmapSteps({ steps, isDraft, currentUserId, currentUserRole }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [updatingId, setUpdatingId] = useState<string | null>(null);
@@ -35,7 +40,7 @@ export function RoadmapSteps({ steps, isDraft }: Props) {
 
       if (!res.ok) {
         const err = await res.json();
-        alert(err.error || "Bir hata oluştu.");
+        toast.error(err.error || "Bir hata oluştu.");
         return;
       }
 
@@ -44,7 +49,7 @@ export function RoadmapSteps({ steps, isDraft }: Props) {
         router.refresh();
       });
     } catch {
-      alert("Bağlantı hatası. Lütfen tekrar deneyin.");
+      toast.error("Bağlantı hatası. Lütfen tekrar deneyin.");
     } finally {
       setUpdatingId(null);
     }
@@ -199,6 +204,24 @@ export function RoadmapSteps({ steps, isDraft }: Props) {
                       </button>
                     )}
                   </div>
+                )}
+
+                {/* Step Yorumları */}
+                {!isLocked && currentUserId && currentUserRole && (
+                  <StepComments
+                    stepId={step.id}
+                    currentUserId={currentUserId}
+                    currentUserRole={currentUserRole}
+                  />
+                )}
+
+                {/* Step Dosyaları */}
+                {!isLocked && currentUserId && currentUserRole && (
+                  <StepFiles
+                    stepId={step.id}
+                    currentUserId={currentUserId}
+                    currentUserRole={currentUserRole}
+                  />
                 )}
               </div>
             </div>

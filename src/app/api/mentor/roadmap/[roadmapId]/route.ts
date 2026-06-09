@@ -40,6 +40,14 @@ export async function GET(
       );
     }
 
+    // Mentor ownership kontrolü
+    if (roadmap.assignedProject.studentProfile.mentorId !== auth.session.user.id) {
+      return NextResponse.json(
+        { error: "Bu yol haritasına erişim yetkiniz yok." },
+        { status: 403 }
+      );
+    }
+
     return NextResponse.json(roadmap);
   } catch (error) {
     console.error("Roadmap GET Error:", error);
@@ -64,6 +72,27 @@ export async function PUT(
     const parsed = updateRoadmapSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
+    }
+
+    // Mentor ownership kontrolü
+    const existingRoadmap = await prisma.roadmap.findUnique({
+      where: { id: roadmapId },
+      include: {
+        assignedProject: {
+          include: { studentProfile: true },
+        },
+      },
+    });
+
+    if (!existingRoadmap) {
+      return NextResponse.json({ error: "Yol haritası bulunamadı!" }, { status: 404 });
+    }
+
+    if (existingRoadmap.assignedProject.studentProfile.mentorId !== auth.session.user.id) {
+      return NextResponse.json(
+        { error: "Bu yol haritasını güncelleme yetkiniz yok." },
+        { status: 403 }
+      );
     }
 
     const updateData: Record<string, string> = {};

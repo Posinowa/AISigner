@@ -2,7 +2,9 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
+import { toast } from "sonner";
 import {
   ArrowLeft,
   Save,
@@ -11,7 +13,6 @@ import {
   BookOpen,
   Plus,
   Trash2,
-  GripVertical,
   ExternalLink,
   Pencil,
   X,
@@ -20,6 +21,8 @@ import {
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
+import { StepComments } from "@/features/messaging/ui/StepComments";
+import { StepFiles } from "@/features/files/ui/StepFiles";
 
 /* ─── Tipler ─── */
 type RoadmapStep = {
@@ -70,6 +73,7 @@ const stepStatusConfig: Record<string, { label: string; color: string; icon: typ
 export default function RoadmapReviewPage() {
   const params = useParams();
   const router = useRouter();
+  const { data: sessionData } = useSession();
   const roadmapId = params.roadmapId as string;
 
   const [roadmap, setRoadmap] = useState<Roadmap | null>(null);
@@ -227,7 +231,7 @@ export default function RoadmapReviewPage() {
   /* ─── Yeni Adım Ekleme ─── */
   async function handleAddStep() {
     if (!newStepForm.title.trim() || !newStepForm.description.trim()) {
-      alert("Başlık ve açıklama zorunludur.");
+      toast.error("Başlık ve açıklama zorunludur.");
       return;
     }
     setSaving(true);
@@ -626,6 +630,24 @@ export default function RoadmapReviewPage() {
                           Sil
                         </button>
                       </div>
+
+                      {/* Adım Yorumları */}
+                      {sessionData?.user?.id && (
+                        <StepComments
+                          stepId={step.id}
+                          currentUserId={sessionData.user.id}
+                          currentUserRole={sessionData.user.role || "MENTOR"}
+                        />
+                      )}
+
+                      {/* Adım Dosyaları */}
+                      {sessionData?.user?.id && (
+                        <StepFiles
+                          stepId={step.id}
+                          currentUserId={sessionData.user.id}
+                          currentUserRole={sessionData.user.role || "MENTOR"}
+                        />
+                      )}
                     </div>
                   )}
                 </div>

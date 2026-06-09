@@ -48,6 +48,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Atanmış proje bulunamadı!" }, { status: 404 });
     }
 
+    // Mentor ownership kontrolü: Proje, bu mentörün öğrencisine ait mi?
+    if (assignedProject.studentProfile.mentorId !== auth.session.user.id) {
+      return NextResponse.json(
+        { error: "Bu proje üzerinde işlem yapma yetkiniz yok." },
+        { status: 403 }
+      );
+    }
+
     // 3. İki kere aynı projeye yol haritası oluşturulmasını engelliyoruz
     if (assignedProject.roadmap) {
       return NextResponse.json(
@@ -86,10 +94,10 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ roadmap: newRoadmap }, { status: 200 });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error("Yol haritası API Hatası:", error);
     return NextResponse.json(
-      { error: error.message || "Yol haritası oluşturulurken bir hata meydana geldi." }, 
+      { error: "Yol haritası oluşturulurken bir hata meydana geldi." }, 
       { status: 500 }
     );
   }

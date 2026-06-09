@@ -2,11 +2,17 @@
 
 import { useSession, signOut, signIn } from "next-auth/react"
 import { useEffect } from "react"
+import { notFound } from "next/navigation"
 
 // 🔍 Bu sayfa, oturum (session) verisini test etmek ve gözlemlemek için açıldı.
 // Amaç: Giriş yapıldığında session objesinin içeriğini görmek, çıkış yapıldığında silindiğini doğrulamak.
 
 export default function DebugPage() {
+  // Production'da erişimi engelle
+  if (process.env.NODE_ENV === "production") {
+    notFound();
+  }
+
   const { data: session, status } = useSession()
 
   // 🧪 Oturum verisini tarayıcı konsoluna yazdırıyoruz.

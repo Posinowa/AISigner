@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { logger } from "@/lib/logger";
 
 export type StudentWithProfile = {
   id: string;
@@ -62,8 +63,10 @@ export async function getMentorStudents(mentorId: string): Promise<StudentWithPr
 
     return students;
   } catch (error) {
-    console.error("Error fetching mentor students:", error);
-    return [];
+    // Hatayı yutup [] DÖNMÜYORUZ: aksi halde DB hatası "öğrenci yok" gibi
+    // görünür. Çağıran API route'u yakalayıp 500 döner.
+    logger.error("Error fetching mentor students:", error);
+    throw error;
   }
 }
 
@@ -106,22 +109,10 @@ export async function getStudentDetail(studentId: string, mentorId: string) {
 
     return student;
   } catch (error) {
-    console.error("Error fetching student detail:", error);
-    return null;
-  }
-}
-
-// Mevcut proje şablonlarını getir
-export async function getAvailableProjects() {
-  try {
-    return await prisma.projectTemplate.findMany({
-      orderBy: {
-        title: "asc",
-      },
-    });
-  } catch (error) {
-    console.error("Error fetching project templates:", error);
-    return [];
+    // "Bulunamadı" durumunu findFirst zaten null ile döner (exception atmaz);
+    // buraya yalnızca gerçek DB hatasında düşülür → yutmak yerine rethrow.
+    logger.error("Error fetching student detail:", error);
+    throw error;
   }
 }
 
@@ -181,7 +172,7 @@ export async function assignProjectToStudent(
 
     return assignedProject;
   } catch (error) {
-    console.error("Error assigning project:", error);
+    logger.error("Error assigning project:", error);
     throw error;
   }
 }
@@ -219,21 +210,57 @@ export async function updateProjectStatus(
       },
     });
   } catch (error) {
-    console.error("Error updating project status:", error);
+    logger.error("Error updating project status:", error);
     throw error;
   }
 }
 
 // Proje atamasını sil (Geri al)
-export async function unassignProject(assignedProjectId: string) {
-  try {
-    return await prisma.assignedProject.delete({
-      where: {
-        id: assignedProjectId,
+// İlerlemeyi sessizce silmemek için: aktif/tamamlanmış proje veya
+// PUBLISHED roadmap varsa force=true gelmeden silmez.
+export async function unassignProject(
+  assignedProjectId: string,
+  mentorId: string,
+  force = false
+) {
+  // Mentor ownership + ilerleme bilgisi
+  const assignedProject = await prisma.assignedProject.findFirst({
+    where: {
+      id: assignedProjectId,
+      studentProfile: { mentorId },
+    },
+    include: {
+      roadmap: {
+        select: {
+          status: true,
+          steps: { select: { status: true } },
+        },
       },
-    });
-  } catch (error) {
-    console.error("Error unassigning project:", error);
-    throw error;
+    },
+  });
+
+  if (!assignedProject) {
+    throw new Error("Bu projeyi silme yetkiniz yok veya proje bulunamadı");
   }
+
+  if (!force) {
+    const hasProgress = assignedProject.status !== "PENDING";
+    const roadmapPublished = assignedProject.roadmap?.status === "PUBLISHED";
+    const hasStepProgress =
+      assignedProject.roadmap?.steps.some(
+        (s) => s.status === "IN_PROGRESS" || s.status === "COMPLETED"
+      ) ?? false;
+
+    if (hasProgress || roadmapPublished || hasStepProgress) {
+      const err = new Error(
+        "Bu projede öğrenci ilerlemesi var. Silmek için onay gerekiyor."
+      ) as Error & { code?: string };
+      err.code = "REQUIRES_CONFIRMATION";
+      throw err;
+    }
+  }
+
+  return prisma.assignedProject.delete({
+    where: { id: assignedProjectId },
+  });
 }

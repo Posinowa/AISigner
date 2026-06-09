@@ -54,3 +54,6 @@ gcp-credentials.json
 
 # Claude temp files
 tmpclaude-*
+
+# Uploaded files
+/uploads

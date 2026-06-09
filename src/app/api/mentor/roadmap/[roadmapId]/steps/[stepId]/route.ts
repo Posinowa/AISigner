@@ -12,16 +12,41 @@ export async function PUT(
   if (!auth.authorized) return auth.response;
 
   try {
-    const { stepId } = await params;
+    const { roadmapId, stepId } = await params;
+
+    // Mentor ownership kontrolü
+    const roadmap = await prisma.roadmap.findUnique({
+      where: { id: roadmapId },
+      include: {
+        assignedProject: {
+          include: { studentProfile: true },
+        },
+      },
+    });
+
+    if (!roadmap) {
+      return NextResponse.json({ error: "Yol haritası bulunamadı!" }, { status: 404 });
+    }
+
+    if (roadmap.assignedProject.studentProfile.mentorId !== auth.session.user.id) {
+      return NextResponse.json(
+        { error: "Bu adımı güncelleme yetkiniz yok." },
+        { status: 403 }
+      );
+    }
+
     const body = await req.json();
     const parsed = updateStepSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
     }
 
+    // Status alanını mentor tarafından güncellenebilir alanlardan çıkar (_status kasıtlı kullanılmıyor)
+    const { status: _status, ...safeData } = parsed.data;
+
     const step = await prisma.roadmapStep.update({
       where: { id: stepId },
-      data: parsed.data,
+      data: safeData,
     });
 
     return NextResponse.json(step);
@@ -44,6 +69,51 @@ export async function DELETE(
 
   try {
     const { roadmapId, stepId } = await params;
+
+    // Mentor ownership kontrolü
+    const roadmap = await prisma.roadmap.findUnique({
+      where: { id: roadmapId },
+      include: {
+        assignedProject: {
+          include: { studentProfile: true },
+        },
+      },
+    });
+
+    if (!roadmap) {
+      return NextResponse.json({ error: "Yol haritası bulunamadı!" }, { status: 404 });
+    }
+
+    if (roadmap.assignedProject.studentProfile.mentorId !== auth.session.user.id) {
+      return NextResponse.json(
+        { error: "Bu adımı silme yetkiniz yok." },
+        { status: 403 }
+      );
+    }
+
+    // Öğrenci ilerlemesi koruması: aktif/tamamlanmış adımlar ?force=true olmadan silinemez
+    const url = new URL(req.url);
+    const force = url.searchParams.get("force") === "true";
+    const step = await prisma.roadmapStep.findUnique({
+      where: { id: stepId },
+      select: { status: true },
+    });
+
+    if (!step) {
+      return NextResponse.json({ error: "Adım bulunamadı." }, { status: 404 });
+    }
+
+    if (!force && (step.status === "IN_PROGRESS" || step.status === "COMPLETED")) {
+      return NextResponse.json(
+        {
+          error:
+            "Bu adımda öğrenci ilerlemesi var. Silmek için onay gerekiyor.",
+          requiresConfirmation: true,
+          stepStatus: step.status,
+        },
+        { status: 409 }
+      );
+    }
 
     await prisma.roadmapStep.delete({
       where: { id: stepId },

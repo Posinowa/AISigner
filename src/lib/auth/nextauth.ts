@@ -2,8 +2,47 @@
 import type { AuthOptions } from "next-auth";
 import Credentials from "next-auth/providers/credentials"
 import { prisma } from "@/lib/auth/prisma"
-import { verify } from "@node-rs/argon2";
+import { hash, verify } from "@node-rs/argon2";
+import { createRateLimiter } from "@/lib/rate-limit";
 
+
+// AUTH_SECRET kontrolü - üretim ortamında eksikse hata fırlat
+if (!process.env.AUTH_SECRET && process.env.NODE_ENV === "production") {
+  throw new Error("AUTH_SECRET ortam değişkeni üretim ortamında tanımlanmalıdır!");
+}
+
+// Brute-force koruması: yalnızca BAŞARISIZ giriş denemeleri sayılır.
+// E-posta başına sıkı, IP başına daha esnek (paylaşımlı NAT yanlış pozitiflerini azaltır).
+const loginLimiterByEmail = createRateLimiter("login-email", {
+  maxRequests: 5,
+  windowSeconds: 600, // 10 dakikada 5 başarısız deneme
+});
+const loginLimiterByIp = createRateLimiter("login-ip", {
+  maxRequests: 15,
+  windowSeconds: 600, // 10 dakikada 15 başarısız deneme
+});
+
+// Timing/enumerasyon önleme: kullanıcı bulunamasa bile argon2'yi sabit bir
+// hash'e karşı çalıştırırız ki yanıt süresi "kullanıcı var/yok" bilgisini sızdırmasın.
+// Hash bir kez üretilip cache'lenir (top-level await'ten kaçınmak için lazy).
+let dummyHashPromise: Promise<string> | null = null;
+function getDummyHash(): Promise<string> {
+  if (!dummyHashPromise) {
+    dummyHashPromise = hash("aisigner-dummy-password-for-constant-time-verify");
+  }
+  return dummyHashPromise;
+}
+
+function getClientIp(headers: Record<string, string | string[] | undefined> | undefined): string {
+  const h = headers ?? {};
+  const realIp = h["x-real-ip"];
+  const realIpStr = Array.isArray(realIp) ? realIp[0] : realIp;
+  if (realIpStr) return realIpStr.trim();
+  const fwd = h["x-forwarded-for"];
+  const fwdStr = Array.isArray(fwd) ? fwd[0] : fwd;
+  if (fwdStr) return fwdStr.split(",")[0]!.trim();
+  return "anonymous";
+}
 
 // NextAuth konfigürasyonu
 export const authOptions : AuthOptions = {
@@ -18,21 +57,41 @@ export const authOptions : AuthOptions = {
         email: { label: "Email", type: "text" },// Form input: Email
         password: { label: "Password", type: "password" },// Form input: Password
       },
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null // Eğer kullanıcı email veya password göndermediyse null dön
- 
-        // DB’den user bul (email ile arama)
+      async authorize(credentials, req) {
+        if (!credentials?.email || !credentials?.password) return null
+
+        // Email normalizasyonu — signup ile aynı kuralı uygula (case-insensitive)
+        const normalizedEmail = credentials.email.toLowerCase().trim()
+
+        const ip = getClientIp(req?.headers)
+        const ipKey = `ip:${ip}`
+        const emailKey = `email:${normalizedEmail}`
+
+        // Bloke kontrolü (sayacı artırmadan): limit aşıldıysa pahalı işe girmeden reddet
+        if (!loginLimiterByIp.peek(ipKey).allowed || !loginLimiterByEmail.peek(emailKey).allowed) {
+          throw new Error("Çok fazla başarısız giriş denemesi. Lütfen birkaç dakika sonra tekrar deneyin.")
+        }
+
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
+          where: { email: normalizedEmail },
         })
-        if (!user) return null
-        
-        // Argon2 ile hash’lenmiş şifreyi kontrol et
-                // verify(hash, plainPassword) şeklinde çalışır
 
-        const isValid = await verify(user.password, credentials.password); // ✅ verify(hash, plain)
+        // Sabit zamanlı doğrulama: kullanıcı yoksa dummy hash'e karşı verify çalıştır
+        const passwordHash = user?.password ?? (await getDummyHash())
+        const isValid = await verify(passwordHash, credentials.password)
 
-        return isValid ? user : null
+        if (!user || !isValid) {
+          // Yalnızca başarısız denemeleri say
+          loginLimiterByIp.check(ipKey)
+          loginLimiterByEmail.check(emailKey)
+          return null
+        }
+
+        // Başarılı giriş → sayaçları temizle (meşru kullanıcı cezalandırılmasın)
+        loginLimiterByIp.reset(ipKey)
+        loginLimiterByEmail.reset(emailKey)
+
+        return user
       },
     }),
   ],
