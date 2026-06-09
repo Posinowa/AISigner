@@ -52,13 +52,10 @@ yardımcı fonksiyona soyutlanabilecek şekilde dar tutulmuştur.
 
 ## Veritabanı Migrasyonları
 
-Docker `CMD` `prisma migrate deploy` çalıştırır. Eğer proje `prisma db push`
-ile yönetiliyor ve `prisma/migrations/` klasörü yoksa, üretim için migration
-geçmişi oluşturun:
+`prisma/migrations/` klasörü mevcut (12 migration). Docker `CMD`
+`prisma migrate deploy` çalıştırır → container başlangıcında şema otomatik
+güncellenir, ekstra işlem gerekmez.
 
-```bash
-npx prisma migrate dev --name init   # ilk migration'ı üret
-```
-
-Aksi halde container başlangıcında `migrate deploy` uygulanacak migration
-bulamaz.
+Yeni şema değişikliklerinde `npx prisma migrate dev --name <ad>` ile yeni bir
+migration üretin. Üretimde yalnızca `prisma db push` kullanmak migration
+geçmişini bozabilir; geçmişi tutarlı tutmak için migration akışını tercih edin.

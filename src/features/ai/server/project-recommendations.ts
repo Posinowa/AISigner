@@ -1,4 +1,5 @@
 import { getModel } from "@/lib/ai/gemini-client";
+import { logger } from "@/lib/logger";
 import { StudentProfile, ProjectTemplate } from "@prisma/client";
 
 export interface RankedProject {
@@ -44,7 +45,7 @@ export async function recommendProjects(
   });
 
   let text = result.response.candidates?.[0]?.content?.parts?.[0]?.text || "";
-  console.log("Proje Önerisi Yanıtı (raw):", text);
+  logger.debug("Proje önerisi ham yanıtı", text);
 
   if (!text.trim()) {
     throw new Error("AI boş yanıt döndürdü.");

@@ -11,7 +11,8 @@
     "lint": "eslint",
     "seed": "tsx scripts/seed.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:ai": "tsx --env-file=.env scripts/test-ai.ts"
   },
   "dependencies": {
     "@google-cloud/vertexai": "^1.10.0",

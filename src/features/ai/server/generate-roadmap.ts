@@ -1,4 +1,5 @@
 import { getModel } from "@/lib/ai/gemini-client";
+import { logger } from "@/lib/logger";
 import { StudentProfile, ProjectTemplate } from "@prisma/client";
 
 export interface RoadmapStepData {
@@ -60,7 +61,7 @@ export async function generateRoadmap(
     const result = await model.generateContent(request);
     let text = result.response.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
-    console.log("Roadmap Yanıtı:", text);
+    logger.debug("Roadmap ham yanıtı", text);
 
     text = text.replace(/```json/gi, "").replace(/```/g, "").trim();
 
@@ -76,7 +77,7 @@ export async function generateRoadmap(
     return roadmapSteps.sort((a, b) => a.order - b.order);
 
   } catch (error) {
-    console.error("Roadmap oluşturulurken hata:", error);
+    logger.error("Roadmap oluşturulurken hata", error);
     throw new Error("Yol haritası üretilemedi. Lütfen daha sonra tekrar deneyin.");
   }
 }

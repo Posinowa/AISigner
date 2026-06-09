@@ -1,4 +1,5 @@
 import { getModel } from "@/lib/ai/gemini-client";
+import { logger } from "@/lib/logger";
 
 export type ProfileAnalysisInput = {
   experienceLevel: string;
@@ -50,7 +51,7 @@ Lütfen aşağıdaki formatta SADECE JSON yanıtı ver (başka metin ekleme):
     const result = await model.generateContent(request);
     let text = result.response.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
-    console.log("Profil Analizi Yanıtı:", text);
+    logger.debug("Profil analizi ham yanıtı", text);
 
     text = text.replace(/```json/gi, "").replace(/```/g, "").trim();
     const startIndex = text.indexOf('{');
@@ -68,14 +69,14 @@ Lütfen aşağıdaki formatta SADECE JSON yanıtı ver (başka metin ekleme):
 
     const validLevels: Array<'Başlangıç' | 'Orta' | 'İleri'> = ['Başlangıç', 'Orta', 'İleri'];
     if (!validLevels.includes(parsedResult.level)) {
-      console.warn(`Geçersiz level: ${parsedResult.level}, Orta olarak ayarlandı`);
+      logger.warn(`Geçersiz level: ${parsedResult.level}, Orta olarak ayarlandı`);
       parsedResult.level = 'Orta';
     }
 
     return parsedResult;
 
   } catch (error) {
-    console.error('Profil analizi hatası:', error);
+    logger.error('Profil analizi hatası', error);
 
     return {
       level: 'Orta',
