@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+  push:
+    branches:
+      - develop
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: ci
+    runs-on: ubuntu-latest
+
+    env:
+      AUTH_SECRET: ci-placeholder-secret
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/aisigner?schema=public
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Detect package scripts
+        shell: bash
+        run: |
+          echo "HAS_LINT=$(node -e 'const p=require("./package.json"); process.stdout.write(p.scripts?.lint ? "true" : "false")')" >> "$GITHUB_ENV"
+          echo "HAS_TYPECHECK=$(node -e 'const p=require("./package.json"); process.stdout.write(p.scripts?.typecheck ? "true" : "false")')" >> "$GITHUB_ENV"
+          echo "HAS_TEST=$(node -e 'const p=require("./package.json"); process.stdout.write(p.scripts?.test ? "true" : "false")')" >> "$GITHUB_ENV"
+          echo "HAS_BUILD=$(node -e 'const p=require("./package.json"); process.stdout.write(p.scripts?.build ? "true" : "false")')" >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run lint
+        if: env.HAS_LINT == 'true'
+        run: npm run lint
+
+      - name: Skip lint
+        if: env.HAS_LINT != 'true'
+        run: echo "No lint script found. Skipping."
+
+      - name: Run typecheck
+        if: env.HAS_TYPECHECK == 'true'
+        run: npm run typecheck
+
+      - name: Skip typecheck
+        if: env.HAS_TYPECHECK != 'true'
+        run: echo "No typecheck script found. Skipping."
+
+      - name: Run tests
+        if: env.HAS_TEST == 'true'
+        run: npm test
+
+      - name: Skip tests
+        if: env.HAS_TEST != 'true'
+        run: echo "No test script found. Skipping."
+
+      - name: Run build
+        if: env.HAS_BUILD == 'true'
+        run: npm run build
+
+      - name: Skip build
+        if: env.HAS_BUILD != 'true'
+        run: echo "No build script found. Skipping."

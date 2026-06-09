@@ -1,0 +1,99 @@
+name: PR Guard
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - synchronize
+      - reopened
+      - ready_for_review
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  pr-guard:
+    name: pr-guard
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate PR title, branch and linked issue
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          title="$(jq -r '.pull_request.title // ""' "$GITHUB_EVENT_PATH")"
+          branch="$(jq -r '.pull_request.head.ref // ""' "$GITHUB_EVENT_PATH")"
+          base="$(jq -r '.pull_request.base.ref // ""' "$GITHUB_EVENT_PATH")"
+          body="$(jq -r '.pull_request.body // ""' "$GITHUB_EVENT_PATH")"
+
+          title_regex='^(feat|fix|chore|refactor|ci|docs): .+'
+          issue_branch_regex='^(feature|fix|chore|refactor|ci|docs)/issue-[0-9]+-[a-z0-9-]+$'
+          linked_issue_regex='(Closes|Fixes|Resolves) #[0-9]+'
+
+          if [[ ! "$title" =~ $title_regex ]]; then
+            echo "::error title=Invalid PR title::PR title must start with one of: feat:, fix:, chore:, refactor:, ci:, docs:"
+            exit 1
+          fi
+
+          if [[ "$base" == "main" ]]; then
+            if [[ ! "$branch" =~ ^release/[a-z0-9._-]+$ ]]; then
+              echo "::error title=Invalid main target::PRs targeting main must come from a release/* branch."
+              exit 1
+            fi
+          elif [[ "$base" == "develop" ]]; then
+            if [[ ! "$branch" =~ $issue_branch_regex ]]; then
+              echo "::error title=Invalid branch name::Branch must match: ^(feature|fix|chore|refactor|ci|docs)/issue-[0-9]+-[a-z0-9-]+$"
+              exit 1
+            fi
+          else
+            echo "::error title=Invalid target branch::PR target branch must be develop, or main for release PRs."
+            exit 1
+          fi
+
+          if [[ ! "$body" =~ $linked_issue_regex ]]; then
+            echo "::error title=Missing linked issue::PR body must include Closes #, Fixes #, or Resolves # followed by an issue number."
+            exit 1
+          fi
+
+      - name: Check changed files and PR size
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          files="$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" --jq '.[].filename')"
+          file_count="$(printf '%s\n' "$files" | sed '/^$/d' | wc -l | tr -d ' ')"
+          changed_lines="$(
+            gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" \
+              --jq '.[] | [.additions, .deletions] | @tsv' \
+              | awk '{ total += $1 + $2 } END { print total + 0 }'
+          )"
+
+          if (( file_count > 20 )); then
+            echo "::warning title=Large PR::This PR changes $file_count files. Consider splitting it if the scope is not tightly related to one issue."
+          fi
+
+          if (( changed_lines > 800 )); then
+            echo "::warning title=Large PR::This PR changes $changed_lines lines. Reviewers should check whether this can be split."
+          fi
+
+          sensitive_regex='(^|/)(package-lock\.json|pnpm-lock\.yaml|yarn\.lock)$|(^|/)\.github/workflows/|(^|/)prisma/migrations/|firebase|supabase|(^|/)\.env(\.|$)'
+          forbidden_regex='(^|/)\.env$|(^|/)\.env\.local$|(^|/)\.env\.production$|\.pem$|\.key$|(^|/)credentials\.json$|(^|/)serviceAccount\.json$|(^|/)service-account\.json$|(^|/)gcp-credentials\.json$'
+
+          sensitive_matches="$(printf '%s\n' "$files" | grep -E "$sensitive_regex" || true)"
+          if [[ -n "$sensitive_matches" ]]; then
+            echo "::warning title=Sensitive files changed::Review these files carefully:"
+            printf '%s\n' "$sensitive_matches"
+          fi
+
+          forbidden_matches="$(printf '%s\n' "$files" | grep -E "$forbidden_regex" || true)"
+          if [[ -n "$forbidden_matches" ]]; then
+            echo "::error title=Forbidden files committed::The following files must not be committed:"
+            printf '%s\n' "$forbidden_matches"
+            exit 1
+          fi

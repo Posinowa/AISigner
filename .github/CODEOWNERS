@@ -1,0 +1,23 @@
+# AISigner CODEOWNERS
+#
+# Ekip GitHub kullanıcıları netleşince aşağıdaki örnek owner alanlarını
+# gerçek kullanıcı veya takım adlarıyla değiştirin.
+# Örnek:
+# /src/app/api/ @org/backend-reviewers
+# /src/features/*/server/ @org/backend-reviewers
+# /src/app/ @org/frontend-reviewers
+# /.github/ @yusufyilmazf
+
+# Frontend ağırlıklı dosyalar.
+/src/app/ @yusufyilmazf
+/src/features/*/ui/ @yusufyilmazf
+/components/ @yusufyilmazf
+
+# Backend ağırlıklı dosyalar.
+/src/app/api/ @yusufyilmazf
+/src/features/*/server/ @yusufyilmazf
+/src/lib/ @yusufyilmazf
+/prisma/ @yusufyilmazf
+
+# GitHub workflow ve repo otomasyon değişiklikleri repo owner tarafından incelenmeli.
+/.github/ @yusufyilmazf
