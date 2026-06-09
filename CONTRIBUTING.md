@@ -33,21 +33,102 @@ npm run seed
 npm run dev
 ```
 
-## Branch İsimlendirme
+## Branch Workflow
 
-```
-feat/<scope>-kısa-açıklama    # Yeni özellik
-fix/<scope>-kısa-açıklama     # Hata düzeltmesi
-docs/<scope>-kısa-açıklama    # Dokümantasyon
-refactor/<scope>-kısa-açıklama # Refactoring
-chore/<scope>-kısa-açıklama   # Bakım işleri
+Bu projede `develop` geliştirme branch'i, `main` production branch'i olarak kullanılır.
+
+- Günlük geliştirme PR'ları `develop` branch'ine açılır.
+- `main` branch'ine yalnızca release PR açılır.
+- `main` ve `develop` branch'lerine doğrudan push yapılmamalıdır.
+- Her çalışma bir GitHub issue ile başlamalıdır.
+- Her PR yalnızca bir net issue kapsamını çözmelidir.
+
+### Organizasyon İçindeki Geliştirici Akışı
+
+1. GitHub Issues üzerinden bir issue seçin veya yeni issue açın.
+2. Lokal `develop` branch'inizi güncelleyin:
+
+```bash
+git checkout develop
+git pull origin develop
 ```
 
-**Örnekler:**
+3. Issue numarasını içeren bir branch oluşturun:
+
+```bash
+git checkout -b feature/issue-38-intern-approval-status
 ```
+
+4. Değişiklikleri yapın, local kontrolleri çalıştırın:
+
+```bash
+npm run lint
+npm test
+npm run build
+```
+
+5. Branch'i remote'a push edin:
+
+```bash
+git push -u origin feature/issue-38-intern-approval-status
+```
+
+6. GitHub üzerinden `develop` hedefli PR açın.
+7. PR açıklamasında issue'yu kapatacak ifadeyi ekleyin:
+
+```md
+Closes #38
+```
+
+8. CI ve PR Guard kontrolleri geçtikten sonra review isteyin.
+
+### Branch İsimlendirme Standardı
+
+Branch adı şu formata uymalıdır:
+
+```text
+<type>/issue-<issueNumber>-<short-title>
+```
+
+Geçerli type değerleri:
+
+```text
+feature
+fix
+chore
+refactor
+ci
+docs
+```
+
+Geçerli örnekler:
+
+```text
+feature/issue-38-intern-approval-status
+fix/issue-42-forgot-password-public-route
+chore/issue-56-demo-seed-data
+refactor/issue-22-clean-auth-guards
+ci/issue-53-github-actions-ci
+docs/issue-57-update-setup-docs
+```
+
+Geçersiz örnekler:
+
+```text
+test
+furkan
+new-branch
+update
+final
+frontend-fixes
 feat/auth-social-login
 fix/signup-validation-bug
-docs/readme-update
+```
+
+PR Guard'ın beklediği regex:
+
+```text
+^(feature|fix|chore|refactor|ci|docs)/issue-[0-9]+-[a-z0-9-]+$
 ```
 
 ## Commit Mesajları
@@ -67,21 +148,107 @@ refactor: prisma client singleton'ı birleştir
 ### PR Açmadan Önce
 - [ ] Kodunuz lint kontrolünden geçiyor: `npm run lint`
 - [ ] Build başarıyla tamamlanıyor: `npm run build`
-- [ ] TypeScript hata vermiyor
+- [ ] Testler geçiyor: `npm test`
 - [ ] İlgili migration varsa eklenmiş
+- [ ] Gereksiz dosya değişikliği yok
+- [ ] `.env`, private key veya service account dosyası commit edilmedi
 
 ### PR Açarken
-1. PR başlığı commit convention'a uygun olmalı
-2. Şu bilgileri eklemelisiniz:
-   - **Ne değişti?** — Kısa açıklama
-   - **Neden değişti?** — Motivasyon / ilgili issue
-   - **Nasıl test edilir?** — Adım adım test talimatları
-3. Ekran görüntüsü / GIF teşvik edilir (UI değişiklikleri için)
+1. PR hedef branch'i normal geliştirme işleri için `develop` olmalı.
+2. `main` hedefli PR yalnızca `release/*` branch'inden açılmalı.
+3. PR başlığı şu formatlardan biriyle başlamalı:
+
+```text
+feat: ...
+fix: ...
+chore: ...
+refactor: ...
+ci: ...
+docs: ...
+```
+
+4. PR açıklamasındaki `Related Issue` bölümünde issue kapatma ifadesi bulunmalı:
+
+```md
+Closes #38
+```
+
+Alternatif olarak şunlar da kabul edilir:
+
+```md
+Fixes #38
+Resolves #38
+```
+
+5. PR açıklamasında şu bilgiler net olmalı:
+   - **Summary:** PR ne yapıyor?
+   - **Changes:** Hangi ana değişiklikler yapıldı?
+   - **Screenshots:** UI değişikliği varsa ekran görüntüsü
+   - **Reviewer Notes:** Reviewer'ın özellikle bakması gereken yerler
+
+### Issue Kapatma Standardı
+
+Issue'nun PR merge edildiğinde otomatik kapanması için PR body içinde şu ifadelerden biri bulunmalıdır:
+
+```md
+Closes #issueNumber
+Fixes #issueNumber
+Resolves #issueNumber
+```
+
+Örnek:
+
+```md
+Closes #42
+```
+
+Sadece aşağıdaki gibi referans vermek issue'yu otomatik kapatmaz:
+
+```md
+Related #42
+See #42
+Issue #42
+```
+
+### PR Guard Neleri Kontrol Eder?
+
+PR Guard aşağıdaki durumlarda PR'ı fail eder:
+
+- PR başlığı `feat:`, `fix:`, `chore:`, `refactor:`, `ci:` veya `docs:` ile başlamıyorsa
+- `develop` hedefli PR branch adı standart regex'e uymuyorsa
+- `main` hedefli PR `release/*` branch'inden gelmiyorsa
+- PR body içinde `Closes #`, `Fixes #` veya `Resolves #` yoksa
+- Forbidden dosya commit edildiyse:
+  - `.env`
+  - `.env.local`
+  - `.env.production`
+  - `*.pem`
+  - `*.key`
+  - `credentials.json`
+  - `serviceAccount.json`
+  - `service-account.json`
+  - `gcp-credentials.json`
+
+PR Guard aşağıdaki durumlarda warning verir, doğrudan fail etmez:
+
+- Değişen dosya sayısı 20'den fazlaysa
+- Değişen satır sayısı 800'den fazlaysa
+- Lock file değiştiyse:
+  - `package-lock.json`
+  - `pnpm-lock.yaml`
+  - `yarn.lock`
+- Migration dosyası değiştiyse
+- GitHub workflow dosyası değiştiyse
+- Firebase veya Supabase config benzeri dosyalar değiştiyse
+
+Bu warning'ler otomatik olarak PR'ı engellemez; reviewer'ın özellikle kontrol etmesi gereken alanları gösterir.
 
 ### PR İnceleme
 - En az 1 maintainer onayı gereklidir
 - Küçük ve odaklı PR'lar tercih edilir (tek bir özellik veya düzeltme)
 - Büyük değişiklikler önce issue'da tartışılmalıdır
+- Review comment'leri çözülmeden merge yapılmamalıdır
+- CI ve PR Guard kontrolleri geçmeden merge yapılmamalıdır
 
 ## Kod Standartları
 
