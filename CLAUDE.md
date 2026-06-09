@@ -12,7 +12,7 @@ Her oturumda bu dosyayı okuyarak kaynak dosyaları baştan taramak gerekmez.
 - **Stack**: Next.js 15 (App Router), TypeScript strict, Tailwind CSS v4, shadcn/ui
 - **Auth**: NextAuth v4, JWT strateji, Credentials provider, argon2 hash
 - **DB**: PostgreSQL + Prisma ORM v6 (schema: `prisma/schema.prisma`)
-- **AI**: Google Vertex AI / Gemini 2.0 Flash (`@google-cloud/vertexai`)
+- **AI**: Google Vertex AI / Gemini 2.5 Flash (`@google-cloud/vertexai`). Bağlantı testi: `npm run test:ai`
 - **Validation**: Zod v4
 - **Form**: react-hook-form v7
 

@@ -31,7 +31,7 @@ export function getVertexAI(): VertexAI {
 }
 
 /** JSON döndüren modeller için (response_mime_type=application/json). */
-export function getModel(modelName: string = "gemini-2.0-flash-001") {
+export function getModel(modelName: string = "gemini-2.5-flash") {
   const vertexAI = getVertexAI();
   return vertexAI.getGenerativeModel({
     model: modelName,
@@ -40,7 +40,7 @@ export function getModel(modelName: string = "gemini-2.0-flash-001") {
 }
 
 /** Düz metin döndüren modeller için (chat vb.). */
-export function getTextModel(modelName: string = "gemini-2.0-flash-001") {
+export function getTextModel(modelName: string = "gemini-2.5-flash") {
   const vertexAI = getVertexAI();
   return vertexAI.getGenerativeModel({ model: modelName });
 }
