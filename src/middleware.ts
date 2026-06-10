@@ -12,7 +12,8 @@ const protectedRoutes: Record<string, string> = {
 };
 
 // Auth gerektirmeyen public sayfalar
-const publicPaths = ["/signin", "/signup", "/api/auth", "/api/health"];
+// NOT: /forgot-password oturumsuz kullanıcılar için erişilebilir olmalı (şifre sıfırlama).
+const publicPaths = ["/signin", "/signup", "/forgot-password", "/api/auth", "/api/health"];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
