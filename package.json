@@ -10,8 +10,6 @@
     "start:docker": "next start -H 0.0.0.0 -p ${PORT:-3000}",
     "lint": "eslint",
     "seed": "tsx scripts/seed.ts",
-    "test": "vitest run",
-    "test:watch": "vitest",
     "test:ai": "tsx --env-file=.env scripts/test-ai.ts"
   },
   "dependencies": {
@@ -45,7 +43,6 @@
     "eslint-config-next": "15.5.0",
     "tailwindcss": "^4",
     "tsx": "^4.20.5",
-    "typescript": "^5.9.2",
-    "vitest": "^4.1.8"
+    "typescript": "^5.9.2"
   }
 }
