@@ -35,6 +35,22 @@ export async function requireAuth(requiredRole?: Role | Role[]) {
     }
   }
 
+  // Onaylanmamış stajyer hesabı (PENDING/REJECTED) hiçbir student işlemi yapamaz.
+  // Admin/mentor bu kontrolden etkilenmez (yalnızca STUDENT rolüne uygulanır).
+  if (
+    session.user.role === "STUDENT" &&
+    session.user.accountStatus &&
+    session.user.accountStatus !== "APPROVED"
+  ) {
+    return {
+      authorized: false as const,
+      response: NextResponse.json(
+        { error: "Hesabınız henüz onaylanmadı." },
+        { status: 403 }
+      ),
+    };
+  }
+
   return {
     authorized: true as const,
     session,

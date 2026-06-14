@@ -15,6 +15,7 @@ model User {
   password      String
   phone         String?
   role          Role      @default(STUDENT)
+  accountStatus AccountStatus @default(APPROVED)
   emailVerified DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -173,6 +174,14 @@ enum Role {
   ADMIN
   MENTOR
   STUDENT
+}
+
+// Stajyer hesap onay durumu. Yeni signup'lar PENDING; admin APPROVED/REJECTED yapar.
+// DB default APPROVED → mevcut kullanıcılar ve admin/mentor migration sonrası kilitlenmez.
+enum AccountStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum AssignmentStatus {
