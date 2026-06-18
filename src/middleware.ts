@@ -63,6 +63,20 @@ export async function middleware(request: NextRequest) {
   // Rol bazlı erişim kontrolü
   const userRole = token.role as string | undefined;
 
+  // Onaylanmamış stajyer (PENDING/REJECTED): korumalı student route'larından
+  // durum ekranına yönlendirilir. (#38 status verisi, #39 ekran)
+  const accountStatus = token.accountStatus as string | undefined;
+  if (
+    userRole === "STUDENT" &&
+    accountStatus &&
+    accountStatus !== "APPROVED" &&
+    (pathname.startsWith("/student-dashboard") ||
+      pathname.startsWith("/student-onboarding") ||
+      pathname.startsWith("/profile-setup"))
+  ) {
+    return NextResponse.redirect(new URL("/account-status", request.url));
+  }
+
   for (const [route, requiredRole] of Object.entries(protectedRoutes)) {
     if (pathname.startsWith(route) && userRole !== requiredRole) {
       // Yanlış role sahip kullanıcıyı kendi dashboard'una yönlendir

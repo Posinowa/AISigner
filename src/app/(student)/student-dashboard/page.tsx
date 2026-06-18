@@ -7,6 +7,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/nextauth";
 import { Clock, Briefcase, Target, MessageSquare } from "lucide-react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Progress } from "@/components/ui/progress";
 import { UnreadBadge } from "@/features/messaging/ui/UnreadBadge";
 import { SecurityQuestionsSetup } from "@/features/auth/ui/SecurityQuestionsSetup";
@@ -17,35 +18,10 @@ export default async function StudentDashboardPage() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return <p>Oturum açmanız gerekiyor.</p>;
 
-  // #38: Onaylanmamış stajyer (PENDING/REJECTED) panele erişemez.
-  // (#39 bu bloğu tam ekran pending/rejected tasarımlarıyla değiştirecek.)
-  const accountStatus = session.user.accountStatus;
-  if (accountStatus && accountStatus !== "APPROVED") {
-    const rejected = accountStatus === "REJECTED";
-    return (
-      <div className="min-h-[80vh] flex flex-col items-center justify-center p-6 text-center relative">
-        <div className="absolute top-4 right-4">
-          <LogoutButton />
-        </div>
-        <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-10 max-w-lg w-full space-y-4">
-          <div
-            className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto ${
-              rejected ? "bg-red-50" : "bg-amber-50"
-            }`}
-          >
-            <Clock className={`w-8 h-8 ${rejected ? "text-red-600" : "text-amber-600"}`} />
-          </div>
-          <h1 className="text-2xl font-bold text-slate-900">
-            {rejected ? "Başvurunuz reddedildi" : "Hesabınız onay bekliyor"}
-          </h1>
-          <p className="text-slate-600 leading-relaxed">
-            {rejected
-              ? "Hesabınız bir yönetici tarafından reddedildi. Sorunuz varsa lütfen ekiple iletişime geçin."
-              : "Kaydınız alındı. Bir yönetici hesabınızı onayladıktan sonra panele erişebilirsiniz."}
-          </p>
-        </div>
-      </div>
-    );
+  // Onaylanmamış stajyer (PENDING/REJECTED) durum ekranına yönlendirilir (#39).
+  // Defense-in-depth: middleware zaten yönlendiriyor, bu sunucu tarafı yedek.
+  if (session.user.accountStatus && session.user.accountStatus !== "APPROVED") {
+    redirect("/account-status");
   }
 
   const profile = await prisma.studentProfile.findUnique({

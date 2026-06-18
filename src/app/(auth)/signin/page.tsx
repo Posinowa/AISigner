@@ -47,15 +47,19 @@ function SigninForm() {
       } else if (result?.ok) {
         // Session cookie'sinin oturduğundan emin olmak için kısa bir bekleme + retry
         let userRole: string | undefined
+        let accountStatus: string | undefined
         for (let i = 0; i < 5; i++) {
           const session = await getSession()
           userRole = session?.user?.role
+          accountStatus = session?.user?.accountStatus
           if (userRole) break
           await new Promise((r) => setTimeout(r, 100))
         }
 
         const target =
-          userRole === "ADMIN"
+          accountStatus && accountStatus !== "APPROVED"
+            ? "/account-status"
+            : userRole === "ADMIN"
             ? "/admin-dashboard"
             : userRole === "MENTOR"
             ? "/mentor-dashboard"
