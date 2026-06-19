@@ -17,9 +17,25 @@ export type UserWithProfile = {
 
 // ------------------------------------
 // Tüm kullanıcıları getir
+// NOT: Explicit select kullanılır — password hash gibi hassas alanlar
+// hiçbir zaman API response'una sızmamalı (include tüm scalar alanları döndürürdü).
 export async function getAllUsers(): Promise<UserWithProfile[]> {
   return prisma.user.findMany({
-    include: { studentProfile: true },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      lastName: true,
+      role: true,
+      studentProfile: {
+        select: {
+          id: true,
+          experienceLevel: true,
+          interests: true,
+          mentorId: true,
+        },
+      },
+    },
     orderBy: { createdAt: "desc" },
   });
 }
@@ -36,9 +52,11 @@ export async function getMentors(): Promise<{id: string; name: string | null; la
 // ------------------------------------
 // Kullanıcı rolünü güncelle
 export async function updateUserRole(userId: string, role: "ADMIN" | "MENTOR" | "STUDENT") {
+  // Güvenli response shape — password hash döndürülmez.
   return prisma.user.update({
     where: { id: userId },
     data: { role },
+    select: { id: true, email: true, name: true, lastName: true, role: true },
   });
 }
 
