@@ -114,6 +114,7 @@ callbacks: {
         token.id = user.id
         token.email = user.email
         token.role = user.role
+        token.accountStatus = (user as { accountStatus?: string }).accountStatus
       }
       return token
     },
@@ -127,7 +128,7 @@ callbacks: {
         id: token.id as string | undefined,
         email: token.email?? "",
         role: typeof token.role === "string" ? token.role : undefined,
-        
+        accountStatus: typeof token.accountStatus === "string" ? token.accountStatus : undefined,
       }
       return session
     },

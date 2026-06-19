@@ -64,6 +64,8 @@ export async function signupAction(
         password: hashedPassword,
         phone: parsed.data.phone ?? null,
         role: "STUDENT",
+        // Yeni stajyer hesabı admin onayına kadar PENDING — aktif değildir.
+        accountStatus: "PENDING",
       },
     })
   } catch (err) {
