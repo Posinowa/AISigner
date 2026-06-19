@@ -7,6 +7,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/nextauth";
 import { Clock, Briefcase, Target, MessageSquare } from "lucide-react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Progress } from "@/components/ui/progress";
 import { UnreadBadge } from "@/features/messaging/ui/UnreadBadge";
 import { SecurityQuestionsSetup } from "@/features/auth/ui/SecurityQuestionsSetup";
