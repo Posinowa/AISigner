@@ -14,6 +14,14 @@ export const assignMentorSchema = z.object({
   mentorId: z.string().nullable(),
 });
 
+// Admin: Stajyer hesap onay durumu güncelleme (approve/reject)
+export const updateAccountStatusSchema = z.object({
+  userId: z.string().min(1, "Kullanıcı ID gerekli"),
+  accountStatus: z.enum(["PENDING", "APPROVED", "REJECTED"], {
+    error: "Geçersiz durum. PENDING, APPROVED veya REJECTED olmalı.",
+  }),
+});
+
 // Admin: Proje şablonu oluşturma
 export const createTemplateSchema = z.object({
   title: z.string().min(1, "Başlık gerekli"),

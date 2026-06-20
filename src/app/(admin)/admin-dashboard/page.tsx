@@ -13,7 +13,11 @@ import {
   Loader2,
   FolderKanban,
   MessageSquare,
+  CheckCircle2,
+  XCircle,
+  Clock,
 } from "lucide-react";
+import { toast } from "sonner";
 import LogoutButton from "@/components/LogoutButton";
 import { UnreadBadge } from "@/features/messaging/ui/UnreadBadge";
 
@@ -23,6 +27,7 @@ type User = {
   name: string | null;
   lastName: string | null;
   role: "ADMIN" | "MENTOR" | "STUDENT";
+  accountStatus: "PENDING" | "APPROVED" | "REJECTED";
   studentProfile?: {
     id: string;
     mentorId?: string | null;
@@ -40,6 +45,12 @@ const roleConfig: Record<User["role"], { label: string; color: string }> = {
   ADMIN: { label: "Yönetici", color: "bg-purple-50 text-purple-700 border-purple-200" },
   MENTOR: { label: "Mentor", color: "bg-blue-50 text-blue-700 border-blue-200" },
   STUDENT: { label: "Öğrenci", color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+};
+
+const statusConfig: Record<User["accountStatus"], { label: string; color: string }> = {
+  PENDING: { label: "Onay Bekliyor", color: "bg-amber-50 text-amber-700 border-amber-200" },
+  APPROVED: { label: "Onaylı", color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  REJECTED: { label: "Reddedildi", color: "bg-red-50 text-red-700 border-red-200" },
 };
 
 export default function AdminDashboard() {
@@ -121,6 +132,38 @@ export default function AdminDashboard() {
     }
   }
 
+  async function handleAccountStatus(userId: string, accountStatus: User["accountStatus"]) {
+    setUpdating(userId);
+    try {
+      const response = await fetch("/api/admin/users/approval", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, accountStatus }),
+      });
+      if (response.ok) {
+        setUsers((prev) =>
+          prev.map((u) => (u.id === userId ? { ...u, accountStatus } : u)),
+        );
+        toast.success(
+          accountStatus === "APPROVED"
+            ? "Stajyer onaylandı."
+            : accountStatus === "REJECTED"
+              ? "Stajyer reddedildi."
+              : "Durum güncellendi.",
+        );
+      } else {
+        const data = await response.json().catch(() => null);
+        const msg =
+          data && typeof data.error === "string" ? data.error : "Durum güncellenemedi.";
+        toast.error(msg);
+      }
+    } catch {
+      toast.error("Bağlantı hatası. Lütfen tekrar deneyin.");
+    } finally {
+      setUpdating(null);
+    }
+  }
+
   const filteredUsers = useMemo(() => {
     const q = search.trim().toLowerCase();
     return users.filter((u) => {
@@ -142,7 +185,10 @@ export default function AdminDashboard() {
     const studentsWithoutMentor = users.filter(
       (u) => u.role === "STUDENT" && u.studentProfile && !u.studentProfile.mentorId,
     ).length;
-    return { total, studentCount, mentorCount, adminCount, studentsWithProfile, studentsWithoutMentor };
+    const pendingCount = users.filter(
+      (u) => u.role === "STUDENT" && u.accountStatus === "PENDING",
+    ).length;
+    return { total, studentCount, mentorCount, adminCount, studentsWithProfile, studentsWithoutMentor, pendingCount };
   }, [users]);
 
   const getDisplayName = (u: { name: string | null; lastName: string | null; email: string }) => {
@@ -219,6 +265,21 @@ export default function AdminDashboard() {
           ))}
         </div>
 
+        {/* Onay bekleyen stajyerler */}
+        {stats.pendingCount > 0 && (
+          <div className="mb-6 flex items-start gap-3 rounded-2xl bg-blue-50 border border-blue-200 px-5 py-4">
+            <Clock className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
+            <div className="text-sm">
+              <p className="font-semibold text-blue-900">
+                {stats.pendingCount} stajyer onay bekliyor
+              </p>
+              <p className="text-blue-700 mt-0.5">
+                Aşağıdaki listeden onay bekleyen stajyerleri onaylayabilir veya reddedebilirsin.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Uyarı banner — mentor atanmamış öğrenciler */}
         {stats.studentsWithoutMentor > 0 && (
           <div className="mb-6 flex items-start gap-3 rounded-2xl bg-amber-50 border border-amber-200 px-5 py-4">
@@ -282,7 +343,7 @@ export default function AdminDashboard() {
               <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3 bg-slate-50/60 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                 <div className="col-span-4">Kullanıcı</div>
                 <div className="col-span-3">Rol</div>
-                <div className="col-span-5">Mentor Ataması</div>
+                <div className="col-span-5">Onay / Mentor</div>
               </div>
 
               {filteredUsers.map((user) => {
@@ -303,6 +364,13 @@ export default function AdminDashboard() {
                           {getDisplayName(user)}
                         </p>
                         <p className="text-xs text-slate-500 truncate">{user.email}</p>
+                        {user.role === "STUDENT" && (
+                          <span
+                            className={`mt-1 inline-flex w-fit items-center px-1.5 py-0.5 text-[10px] font-semibold rounded border ${statusConfig[user.accountStatus].color}`}
+                          >
+                            {statusConfig[user.accountStatus].label}
+                          </span>
+                        )}
                       </div>
                       <span
                         className={`md:hidden shrink-0 px-2 py-1 text-[10px] font-semibold rounded-lg border ${role.color}`}
@@ -328,10 +396,30 @@ export default function AdminDashboard() {
                       {isUpdating && <Loader2 className="animate-spin w-3.5 h-3.5 text-blue-600" />}
                     </div>
 
-                    {/* Mentor Atama */}
+                    {/* Onay / Mentor Atama */}
                     <div className="md:col-span-5 flex items-center">
                       {user.role === "STUDENT" ? (
-                        user.studentProfile ? (
+                        user.accountStatus !== "APPROVED" ? (
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <button
+                              onClick={() => handleAccountStatus(user.id, "APPROVED")}
+                              disabled={isUpdating}
+                              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors disabled:opacity-60"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Onayla
+                            </button>
+                            {user.accountStatus === "PENDING" && (
+                              <button
+                                onClick={() => handleAccountStatus(user.id, "REJECTED")}
+                                disabled={isUpdating}
+                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 text-xs font-semibold transition-colors disabled:opacity-60"
+                              >
+                                <XCircle className="w-3.5 h-3.5" /> Reddet
+                              </button>
+                            )}
+                            {isUpdating && <Loader2 className="animate-spin w-3.5 h-3.5 text-blue-600" />}
+                          </div>
+                        ) : user.studentProfile ? (
                           <div className="flex items-center gap-2 w-full">
                             <select
                               value={user.studentProfile.mentorId || ""}
