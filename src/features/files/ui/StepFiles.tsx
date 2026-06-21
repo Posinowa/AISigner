@@ -34,9 +34,12 @@ type Props = {
   stepId: string;
   currentUserId: string;
   currentUserRole: string;
+  isDraft?: boolean;
 };
 
-export function StepFiles({ stepId, currentUserId, currentUserRole }: Props) {
+export function StepFiles({ stepId, currentUserId, currentUserRole, isDraft }: Props) {
+  // #52: Taslak roadmap'te öğrenci dosya yükleyemez (mentor inceleme için yükleyebilir).
+  const interactionLocked = isDraft && currentUserRole === "STUDENT";
   const [files, setFiles] = useState<StepFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -178,46 +181,52 @@ export function StepFiles({ stepId, currentUserId, currentUserRole }: Props) {
       {/* Dosya Paneli */}
       {isOpen && (
         <div className="mt-3 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
-          {/* Upload Alanı */}
-          <div
-            className={`relative border-2 border-dashed rounded-lg p-4 text-center transition-colors cursor-pointer
-              ${dragOver
-                ? "border-blue-400 bg-blue-50"
-                : "border-slate-200 hover:border-slate-300 bg-slate-50/50"
-              }
-              ${uploading ? "pointer-events-none opacity-60" : ""}`}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragOver(true);
-            }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={onDrop}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              className="hidden"
-              onChange={onFileChange}
-              accept=".png,.jpg,.jpeg,.gif,.webp,.pdf,.txt,.md,.csv,.json,.zip,.js,.ts,.tsx,.jsx,.css,.py,.java,.go,.rs,.c,.cpp,.h,.sql"
-            />
-            {uploading ? (
-              <div className="flex items-center justify-center gap-2 py-1">
-                <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
-                <span className="text-xs text-slate-500">Yükleniyor...</span>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center gap-1 py-1">
-                <Upload className="w-5 h-5 text-slate-400" />
-                <span className="text-xs text-slate-500">
-                  Dosyayı sürükleyin veya tıklayıp seçin
-                </span>
-                <span className="text-[10px] text-slate-400">
-                  Maks. 10 MB &middot; Resim, PDF, Kod, ZIP
-                </span>
-              </div>
-            )}
-          </div>
+          {/* Upload Alanı — taslak roadmap'te öğrenci yükleyemez (#52) */}
+          {interactionLocked ? (
+            <p className="text-[11px] text-slate-400 text-center border-2 border-dashed border-slate-200 rounded-lg p-4">
+              Bu yol haritası taslak aşamasında. Mentörünüz yayınladığında dosya yükleyebilirsiniz.
+            </p>
+          ) : (
+            <div
+              className={`relative border-2 border-dashed rounded-lg p-4 text-center transition-colors cursor-pointer
+                ${dragOver
+                  ? "border-blue-400 bg-blue-50"
+                  : "border-slate-200 hover:border-slate-300 bg-slate-50/50"
+                }
+                ${uploading ? "pointer-events-none opacity-60" : ""}`}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOver(true);
+              }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={onDrop}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                onChange={onFileChange}
+                accept=".png,.jpg,.jpeg,.gif,.webp,.pdf,.txt,.md,.csv,.json,.zip,.js,.ts,.tsx,.jsx,.css,.py,.java,.go,.rs,.c,.cpp,.h,.sql"
+              />
+              {uploading ? (
+                <div className="flex items-center justify-center gap-2 py-1">
+                  <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                  <span className="text-xs text-slate-500">Yükleniyor...</span>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-1 py-1">
+                  <Upload className="w-5 h-5 text-slate-400" />
+                  <span className="text-xs text-slate-500">
+                    Dosyayı sürükleyin veya tıklayıp seçin
+                  </span>
+                  <span className="text-[10px] text-slate-400">
+                    Maks. 10 MB &middot; Resim, PDF, Kod, ZIP
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Hata Mesajı */}
           {error && (
