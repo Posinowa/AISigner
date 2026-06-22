@@ -9,21 +9,23 @@ const limiter = createRateLimiter("ai-chat", {
   windowSeconds: 60,
 });
 
-const SYSTEM_PROMPT = `Sen AISigner platformundaki bir yapay zeka eğitim asistanısın. Adın "Posilog"dur.
+const SYSTEM_PROMPT = `Sen AISigner platformundaki bir yapay zeka öğrenme rehberisin. Adın "Posilog"dur.
+
+Rolün REHBERLİK etmek — öğrencinin YERİNE işi YAPMAMAK. Amacın, öğrencinin kendi başına ilerlemeyi öğrenmesidir.
 
 Görevin:
-- Öğrencilere yazılım geliştirme, programlama ve teknoloji konularında yardımcı olmak
-- Proje adımlarında takıldıkları noktaları açıklamak
-- Kavramları basit ve anlaşılır bir dille Türkçe açıklamak
-- Kod örnekleri ile desteklemek
-- Motivasyon vermek ve öğrenme sürecini desteklemek
+- Öğrenciyi yönlendir: nereden başlayacağını, hangi roadmap adımına / issue'ya odaklanacağını, nasıl plan yapacağını ve nasıl branch açıp ilerleyeceğini anlat.
+- Takıldığı noktada problemi küçük adımlara böl, doğru soruları sormasına yardım et, ilgili kavramı veya kaynağı işaret et.
+- Gerektiğinde KISA, açıklayıcı kod parçacıkları (snippet) ver — ama tam çözümü/ödevi baştan sona yazma.
+- Motivasyon ver, öğrenme sürecini destekle.
 
 Kurallar:
-- Türkçe yanıt ver (teknik terimler hariç)
-- Kısa ve öz ol, gereksiz uzatma
-- Konu dışı sorularda kibar bir şekilde yönlendir
-- Asla zararlı, yanıltıcı veya uygunsuz içerik üretme
-- Öğrencinin seviyesine uygun açıklamalar yap`;
+- Öğrencinin yerine tam çözüm, komple dosya veya uzun hazır kod ÜRETME. Bunun yerine yaklaşımı, adımları ve ipuçlarını ver.
+- Öğrenci "kodu sen yaz / ödevi çöz" derse kibarca yönlendir: "Hadi birlikte adım adım ilerleyelim" de ve ilk adımı sor.
+- Mümkünse öğrencinin aktif projesi, roadmap adımı ve hedeflerini kullanarak somut yönlendir.
+- Türkçe yanıt ver (teknik terimler hariç), kısa ve öz ol.
+- Konu dışı sorularda kibarca öğrenme hedefine yönlendir.
+- Asla zararlı, yanıltıcı veya uygunsuz içerik üretme.`;
 
 /**
  * POST /api/student/ai-chat
@@ -141,7 +143,7 @@ export async function POST(req: Request) {
           role: "model",
           parts: [
             {
-              text: "Anladım! Ben Posilog. Yazılım ve teknoloji konularında sorularınıza yardımcı olmaya hazırım. Nasıl yardımcı olabilirim?",
+              text: "Selam! Ben Posilog 👋 Senin yerine ödevini yapmam ama nereden başlayacağını, hangi adıma odaklanacağını ve nasıl ilerleyeceğini birlikte planlarız. Hangi konuda takıldın?",
             },
           ],
         },
@@ -151,14 +153,15 @@ export async function POST(req: Request) {
 
     const result = await chat.sendMessage(message.trim());
     const response = result.response;
-    const text = response.candidates?.[0]?.content?.parts?.[0]?.text || "Üzgünüm, bir cevap üretemiyorum. Lütfen tekrar deneyin.";
+    const text = response.candidates?.[0]?.content?.parts?.[0]?.text || "Bunu tam çözemedim. Sorunu biraz daha somutlaştırır mısın — hangi adımda, tam olarak nerede takıldın?";
 
     return NextResponse.json({ reply: text });
   } catch (error) {
     console.error("POST /api/student/ai-chat error:", error);
-    return NextResponse.json(
-      { error: "AI yanıt üretirken hata oluştu. Lütfen tekrar deneyin." },
-      { status: 500 }
-    );
+    // #51: AI servisine ulaşılamazsa hata ekranı yerine dostça bir rehber fallback döndür.
+    return NextResponse.json({
+      reply:
+        "Şu an sana bağlanırken bir aksaklık oldu 🙏 Bu sırada şöyle ilerleyebilirsin: roadmap'inde şu anki adıma odaklan, takıldığın yeri küçük parçalara böl ve adımdaki kaynakları incele. Birazdan tekrar yazarsan kaldığımız yerden devam ederiz.",
+    });
   }
 }
