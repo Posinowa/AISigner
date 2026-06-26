@@ -111,10 +111,36 @@ export const authOptions : AuthOptions = {
 callbacks: {
     async jwt({ token, user }) {
       if (user) {
+        // İlk giriş — bilgileri token'a yaz
         token.id = user.id
         token.email = user.email
         token.role = user.role
         token.accountStatus = (user as { accountStatus?: string }).accountStatus
+        return token
+      }
+
+      // #44: Sonraki isteklerde rol + hesap durumunu DB'den tazele.
+      // Admin bir kullanıcının rolünü düşürürse (veya hesabını reddederse),
+      // değişiklik aktif session'a bir sonraki istekte yansır — stale role
+      // ile korumalı API kullanma penceresi kapanır.
+      // Not: JWT yapısına uygun en basit çözüm; getServerSession başına 1 sorgu.
+      if (token.id) {
+        try {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: token.id as string },
+            select: { role: true, accountStatus: true },
+          })
+          if (dbUser) {
+            token.role = dbUser.role
+            token.accountStatus = dbUser.accountStatus
+          } else {
+            // Kullanıcı silinmiş → yetkiyi kaldır
+            token.role = undefined
+            token.accountStatus = undefined
+          }
+        } catch {
+          // DB geçici hatası → mevcut token değerlerini koru (oturumu bozma)
+        }
       }
       return token
     },
