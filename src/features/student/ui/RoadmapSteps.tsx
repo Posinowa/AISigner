@@ -212,6 +212,7 @@ export function RoadmapSteps({ steps, isDraft, currentUserId, currentUserRole }:
                     stepId={step.id}
                     currentUserId={currentUserId}
                     currentUserRole={currentUserRole}
+                    isDraft={isDraft}
                   />
                 )}
 
@@ -221,6 +222,7 @@ export function RoadmapSteps({ steps, isDraft, currentUserId, currentUserRole }:
                     stepId={step.id}
                     currentUserId={currentUserId}
                     currentUserRole={currentUserRole}
+                    isDraft={isDraft}
                   />
                 )}
               </div>

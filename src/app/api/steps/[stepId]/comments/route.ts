@@ -87,6 +87,16 @@ export async function POST(
       );
     }
 
+    // #52: Öğrenci yalnızca PUBLISHED roadmap adımına yorum ekleyebilir.
+    // Mentor, taslağı (DRAFT) düzenleme/inceleme için yorum yapabilir.
+    const isStudent = step.roadmap.assignedProject.studentProfile.userId === userId;
+    if (isStudent && step.roadmap.status !== "PUBLISHED") {
+      return NextResponse.json(
+        { error: "Bu yol haritası henüz yayınlanmadı. Yayınlandığında etkileşim kurabilirsiniz." },
+        { status: 403 }
+      );
+    }
+
     const body = await req.json();
     const parsed = createStepCommentSchema.safeParse(body);
     if (!parsed.success) {

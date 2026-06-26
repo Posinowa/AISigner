@@ -22,9 +22,12 @@ type Props = {
   stepId: string;
   currentUserId: string;
   currentUserRole: string;
+  isDraft?: boolean;
 };
 
-export function StepComments({ stepId, currentUserId, currentUserRole }: Props) {
+export function StepComments({ stepId, currentUserId, currentUserRole, isDraft }: Props) {
+  // #52: Taslak roadmap'te öğrenci yorum ekleyemez (mentor inceleme için ekleyebilir).
+  const interactionLocked = isDraft && currentUserRole === "STUDENT";
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
   const [loading, setLoading] = useState(false);
@@ -253,29 +256,35 @@ export function StepComments({ stepId, currentUserId, currentUserRole }: Props) 
             </div>
           )}
 
-          {/* Yorum Gönder */}
-          <form onSubmit={handleSend} className="flex gap-2 items-end pt-2 border-t border-slate-200">
-            <textarea
-              ref={inputRef}
-              value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
-              placeholder="Yorumunuzu yazın..."
-              maxLength={1000}
-              rows={2}
-              className="flex-1 text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-            />
-            <button
-              type="submit"
-              disabled={!newComment.trim() || sending}
-              className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
-            >
-              {sending ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Send className="w-3.5 h-3.5" />
-              )}
-            </button>
-          </form>
+          {/* Yorum Gönder — taslak roadmap'te öğrenci etkileşim kuramaz (#52) */}
+          {interactionLocked ? (
+            <p className="text-[11px] text-slate-400 text-center pt-2 border-t border-slate-200">
+              Bu yol haritası taslak aşamasında. Mentörünüz yayınladığında yorum ekleyebilirsiniz.
+            </p>
+          ) : (
+            <form onSubmit={handleSend} className="flex gap-2 items-end pt-2 border-t border-slate-200">
+              <textarea
+                ref={inputRef}
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                placeholder="Yorumunuzu yazın..."
+                maxLength={1000}
+                rows={2}
+                className="flex-1 text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              />
+              <button
+                type="submit"
+                disabled={!newComment.trim() || sending}
+                className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
+              >
+                {sending ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Send className="w-3.5 h-3.5" />
+                )}
+              </button>
+            </form>
+          )}
         </div>
       )}
     </div>

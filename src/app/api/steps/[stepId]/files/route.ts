@@ -122,6 +122,16 @@ export async function POST(
       );
     }
 
+    // #52: Öğrenci yalnızca PUBLISHED roadmap adımına dosya yükleyebilir.
+    // Mentor, taslağı (DRAFT) inceleme/düzenleme için yükleyebilir.
+    const isStudent = step.roadmap.assignedProject.studentProfile.userId === userId;
+    if (isStudent && step.roadmap.status !== "PUBLISHED") {
+      return NextResponse.json(
+        { error: "Bu yol haritası henüz yayınlanmadı. Yayınlandığında etkileşim kurabilirsiniz." },
+        { status: 403 }
+      );
+    }
+
     // Bu adıma ait dosya sayısını kontrol et (max 10)
     const fileCount = await prisma.stepFile.count({ where: { stepId } });
     if (fileCount >= 10) {
