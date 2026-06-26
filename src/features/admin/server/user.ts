@@ -7,6 +7,7 @@ export type UserWithProfile = {
   name: string | null;
   lastName: string | null;
   role: "ADMIN" | "MENTOR" | "STUDENT";
+  accountStatus: "PENDING" | "APPROVED" | "REJECTED";
   studentProfile?: {
     id: string;
     experienceLevel?: string | null;
@@ -27,6 +28,7 @@ export async function getAllUsers(): Promise<UserWithProfile[]> {
       name: true,
       lastName: true,
       role: true,
+      accountStatus: true,
       studentProfile: {
         select: {
           id: true,
@@ -57,6 +59,19 @@ export async function updateUserRole(userId: string, role: "ADMIN" | "MENTOR" | 
     where: { id: userId },
     data: { role },
     select: { id: true, email: true, name: true, lastName: true, role: true },
+  });
+}
+
+// ------------------------------------
+// Stajyer hesap onay durumunu güncelle (approve/reject)
+export async function updateAccountStatus(
+  userId: string,
+  accountStatus: "PENDING" | "APPROVED" | "REJECTED",
+) {
+  return prisma.user.update({
+    where: { id: userId },
+    data: { accountStatus },
+    select: { id: true, email: true, name: true, lastName: true, role: true, accountStatus: true },
   });
 }
 
