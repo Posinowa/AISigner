@@ -14,6 +14,38 @@ export const assignMentorSchema = z.object({
   mentorId: z.string().nullable(),
 });
 
+// ==========================================
+// 📋 Anket (Survey) Şemaları — #45
+// ==========================================
+
+// Admin: Anket sorusu oluşturma
+export const createSurveyQuestionSchema = z.object({
+  question: z.string().min(1, "Soru metni gerekli").max(500, "Soru en fazla 500 karakter olabilir"),
+  options: z.array(z.string().min(1, "Seçenek boş olamaz").max(200)).max(20, "En fazla 20 seçenek").default([]),
+  order: z.number().int().min(0).optional(),
+  isActive: z.boolean().optional(),
+});
+
+// Admin: Anket sorusu güncelleme/pasifleştirme (kısmi)
+export const updateSurveyQuestionSchema = z.object({
+  question: z.string().min(1).max(500).optional(),
+  options: z.array(z.string().min(1).max(200)).max(20).optional(),
+  order: z.number().int().min(0).optional(),
+  isActive: z.boolean().optional(),
+});
+
+// Öğrenci: Anket cevaplarını kaydetme (toplu)
+export const saveSurveyAnswersSchema = z.object({
+  answers: z
+    .array(
+      z.object({
+        questionId: z.string().min(1, "Soru ID gerekli"),
+        answer: z.string().min(1, "Cevap boş olamaz").max(2000, "Cevap en fazla 2000 karakter olabilir"),
+      }),
+    )
+    .min(1, "En az bir cevap gerekli"),
+});
+
 // Admin: Stajyer hesap onay durumu güncelleme (approve/reject)
 export const updateAccountStatusSchema = z.object({
   userId: z.string().min(1, "Kullanıcı ID gerekli"),

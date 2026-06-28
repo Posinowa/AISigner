@@ -55,6 +55,7 @@ model StudentProfile {
   user             User              @relation("StudentProfile_userIdToUser", fields: [userId], references: [id], onDelete: Cascade)
   mentor           User?             @relation("StudentProfile_mentorIdToUser", fields: [mentorId], references: [id])
   assignedProjects AssignedProject[]
+  surveyAnswers    SurveyAnswer[]
 }
 
 model ProjectTemplate {
@@ -168,6 +169,36 @@ model SecurityAnswer {
 
   @@unique([userId, questionId])
   @@index([userId])
+}
+
+// #45: Admin tarafından yönetilen anket soruları havuzu.
+// options boşsa serbest metin; doluysa seçenekli soru. isActive=false → pasifleştirilmiş.
+model SurveyQuestion {
+  id        String   @id @default(cuid())
+  question  String
+  options   String[] @default([])
+  order     Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  answers SurveyAnswer[]
+}
+
+// #45: Öğrencinin bir ankete verdiği cevap — profile ile ilişkili.
+model SurveyAnswer {
+  id               String   @id @default(cuid())
+  questionId       String
+  studentProfileId String
+  answer           String   @db.VarChar(2000)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  question       SurveyQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  studentProfile StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([questionId, studentProfileId])
+  @@index([studentProfileId])
 }
 
 enum Role {
