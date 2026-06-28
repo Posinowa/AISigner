@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAllUsers, updateUserRole, assignMentor } from "@/features/admin/server/user";
+import { getAllUsers, updateUserRole, assignMentor, AssignmentValidationError } from "@/features/admin/server/user";
 import { requireAuth } from "@/lib/auth/guard";
 import { updateRoleSchema, assignMentorSchema } from "@/lib/validations/api";
 
@@ -43,6 +43,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
   }
 
-  const updated = await assignMentor(parsed.data.studentId, parsed.data.mentorId);
-  return NextResponse.json(updated);
+  try {
+    const updated = await assignMentor(parsed.data.studentId, parsed.data.mentorId);
+    return NextResponse.json(updated);
+  } catch (error) {
+    // #43: Geçersiz rol → 400 (anlamlı mesaj). Diğer hatalar → 500.
+    if (error instanceof AssignmentValidationError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    console.error("POST /api/admin/users assignMentor error:", error);
+    return NextResponse.json(
+      { error: "Mentor atama sırasında bir hata oluştu." },
+      { status: 500 },
+    );
+  }
 }

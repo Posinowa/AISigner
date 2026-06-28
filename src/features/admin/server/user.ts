@@ -76,8 +76,47 @@ export async function updateAccountStatus(
 }
 
 // ------------------------------------
+// Mentor atama doğrulama hatası — route bunu 4xx'e çevirir (DB hatası 500 ile karışmasın).
+export class AssignmentValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AssignmentValidationError";
+  }
+}
+
+// ------------------------------------
 // Öğrenciye mentor atama (profil yoksa otomatik oluştur)
+// #43: Rolleri doğrula — yalnızca STUDENT'a, yalnızca MENTOR atanabilir.
 export async function assignMentor(studentId: string, mentorId: string | null) {
+  const student = await prisma.user.findUnique({
+    where: { id: studentId },
+    select: { role: true },
+  });
+  if (!student) {
+    throw new AssignmentValidationError("Öğrenci bulunamadı.");
+  }
+  if (student.role !== "STUDENT") {
+    throw new AssignmentValidationError(
+      "Mentor yalnızca STUDENT rolündeki kullanıcıya atanabilir.",
+    );
+  }
+
+  // mentorId null → atamayı kaldır (rol kontrolü gerekmez)
+  if (mentorId !== null) {
+    const mentor = await prisma.user.findUnique({
+      where: { id: mentorId },
+      select: { role: true },
+    });
+    if (!mentor) {
+      throw new AssignmentValidationError("Mentor bulunamadı.");
+    }
+    if (mentor.role !== "MENTOR") {
+      throw new AssignmentValidationError(
+        "Yalnızca MENTOR rolündeki kullanıcı mentor olarak atanabilir.",
+      );
+    }
+  }
+
   return prisma.studentProfile.upsert({
     where: { userId: studentId },
     update: { mentorId },

@@ -124,9 +124,17 @@ export default function AdminDashboard() {
               : u,
           ),
         );
+        toast.success(mentorId === "" ? "Mentor ataması kaldırıldı." : "Mentor atandı.");
+      } else {
+        // #43: Geçersiz rol gibi 4xx hatalarında anlamlı mesajı göster.
+        const data = await response.json().catch(() => null);
+        const msg =
+          data && typeof data.error === "string" ? data.error : "Mentor atanamadı.";
+        toast.error(msg);
       }
     } catch (error) {
       console.error("Error assigning mentor:", error);
+      toast.error("Bağlantı hatası. Lütfen tekrar deneyin.");
     } finally {
       setUpdating(null);
     }
