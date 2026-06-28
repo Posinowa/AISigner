@@ -1,6 +1,7 @@
 // features/student/ui/ProfileSummaryCard.tsx
 
 import { Lightbulb, TrendingUp } from 'lucide-react';
+import { experienceLevelLabel } from '@/lib/experience-level';
 
 type Props = {
   summary: string;
@@ -10,16 +11,8 @@ type Props = {
 };
 
 export function ProfileSummaryCard({ summary, tracks, level, recommendations }: Props) {
-  const levelMap: Record<string, string> = {
-    beginner: "Yeni Başlayan",
-    intermediate: "Orta Seviye",
-    advanced: "İleri Seviye",
-    "Başlangıç": "Başlangıç",
-    "Orta": "Orta Seviye",
-    "İleri": "İleri Seviye",
-  };
-
-  const translatedLevel = levelMap[level] ?? level;
+  // #54: Seviye değeri (ham/küçük harf/AI Türkçe çıktısı) tek standart etikete indirgenir.
+  const translatedLevel = experienceLevelLabel(level);
 
   return (
     <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl shadow-md p-6 space-y-5 border border-blue-100">

@@ -5,6 +5,7 @@ import { getTextModel } from "@/lib/ai/gemini-client";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { incrementCounter } from "@/lib/metrics";
+import { experienceLevelLabel } from "@/lib/experience-level";
 
 const limiter = createRateLimiter("ai-chat", {
   maxRequests: 20,
@@ -93,7 +94,7 @@ export async function POST(req: Request) {
     let context = "";
     if (profile) {
       context += `\n\nÖğrenci Bilgileri:`;
-      context += `\n- Deneyim Seviyesi: ${profile.experienceLevel}`;
+      context += `\n- Deneyim Seviyesi: ${experienceLevelLabel(profile.experienceLevel)}`;
       context += `\n- İlgi Alanları: ${profile.interests.join(", ")}`;
       if (profile.goals) context += `\n- Hedefler: ${profile.goals}`;
 

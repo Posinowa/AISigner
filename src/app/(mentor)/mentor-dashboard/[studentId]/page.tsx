@@ -5,6 +5,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import { ArrowLeft, User, Calendar, Target, Clock, BookOpen, Plus, CheckCircle, AlertCircle, Trash2, Sparkles, Map } from "lucide-react"; // Map ikonu eklendi
 import Link from "next/link";
 import { toast } from "sonner";
+import { experienceLevelLabel } from "@/lib/experience-level";
 
 type ProjectTemplate = {
   id: string;
@@ -341,7 +342,7 @@ export default function StudentDetailPage() {
               <div className="space-y-4">
                 <div>
                   <label className="text-sm font-medium text-gray-700">Deneyim Seviyesi</label>
-                  <p className="text-gray-900">{student.studentProfile.experienceLevel}</p>
+                  <p className="text-gray-900">{experienceLevelLabel(student.studentProfile.experienceLevel)}</p>
                 </div>
 
                 {student.studentProfile.birthYear && (

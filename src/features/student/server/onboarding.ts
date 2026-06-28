@@ -6,6 +6,7 @@ import { personalSchema, experienceSchema, goalsSchema } from "../models/onboard
 import { prisma } from "@/lib/auth/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth/nextauth"
+import { normalizeExperienceLevel } from "@/lib/experience-level"
 
 // Tek birleşik şema
 const onboardingSchema = z.object({
@@ -29,6 +30,10 @@ export async function saveOnboarding(rawData: unknown) {
   }
   const data = parse.data
 
+  // #54: Deneyim seviyesini kanonik UPPERCASE'e normalize ederek sakla
+  // (UI ve AI tek standart formatla çalışsın).
+  const experienceLevel = normalizeExperienceLevel(data.experience.level)
+
   // 3. User + StudentProfile'ı atomik güncelle (firstName/lastName/phone User'da, profil alanları StudentProfile'da)
   await prisma.$transaction([
     prisma.user.update({
@@ -42,7 +47,7 @@ export async function saveOnboarding(rawData: unknown) {
     prisma.studentProfile.upsert({
       where: { userId: session.user.id },
       update: {
-        experienceLevel: data.experience.level,
+        experienceLevel,
         interests: data.experience.interest,
         goals: data.goals.goal,
         availability: data.goals.availability,
@@ -50,7 +55,7 @@ export async function saveOnboarding(rawData: unknown) {
       },
       create: {
         userId: session.user.id,
-        experienceLevel: data.experience.level,
+        experienceLevel,
         interests: data.experience.interest,
         goals: data.goals.goal,
         availability: data.goals.availability,
