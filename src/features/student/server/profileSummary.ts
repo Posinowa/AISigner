@@ -2,6 +2,7 @@
 
 import { unstable_cache } from "next/cache";
 import { analyzeStudentProfile } from "@/features/ai/server/profile-analysis";
+import { experienceLevelLabel } from "@/lib/experience-level";
 
 export type ProfileSummaryResponse = {
   level: string;
@@ -86,10 +87,11 @@ export async function getMockProfileSummary(input: {
     return `${interest} için Genel Öğrenme Yolu`;
   });
 
-  const summary = `Bu kullanıcı ${input.experienceLevel} seviyesinde. İlgi alanları: ${input.interests.join(", ")}. Hedefi: ${input.goals}.`;
+  const levelLabel = experienceLevelLabel(input.experienceLevel);
+  const summary = `Bu kullanıcı ${levelLabel} seviyesinde. İlgi alanları: ${input.interests.join(", ")}. Hedefi: ${input.goals}.`;
 
   return {
-    level: input.experienceLevel,
+    level: levelLabel,
     tracks,
     summary,
   };

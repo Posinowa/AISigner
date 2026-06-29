@@ -1,5 +1,6 @@
 import { getModel } from "@/lib/ai/gemini-client";
 import { logger } from "@/lib/logger";
+import { experienceLevelLabel } from "@/lib/experience-level";
 import { StudentProfile, ProjectTemplate } from "@prisma/client";
 
 export interface RoadmapStepData {
@@ -27,7 +28,7 @@ export async function generateRoadmap(
       adım adım bir öğrenme ve geliştirme yol haritası (roadmap) çıkarman gerekiyor.
 
       ÖĞRENCİ PROFİLİ:
-      - Seviye: ${studentProfile.experienceLevel}
+      - Seviye: ${experienceLevelLabel(studentProfile.experienceLevel)}
       - İlgi Alanları: ${interestsText}
       - Hedefler: ${studentProfile.goals || "Belirtilmemiş"}
 

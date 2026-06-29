@@ -1,5 +1,6 @@
 import { getModel } from "@/lib/ai/gemini-client";
 import { logger } from "@/lib/logger";
+import { experienceLevelLabel } from "@/lib/experience-level";
 import { StudentProfile, ProjectTemplate } from "@prisma/client";
 
 export interface RankedProject {
@@ -22,7 +23,7 @@ export async function recommendProjects(
     Sen kıdemli bir yazılım mentörüsün. Görevin, bir öğrencinin profiline en uygun projeleri seçmektir.
 
     ÖĞRENCİ PROFİLİ:
-    - Seviye: ${studentProfile.experienceLevel}
+    - Seviye: ${experienceLevelLabel(studentProfile.experienceLevel)}
     - İlgi Alanları: ${interestsText}
     - Hedefler: ${studentProfile.goals ?? "(belirtilmemiş)"}
 

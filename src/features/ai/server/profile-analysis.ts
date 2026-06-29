@@ -1,5 +1,6 @@
 import { getModel } from "@/lib/ai/gemini-client";
 import { logger } from "@/lib/logger";
+import { experienceLevelLabel } from "@/lib/experience-level";
 
 export type ProfileAnalysisInput = {
   experienceLevel: string;
@@ -21,7 +22,7 @@ export async function analyzeStudentProfile(
 
   const prompt = `Sen bir yazılım eğitimi uzmanısın. Aşağıdaki stajyer/öğrenci profilini analiz et ve değerlendir:
 
-Deneyim Seviyesi: ${input.experienceLevel}
+Deneyim Seviyesi: ${experienceLevelLabel(input.experienceLevel)}
 İlgi Alanları: ${input.interests.join(', ')}
 Hedefler: ${input.goals || 'Belirtilmemiş'}
 Çalışma Uygunluğu: ${input.availability || 'Belirtilmemiş'}
@@ -81,7 +82,7 @@ Lütfen aşağıdaki formatta SADECE JSON yanıtı ver (başka metin ekleme):
     return {
       level: 'Orta',
       tracks: input.interests.slice(0, 3),
-      summary: `${input.experienceLevel} seviyesinde bir öğrenci. ${input.interests.join(', ')} alanlarında ilgi gösteriyor.`,
+      summary: `${experienceLevelLabel(input.experienceLevel)} seviyesinde bir öğrenci. ${input.interests.join(', ')} alanlarında ilgi gösteriyor.`,
       recommendations: [
         'Temel kavramları pekiştirmeye devam edin',
         'Küçük projelerle pratik yapın',

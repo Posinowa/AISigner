@@ -5,6 +5,7 @@ import { Users, BookOpen, Clock, CheckCircle, AlertCircle, MessageSquare, UserCi
 import Link from "next/link";
 import LogoutButton from "@/components/LogoutButton";
 import { UnreadBadge } from "@/features/messaging/ui/UnreadBadge";
+import { experienceLevelLabel } from "@/lib/experience-level";
 
 type StudentWithProfile = {
   id: string;
@@ -41,12 +42,6 @@ const difficultyConfig = {
   EASY: { label: "Kolay", color: "bg-emerald-50 text-emerald-700 border border-emerald-200" },
   MEDIUM: { label: "Orta", color: "bg-amber-50 text-amber-700 border border-amber-200" },
   HARD: { label: "Zor", color: "bg-red-50 text-red-700 border border-red-200" }
-};
-
-const experienceLevelMap: Record<string, string> = {
-  BEGINNER: "Başlangıç",
-  INTERMEDIATE: "Orta",
-  ADVANCED: "İleri",
 };
 
 export default function MentorDashboardPage() {
@@ -184,7 +179,7 @@ export default function MentorDashboardPage() {
               const completedCount = getCompletedProjects(student);
               const hasProfile = !!student.studentProfile;
               const expLevel = hasProfile
-                ? (experienceLevelMap[student.studentProfile!.experienceLevel] || student.studentProfile!.experienceLevel)
+                ? experienceLevelLabel(student.studentProfile!.experienceLevel)
                 : null;
 
               return (
