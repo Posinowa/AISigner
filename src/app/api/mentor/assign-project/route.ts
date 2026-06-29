@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { assignProjectToStudent } from "@/features/mentors/server/actions";
+import { assignProjectToStudent, AssignmentConflictError } from "@/features/mentors/server/actions";
 import { requireAuth } from "@/lib/auth/guard";
 import { assignProjectSchema } from "@/lib/validations/api";
 
@@ -26,6 +26,10 @@ export async function POST(req: Request) {
     return NextResponse.json(result, { status: 201 });
 
   } catch (error: unknown) {
+    // #58: Aynı proje-öğrenci çifti zaten varsa → 409 (kullanıcı dostu mesaj).
+    if (error instanceof AssignmentConflictError) {
+      return NextResponse.json({ error: error.message }, { status: 409 });
+    }
     console.error("Proje atama hatası:", error);
     return NextResponse.json(
       { error: "Proje atanırken bir hata oluştu." },

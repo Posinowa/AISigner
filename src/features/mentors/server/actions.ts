@@ -1,5 +1,14 @@
 import { prisma } from "@/lib/db";
+import { Prisma } from "@prisma/client";
 import { logger } from "@/lib/logger";
+
+// #58: Aynı proje aynı öğrenciye iki kez atanmaya çalışılırsa — route bunu 409'a çevirir.
+export class AssignmentConflictError extends Error {
+  constructor(message = "Bu proje zaten öğrenciye atanmış") {
+    super(message);
+    this.name = "AssignmentConflictError";
+  }
+}
 
 export type StudentWithProfile = {
   id: string;
@@ -135,7 +144,7 @@ export async function assignProjectToStudent(
       throw new Error("Bu öğrenci size atanmamış");
     }
 
-    // Aynı projeyi daha önce atanmış mı kontrol et
+    // Aynı projeyi daha önce atanmış mı kontrol et (hızlı yol — kullanıcı dostu)
     const existingAssignment = await prisma.assignedProject.findFirst({
       where: {
         studentProfileId,
@@ -144,7 +153,7 @@ export async function assignProjectToStudent(
     });
 
     if (existingAssignment) {
-      throw new Error("Bu proje zaten öğrenciye atanmış");
+      throw new AssignmentConflictError();
     }
 
     // Projeyi ata
@@ -172,6 +181,18 @@ export async function assignProjectToStudent(
 
     return assignedProject;
   } catch (error) {
+    // Zaten kullanıcı dostu çakışma hatası → olduğu gibi yükselt (gürültülü loglama yok).
+    if (error instanceof AssignmentConflictError) {
+      throw error;
+    }
+    // #58: Yarış koşulu — ön kontrolü aynı anda geçen iki istekten biri DB unique
+    // ihlaline (P2002) düşer. Bunu da kullanıcı dostu çakışma hatasına çeviriyoruz.
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      throw new AssignmentConflictError();
+    }
     logger.error("Error assigning project:", error);
     throw error;
   }
