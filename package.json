@@ -9,6 +9,8 @@
     "start": "next start",
     "start:docker": "next start -H 0.0.0.0 -p ${PORT:-3000}",
     "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "seed": "tsx scripts/seed.ts",
     "test:ai": "tsx --env-file=.env scripts/test-ai.ts"
   },
@@ -43,6 +45,8 @@
     "eslint-config-next": "15.5.0",
     "tailwindcss": "^4",
     "tsx": "^4.20.5",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "vite-tsconfig-paths": "^6.1.1",
+    "vitest": "^3.2.6"
   }
 }

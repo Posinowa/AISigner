@@ -3,6 +3,8 @@ import { requireAuth } from "@/lib/auth/guard";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { getTextModel } from "@/lib/ai/gemini-client";
 import { prisma } from "@/lib/db";
+import { logger } from "@/lib/logger";
+import { incrementCounter } from "@/lib/metrics";
 
 const limiter = createRateLimiter("ai-chat", {
   maxRequests: 20,
@@ -115,6 +117,8 @@ export async function POST(req: Request) {
       }
     }
 
+    // #71: AI çağrısı denemesini say — fallback oranı (fallback/attempt) izlenebilsin.
+    incrementCounter("ai_chat.attempt");
     const model = getTextModel();
 
     // Chat geçmişini oluştur (sadece user/assistant rolleri kabul et - prompt injection önleme)
@@ -157,7 +161,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ reply: text });
   } catch (error) {
-    console.error("POST /api/student/ai-chat error:", error);
+    // #71: Fallback'i say ve logla — fallback oranı yükselirse AI servisi izlenebilsin.
+    incrementCounter("ai_chat.fallback");
+    logger.error("ai-chat fallback served (AI çağrısı başarısız)", error);
     // #51: AI servisine ulaşılamazsa hata ekranı yerine dostça bir rehber fallback döndür.
     return NextResponse.json({
       reply:
