@@ -5,7 +5,7 @@ import { RoadmapSteps } from "@/features/student/ui/RoadmapSteps";
 import { prisma } from "@/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/nextauth";
-import { Clock, Briefcase, Target, MessageSquare } from "lucide-react";
+import { Clock, Briefcase, Target, MessageSquare, Github } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Progress } from "@/components/ui/progress";
@@ -190,6 +190,17 @@ export default async function StudentDashboardPage() {
                         <p className="text-slate-600 mt-2 text-sm max-w-3xl leading-relaxed">
                           {project.projectTemplate.description}
                         </p>
+                        {project.projectTemplate.githubRepoUrl && (
+                          <a
+                            href={project.projectTemplate.githubRepoUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 text-xs text-slate-600 hover:text-slate-900 mt-2 transition-colors"
+                          >
+                            <Github className="w-3.5 h-3.5" />
+                            {project.projectTemplate.githubRepoUrl.replace(/^https:\/\/github\.com\//, "")}
+                          </a>
+                        )}
                       </div>
                     </div>
 

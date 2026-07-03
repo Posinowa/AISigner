@@ -6,6 +6,7 @@ export type CreateTemplateData = {
   description: string;
   difficulty: "EASY" | "MEDIUM" | "HARD";
   track: string[];
+  githubRepoUrl?: string | null;
 };
 
 export type UpdateTemplateData = Partial<CreateTemplateData>;
@@ -31,6 +32,7 @@ export async function createTemplate(data: CreateTemplateData) {
         description: data.description,
         difficulty: data.difficulty,
         track: data.track,
+        githubRepoUrl: data.githubRepoUrl ?? null,
       },
     });
   } catch (error) {

@@ -54,6 +54,24 @@ export const updateAccountStatusSchema = z.object({
   }),
 });
 
+// #49: Public GitHub repository URL — yalnızca github.com üzerinde
+// https://github.com/<owner>/<repo>(...) formatı kabul edilir.
+const githubRepoUrlSchema = z
+  .string()
+  .trim()
+  .refine((val) => {
+    try {
+      const url = new URL(val);
+      if (url.protocol !== "https:" || url.hostname !== "github.com") return false;
+      const segments = url.pathname.split("/").filter(Boolean);
+      return segments.length >= 2;
+    } catch {
+      return false;
+    }
+  }, "Geçerli bir GitHub repository URL'i girin (ör: https://github.com/kullanici/repo)")
+  .nullable()
+  .optional();
+
 // Admin: Proje şablonu oluşturma
 export const createTemplateSchema = z.object({
   title: z.string().min(1, "Başlık gerekli"),
@@ -62,6 +80,7 @@ export const createTemplateSchema = z.object({
     error: "Geçersiz zorluk seviyesi. EASY, MEDIUM veya HARD olmalı.",
   }),
   track: z.array(z.string()).default([]),
+  githubRepoUrl: githubRepoUrlSchema,
 });
 
 // Admin: Proje şablonu güncelleme
@@ -70,6 +89,7 @@ export const updateTemplateSchema = z.object({
   description: z.string().min(1).optional(),
   difficulty: z.enum(["EASY", "MEDIUM", "HARD"]).optional(),
   track: z.array(z.string()).optional(),
+  githubRepoUrl: githubRepoUrlSchema,
 });
 
 // Mentor: Proje atama

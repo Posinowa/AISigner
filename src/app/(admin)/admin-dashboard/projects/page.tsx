@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Plus, Pencil, Trash2, X, ArrowLeft, FolderKanban } from "lucide-react";
+import { Plus, Pencil, Trash2, X, ArrowLeft, FolderKanban, Github } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -11,6 +11,7 @@ type ProjectTemplate = {
   description: string;
   difficulty: "EASY" | "MEDIUM" | "HARD";
   track: string[];
+  githubRepoUrl?: string | null;
 };
 
 type FormData = {
@@ -18,6 +19,7 @@ type FormData = {
   description: string;
   difficulty: "EASY" | "MEDIUM" | "HARD";
   track: string;
+  githubRepoUrl: string;
 };
 
 const difficultyColors = {
@@ -35,6 +37,7 @@ export default function ProjectsPage() {
     description: "",
     difficulty: "EASY",
     track: "",
+    githubRepoUrl: "",
   });
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(true); // Sayfa yükleniyor durumu
@@ -63,7 +66,7 @@ export default function ProjectsPage() {
   }, [loadTemplates]);
 
   function resetForm() {
-    setForm({ title: "", description: "", difficulty: "EASY", track: "" });
+    setForm({ title: "", description: "", difficulty: "EASY", track: "", githubRepoUrl: "" });
     setIsFormOpen(false);
     setEditingId(null);
   }
@@ -74,6 +77,7 @@ export default function ProjectsPage() {
       description: template.description,
       difficulty: template.difficulty,
       track: template.track.join(", "),
+      githubRepoUrl: template.githubRepoUrl ?? "",
     });
     setEditingId(template.id);
     setIsFormOpen(true);
@@ -87,6 +91,8 @@ export default function ProjectsPage() {
       const payload = {
         ...form,
         track: form.track.split(",").map(t => t.trim()).filter(Boolean),
+        // #49: Boş input -> null (repo linki opsiyonel; boş string geçersiz URL sayılmasın).
+        githubRepoUrl: form.githubRepoUrl.trim() === "" ? null : form.githubRepoUrl.trim(),
       };
 
       let res;
@@ -104,12 +110,26 @@ export default function ProjectsPage() {
         });
       }
 
-      if (!res.ok) throw new Error("Failed to save template");
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        const fieldErrors = data?.error;
+        let message = "Şablon kaydedilemedi.";
+        if (fieldErrors && typeof fieldErrors === "object") {
+          const firstMessage = Object.values(fieldErrors).flat()[0];
+          if (firstMessage) message = String(firstMessage);
+        } else if (typeof fieldErrors === "string") {
+          message = fieldErrors;
+        }
+        toast.error(message);
+        return;
+      }
 
       await loadTemplates();
       resetForm();
+      toast.success(editingId ? "Şablon güncellendi." : "Şablon oluşturuldu.");
     } catch (error) {
       console.error("Failed to save template:", error);
+      toast.error("Bağlantı hatası. Lütfen tekrar deneyin.");
     } finally {
       setLoading(false);
     }
@@ -250,6 +270,19 @@ export default function ProjectsPage() {
                 </div>
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  GitHub Repository URL (opsiyonel)
+                </label>
+                <input
+                  type="text"
+                  value={form.githubRepoUrl}
+                  onChange={e => setForm(f => ({ ...f, githubRepoUrl: e.target.value }))}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="https://github.com/kullanici/repo"
+                />
+              </div>
+
               <div className="flex justify-end gap-3 pt-4 border-t">
                 <button
                   type="button"
@@ -324,6 +357,18 @@ export default function ProjectsPage() {
                         </span>
                       )}
                     </div>
+
+                    {template.githubRepoUrl && (
+                      <a
+                        href={template.githubRepoUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs text-slate-600 hover:text-slate-900 mb-4 transition-colors"
+                      >
+                        <Github className="w-3.5 h-3.5" />
+                        {template.githubRepoUrl.replace(/^https:\/\/github\.com\//, "")}
+                      </a>
+                    )}
 
                     <div className="flex justify-between items-center">
                       <span className="text-xs text-slate-500">
