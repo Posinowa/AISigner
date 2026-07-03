@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, PlayCircle, Lock, ExternalLink, Loader2 } from "lucide-react";
+import { CheckCircle2, PlayCircle, Lock, ExternalLink, Loader2, Github } from "lucide-react";
 import { StepComments } from "@/features/messaging/ui/StepComments";
 import { StepFiles } from "@/features/files/ui/StepFiles";
 import { toast } from "sonner";
@@ -15,6 +15,7 @@ type Step = {
   status: string;
   estimatedHours: number | null;
   resources: string[];
+  githubIssueUrl?: string | null;
 };
 
 type Props = {
@@ -144,6 +145,19 @@ export function RoadmapSteps({ steps, isDraft, currentUserId, currentUserRole }:
                   <p className="text-xs text-slate-400 mt-2">
                     Tahmini süre: ~{step.estimatedHours} saat
                   </p>
+                )}
+
+                {/* GitHub Issue Linki */}
+                {!isLocked && step.githubIssueUrl && (
+                  <a
+                    href={step.githubIssueUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center text-xs font-medium text-slate-600 hover:text-blue-600 transition-colors mt-2"
+                  >
+                    <Github className="w-3.5 h-3.5 mr-1.5" />
+                    GitHub Issue&apos;yu Görüntüle
+                  </a>
                 )}
 
                 {/* Kilitli mesajı */}

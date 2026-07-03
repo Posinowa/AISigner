@@ -20,6 +20,7 @@ import {
   Send,
   ChevronDown,
   ChevronUp,
+  Github,
 } from "lucide-react";
 import { StepComments } from "@/features/messaging/ui/StepComments";
 import { StepFiles } from "@/features/files/ui/StepFiles";
@@ -33,6 +34,7 @@ type RoadmapStep = {
   estimatedHours: number | null;
   resources: string[];
   status: string;
+  githubIssueUrl?: string | null;
 };
 
 type Roadmap = {
@@ -69,6 +71,25 @@ const stepStatusConfig: Record<string, { label: string; color: string; icon: typ
   COMPLETED: { label: "Tamamlandı", color: "bg-green-100 text-green-700", icon: CheckCircle },
 };
 
+// #50: Boş input -> null (issue linki opsiyonel; boş string geçersiz URL sayılmasın).
+function toNullableUrl(value: string): string | null {
+  const trimmed = value.trim();
+  return trimmed === "" ? null : trimmed;
+}
+
+// #50: Zod fieldErrors ({ alan: [mesaj] }) şeklindeki hatayı okunabilir tek mesaja indirger.
+async function extractErrorMessage(res: Response, fallback: string): Promise<string> {
+  const data = await res.json().catch(() => null);
+  const fieldErrors = data?.error;
+  if (fieldErrors && typeof fieldErrors === "object") {
+    const first = Object.values(fieldErrors).flat()[0];
+    if (first) return String(first);
+  } else if (typeof fieldErrors === "string") {
+    return fieldErrors;
+  }
+  return fallback;
+}
+
 /* ─── Sayfa ─── */
 export default function RoadmapReviewPage() {
   const params = useParams();
@@ -88,6 +109,7 @@ export default function RoadmapReviewPage() {
     description: "",
     estimatedHours: 0,
     resources: [""],
+    githubIssueUrl: "",
   });
 
   // Yeni adım ekleme
@@ -97,6 +119,7 @@ export default function RoadmapReviewPage() {
     description: "",
     estimatedHours: 2,
     resources: [""],
+    githubIssueUrl: "",
   });
 
   // Hangi adım açık (accordion)
@@ -174,13 +197,14 @@ export default function RoadmapReviewPage() {
       description: step.description,
       estimatedHours: step.estimatedHours ?? 0,
       resources: step.resources.length > 0 ? [...step.resources] : [""],
+      githubIssueUrl: step.githubIssueUrl ?? "",
     });
     setExpandedStepId(step.id);
   }
 
   function cancelEditStep() {
     setEditingStepId(null);
-    setEditForm({ title: "", description: "", estimatedHours: 0, resources: [""] });
+    setEditForm({ title: "", description: "", estimatedHours: 0, resources: [""], githubIssueUrl: "" });
   }
 
   async function handleSaveStep() {
@@ -197,15 +221,19 @@ export default function RoadmapReviewPage() {
             description: editForm.description,
             estimatedHours: editForm.estimatedHours || null,
             resources: editForm.resources.filter((r) => r.trim() !== ""),
+            githubIssueUrl: toNullableUrl(editForm.githubIssueUrl),
           }),
         }
       );
       if (res.ok) {
         await loadRoadmap();
         cancelEditStep();
+      } else {
+        toast.error(await extractErrorMessage(res, "Adım güncellenemedi."));
       }
     } catch (error) {
       console.error(error);
+      toast.error("Bağlantı hatası. Lütfen tekrar deneyin.");
     } finally {
       setSaving(false);
     }
@@ -244,15 +272,19 @@ export default function RoadmapReviewPage() {
           description: newStepForm.description,
           estimatedHours: newStepForm.estimatedHours || null,
           resources: newStepForm.resources.filter((r) => r.trim() !== ""),
+          githubIssueUrl: toNullableUrl(newStepForm.githubIssueUrl),
         }),
       });
       if (res.ok) {
         await loadRoadmap();
         setShowAddForm(false);
-        setNewStepForm({ title: "", description: "", estimatedHours: 2, resources: [""] });
+        setNewStepForm({ title: "", description: "", estimatedHours: 2, resources: [""], githubIssueUrl: "" });
+      } else {
+        toast.error(await extractErrorMessage(res, "Adım eklenemedi."));
       }
     } catch (error) {
       console.error(error);
+      toast.error("Bağlantı hatası. Lütfen tekrar deneyin.");
     } finally {
       setSaving(false);
     }
@@ -534,6 +566,16 @@ export default function RoadmapReviewPage() {
                         />
                       </div>
                       <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">GitHub Issue Linki (opsiyonel)</label>
+                        <input
+                          type="text"
+                          value={editForm.githubIssueUrl}
+                          onChange={(e) => setEditForm({ ...editForm, githubIssueUrl: e.target.value })}
+                          placeholder="https://github.com/kullanici/repo/issues/12"
+                          className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-300 focus:border-purple-400 outline-none"
+                        />
+                      </div>
+                      <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Kaynaklar</label>
                         <div className="space-y-2">
                           {editForm.resources.map((res, i) => (
@@ -612,6 +654,18 @@ export default function RoadmapReviewPage() {
                           <Clock className="w-3 h-3" />
                           Tahmini: {step.estimatedHours} saat
                         </div>
+                      )}
+
+                      {step.githubIssueUrl && (
+                        <a
+                          href={step.githubIssueUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 transition-colors"
+                        >
+                          <Github className="w-3.5 h-3.5" />
+                          {step.githubIssueUrl.replace(/^https:\/\/github\.com\//, "")}
+                        </a>
                       )}
 
                       <div className="flex items-center gap-2 mt-4 pt-3 border-t border-gray-100">
@@ -695,6 +749,16 @@ export default function RoadmapReviewPage() {
                 />
               </div>
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">GitHub Issue Linki (opsiyonel)</label>
+                <input
+                  type="text"
+                  value={newStepForm.githubIssueUrl}
+                  onChange={(e) => setNewStepForm({ ...newStepForm, githubIssueUrl: e.target.value })}
+                  placeholder="https://github.com/kullanici/repo/issues/12"
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-300 focus:border-purple-400 outline-none"
+                />
+              </div>
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Kaynaklar</label>
                 <div className="space-y-2">
                   {newStepForm.resources.map((res, i) => (
@@ -734,7 +798,7 @@ export default function RoadmapReviewPage() {
                 <button
                   onClick={() => {
                     setShowAddForm(false);
-                    setNewStepForm({ title: "", description: "", estimatedHours: 2, resources: [""] });
+                    setNewStepForm({ title: "", description: "", estimatedHours: 2, resources: [""], githubIssueUrl: "" });
                   }}
                   className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 font-medium"
                 >

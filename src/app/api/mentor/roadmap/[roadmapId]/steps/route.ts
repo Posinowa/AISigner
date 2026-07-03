@@ -60,6 +60,7 @@ export async function POST(
         description: parsed.data.description,
         estimatedHours: parsed.data.estimatedHours || null,
         resources: parsed.data.resources || [],
+        githubIssueUrl: parsed.data.githubIssueUrl || null,
         status: "TODO",
       },
     });
