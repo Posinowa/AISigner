@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth/nextauth";
 import { prisma } from "@/lib/db";
 import OnboardingForm from "@/features/student/ui/OnboardingForm";
+import { listSurveyQuestions } from "@/features/survey/server/survey";
+import type { SurveyQuestionView } from "@/features/survey/answers";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +19,20 @@ export default async function ProfileSetupPage() {
     select: { name: true, lastName: true, phone: true },
   });
 
+  // #46: Admin'in tanımladığı aktif anket sorularını göster. Hata olursa form
+  // mevcut akışı bozmadan çalışmalı → boş dizi ile devam et (soru adımı gizlenir).
+  let surveyQuestions: SurveyQuestionView[] = [];
+  try {
+    const questions = await listSurveyQuestions({ activeOnly: true });
+    surveyQuestions = questions.map((q) => ({
+      id: q.id,
+      question: q.question,
+      options: q.options,
+    }));
+  } catch (error) {
+    console.error("profile-setup: anket soruları yüklenemedi", error);
+  }
+
   return (
     <OnboardingForm
       initial={{
@@ -24,6 +40,7 @@ export default async function ProfileSetupPage() {
         lastName: user?.lastName ?? undefined,
         phoneNumber: user?.phone ?? undefined,
       }}
+      surveyQuestions={surveyQuestions}
     />
   );
 }
