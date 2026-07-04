@@ -6,6 +6,7 @@ import { ArrowLeft, User, Calendar, Target, Clock, BookOpen, Plus, CheckCircle, 
 import Link from "next/link";
 import { toast } from "sonner";
 import { experienceLevelLabel } from "@/lib/experience-level";
+import { ProfileAnalysisCard, type ProfileAnalysisData } from "@/features/ai/ui/ProfileAnalysisCard";
 
 type ProjectTemplate = {
   id: string;
@@ -55,6 +56,8 @@ type StudentDetail = {
       createdAt: string;
       roadmap?: Roadmap | null; // 🚀 SPRINT 3: Roadmap eklendi
     }[];
+    // #48: Detaylı AI profil analizi (yoksa null — henüz üretilmemiş).
+    profileAnalysis: ProfileAnalysisData | null;
   } | null;
 };
 
@@ -510,6 +513,13 @@ export default function StudentDetailPage() {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* #48: Detaylı AI Profil Analizi (profil varsa) */}
+      {student.studentProfile && (
+        <div className="mt-6">
+          <ProfileAnalysisCard analysis={student.studentProfile.profileAnalysis} />
         </div>
       )}
 

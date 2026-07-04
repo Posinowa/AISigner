@@ -16,10 +16,13 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
+  Sparkles,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import LogoutButton from "@/components/LogoutButton";
 import { UnreadBadge } from "@/features/messaging/ui/UnreadBadge";
+import { ProfileAnalysisCard, type ProfileAnalysisData } from "@/features/ai/ui/ProfileAnalysisCard";
 
 type User = {
   id: string;
@@ -60,6 +63,39 @@ export default function AdminDashboard() {
   const [updating, setUpdating] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<"ALL" | User["role"]>("ALL");
+
+  // #48: Analiz modal'ı — hangi öğrenci için açık, veri/loading/error durumu (lazy fetch).
+  const [analysisModalUser, setAnalysisModalUser] = useState<User | null>(null);
+  const [analysisData, setAnalysisData] = useState<ProfileAnalysisData | null>(null);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+
+  async function openAnalysisModal(user: User) {
+    setAnalysisModalUser(user);
+    setAnalysisData(null);
+    setAnalysisError(null);
+    setAnalysisLoading(true);
+    try {
+      const res = await fetch(`/api/admin/students/${user.id}/profile-analysis`);
+      if (res.ok) {
+        const data = await res.json();
+        setAnalysisData(data.analysis);
+      } else {
+        const data = await res.json().catch(() => null);
+        setAnalysisError(
+          (data && typeof data.error === "string" && data.error) || "Analiz yüklenemedi.",
+        );
+      }
+    } catch {
+      setAnalysisError("Bağlantı hatası. Lütfen tekrar deneyin.");
+    } finally {
+      setAnalysisLoading(false);
+    }
+  }
+
+  function closeAnalysisModal() {
+    setAnalysisModalUser(null);
+  }
 
   useEffect(() => {
     async function loadData() {
@@ -373,11 +409,21 @@ export default function AdminDashboard() {
                         </p>
                         <p className="text-xs text-slate-500 truncate">{user.email}</p>
                         {user.role === "STUDENT" && (
-                          <span
-                            className={`mt-1 inline-flex w-fit items-center px-1.5 py-0.5 text-[10px] font-semibold rounded border ${statusConfig[user.accountStatus].color}`}
-                          >
-                            {statusConfig[user.accountStatus].label}
-                          </span>
+                          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                            <span
+                              className={`inline-flex w-fit items-center px-1.5 py-0.5 text-[10px] font-semibold rounded border ${statusConfig[user.accountStatus].color}`}
+                            >
+                              {statusConfig[user.accountStatus].label}
+                            </span>
+                            {user.studentProfile && (
+                              <button
+                                onClick={() => openAnalysisModal(user)}
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold rounded border bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 transition-colors"
+                              >
+                                <Sparkles className="w-2.5 h-2.5" /> Analizi Gör
+                              </button>
+                            )}
+                          </div>
                         )}
                       </div>
                       <span
@@ -461,6 +507,35 @@ export default function AdminDashboard() {
           )}
         </div>
       </div>
+
+      {/* #48: Admin — Detaylı AI Profil Analizi Modal'ı (lazy fetch) */}
+      {analysisModalUser && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 sticky top-0 bg-white rounded-t-2xl">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">AI Profil Analizi</h2>
+                <p className="text-sm text-slate-500">
+                  {getDisplayName(analysisModalUser)} ({analysisModalUser.email})
+                </p>
+              </div>
+              <button
+                onClick={closeAnalysisModal}
+                className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6">
+              <ProfileAnalysisCard
+                analysis={analysisData}
+                loading={analysisLoading}
+                error={analysisError}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
