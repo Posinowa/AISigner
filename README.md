@@ -392,17 +392,18 @@ docker ps
 ```
 
 ## Seed Nasıl Çalıştırılır?
-🔹 Seed (Örnek Kullanıcıları Ekleme)
+🔹 Seed (Birleşik Demo Verisi)
 
-- Bu adımlar, Lokal geliştirme sırasında veritabanına hızlıca test edilebilecek 3 örnek kullanıcı eklemek için kullanılır.Seed script’i idempotent çalışır, yani aynı script tekrar tekrar çalıştırıldığında kullanıcılar çoğalmaz.
-
+- `npm run seed`, lokal geliştirme sırasında hızlıca test edilebilecek bir demo ortamı kurar:
+  - `admin@example.com` / `mentor@example.com` / `student@example.com` kullanıcıları,
+  - Student'ın Mentor'a atanmış bir `StudentProfile`'ı (deneyim seviyesi, ilgi alanı, hedef, uygunluk),
+  - Örnek proje şablonları (`scripts/seed-projects.ts`'ten, `seed.ts` tarafından çağrılır).
 - Şifreler güvenli şekilde **argon2** ile hashlenir.
-- Prisma Client kullanılarak veritabanına bağlantı sağlanır.
-
+- Script tamamen idempotent'tir — kullanıcılar `upsert`, profil `upsert`, proje şablonları title'a göre varlık kontrolüyle oluşturulur. Tekrar çalıştırmak duplicate veri üretmez.
 
 **Seed Script Çalıştırma**
 
-Seed’i çalıştırmak için terminalden proje klasöründe şu komutu çalıştır:
+Seed'i çalıştırmak için terminalden proje klasöründe şu komutu çalıştır:
 ```
 npm run seed
 ```
@@ -413,8 +414,13 @@ Script çalıştığında terminalde şöyle bir çıktı görürsün:
 ✅ ADMIN user created: admin@example.com
 ✅ MENTOR user created: mentor@example.com
 ✅ STUDENT user created: student@example.com
-Seed process completed! 3 users added!
+✅ Student, mentor'a atandı: student@example.com → mentor@example.com
+✅ Proje şablonu eklendi: Kişisel Portföy Web Sitesi
+...
+🎉 Seed tamamlandı — admin/mentor/student kullanıcıları, mentor-stajyer ataması ve proje şablonları hazır.
 ```
+
+Sadece proje şablonlarını ayrıca eklemek/kontrol etmek istersen (örn. mevcut bir DB'ye): `tsx scripts/seed-projects.ts`.
 
 ## Kimlik Doğrulama (NextAuth)
 
@@ -745,7 +751,8 @@ Uygulama Next.js App Router mimarisiyle yapılandırılmıştır. Dosya sistemi 
 │   ├── migrations/           # Prisma migration dosyaları
 ├── public/                   # Statik dosyalar (favicon, resimler vs.)
 ├── scripts/
-│   └── seed.ts               # Test kullanıcılarını ekleyen seed script
+│   ├── seed.ts               # Birleşik demo seed (kullanıcılar + mentor-stajyer + proje şablonları)
+│   └── seed-projects.ts      # Örnek proje şablonları (seed.ts tarafından çağrılır)
 ├── src/
 │   ├── app/
 │   │   ├── (admin)/          # Admin'e özel route grubu
@@ -813,9 +820,9 @@ Uygulama Next.js App Router mimarisiyle yapılandırılmıştır. Dosya sistemi 
   - `User` ve `Role` modeli tanımlandı  
   - Prisma singleton (`src/lib/db.ts`) ile bağlantı yönetimi sağlandı
 
-***Seed sistemi***:  
-  - `npx prisma db seed` ile 1 admin, 1 mentor, 1 öğrenci oluşturuluyor  
-  - Şifreler hashlenmiş (`argon2`) ve veritabanına kaydediliyor  
+***Seed sistemi***:
+  - `npm run seed` ile 1 admin, 1 mentor, 1 öğrenci + mentor-stajyer ataması + örnek proje şablonları oluşturuluyor (birleşik, idempotent akış — bkz. "Seed Nasıl Çalıştırılır?")
+  - Şifreler hashlenmiş (`argon2`) ve veritabanına kaydediliyor
   - Test kullanıcıları: `admin@example.com`, `mentor@example.com`, `student@example.com`
 
  ***Kimlik doğrulama (Auth)***:  

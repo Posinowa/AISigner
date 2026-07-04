@@ -1,8 +1,11 @@
 import { PrismaClient } from "@prisma/client";
+import { pathToFileURL } from "url";
 
-const prisma = new PrismaClient();
-
-async function main() {
+/**
+ * #56: scripts/seed.ts tarafından çağrılır (birleşik seed akışı); ayrıca
+ * `tsx scripts/seed-projects.ts` ile tek başına da çalıştırılabilir.
+ */
+export async function seedProjectTemplates(prisma: PrismaClient): Promise<void> {
   const templates = [
     {
       title: "Kişisel Portföy Web Sitesi",
@@ -124,30 +127,51 @@ WebSocket teknolojisi kullanarak gerçek zamanlı mesajlaşma uygulaması geliş
     },
   ];
 
+  let createdCount = 0;
   for (const template of templates) {
-    await prisma.projectTemplate.upsert({
-      where: {
-        id: template.title, // will not match, forces create
-      },
-      update: {},
-      create: {
+    // #56: ProjectTemplate.id bir cuid, title bir unique constraint değil —
+    // önceki `upsert({ where: { id: template.title } })` asla eşleşmiyordu,
+    // her çalıştırmada yeni bir kayıt oluşturuyordu (duplicate). title'a göre
+    // varlık kontrolü yapıp yalnızca yoksa oluşturuyoruz.
+    const existing = await prisma.projectTemplate.findFirst({
+      where: { title: template.title },
+      select: { id: true },
+    });
+
+    if (existing) {
+      console.log(`⏭️  Zaten mevcut, atlandı: ${template.title}`);
+      continue;
+    }
+
+    await prisma.projectTemplate.create({
+      data: {
         title: template.title,
         description: template.description,
         track: template.track,
         difficulty: template.difficulty,
       },
     });
+    createdCount++;
     console.log(`✅ Proje şablonu eklendi: ${template.title}`);
   }
 
-  console.log(`\n🎉 Toplam ${templates.length} proje şablonu başarıyla eklendi!`);
+  console.log(
+    `\n🎉 Proje şablonları hazır: ${createdCount} yeni, ${templates.length - createdCount} zaten mevcuttu (toplam ${templates.length}).`,
+  );
 }
 
-main()
-  .catch((e) => {
-    console.error("❌ Seed hatası:", e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+// Doğrudan `tsx scripts/seed-projects.ts` ile çalıştırılırsa (import edildiğinde değil).
+const isRunDirectly =
+  process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isRunDirectly) {
+  const prisma = new PrismaClient();
+  seedProjectTemplates(prisma)
+    .catch((e) => {
+      console.error("❌ Seed hatası:", e);
+      process.exit(1);
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}
