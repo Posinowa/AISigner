@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { ArrowLeft, User, Calendar, Target, Clock, BookOpen, Plus, CheckCircle, AlertCircle, Trash2, Sparkles, Map } from "lucide-react"; // Map ikonu eklendi
+import { ArrowLeft, User, Calendar, Target, Clock, BookOpen, Plus, CheckCircle, AlertCircle, Trash2, Sparkles, Map, Github } from "lucide-react"; // Map ikonu eklendi
 import Link from "next/link";
 import { toast } from "sonner";
 import { experienceLevelLabel } from "@/lib/experience-level";
@@ -14,6 +14,7 @@ type ProjectTemplate = {
   description: string;
   difficulty: "EASY" | "MEDIUM" | "HARD";
   track: string[];
+  githubRepoUrl?: string | null;
 };
 
 type AIRecommendation = {
@@ -449,7 +450,19 @@ export default function StudentDetailPage() {
                         <p className="text-gray-600 text-sm mb-4 line-clamp-2">
                           {project.projectTemplate.description}
                         </p>
-                        
+
+                        {project.projectTemplate.githubRepoUrl && (
+                          <a
+                            href={project.projectTemplate.githubRepoUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 text-xs text-gray-600 hover:text-gray-900 mb-3 transition-colors"
+                          >
+                            <Github className="w-3.5 h-3.5" />
+                            {project.projectTemplate.githubRepoUrl.replace(/^https:\/\/github\.com\//, "")}
+                          </a>
+                        )}
+
                         <div className="flex items-center justify-between mb-4">
                           <div className="flex flex-wrap gap-1">
                             {project.projectTemplate.track.slice(0, 3).map((tag, index) => (

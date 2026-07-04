@@ -60,13 +60,15 @@ model StudentProfile {
 }
 
 model ProjectTemplate {
-  id          String   @id @default(cuid())
-  title       String
-  description String
-  track       String[]
-  difficulty  Difficulty
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(cuid())
+  title         String
+  description   String
+  track         String[]
+  difficulty    Difficulty
+  // #49: Projenin GitHub repository URL'i (opsiyonel, public repo).
+  githubRepoUrl String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   assignedProjects AssignedProject[]
 }
