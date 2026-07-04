@@ -8,8 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { saveOnboarding } from "@/features/student/server/onboarding";
-import { CheckCircle, User, Target, Award, ArrowRight, ArrowLeft, Rocket, Terminal, BookOpen, Clock } from "lucide-react";
+import { CheckCircle, User, Target, Award, ArrowRight, ArrowLeft, Rocket, Terminal, BookOpen, Clock, ClipboardList } from "lucide-react";
 import { toast } from "sonner";
+import { buildSurveyAnswerPayload, type SurveyQuestionView } from "@/features/survey/answers";
 
 import type { FieldPath } from "react-hook-form";
 
@@ -73,16 +74,31 @@ type OnboardingInitialValues = {
 
 export default function OnboardingForm({
   initial,
-}: { initial?: OnboardingInitialValues } = {}) {
+  surveyQuestions = [],
+}: {
+  initial?: OnboardingInitialValues;
+  surveyQuestions?: SurveyQuestionView[];
+} = {}) {
+  // #46: Admin anket soruları varsa forma ek bir "Ek Sorular" adımı eklenir.
+  const hasSurvey = surveyQuestions.length > 0;
+  const allSteps = hasSurvey
+    ? [
+        ...steps,
+        { id: steps.length, title: "Ek Sorular", icon: ClipboardList, description: "Mentörünüz için birkaç ek soru" },
+      ]
+    : steps;
+
   const [step, setStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Anket cevapları (questionId → cevap). RHF dışında tutulur çünkü sorular dinamiktir.
+  const [answers, setAnswers] = useState<Record<string, string>>({});
   // Her adım için "kullanıcı bu adımda Sonraki Adım'a bastı mı?" flag'i.
   // zodResolver tüm form'u parse ettiği için trigger() çağrılmasa bile
   // errors objesi diğer adımların alanlarıyla dolar; bu flag ile sadece
   // ilgilendiği adımda Sonraki/Tamamla'ya bastıktan sonra hata gösteririz.
-  const [stepAttempted, setStepAttempted] = useState<boolean[]>([
-    false, false, false, false,
-  ]);
+  const [stepAttempted, setStepAttempted] = useState<boolean[]>(() =>
+    new Array(allSteps.length).fill(false),
+  );
 
   const { register, handleSubmit, trigger, clearErrors, formState: { errors } } = useForm<EnhancedFormData>({
     resolver: zodResolver(enhancedSchema),
@@ -125,7 +141,7 @@ export default function OnboardingForm({
 
   // Submit denemesinde tüm adımlar için hata göster
   const markAllStepsAttempted = () =>
-    setStepAttempted([true, true, true, true]);
+    setStepAttempted(allSteps.map(() => true));
 
   const onBack = () => setStep((s) => s - 1);
 
@@ -154,10 +170,29 @@ export default function OnboardingForm({
       };
 
       await saveOnboarding(backendPayload);
-      
+
+      // #46: Anket cevapları (varsa) profile kaydedildikten sonra gönderilir.
+      // Profil oluştuğundan saveSurveyAnswers profili bulabilir. Cevaplar opsiyonel:
+      // hiç doldurulmadıysa istek atılmaz.
+      const surveyPayload = buildSurveyAnswerPayload(answers);
+      if (surveyPayload.length > 0) {
+        const res = await fetch("/api/student/survey-answers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ answers: surveyPayload }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          const msg =
+            data && typeof data.error === "string" ? data.error : "Anket cevapları kaydedilemedi.";
+          toast.error(msg);
+          return; // Profil kaydedildi; kullanıcı cevapları tekrar gönderebilir.
+        }
+      }
+
       // Başarılı olursa yönlendirme yapılabilir.
-      window.location.href = "/student-dashboard"; 
-      
+      window.location.href = "/student-dashboard";
+
     } catch (err) {
       console.error("Onboarding kaydı başarısız:", err);
       toast.error("Kayıt sırasında bir hata oluştu.");
@@ -166,8 +201,8 @@ export default function OnboardingForm({
     }
   };
 
-  const currentStep = steps[step];
-  const progress = ((step + 1) / steps.length) * 100;
+  const currentStep = allSteps[step];
+  const progress = ((step + 1) / allSteps.length) * 100;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 py-12 px-4">
@@ -182,7 +217,7 @@ export default function OnboardingForm({
         {/* Steps Indicator */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4 px-4">
-            {steps.map((s, index) => (
+            {allSteps.map((s, index) => (
               <div key={s.id} className="flex flex-col items-center relative w-full">
                 <div className={`flex items-center justify-center w-12 h-12 rounded-full border-2 z-10 bg-white transition-all duration-300 ${
                   index <= step ? 'border-blue-600 text-blue-600 bg-blue-50' : 'border-gray-200 text-gray-400'
@@ -192,7 +227,7 @@ export default function OnboardingForm({
                 <span className={`text-xs font-medium mt-2 hidden sm:block ${index <= step ? 'text-blue-700' : 'text-gray-400'}`}>
                   {s.title}
                 </span>
-                {index < steps.length - 1 && (
+                {index < allSteps.length - 1 && (
                   <div className={`absolute top-6 left-[50%] w-full h-[2px] -z-0 transition-all duration-300 ${
                     index < step ? 'bg-blue-600' : 'bg-gray-200'
                   }`} />
@@ -369,6 +404,46 @@ export default function OnboardingForm({
               </div>
             )}
 
+            {/* ADIM 4 (opsiyonel): ADMIN ANKET SORULARI */}
+            {hasSurvey && step === allSteps.length - 1 && (
+              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                {surveyQuestions.map((q) => (
+                  <div key={q.id} className="space-y-3">
+                    <label className="block text-sm font-semibold text-gray-700">{q.question}</label>
+                    {q.options.length > 0 ? (
+                      <div className="grid gap-3 md:grid-cols-2">
+                        {q.options.map((opt) => (
+                          <label key={opt} className="relative">
+                            <input
+                              type="radio"
+                              name={`survey-${q.id}`}
+                              value={opt}
+                              checked={answers[q.id] === opt}
+                              onChange={() => setAnswers((prev) => ({ ...prev, [q.id]: opt }))}
+                              className="sr-only peer"
+                            />
+                            <div className="p-4 border-2 border-gray-100 rounded-xl cursor-pointer hover:border-blue-200 peer-checked:border-blue-600 peer-checked:bg-blue-50/50 transition-all text-sm font-medium text-gray-800">
+                              {opt}
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    ) : (
+                      <textarea
+                        rows={3}
+                        maxLength={2000}
+                        value={answers[q.id] ?? ""}
+                        onChange={(e) => setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))}
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none resize-none transition-all"
+                        placeholder="Cevabınız..."
+                      />
+                    )}
+                  </div>
+                ))}
+                <p className="text-xs text-gray-400">Bu sorular opsiyoneldir; boş bırakabilirsiniz.</p>
+              </div>
+            )}
+
             {/* Navigation Buttons */}
             <div className="flex items-center justify-between pt-8 border-t border-gray-100">
               <Button 
@@ -380,9 +455,9 @@ export default function OnboardingForm({
                 <ArrowLeft className="w-4 h-4 mr-2" /> Geri
               </Button>
               
-              {step < steps.length - 1 ? (
-                <Button 
-                  type="button" 
+              {step < allSteps.length - 1 ? (
+                <Button
+                  type="button"
                   onClick={onNext}
                   className="h-12 px-8 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-all shadow-md shadow-blue-200"
                 >

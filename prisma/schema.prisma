@@ -56,6 +56,7 @@ model StudentProfile {
   mentor           User?             @relation("StudentProfile_mentorIdToUser", fields: [mentorId], references: [id])
   assignedProjects AssignedProject[]
   surveyAnswers    SurveyAnswer[]
+  profileAnalysis  ProfileAnalysis?
 }
 
 model ProjectTemplate {
@@ -109,6 +110,8 @@ model RoadmapStep {
   resources      String[]
   estimatedHours Int?
   status         StepStatus @default(TODO)
+  // #50: Bu adımın bağlı olduğu GitHub issue linki (opsiyonel).
+  githubIssueUrl String?
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 
@@ -188,6 +191,24 @@ model SurveyQuestion {
   updatedAt DateTime @updatedAt
 
   answers SurveyAnswer[]
+}
+
+// #47: AI profil analizinin kalıcı sonucu — öğrenci profiliyle 1-1.
+// Profil tamamlandığında/güncellendiğinde üretilip upsert edilir (tek satır).
+model ProfileAnalysis {
+  id               String   @id @default(cuid())
+  studentProfileId String   @unique
+  level            String
+  summary          String   @db.VarChar(2000)
+  strengths        String[]
+  developmentAreas String[]
+  technicalTracks  String[]
+  recommendedPath  String   @db.VarChar(2000)
+  recommendations  String[]
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  studentProfile StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
 }
 
 // #45: Öğrencinin bir ankete verdiği cevap — profile ile ilişkili.

@@ -114,12 +114,30 @@ export const updateRoadmapSchema = z.object({
   status: z.enum(["DRAFT", "PUBLISHED"]).optional(),
 });
 
+// #50: GitHub issue URL — https://github.com/<owner>/<repo>/issues/<number> formatı zorunlu.
+const githubIssueUrlSchema = z
+  .string()
+  .trim()
+  .refine((val) => {
+    try {
+      const url = new URL(val);
+      if (url.protocol !== "https:" || url.hostname !== "github.com") return false;
+      const segments = url.pathname.split("/").filter(Boolean);
+      return segments.length === 4 && segments[2] === "issues" && /^\d+$/.test(segments[3]);
+    } catch {
+      return false;
+    }
+  }, "Geçerli bir GitHub issue URL'i girin (ör: https://github.com/kullanici/repo/issues/12)")
+  .nullable()
+  .optional();
+
 // Mentor: Roadmap adım ekleme
 export const createStepSchema = z.object({
   title: z.string().min(1, "Başlık zorunlu"),
   description: z.string().min(1, "Açıklama zorunlu"),
   estimatedHours: z.number().int().positive().optional().nullable(),
   resources: z.array(z.string()).default([]),
+  githubIssueUrl: githubIssueUrlSchema,
 });
 
 // Mentor: Roadmap adım güncelleme
@@ -130,6 +148,7 @@ export const updateStepSchema = z.object({
   resources: z.array(z.string()).optional(),
   order: z.number().int().positive().optional(),
   status: z.enum(["TODO", "IN_PROGRESS", "COMPLETED"]).optional(),
+  githubIssueUrl: githubIssueUrlSchema,
 });
 
 // Mentor: Proje kaldırma

@@ -111,6 +111,8 @@ export async function getStudentDetail(studentId: string, mentorId: string) {
                 createdAt: "desc",
               },
             },
+            // #48: Detaylı AI profil analizi (varsa) — mentor kendi öğrencisininkini görür.
+            profileAnalysis: true,
           },
         },
       },

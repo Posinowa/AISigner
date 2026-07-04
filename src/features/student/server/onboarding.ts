@@ -7,6 +7,8 @@ import { prisma } from "@/lib/auth/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth/nextauth"
 import { normalizeExperienceLevel } from "@/lib/experience-level"
+import { generateAndPersistProfileAnalysis } from "@/features/ai/server/profile-analysis-store"
+import { logger } from "@/lib/logger"
 
 // Tek birleşik şema
 const onboardingSchema = z.object({
@@ -35,7 +37,7 @@ export async function saveOnboarding(rawData: unknown) {
   const experienceLevel = normalizeExperienceLevel(data.experience.level)
 
   // 3. User + StudentProfile'ı atomik güncelle (firstName/lastName/phone User'da, profil alanları StudentProfile'da)
-  await prisma.$transaction([
+  const [, studentProfile] = await prisma.$transaction([
     prisma.user.update({
       where: { id: session.user.id },
       data: {
@@ -64,7 +66,21 @@ export async function saveOnboarding(rawData: unknown) {
     }),
   ])
 
-  // 4. Profil değişti → AI özet cache'ini invalidate et
+  // 4. #47: Detaylı AI analizini üret + kalıcı sakla. Best-effort — hata olursa
+  // onboarding akışı kırılmaz (analyzeStudentProfile zaten fallback döndürür;
+  // yalnızca DB persist hatasına karşı try/catch).
+  try {
+    await generateAndPersistProfileAnalysis(studentProfile.id, {
+      experienceLevel,
+      interests: data.experience.interest,
+      goals: data.goals.goal,
+      availability: data.goals.availability,
+    })
+  } catch (error) {
+    logger.error("Onboarding: profil analizi kaydedilemedi", error)
+  }
+
+  // 5. Profil değişti → AI özet cache'ini invalidate et
   revalidateTag(`profile-summary-${session.user.id}`)
 
   // Client component zaten window.location.href ile yönlendiriyor,
