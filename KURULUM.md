@@ -1,185 +1,56 @@
-## Database Kurulumu
- 
- ### 1. Docker ile PostgreSQL'i Ayağa Kaldır
-PostgreSQL veritabanını Docker üzerinden ayağa kaldırmak için:
-```
-docker compose up -d
-```
-Veri tabanı çalışıyor mu test etmek için:
-```
- docker compose ps 
-```
+# Kurulum — Detaylı Sorun Giderme
 
- Başarılı çıktı:
- ```
-NAME          COMMAND                  SERVICE    STATUS      PORTS
-aisigner_db   "docker-entrypoint.s…"   postgres   Up 5 seconds   0.0.0.0:5432->5432/tcp
-```
-### 2. Prisma Kurulumu
- Bağımlılıkları yükle
-```
-npm install prisma --save-dev
+> Bu dosya, ana kurulum adımları için **değil**, yerel veritabanı kurulumunda karşılaşılabilecek
+> sorunları gidermek için bir referanstır. Adım adım kurulum için `README.md`'deki **"Hızlı
+> Kurulum"** bölümünü kullanın. Modellerin güncel/otoriter tanımı için `prisma/schema.prisma`
+> dosyasına bakın — bu dosyanın burada ayrı bir kopyası tutulmuyor (kopyalar kodla çelişip eskir).
 
-npm install @prisma/client
-```
-
-Prisma'yı başlat
-```
-npx prisma init
-```
-
-### .env dosyasını düzenle (DATABASE_URL'i ayarla)
-
-``` 
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/aisigner?schema=public" 
-
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-AUTH_SECRET=change_me
-
-```
-
- ### Schema dosyasını düzenle (models ekle)
- **Mevcut Modeller**
-
-* **User Modeli**
-```
- model User {
-
-  id        String   @id @default(cuid())  
-  email     String   @unique                        
-  name      String?    
-  lastName  String?                                
-  password  String  //hashed password
-  phone     String?                                        
-  role      Role     @default(STUDENT)                
-  createdAt DateTime @default(now())                
-  updatedAt DateTime @updatedAt    
-
-  emailVerified DateTime?
-  sessions      Session[]
-  studentProfile  StudentProfile?  @relation("StudentUser")
-  menteeProfiles StudentProfile[] @relation("StudentMentor")
-}
-
-enum Role {
-  ADMIN
-  MENTOR  
-  STUDENT
-}
-
-```
-
-### 3. Migration Çalıştır
-
-İlk migration'ı oluştur ve uygula ve Prisma Client'i generate et 
-```
-npx prisma migrate dev --name init
-
-npx prisma generate
-
-```
-### 4. Veritabanını Kontrol Et
-
-
-* Tablolar oluştu mu?
-```
-docker exec -it aisigner_db psql -U postgres -d aisigner -c "\dt"
-```
- * User tablosu yapısı doğru mu?
-```
-docker exec -it aisigner_db psql -U postgres -d aisigner -c "\d users"
-```
- **Prisma Studio ile Görsel Test**
-
- * http://localhost:5555 adresinde web arayüzü açılacak, users tablosunu görebiliyor musun?
- ```
- npx prisma studio
- ```
-
-**Prisma Client dosyalarının oluştuğunu kontrol et**
-```
-ls node_modules/.prisma/client/
-```
-**TypeScript tip dosyalarını kontrol et**
-```
-ls node_modules/@prisma/client/
-``` 
-### 5. Test Verisi Ekleme
-
-**Prisma Studio ile görsel olarak**
-```
-npx prisma studio
-```
-* +Add record butonuna bas
-* verileri gir
-* save e bas
-
-**Veya terminalden**
-```
-docker exec -it aisigner_db psql -U postgres -d aisigner -c "
-INSERT INTO \"User\" (email, password, role) 
-VALUES ('test@example.com', 'geçici_şifre', 'STUDENT') 
-"
-``` 
-NOT: gerçek projede şifre hashlenmeli
-
-### 6. Eğer Hata Alırsan
-
-1) Docker container'ının çalıştığından emin ol: 
-```
-docker ps
-```
-2) .env dosyasındaki DATABASE_URL'i kontrol et
- 
-3) Önceki migration'ları resetle:
-```
- npx prisma migrate reset
-
-```
-
-## Seed Nasıl Çalıştırılır?
-🔹 Seed (Örnek Kullanıcıları Ekleme)
-
-- Bu adımlar, Lokal geliştirme sırasında veritabanına hızlıca test edilebilecek 3 örnek kullanıcı eklemek için kullanılır.Seed script’i idempotent çalışır, yani aynı script tekrar tekrar çalıştırıldığında kullanıcılar çoğalmaz.
-
-- Şifreler güvenli şekilde **argon2** ile hashlenir.
-- Prisma Client kullanılarak veritabanına bağlantı sağlanır.
-
-
-**Adım 1 – Gerekli Paketler**
-
-Önce proje bağımlılıklarını yükleyin:
+## 1. PostgreSQL (Docker)
 
 ```bash
-npm install @prisma/client @node-rs/argon2 tsx
-
-```
-Not: Canlı ortamda NODE_ENV=production ve doğru DATABASE_URL kullanılmalı.
-
-**Adım 2 - package.json Script**
-`package.json` dosyanızın `"scripts"` bölümüne aşağıdaki satırı ekleyin:
-
-```json
-"scripts": {
-  "seed": "tsx scripts/seed.ts"
-}
-
+docker compose up -d
+docker compose ps   # Servisin "Up" olduğunu doğrula
 ```
 
-**Adım 3 - Seed Script Çalıştırma**
+Beklenen çıktıda `aisigner_db` servisi `Up` durumda ve `0.0.0.0:5432->5432/tcp` portu açık olmalı.
 
-Seed’i çalıştırmak için terminalden proje klasöründe şu komutu çalıştır:
+## 2. Migration ve Prisma Client
+
+Bu repo migration geçmişini (`prisma/migrations/`) commit'lenmiş halde içerir. Fresh bir clone'da
+bunları **uygulamak** için (yeni migration oluşturmak için değil):
+
+```bash
+npx prisma migrate deploy
+npx prisma generate
 ```
+
+`npx prisma migrate dev` yalnızca `schema.prisma`'da **yeni bir değişiklik** yapıp yeni bir
+migration üretirken kullanılır — aktif geliştirme sırasında.
+
+**Tablolar doğru oluştu mu?**
+```bash
+docker exec -it aisigner_db bash -c "psql -U postgres -d aisigner -c '\dt'"
+```
+
+**Prisma Studio ile görsel kontrol** (`http://localhost:5555`):
+```bash
+npx prisma studio
+```
+
+## 3. Test Verisi
+
+```bash
 npm run seed
 ```
 
-Script çalıştığında terminalde şöyle bir çıktı görürsün:
-```
-✅ ADMIN user created: admin@example.com
-✅ MENTOR user created: mentor@example.com
-✅ STUDENT user created: student@example.com
-Seed process completed! 3 users added!
-```
+Ne oluşturduğu ve idempotency davranışı için `README.md`'deki **"Seed Nasıl Çalıştırılır?"**
+bölümüne bakın. Elle `INSERT` ile düz metin şifre eklemeyin — seed script argon2 ile hash'ler.
 
-Eğer script daha önce çalıştırıldıysa ve kullanıcılar zaten varsa, tekrar ekleme yapılmaz (idempotent davranış).
+## 4. Eğer Hata Alırsan
 
+1. Docker container'ının çalıştığından emin ol: `docker ps`
+2. `.env` dosyasındaki `DATABASE_URL`'i kontrol et (bkz. `.env.example`)
+3. Migration/schema uyumsuzluğu varsa (yalnızca lokal/geliştirme ortamında — **veri kaybına yol
+   açar**): `npx prisma migrate reset`
+4. `AUTH_SECRET` ortam değişkeninin tanımlı olduğundan emin ol (NextAuth v4 bunu bekler —
+   `NEXTAUTH_SECRET` değil).

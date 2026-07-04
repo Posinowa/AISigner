@@ -12,13 +12,19 @@ AISigner, stajyer/öğrencilerin kısa bir anketle güçlü yönlerini ve seviye
 - Admin’in mentör ataması
 - Mentörün proje havuzundan öğrenciye proje ataması
 - AI destekli roadmap üretimi ve adımların onaylanması
-- GitHub fork/PR akışına dayalı çalışma düzeni
+- GitHub fork/PR akışına dayalı çalışma düzeni (bkz. "GitHub Entegrasyonu — Mevcut Durum")
+
+### GitHub Entegrasyonu — Mevcut Durum
+
+- ✅ Proje şablonlarına GitHub repository URL'i eklenebilir (admin, `ProjectTemplate.githubRepoUrl`).
+- ✅ Roadmap adımlarına GitHub issue linki eklenebilir (mentor, `RoadmapStep.githubIssueUrl`); öğrenci roadmap üzerinde bu linki görür.
+- ❌ Henüz **yok**: otomatik fork/PR oluşturma, issue durumu senkronizasyonu, webhook/GitHub App entegrasyonu. Şu an akış tamamen link-bazlı ve manuel — öğrenci/mentor repo ve issue linklerini elle takip eder.
 
 ## Ön Gereksinimler
 
 Projeyi kurmadan önce sisteminizde aşağıdaki yazılımların kurulu olduğundan emin olun:
 
-- **Node.js** (v18 veya üzeri)  
+- **Node.js** (v20 veya üzeri — CI de bu sürümü kullanıyor)  
 - **npm** (Node.js ile birlikte gelir)  
 - **Docker** & **Docker Compose**  
 - **Git**
@@ -27,7 +33,7 @@ Projeyi kurmadan önce sisteminizde aşağıdaki yazılımların kurulu olduğun
 
 ##  Hızlı Kurulum
 
-> 1. `git clone https://github.com/elifgularslan/AISigner.git`  
+> 1. `git clone https://github.com/Posinowa/AISigner.git`  
 >    → Projeyi kendi bilgisayarına indir.
 
 > 2. `cd AISigner`  
@@ -37,16 +43,16 @@ Projeyi kurmadan önce sisteminizde aşağıdaki yazılımların kurulu olduğun
 >    → PostgreSQL veritabanını arka planda başlat.
 
 > 4. `.env` dosyasını oluştur  
->    → Ortam değişkenlerini `.env.example` dosyasına göre tanımla (örnek: `DATABASE_URL`, `NEXTAUTH_SECRET`).
+>    → Ortam değişkenlerini `.env.example` dosyasına göre tanımla (örnek: `DATABASE_URL`, `AUTH_SECRET` — NextAuth v4'ün beklediği değişken adı budur, `NEXTAUTH_SECRET` değil).
 
 > 5. `npm install`  
 >    → Proje bağımlılıklarını yükle (Next.js, Prisma, Argon2 vb.)
 
-> 6. `npx prisma migrate dev --name init`  
->    → Veritabanı tablolarını oluştur ve Prisma Client’i generate et.
+> 6. `npx prisma migrate deploy` ardından `npx prisma generate`  
+>    → Repoda hazır bulunan tüm migration'ları veritabanına uygula ve Prisma Client'i üret. (`migrate dev` yalnızca schema.prisma'da yeni bir değişiklik yapıp yeni migration üretirken kullanılır; mevcut projeyi ilk kez ayağa kaldırırken `deploy` doğru komuttur.)
 
 > 7. `npm run seed`  
->    → Test kullanıcılarını veritabanına ekle (admin, mentor, öğrenci).
+>    → Demo verisini oluştur: admin/mentor/student kullanıcıları, student'ın mentor'a ataması ve örnek proje şablonları (idempotent — tekrar çalıştırmak duplicate üretmez, bkz. "Seed Nasıl Çalıştırılır?").
 
 > 8. `npm run dev`  
 >    → Uygulamayı başlat (`http://localhost:3000` adresinde çalışır).
@@ -127,269 +133,31 @@ npm run seed
 
 
 
-##  Ana Bağımlılıkların Yüklenmesi
+## Database Kurulumu — Sorun Giderme
 
-### Tüm package.json bağımlılıklarını yükleyin
+> Adım adım kurulum için yukarıdaki **"Hızlı Kurulum"** bölümüne bakın. Burada yalnızca sık karşılaşılan sorunlar ve doğrulama komutları var. Modellerin güncel/otoriter tanımı için `prisma/schema.prisma` dosyasına bakın — bu dosyanın README'de ayrı bir kopyası tutulmuyor (kopyalar zamanla kodla çelişip eskiyor).
+
+**Docker/veritabanı çalışıyor mu?**
 ```bash
-npm install
-```
-Not: Bu adımı atlarsanız, proje çalışmaz çünkü gerekli kütüphaneler (Next.js, Prisma Client, Argon2 vb.) yüklü olmaz. Komutları çalıştırırken hata alırsınız.
-
-### .env dosyasını düzenle (DATABASE_URL'i ayarla)
-
-```bash 
-DATABASE_URL= "YOUR_DATABASE_URL"
-NEXT_PUBLIC_APP_URL= YOUR_LOCAL_HOST_URL
-AUTH_SECRET= change_me
-
+docker compose ps
 ```
 
-
-## Database Kurulumu
- 
- ### 1. Docker ile PostgreSQL'i Ayağa Kaldır
-PostgreSQL veritabanını Docker üzerinden ayağa kaldırmak için:
+**Tablolar doğru oluştu mu?**
 ```bash
-docker compose up -d
-```
-Veri tabanı çalışıyor mu test etmek için:
-```bash
- docker compose ps 
-```
-
- Başarılı çıktı:
- ```
-NAME          COMMAND                  SERVICE    STATUS      PORTS
-aisigner_db   "docker-entrypoint.s…"   postgres   Up 5 seconds   0.0.0.0:5432->5432/tcp
-```
-### 2. Prismayı başlat
-
-```bash
-npx prisma init
-```
-
-
-
- ### Schema dosyasını düzenle (models ekle)
- **Mevcut Modeller**
-
-* **User Modeli**
-```prisma
- model User {
-
-  id        String   @id @default(cuid())  
-  email     String   @unique                        
-  name      String?    
-  lastName  String?                                
-  password  String  //hashed password
-  phone     String?                                        
-  role      Role     @default(STUDENT)                
-  createdAt DateTime @default(now())                
-  updatedAt DateTime @updatedAt    
-
-  emailVerified DateTime?
-  sessions      Session[]
-  studentProfile  StudentProfile?  @relation("StudentUser")
-  menteeProfiles StudentProfile[] @relation("StudentMentor")
-}
-
-enum Role {
-  ADMIN
-  MENTOR  
-  STUDENT
-}
-
-```
-* **Session Modeli**
-```prisma
-model Session {
-  id           String    @id @default(cuid())
-  sessionToken String    @unique
-  userId       String
-  expires      DateTime
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-```
-
-* **StudentProfile Modeli**
-```prisma
-model StudentProfile {
-  id              String   @id @default(cuid())
-  userId          String   @unique
-  user            User     @relation("StudentUser", fields: [userId], references: [id], onDelete: Cascade)
-  birthYear       Int?
-  experienceLevel String
-  interests       String[]
-  goals           String?
-  availability    String?
-
-  mentorId        String?
-  mentor          User?    @relation("StudentMentor", fields: [mentorId], references: [id])
-
- assignedProjects AssignedProject[]
-
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-}
-```
-
-
-* **ProjectTemplate Modeli**
-```prisma
-model ProjectTemplate{
-  id             String @id @default(cuid())
-  title          String
-  description    String     //md formatı
-  track          String[]   //["web" , "mobile"]
-  difficulty     Difficulty
-  
-  assignedProjects AssignedProject[]
-
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-}
-
-enum Difficulty{
-  HARD
-  MEDIUM
-  EASY
-}
-
-```
-
-* **AssignedProject Modeli**
-```prisma
-model AssignedProject {
-  id                String   @id @default(cuid())
-  studentProfileId  String
-  projectTemplateId String
-  status            AssignmentStatus @default(PENDING)
-
-  studentProfile    StudentProfile @relation(fields: [studentProfileId], references: [id])
-  projectTemplate   ProjectTemplate @relation(fields: [projectTemplateId], references: [id])
-
-  roadmap           Roadmap?
-
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-}
-
-enum AssignmentStatus {
-  PENDING
-  IN_PROGRESS
-  COMPLETED
-}
-```
-
-* **Roadmap Modeli**
-```prisma
-model Roadmap {
-  id                String        @id @default(cuid())
-  assignedProjectId String        @unique
-  assignedProject   AssignedProject @relation(fields: [assignedProjectId], references: [id], onDelete: Cascade)
-  title             String
-  status            RoadmapStatus @default(DRAFT)
-  steps             RoadmapStep[]
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-}
-
-model RoadmapStep {
-  id             String     @id @default(cuid())
-  roadmapId      String
-  roadmap        Roadmap    @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
-  order          Int
-  title          String
-  description    String
-  resources      String[]
-  estimatedHours Int?
-  status         StepStatus @default(TODO)
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
-}
-```
-### 3. Migration Çalıştır
-
-İlk migration'ı oluştur ve uygula ve Prisma Client'i generate et 
-```
-npx prisma migrate dev --name init
-
-npx prisma generate
-
-```
-### 4. Veritabanını Kontrol Et
-
-
-* Tablolar oluştu mu?
-```
 docker exec -it aisigner_db bash -c "psql -U postgres -d aisigner -c '\dt'"
+```
 
-```
- * User tablosu yapısı doğru mu?
-```
-docker exec -it aisigner_db bash -c "psql -U postgres -d aisigner -c '\d \"User\"'"
-```
- **Prisma Studio ile Görsel Test**
-
- * http://localhost:5555 adresinde web arayüzü açılacak, users tablosunu görebiliyor musun?
- ```
- npx prisma studio
- ```
-
-**Prisma Client dosyalarının oluştuğunu kontrol et**
-```
-ls node_modules/.prisma/client/
-```
-**TypeScript tip dosyalarını kontrol et**
-```
-ls node_modules/@prisma/client/
-``` 
-### 5. Test Verisi Ekleme
-
-**Otomatik olarak Seed'i çalıştırarak (önerilen yöntem):**
+**Prisma Studio ile görsel kontrol** (`http://localhost:5555`):
 ```bash
-npm run seed
-```
-**Ekstra Kontrol: Kullanıcı sayısı**
-Seed script’in doğru çalışıp çalışmadığını kontrol etmek için kullanın . Örneğin  sonucu → admin, mentor, student kullanıcıları başarıyla eklenmiş demektir.
-
-```bash
-docker exec -it aisigner_db bash -c "psql -U postgres -d aisigner -c 'SELECT COUNT(*) FROM \"User\"'"
-```
-
-**Veya Prisma Studio ile görsel olarak**
-```
 npx prisma studio
 ```
-* +Add record butonuna bas
-* verileri gir
-* save e bas
 
-**Veya terminalden**
+**Migration/schema uyumsuzluğu yaşıyorsan** (yalnızca lokal/geliştirme ortamında — veri kaybına yol açar):
+```bash
+npx prisma migrate reset
 ```
-docker exec -it aisigner_db psql -U postgres -d aisigner -c "
-INSERT INTO \"User\" (email, password, role) 
-VALUES ('test@example.com', 'geçici_şifre', 'STUDENT') 
-"
-``` 
-NOT: gerçek projede şifre hashlenmeli
 
-### 6. Eğer Hata Alırsan
-
-1) Docker container'ının çalıştığından emin ol: 
-```
-docker ps
-```
-2) .env dosyasındaki DATABASE_URL'i kontrol et
- 
-3) Önceki migration'ları resetle:
-```
- npx prisma migrate reset
-
-```
+**Test verisi eklemek için** `npm run seed` kullanın (bkz. "Seed Nasıl Çalıştırılır?") — argon2 ile şifreleri güvenli şekilde hash'ler. Elle `INSERT` ile düz metin şifre eklemeyin.
 
 ## Seed Nasıl Çalıştırılır?
 🔹 Seed (Örnek Kullanıcıları Ekleme)
@@ -481,7 +249,7 @@ Yeni gelen bir geliştirici aşağıdaki adımları izleyerek M2 sürecini uçta
    - E-posta: `student@example.com`
    - Şifre: `geçici_şifre`
 
-3. Oturum açıldıktan sonra http://localhost:3000/student-onboarding  sayfasına git.
+3. Oturum açıldıktan sonra http://localhost:3000/profile-setup sayfasına git. (Eski `/student-onboarding` URL'i hâlâ çalışır ama `/profile-setup`'a kalıcı yönlendirme yapar.)
 4. Formu 3 adımda doldur:
    - Kişisel Bilgiler
    - Deneyim Seviyesi
@@ -758,8 +526,8 @@ Uygulama Next.js App Router mimarisiyle yapılandırılmıştır. Dosya sistemi 
 │   │   │   └── layout.tsx
 │   │   ├── (student)/        # Öğrenci'ye özel route grubu
 |   |   |   ├── student-dashboard/
-|   |   |   |
-|   |   |   ├── student-onboarding/# Öğrenci kayıt/karşılama süreci
+|   |   |   ├── profile-setup/      # Öğrenci onboarding/profil formu (gerçek sayfa)
+|   |   |   ├── student-onboarding/ # Eski URL — /profile-setup'a kalıcı yönlendirme
 │   │   │   └── layout.tsx
 │   │   ├── (auth)/           # Giriş / Kayıt / Çıkış sayfaları
 │   │   │   ├── signin/
