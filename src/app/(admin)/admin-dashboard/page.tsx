@@ -1,7 +1,7 @@
 // 🧭 Admin paneli — kullanıcı/rol yönetimi ve mentor atama
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Users,
@@ -60,6 +60,9 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState<User[]>([]);
   const [mentors, setMentors] = useState<Mentor[]>([]);
   const [loading, setLoading] = useState(true);
+  // #59: Fetch başarısız olduğunda "kullanıcı yok" ile "istek başarısız oldu" birbirine
+  // karışmasın diye ayrı bir hata durumu (mentor-dashboard'daki desenle tutarlı).
+  const [loadError, setLoadError] = useState(false);
   const [updating, setUpdating] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<"ALL" | User["role"]>("ALL");
@@ -97,25 +100,33 @@ export default function AdminDashboard() {
     setAnalysisModalUser(null);
   }
 
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const [usersRes, mentorsRes] = await Promise.all([
-          fetch("/api/admin/users"),
-          fetch("/api/admin/mentors"),
-        ]);
-        const usersData = usersRes.ok ? await usersRes.json() : [];
-        const mentorsData = mentorsRes.ok ? await mentorsRes.json() : [];
-        setUsers(usersData);
-        setMentors(mentorsData);
-      } catch (err) {
-        console.error("Fetch error:", err);
-      } finally {
-        setLoading(false);
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const [usersRes, mentorsRes] = await Promise.all([
+        fetch("/api/admin/users"),
+        fetch("/api/admin/mentors"),
+      ]);
+      if (!usersRes.ok || !mentorsRes.ok) {
+        setLoadError(true);
+        return;
       }
+      const usersData = await usersRes.json();
+      const mentorsData = await mentorsRes.json();
+      setUsers(usersData);
+      setMentors(mentorsData);
+    } catch (err) {
+      console.error("Fetch error:", err);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
     }
-    loadData();
   }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   async function handleRoleChange(userId: string, role: User["role"]) {
     setUpdating(userId);
@@ -127,9 +138,24 @@ export default function AdminDashboard() {
       });
       if (response.ok) {
         setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role } : u)));
+        toast.success("Rol güncellendi.");
+      } else {
+        // #59: Hata hem düz string (ör. "kendi rolünü değiştiremezsin" guard'ı, 403)
+        // hem zod fieldErrors objesi olarak gelebilir — ikisi de gösterilsin.
+        const data = await response.json().catch(() => null);
+        const fieldErrors = data?.error;
+        let message = "Rol güncellenemedi.";
+        if (typeof fieldErrors === "string" && fieldErrors.trim().length > 0) {
+          message = fieldErrors;
+        } else if (fieldErrors && typeof fieldErrors === "object") {
+          const firstMessage = Object.values(fieldErrors).flat()[0];
+          if (firstMessage) message = String(firstMessage);
+        }
+        toast.error(message);
       }
     } catch (error) {
       console.error("Error updating role:", error);
+      toast.error("Bağlantı hatası. Lütfen tekrar deneyin.");
     } finally {
       setUpdating(null);
     }
@@ -251,6 +277,28 @@ export default function AdminDashboard() {
       <div className="flex items-center justify-center min-h-screen bg-slate-50">
         <Loader2 className="animate-spin h-7 w-7 text-blue-600 mr-3" />
         <span className="text-slate-600 font-medium">Kullanıcılar yükleniyor...</span>
+      </div>
+    );
+  }
+
+  // #59: Fetch başarısız olduğunda "hiç kullanıcı yok" gibi görünmesin diye
+  // ayrı bir hata durumu (mentor-dashboard'daki desenle tutarlı).
+  if (loadError) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 px-4 text-center">
+        <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mb-4">
+          <AlertCircle className="w-7 h-7 text-red-500" />
+        </div>
+        <h2 className="text-lg font-semibold text-slate-900">Kullanıcılar yüklenemedi</h2>
+        <p className="text-slate-500 text-sm mt-1 mb-5">
+          Bağlantıda bir sorun oluştu. Lütfen tekrar deneyin.
+        </p>
+        <button
+          onClick={loadData}
+          className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-5 py-2.5 transition-colors"
+        >
+          Tekrar Dene
+        </button>
       </div>
     );
   }

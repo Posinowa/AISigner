@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Plus, Pencil, Trash2, X, ArrowLeft, FolderKanban, Github } from "lucide-react";
+import { Plus, Pencil, Trash2, X, ArrowLeft, FolderKanban, Github, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -41,10 +41,14 @@ export default function ProjectsPage() {
   });
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(true); // Sayfa yükleniyor durumu
+  // #59: Fetch başarısız olduğunda "hiç şablon yok" ile "istek başarısız oldu"
+  // birbirine karışmasın diye ayrı bir hata durumu.
+  const [loadError, setLoadError] = useState(false);
 
   const loadTemplates = useCallback(async () => {
     try {
       setPageLoading(true);
+      setLoadError(false);
       const res = await fetch("/api/admin/project-templates");
 
       if (!res.ok) {
@@ -55,7 +59,7 @@ export default function ProjectsPage() {
       setTemplates(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Failed to load templates:", error);
-      setTemplates([]);
+      setLoadError(true);
     } finally {
       setPageLoading(false);
     }
@@ -309,6 +313,21 @@ export default function ProjectsPage() {
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
           <span className="ml-3 text-slate-600">Şablonlar yükleniyor...</span>
+        </div>
+      ) : loadError ? (
+        /* #59: "Hiç şablon yok" ile "istek başarısız oldu" karışmasın diye ayrı hata durumu. */
+        <div className="text-center py-12">
+          <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-7 h-7 text-red-500" />
+          </div>
+          <h3 className="text-lg font-medium text-slate-900 mb-2">Şablonlar yüklenemedi</h3>
+          <p className="text-slate-600 mb-4">Bağlantıda bir sorun oluştu. Lütfen tekrar deneyin.</p>
+          <button
+            onClick={loadTemplates}
+            className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+          >
+            Tekrar Dene
+          </button>
         </div>
       ) : (
         <>
