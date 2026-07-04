@@ -19,6 +19,19 @@ export default async function ProfileSetupPage() {
     select: { name: true, lastName: true, phone: true },
   });
 
+  // #55: Mevcut StudentProfile varsa (öğrenci daha önce onboarding'i tamamlamışsa)
+  // formu boş değil, kayıtlı verilerle önceden doldur.
+  const studentProfile = await prisma.studentProfile.findUnique({
+    where: { userId: session.user.id },
+    select: {
+      birthYear: true,
+      experienceLevel: true,
+      interests: true,
+      goals: true,
+      availability: true,
+    },
+  });
+
   // #46: Admin'in tanımladığı aktif anket sorularını göster. Hata olursa form
   // mevcut akışı bozmadan çalışmalı → boş dizi ile devam et (soru adımı gizlenir).
   let surveyQuestions: SurveyQuestionView[] = [];
@@ -39,6 +52,11 @@ export default async function ProfileSetupPage() {
         firstName: user?.name ?? undefined,
         lastName: user?.lastName ?? undefined,
         phoneNumber: user?.phone ?? undefined,
+        birthYear: studentProfile?.birthYear ?? undefined,
+        experienceLevel: studentProfile?.experienceLevel ?? undefined,
+        interests: studentProfile?.interests ?? undefined,
+        goals: studentProfile?.goals ?? undefined,
+        availability: studentProfile?.availability ?? undefined,
       }}
       surveyQuestions={surveyQuestions}
     />
