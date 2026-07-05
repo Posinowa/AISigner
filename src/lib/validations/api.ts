@@ -63,6 +63,9 @@ const githubRepoUrlSchema = z
     try {
       const url = new URL(val);
       if (url.protocol !== "https:" || url.hostname !== "github.com") return false;
+      // #89: Yalnızca tam repo kökü kabul edilir — query (?tab=...) veya hash (#readme)
+      // içeren URL'ler reddedilir; kök form kanonik kalsın.
+      if (url.search !== "" || url.hash !== "") return false;
       // #83: Yalnızca repo kökü (owner/repo) kabul edilir; tree/issues/pull gibi
       // daha derin yollar reddedilir (önceki >=2 kontrolü bunları da geçiriyordu).
       const segments = url.pathname.split("/").filter(Boolean);

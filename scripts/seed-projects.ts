@@ -4,6 +4,21 @@ import { pathToFileURL } from "url";
 /**
  * #56: scripts/seed.ts tarafından çağrılır (birleşik seed akışı); ayrıca
  * `tsx scripts/seed-projects.ts` ile tek başına da çalıştırılabilir.
+ *
+ * #89 — Idempotency / DB seviyesi kararı:
+ * Aşağıdaki title-bazlı `findFirst` + koşullu `create` yaklaşımı KORUNUYOR;
+ * `ProjectTemplate.title` üzerine unique constraint EKLENMEDİ. Gerekçe:
+ *  1) Seed tek bir süreçte SIRAYLA çalışır — gerçek bir yarış koşulu (aynı anda
+ *     iki çağrı) senaryosu yok; endişe teoriktir.
+ *  2) title bir domain-unique alan DEĞİL — admin bilinçli olarak aynı başlıkla
+ *     varyant şablonlar oluşturabilir; unique constraint bu esnekliği kaldırır.
+ *  3) Mevcut DB'lerde eski hatalı seed'in (bkz. #56) ürettiği duplicate-title
+ *     satırlar olabilir; unique index ekleyen bir migration bu satırlarda
+ *     BAŞARISIZ olur — güvenli eklemek önce dedup migration'ı gerektirir, bu da
+ *     bu sertleştirme kapsamının dışında (ayrı, dikkatli bir iş).
+ * Sonuç: teknik gerekçeyle ertelendi. Gerçek eşzamanlı yazım ihtiyacı doğarsa
+ * (admin API'sinden toplu içe aktarma vb.) o zaman dedup + unique index + upsert
+ * birlikte değerlendirilmeli.
  */
 export async function seedProjectTemplates(prisma: PrismaClient): Promise<void> {
   const templates = [

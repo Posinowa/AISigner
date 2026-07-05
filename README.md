@@ -459,6 +459,7 @@ Yeni gelen bir geliştirici aşağıdaki adımları izleyerek M3 sürecini uçta
 Detaylı katkı rehberi için [CONTRIBUTING.md](CONTRIBUTING.md) dosyasına bakın.
 - Fork → branch → PR akışı ile katkı verin.
 - Küçük ve odaklı PR’lar tercih edilir.
+- Merge/deploy öncesi hızlı doğrulama için [docs/SMOKE-CHECKLIST.md](docs/SMOKE-CHECKLIST.md) (lint/test/build + kritik akış smoke adımları).
 
 ## Lisans
 MIT

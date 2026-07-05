@@ -81,6 +81,26 @@ describe("createTemplateSchema — githubRepoUrl (#49)", () => {
     ).toBe(true);
   });
 
+  it("#89: query (?tab=...) içeren URL'i reddeder", () => {
+    for (const url of [
+      "https://github.com/org/repo?tab=readme",
+      "https://github.com/org/repo/?tab=readme",
+    ]) {
+      expect(createTemplateSchema.safeParse({ ...templateBase, githubRepoUrl: url }).success).toBe(
+        false,
+      );
+    }
+  });
+
+  it("#89: hash (#readme) içeren URL'i reddeder", () => {
+    expect(
+      createTemplateSchema.safeParse({
+        ...templateBase,
+        githubRepoUrl: "https://github.com/org/repo#readme",
+      }).success,
+    ).toBe(false);
+  });
+
   it("http (https değil) reddedilir", () => {
     const result = createTemplateSchema.safeParse({
       ...templateBase,

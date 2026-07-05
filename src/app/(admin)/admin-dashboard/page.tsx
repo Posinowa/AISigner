@@ -27,6 +27,7 @@ import {
   parseProfileAnalysisApiResponse,
   type ProfileAnalysisData,
 } from "@/features/ai/ui/ProfileAnalysisCard";
+import { extractApiErrorMessage } from "@/lib/api-error";
 
 type User = {
   id: string;
@@ -141,18 +142,10 @@ export default function AdminDashboard() {
         setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role } : u)));
         toast.success("Rol güncellendi.");
       } else {
-        // #59: Hata hem düz string (ör. "kendi rolünü değiştiremezsin" guard'ı, 403)
-        // hem zod fieldErrors objesi olarak gelebilir — ikisi de gösterilsin.
+        // #59/#89: Hata hem düz string (ör. "kendi rolünü değiştiremezsin" guard'ı, 403)
+        // hem zod fieldErrors objesi olarak gelebilir — ortak helper ikisini de gösterir.
         const data = await response.json().catch(() => null);
-        const fieldErrors = data?.error;
-        let message = "Rol güncellenemedi.";
-        if (typeof fieldErrors === "string" && fieldErrors.trim().length > 0) {
-          message = fieldErrors;
-        } else if (fieldErrors && typeof fieldErrors === "object") {
-          const firstMessage = Object.values(fieldErrors).flat()[0];
-          if (firstMessage) message = String(firstMessage);
-        }
-        toast.error(message);
+        toast.error(extractApiErrorMessage(data?.error, "Rol güncellenemedi."));
       }
     } catch (error) {
       console.error("Error updating role:", error);

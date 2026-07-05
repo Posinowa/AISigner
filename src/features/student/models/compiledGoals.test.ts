@@ -52,3 +52,23 @@ describe("parseCompiledGoals — fallback (#55)", () => {
     expect(parseCompiledGoals("   ")).toEqual({ knownTech: "", futureGoal: "", learningStyle: "" });
   });
 });
+
+// #89: Prefill regresyon koruması — kayıtlı goals'ı forma açıp (parse) tekrar
+// kaydetmek (compile) ilk kaydı bozmamalı. DB'de saklanan string, prefill sonrası
+// yeniden derlendiğinde birebir aynı kalmalı (kullanıcı hiçbir alanı değiştirmezse).
+describe("prefill round-trip stabilitesi (#89)", () => {
+  it("stored → parse → compile aynı stored string'i üretir (stabil)", () => {
+    const original = compileGoals({
+      knownTech: "Python temel seviye",
+      futureGoal: "Backend geliştirici olmak",
+      learningStyle: "Proje yaparak öğrenirim",
+    });
+
+    const fieldsFromDb = parseCompiledGoals(original);
+    const recompiled = compileGoals(fieldsFromDb);
+
+    expect(recompiled).toBe(original);
+    // Ve tekrar parse edilince alanlar hâlâ aynı.
+    expect(parseCompiledGoals(recompiled)).toEqual(fieldsFromDb);
+  });
+});

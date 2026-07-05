@@ -68,4 +68,18 @@ describe("experienceLevelToFormValue (#55)", () => {
     expect(experienceLevelToFormValue(null)).toBe("beginner");
     expect(experienceLevelToFormValue(undefined)).toBe("beginner");
   });
+
+  // #89: Prefill regresyon koruması — kanonik → form değeri eşlemesi SABİT kalmalı.
+  // OnboardingForm'un radio value'ları bu tam eşlemeye bağlı; biri değişirse prefill
+  // yanlış seçili gelir. Tablo bilinçli olarak burada kilitleniyor.
+  it("kanonik → form değeri eşlemesi tam olarak beklenen tabloya eşittir", () => {
+    const mapping: Record<string, "beginner" | "intermediate" | "advanced"> = {
+      BEGINNER: "beginner",
+      INTERMEDIATE: "intermediate",
+      ADVANCED: "advanced",
+    };
+    for (const [canonical, formValue] of Object.entries(mapping)) {
+      expect(experienceLevelToFormValue(canonical)).toBe(formValue);
+    }
+  });
 });
