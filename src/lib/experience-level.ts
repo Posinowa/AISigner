@@ -51,3 +51,22 @@ export function normalizeExperienceLevel(
 export function experienceLevelLabel(value: string | null | undefined): string {
   return EXPERIENCE_LEVEL_LABELS[normalizeExperienceLevel(value)];
 }
+
+/** OnboardingForm'un radio değerleri (küçük harf) — kanonik değerin form karşılığı. */
+export type ExperienceLevelFormValue = "beginner" | "intermediate" | "advanced";
+
+const FORM_VALUES: Record<ExperienceLevel, ExperienceLevelFormValue> = {
+  BEGINNER: "beginner",
+  INTERMEDIATE: "intermediate",
+  ADVANCED: "advanced",
+};
+
+/**
+ * #55: Kanonik (DB'de saklanan UPPERCASE) değeri, onboarding formunun radio
+ * input'larının beklediği küçük harf değere çevirir — prefill için gerekli.
+ */
+export function experienceLevelToFormValue(
+  value: string | null | undefined,
+): ExperienceLevelFormValue {
+  return FORM_VALUES[normalizeExperienceLevel(value)];
+}

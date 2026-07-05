@@ -15,6 +15,8 @@ import {
   extractSurveyErrorMessage,
   type SurveyQuestionView,
 } from "@/features/survey/answers";
+import { compileGoals, parseCompiledGoals } from "@/features/student/models/compiledGoals";
+import { experienceLevelToFormValue } from "@/lib/experience-level";
 
 import type { FieldPath } from "react-hook-form";
 
@@ -74,6 +76,12 @@ type OnboardingInitialValues = {
   firstName?: string;
   lastName?: string;
   phoneNumber?: string;
+  // #55: Mevcut StudentProfile alanları — profile-setup'a dönen öğrenci için prefill.
+  birthYear?: number;
+  experienceLevel?: string;
+  interests?: string[];
+  goals?: string;
+  availability?: string;
 };
 
 export default function OnboardingForm({
@@ -111,6 +119,10 @@ export default function OnboardingForm({
     new Array(allSteps.length).fill(false),
   );
 
+  // #55: Mevcut StudentProfile.goals tek bir derlenmiş string — form'un üç ayrı
+  // alanına (knownTech/futureGoal/learningStyle) geri ayrıştırılır.
+  const parsedGoals = parseCompiledGoals(initial?.goals);
+
   const { register, handleSubmit, trigger, clearErrors, formState: { errors } } = useForm<EnhancedFormData>({
     resolver: zodResolver(enhancedSchema),
     mode: "onSubmit",
@@ -118,12 +130,21 @@ export default function OnboardingForm({
       personal: {
         firstName: initial?.firstName ?? "",
         lastName: initial?.lastName ?? "",
-        birthYear: undefined,
+        birthYear: initial?.birthYear ?? undefined,
         phoneNumber: initial?.phoneNumber ?? "",
       },
-      experience: { level: "", knownTech: "" },
-      vision: { interest: [], futureGoal: "" },
-      workingStyle: { learningStyle: "", availability: "" },
+      experience: {
+        level: initial?.experienceLevel ? experienceLevelToFormValue(initial.experienceLevel) : "",
+        knownTech: parsedGoals.knownTech,
+      },
+      vision: {
+        interest: initial?.interests ?? [],
+        futureGoal: parsedGoals.futureGoal,
+      },
+      workingStyle: {
+        learningStyle: parsedGoals.learningStyle,
+        availability: initial?.availability ?? "",
+      },
     },
   });
 
@@ -161,11 +182,13 @@ export default function OnboardingForm({
     try {
       setIsSubmitting(true);
       
-      const compiledAIContext = `
-[MEVCUT BİLGİ BİRİKİMİ]: ${data.experience.knownTech}
-[GELECEK VİZYONU VE HEDEFLER]: ${data.vision.futureGoal}
-[ÖĞRENME VE ÇALIŞMA STİLİ]: ${data.workingStyle.learningStyle}
-      `.trim();
+      // #55: compileGoals — parseCompiledGoals ile aynı formatı kullanır (prefill
+      // round-trip'i bozulmasın diye derleme mantığı tek yerde tutuluyor).
+      const compiledAIContext = compileGoals({
+        knownTech: data.experience.knownTech,
+        futureGoal: data.vision.futureGoal,
+        learningStyle: data.workingStyle.learningStyle,
+      });
 
       // Eski backendin bozulmaması için veriyi onun beklediği formata çeviriyoruz
       const backendPayload = {

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   normalizeExperienceLevel,
   experienceLevelLabel,
+  experienceLevelToFormValue,
   DEFAULT_EXPERIENCE_LEVEL,
 } from "@/lib/experience-level";
 
@@ -47,5 +48,24 @@ describe("experienceLevelLabel (#54)", () => {
 
   it("tanınmayan değer → DEFAULT etiketi", () => {
     expect(experienceLevelLabel("xyz")).toBe("Başlangıç");
+  });
+});
+
+describe("experienceLevelToFormValue (#55)", () => {
+  it("kanonik UPPERCASE değeri form'un küçük harf radio değerine çevirir", () => {
+    expect(experienceLevelToFormValue("BEGINNER")).toBe("beginner");
+    expect(experienceLevelToFormValue("INTERMEDIATE")).toBe("intermediate");
+    expect(experienceLevelToFormValue("ADVANCED")).toBe("advanced");
+  });
+
+  it("zaten küçük harf veya Türkçe etiket olsa da doğru form değerine çevirir", () => {
+    expect(experienceLevelToFormValue("advanced")).toBe("advanced");
+    expect(experienceLevelToFormValue("Orta")).toBe("intermediate");
+  });
+
+  it("tanınmayan/boş değer → DEFAULT'un form değeri (beginner)", () => {
+    expect(experienceLevelToFormValue("xyz")).toBe("beginner");
+    expect(experienceLevelToFormValue(null)).toBe("beginner");
+    expect(experienceLevelToFormValue(undefined)).toBe("beginner");
   });
 });
