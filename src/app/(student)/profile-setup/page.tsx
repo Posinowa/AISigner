@@ -33,8 +33,12 @@ export default async function ProfileSetupPage() {
   });
 
   // #46: Admin'in tanımladığı aktif anket sorularını göster. Hata olursa form
-  // mevcut akışı bozmadan çalışmalı → boş dizi ile devam et (soru adımı gizlenir).
+  // mevcut akışı bozmadan çalışmalı → boş dizi ile devam et.
+  // #83: Ama "gerçekten hiç soru yok" ile "yükleme başarısız oldu" aynı boş
+  // diziyle sonuçlanmasın diye ayrı bir flag taşınıyor — form bunu görüp
+  // kullanıcıya açık bir hata mesajı gösterebiliyor.
   let surveyQuestions: SurveyQuestionView[] = [];
+  let surveyLoadFailed = false;
   try {
     const questions = await listSurveyQuestions({ activeOnly: true });
     surveyQuestions = questions.map((q) => ({
@@ -44,6 +48,7 @@ export default async function ProfileSetupPage() {
     }));
   } catch (error) {
     console.error("profile-setup: anket soruları yüklenemedi", error);
+    surveyLoadFailed = true;
   }
 
   return (
@@ -59,6 +64,7 @@ export default async function ProfileSetupPage() {
         availability: studentProfile?.availability ?? undefined,
       }}
       surveyQuestions={surveyQuestions}
+      surveyLoadFailed={surveyLoadFailed}
     />
   );
 }

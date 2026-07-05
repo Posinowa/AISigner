@@ -22,7 +22,11 @@ import {
 import { toast } from "sonner";
 import LogoutButton from "@/components/LogoutButton";
 import { UnreadBadge } from "@/features/messaging/ui/UnreadBadge";
-import { ProfileAnalysisCard, type ProfileAnalysisData } from "@/features/ai/ui/ProfileAnalysisCard";
+import {
+  ProfileAnalysisCard,
+  parseProfileAnalysisApiResponse,
+  type ProfileAnalysisData,
+} from "@/features/ai/ui/ProfileAnalysisCard";
 
 type User = {
   id: string;
@@ -77,15 +81,12 @@ export default function AdminDashboard() {
     setAnalysisLoading(true);
     try {
       const res = await fetch(`/api/admin/students/${user.id}/profile-analysis`);
-      if (res.ok) {
-        const data = await res.json();
-        setAnalysisData(data.analysis);
-      } else {
-        const data = await res.json().catch(() => null);
-        setAnalysisError(
-          (data && typeof data.error === "string" && data.error) || "Analiz yüklenemedi.",
-        );
-      }
+      const body = await res.json().catch(() => null);
+      // #83: Yorumlama saf bir fonksiyona taşındı — "analiz yok" (ok+null) ile
+      // "istek başarısız oldu" (!ok) net ayrılıyor ve ayrı test ediliyor.
+      const { analysis, error } = parseProfileAnalysisApiResponse(res.ok, body);
+      setAnalysisData(analysis);
+      setAnalysisError(error);
     } catch {
       setAnalysisError("Bağlantı hatası. Lütfen tekrar deneyin.");
     } finally {

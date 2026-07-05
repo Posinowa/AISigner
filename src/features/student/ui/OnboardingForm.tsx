@@ -8,9 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { saveOnboarding } from "@/features/student/server/onboarding";
-import { CheckCircle, User, Target, Award, ArrowRight, ArrowLeft, Rocket, Terminal, BookOpen, Clock, ClipboardList } from "lucide-react";
+import { CheckCircle, User, Target, Award, ArrowRight, ArrowLeft, Rocket, Terminal, BookOpen, Clock, ClipboardList, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
-import { buildSurveyAnswerPayload, type SurveyQuestionView } from "@/features/survey/answers";
+import {
+  buildSurveyAnswerPayload,
+  extractSurveyErrorMessage,
+  type SurveyQuestionView,
+} from "@/features/survey/answers";
 import { compileGoals, parseCompiledGoals } from "@/features/student/models/compiledGoals";
 import { experienceLevelToFormValue } from "@/lib/experience-level";
 
@@ -83,12 +87,19 @@ type OnboardingInitialValues = {
 export default function OnboardingForm({
   initial,
   surveyQuestions = [],
+  surveyLoadFailed = false,
 }: {
   initial?: OnboardingInitialValues;
   surveyQuestions?: SurveyQuestionView[];
+  /** #83: Sorular admin tarafından tanımlanmamış (gerçek boş) mu, yoksa fetch mi
+   *  başarısız oldu? İkisi de surveyQuestions=[] ile sonuçlanır; bu flag onları
+   *  ayırt eder — fetch hatasında adım gizlenmez, açık bir hata mesajı gösterir. */
+  surveyLoadFailed?: boolean;
 } = {}) {
   // #46: Admin anket soruları varsa forma ek bir "Ek Sorular" adımı eklenir.
-  const hasSurvey = surveyQuestions.length > 0;
+  // #83: Sorular yüklenemediyse de (gerçek boş değilse) adım gösterilir — kullanıcı
+  // hatayı görsün, adımın "hiç soru yokmuş" gibi sessizce kaybolması yerine.
+  const hasSurvey = surveyQuestions.length > 0 || surveyLoadFailed;
   const allSteps = hasSurvey
     ? [
         ...steps,
@@ -206,9 +217,9 @@ export default function OnboardingForm({
         });
         if (!res.ok) {
           const data = await res.json().catch(() => null);
-          const msg =
-            data && typeof data.error === "string" ? data.error : "Anket cevapları kaydedilemedi.";
-          toast.error(msg);
+          // #83: Hata hem düz string (SurveyValidationError/500) hem zod fieldErrors
+          // objesi (400 validation) olarak gelebilir — ikisi de doğru gösterilsin.
+          toast.error(extractSurveyErrorMessage(data?.error, "Anket cevapları kaydedilemedi."));
           return; // Profil kaydedildi; kullanıcı cevapları tekrar gönderebilir.
         }
       }
@@ -430,6 +441,17 @@ export default function OnboardingForm({
             {/* ADIM 4 (opsiyonel): ADMIN ANKET SORULARI */}
             {hasSurvey && step === allSteps.length - 1 && (
               <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                {/* #83: Sorular yüklenemedi (fetch hatası) — "hiç soru yok" ile
+                    karıştırılmasın diye açık bir uyarı gösterilir. */}
+                {surveyLoadFailed && (
+                  <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                    <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                    <p className="text-sm text-amber-800">
+                      Ek sorular şu anda yüklenemedi. Bu adımı boş bırakarak kayıt işlemine devam edebilirsiniz;
+                      sorunu daha sonra profilinizden yanıtlayabilirsiniz.
+                    </p>
+                  </div>
+                )}
                 {surveyQuestions.map((q) => (
                   <div key={q.id} className="space-y-3">
                     <label className="block text-sm font-semibold text-gray-700">{q.question}</label>
@@ -463,7 +485,9 @@ export default function OnboardingForm({
                     )}
                   </div>
                 ))}
-                <p className="text-xs text-gray-400">Bu sorular opsiyoneldir; boş bırakabilirsiniz.</p>
+                {surveyQuestions.length > 0 && (
+                  <p className="text-xs text-gray-400">Bu sorular opsiyoneldir; boş bırakabilirsiniz.</p>
+                )}
               </div>
             )}
 

@@ -50,6 +50,37 @@ describe("createTemplateSchema — githubRepoUrl (#49)", () => {
     expect(result.success).toBe(false);
   });
 
+  it("#83: repo kökünden daha derin yolları reddeder (tree/issues/pull)", () => {
+    for (const url of [
+      "https://github.com/kullanici/repo/tree/main",
+      "https://github.com/kullanici/repo/issues/1",
+      "https://github.com/kullanici/repo/pull/1",
+      "https://github.com/kullanici/repo/blob/main/README.md",
+    ]) {
+      expect(createTemplateSchema.safeParse({ ...templateBase, githubRepoUrl: url }).success).toBe(
+        false,
+      );
+    }
+  });
+
+  it("#83: yalnızca tam repo kökünü (owner/repo) kabul eder", () => {
+    expect(
+      createTemplateSchema.safeParse({
+        ...templateBase,
+        githubRepoUrl: "https://github.com/kullanici/repo",
+      }).success,
+    ).toBe(true);
+  });
+
+  it("#83: sondaki / repo kökü kabulünü bozmaz", () => {
+    expect(
+      createTemplateSchema.safeParse({
+        ...templateBase,
+        githubRepoUrl: "https://github.com/kullanici/repo/",
+      }).success,
+    ).toBe(true);
+  });
+
   it("http (https değil) reddedilir", () => {
     const result = createTemplateSchema.safeParse({
       ...templateBase,
