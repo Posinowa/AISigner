@@ -20,8 +20,49 @@ type Props = {
   error?: string | null;
 };
 
+export type ProfileAnalysisViewState = "loading" | "error" | "empty" | "data";
+
+/**
+ * #83: Kartın hangi durumu göstereceğine karar veren saf fonksiyon — bileşenden
+ * ayrı test edilebilsin diye çıkarıldı. Öncelik sırası kasıtlı ve sabit:
+ * loading > error > empty > data. Örn. loading sırasında eski bir error/analysis
+ * hâlâ prop'larda olsa bile loading gösterilir (yarış durumu / stale veri karışmasın).
+ */
+export function resolveProfileAnalysisViewState(
+  props: Pick<Props, "analysis" | "loading" | "error">,
+): ProfileAnalysisViewState {
+  if (props.loading) return "loading";
+  if (props.error) return "error";
+  if (!props.analysis) return "empty";
+  return "data";
+}
+
+/**
+ * #83: `GET /api/admin/students/[studentId]/profile-analysis` yanıtını yorumlayan
+ * saf fonksiyon (fetch/IO'dan ayrık, test edilebilir). API sözleşmesi:
+ * - ok + `{analysis: null}`  → analiz henüz üretilmemiş (empty state, HATA DEĞİL).
+ * - ok + `{analysis: {...}}` → analiz bulundu.
+ * - !ok                      → gerçek hata (404 profil yok, 500 vb.) — mesaj gösterilir.
+ * Bu ayrım olmadan "analiz yok" ile "istek başarısız oldu" birbirine karışabilir.
+ */
+export function parseProfileAnalysisApiResponse(
+  ok: boolean,
+  body: { analysis?: ProfileAnalysisData | null; error?: unknown } | null,
+): { analysis: ProfileAnalysisData | null; error: string | null } {
+  if (ok) {
+    return { analysis: body?.analysis ?? null, error: null };
+  }
+  const message =
+    body && typeof body.error === "string" && body.error.trim().length > 0
+      ? body.error
+      : "Analiz yüklenemedi.";
+  return { analysis: null, error: message };
+}
+
 export function ProfileAnalysisCard({ analysis, loading, error }: Props) {
-  if (loading) {
+  const viewState = resolveProfileAnalysisViewState({ analysis, loading, error });
+
+  if (viewState === "loading") {
     return (
       <div className="bg-white rounded-xl border border-slate-200 p-8 flex items-center justify-center gap-3 text-slate-500">
         <Loader2 className="w-5 h-5 animate-spin" />
@@ -30,7 +71,7 @@ export function ProfileAnalysisCard({ analysis, loading, error }: Props) {
     );
   }
 
-  if (error) {
+  if (viewState === "error") {
     return (
       <div className="bg-white rounded-xl border border-red-200 p-8 flex flex-col items-center justify-center gap-2 text-center">
         <AlertCircle className="w-6 h-6 text-red-500" />
@@ -39,7 +80,7 @@ export function ProfileAnalysisCard({ analysis, loading, error }: Props) {
     );
   }
 
-  if (!analysis) {
+  if (viewState === "empty" || !analysis) {
     return (
       <div className="bg-white rounded-xl border border-slate-200 p-8 flex flex-col items-center justify-center gap-2 text-center">
         <Sparkles className="w-6 h-6 text-slate-300" />
