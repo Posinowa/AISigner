@@ -428,7 +428,7 @@ export default function StudentDetailPage() {
                       <div key={project.id} className="border rounded-lg p-5 relative group bg-white hover:shadow-md transition-all">
                         <button 
                          onClick={() => handleDeleteAssignment(project.id)}
-                         className="absolute top-3 right-3 p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors opacity-0 group-hover:opacity-100 z-10"
+                         className="absolute top-3 right-3 p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 z-10"
                          title="Atamayı Kaldır"
                           >
                            <Trash2 className="w-4 h-4" />
