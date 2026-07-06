@@ -188,7 +188,7 @@ export function StepComments({ stepId, currentUserId, currentUserRole, isDraft }
                         <span className="text-xs font-semibold text-gray-800">
                           {getFullName(comment.author)}
                         </span>
-                        <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${roleInfo.color}`}>
+                        <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded ${roleInfo.color}`}>
                           {roleInfo.label}
                         </span>
                         <span className="text-[10px] text-gray-400">
