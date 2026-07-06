@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod"; // 🚀 Zod'u içeri aktarıyoruz
@@ -109,6 +109,17 @@ export default function OnboardingForm({
 
   const [step, setStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Adım geçişinde form kartını üste kaydır — kullanıcı yeni adımın ortasından
+  // değil başından (başlık + ilk alan) görsün (#10).
+  const topRef = useRef<HTMLDivElement>(null);
+  const didMountRef = useRef(false);
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
+    topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [step]);
   // Anket cevapları (questionId → cevap). RHF dışında tutulur çünkü sorular dinamiktir.
   const [answers, setAnswers] = useState<Record<string, string>>({});
   // Her adım için "kullanıcı bu adımda Sonraki Adım'a bastı mı?" flag'i.
@@ -240,7 +251,7 @@ export default function OnboardingForm({
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 py-12 px-4">
-      <div className="max-w-3xl mx-auto">
+      <div ref={topRef} className="max-w-3xl mx-auto scroll-mt-6">
         
         {/* Header */}
         <div className="text-center mb-8">

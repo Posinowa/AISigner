@@ -3,7 +3,7 @@
 
 import { Suspense, useState } from "react"
 import { validateUser } from "./actions"
-import { signIn, getSession } from "next-auth/react"
+import { signIn } from "next-auth/react"
 import { Eye, EyeOff, LogIn, Loader2, CheckCircle2 } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
@@ -45,28 +45,10 @@ function SigninForm() {
       if (result?.error) {
         setState({ error: { general: ["E-posta veya şifre hatalı! Lütfen tekrar deneyin."] } })
       } else if (result?.ok) {
-        // Session cookie'sinin oturduğundan emin olmak için kısa bir bekleme + retry
-        let userRole: string | undefined
-        let accountStatus: string | undefined
-        for (let i = 0; i < 5; i++) {
-          const session = await getSession()
-          userRole = session?.user?.role
-          accountStatus = session?.user?.accountStatus
-          if (userRole) break
-          await new Promise((r) => setTimeout(r, 100))
-        }
-
-        const target =
-          accountStatus && accountStatus !== "APPROVED"
-            ? "/account-status"
-            : userRole === "ADMIN"
-            ? "/admin-dashboard"
-            : userRole === "MENTOR"
-            ? "/mentor-dashboard"
-            : "/student-dashboard"
-
-        // Hard navigation: cookie'lerin server'a temiz şekilde gitmesini garanti et
-        window.location.href = target
+        // Yönlendirme kararı tek yerde — "/" route'unda (sunucu) — toplanıyor.
+        // Hard navigation cookie'nin server'a temiz gitmesini garanti eder; böylece
+        // client tarafında getSession retry hack'ine (yavaş ağda kırılgan) gerek kalmaz.
+        window.location.href = "/"
         return
       }
     } catch (err: unknown) {
