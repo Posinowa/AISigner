@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { saveOnboarding } from "@/features/student/server/onboarding";
-import { CheckCircle, User, Target, Award, ArrowRight, ArrowLeft, Rocket, Terminal, BookOpen, Clock, ClipboardList, AlertCircle } from "lucide-react";
+import { CheckCircle, User, Target, Award, ArrowRight, ArrowLeft, Rocket, Terminal, BookOpen, Clock, ClipboardList, AlertCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   buildSurveyAnswerPayload,
@@ -517,7 +517,7 @@ export default function OnboardingForm({
                   className="h-12 px-10 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold transition-all shadow-lg shadow-blue-200 disabled:opacity-70"
                 >
                   {isSubmitting ? (
-                    <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-3" /> Kaydediliyor...</>
+                    <><Loader2 className="w-5 h-5 animate-spin mr-3" /> Kaydediliyor...</>
                   ) : (
                     <><CheckCircle className="w-5 h-5 mr-2" /> Kaydı Tamamla</>
                   )}

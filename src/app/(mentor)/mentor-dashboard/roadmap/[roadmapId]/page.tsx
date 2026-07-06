@@ -21,6 +21,7 @@ import {
   ChevronDown,
   ChevronUp,
   Github,
+  Loader2,
 } from "lucide-react";
 import { StepComments } from "@/features/messaging/ui/StepComments";
 import { StepFiles } from "@/features/files/ui/StepFiles";
@@ -333,7 +334,7 @@ export default function RoadmapReviewPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
         <span className="ml-3 text-gray-600">Yol haritası yükleniyor...</span>
       </div>
     );
@@ -422,7 +423,7 @@ export default function RoadmapReviewPage() {
             }`}
           >
             {publishing ? (
-              <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full" />
+              <Loader2 className="w-4 h-4 animate-spin" />
             ) : isDraft ? (
               <Send className="w-4 h-4" />
             ) : (

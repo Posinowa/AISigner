@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { ArrowLeft, User, Calendar, Target, Clock, BookOpen, Plus, CheckCircle, AlertCircle, Trash2, Sparkles, Map, Github } from "lucide-react"; // Map ikonu eklendi
+import { ArrowLeft, User, Calendar, Target, Clock, BookOpen, Plus, CheckCircle, AlertCircle, Trash2, Sparkles, Map, Github, Loader2 } from "lucide-react"; // Map ikonu eklendi
 import Link from "next/link";
 import { toast } from "sonner";
 import { experienceLevelLabel } from "@/lib/experience-level";
@@ -287,7 +287,7 @@ export default function StudentDetailPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
         <span className="ml-3 text-gray-600">Öğrenci detayları yükleniyor...</span>
       </div>
     );
@@ -505,7 +505,7 @@ export default function StudentDetailPage() {
                               >
                                 {generatingRoadmapId === project.id ? (
                                   <>
-                                    <div className="animate-spin w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full mr-2" /> 
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" />
                                     Harita Çiziliyor...
                                   </>
                                 ) : (
@@ -557,7 +557,7 @@ export default function StudentDetailPage() {
                   }`}
                 >
                   {isAIThinking || templatesLoading ? (
-                    <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full" />
+                    <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
                     <Sparkles className="w-4 h-4" />
                   )}
