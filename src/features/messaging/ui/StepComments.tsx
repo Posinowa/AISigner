@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { MessageSquare, Send, Loader2, Trash2, Pencil, X, User } from "lucide-react";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { toast } from "sonner";
 
 type Comment = {
@@ -26,6 +27,7 @@ type Props = {
 };
 
 export function StepComments({ stepId, currentUserId, currentUserRole, isDraft }: Props) {
+  const confirm = useConfirm();
   // #52: Taslak roadmap'te öğrenci yorum ekleyemez (mentor inceleme için ekleyebilir).
   const interactionLocked = isDraft && currentUserRole === "STUDENT";
   const [comments, setComments] = useState<Comment[]>([]);
@@ -118,7 +120,13 @@ export function StepComments({ stepId, currentUserId, currentUserRole, isDraft }
   }
 
   async function handleDelete(commentId: string) {
-    if (!confirm("Bu yorumu silmek istediğinizden emin misiniz?")) return;
+    const ok = await confirm({
+      title: "Yorumu sil",
+      description: "Bu yorumu silmek istediğinizden emin misiniz?",
+      confirmLabel: "Sil",
+      danger: true,
+    });
+    if (!ok) return;
 
     try {
       const res = await fetch(`/api/steps/${stepId}/comments/${commentId}`, {

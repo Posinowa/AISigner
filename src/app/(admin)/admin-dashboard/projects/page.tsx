@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Plus, Pencil, Trash2, X, ArrowLeft, FolderKanban, Github, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 type ProjectTemplate = {
   id: string;
@@ -29,6 +30,7 @@ const difficultyColors = {
 };
 
 export default function ProjectsPage() {
+  const confirm = useConfirm();
   const [templates, setTemplates] = useState<ProjectTemplate[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -140,7 +142,13 @@ export default function ProjectsPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Bu proje şablonunu silmek istediğinizden emin misiniz?")) return;
+    const ok = await confirm({
+      title: "Proje şablonunu sil",
+      description: "Bu proje şablonunu silmek istediğinizden emin misiniz?",
+      confirmLabel: "Sil",
+      danger: true,
+    });
+    if (!ok) return;
 
     try {
       const res = await fetch(`/api/admin/project-templates/${id}`, { 
