@@ -11,6 +11,18 @@ export type CreateTemplateData = {
 
 export type UpdateTemplateData = Partial<CreateTemplateData>;
 
+// #112: Prisma unique ihlalini (P2002) route'un 409'a çevirebileceği
+// ayırt edilebilir bir hataya dönüştürür (unassignProject'teki code kalıbı).
+function throwIfDuplicateTitle(error: unknown): void {
+  if ((error as { code?: string })?.code === "P2002") {
+    const err = new Error("Bu başlıkta bir proje şablonu zaten var.") as Error & {
+      code?: string;
+    };
+    err.code = "DUPLICATE_TITLE";
+    throw err;
+  }
+}
+
 export async function listTemplates() {
   try {
     return await prisma.projectTemplate.findMany({
@@ -37,6 +49,7 @@ export async function createTemplate(data: CreateTemplateData) {
     });
   } catch (error) {
     console.error("Error creating template:", error);
+    throwIfDuplicateTitle(error);
     throw new Error("Failed to create template");
   }
 }
@@ -49,6 +62,7 @@ export async function updateTemplate(id: string, data: UpdateTemplateData) {
     });
   } catch (error) {
     console.error("Error updating template:", error);
+    throwIfDuplicateTitle(error);
     throw new Error("Failed to update template");
   }
 }

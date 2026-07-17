@@ -61,7 +61,8 @@ model StudentProfile {
 
 model ProjectTemplate {
   id            String   @id @default(cuid())
-  title         String
+  // #112: Seed idempotency title lookup'ına dayanır; DB seviyesinde de benzersiz olmalı.
+  title         String   @unique
   description   String
   track         String[]
   difficulty    Difficulty

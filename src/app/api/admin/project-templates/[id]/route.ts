@@ -18,6 +18,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const updated = await updateTemplate(id, parsed.data);
     return NextResponse.json(updated);
   } catch (error) {
+    // #112: Title güncellemesi mevcut bir şablonla çakışırsa → 409
+    if ((error as { code?: string })?.code === "DUPLICATE_TITLE") {
+      return NextResponse.json(
+        { error: "Bu başlıkta bir proje şablonu zaten var." },
+        { status: 409 }
+      );
+    }
     console.error("PATCH /api/admin/project-templates/[id] error:", error);
     return NextResponse.json({ error: "Failed to update template" }, { status: 500 });
   }
