@@ -3,6 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { extractApiErrorMessage } from "@/lib/api-error-message";
 import {
   Users,
   GraduationCap,
@@ -141,18 +142,10 @@ export default function AdminDashboard() {
         setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role } : u)));
         toast.success("Rol güncellendi.");
       } else {
-        // #59: Hata hem düz string (ör. "kendi rolünü değiştiremezsin" guard'ı, 403)
-        // hem zod fieldErrors objesi olarak gelebilir — ikisi de gösterilsin.
+        // #59/#114: Hata hem düz string (guard, 403) hem zod fieldErrors objesi
+        // olarak gelebilir — ortak, test edilen helper ikisini de ele alır.
         const data = await response.json().catch(() => null);
-        const fieldErrors = data?.error;
-        let message = "Rol güncellenemedi.";
-        if (typeof fieldErrors === "string" && fieldErrors.trim().length > 0) {
-          message = fieldErrors;
-        } else if (fieldErrors && typeof fieldErrors === "object") {
-          const firstMessage = Object.values(fieldErrors).flat()[0];
-          if (firstMessage) message = String(firstMessage);
-        }
-        toast.error(message);
+        toast.error(extractApiErrorMessage(data, "Rol güncellenemedi."));
       }
     } catch (error) {
       console.error("Error updating role:", error);
@@ -189,11 +182,9 @@ export default function AdminDashboard() {
         );
         toast.success(mentorId === "" ? "Mentor ataması kaldırıldı." : "Mentor atandı.");
       } else {
-        // #43: Geçersiz rol gibi 4xx hatalarında anlamlı mesajı göster.
+        // #43/#114: Geçersiz rol gibi 4xx hatalarında anlamlı mesajı göster.
         const data = await response.json().catch(() => null);
-        const msg =
-          data && typeof data.error === "string" ? data.error : "Mentor atanamadı.";
-        toast.error(msg);
+        toast.error(extractApiErrorMessage(data, "Mentor atanamadı."));
       }
     } catch (error) {
       console.error("Error assigning mentor:", error);
@@ -224,9 +215,7 @@ export default function AdminDashboard() {
         );
       } else {
         const data = await response.json().catch(() => null);
-        const msg =
-          data && typeof data.error === "string" ? data.error : "Durum güncellenemedi.";
-        toast.error(msg);
+        toast.error(extractApiErrorMessage(data, "Durum güncellenemedi."));
       }
     } catch {
       toast.error("Bağlantı hatası. Lütfen tekrar deneyin.");
