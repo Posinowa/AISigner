@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { DebugNavbar } from "@/components/DebugNavbar"
 import { SessionProvider } from "@/components/SessionProvider"
+import { ConfirmDialogProvider } from "@/components/ui/ConfirmDialog"
 import { Toaster } from "sonner"
 
 const geistSans = Geist({
@@ -32,12 +33,15 @@ export default function RootLayout({
       >
         {/* 🔐 NextAuth oturum sağlayıcısı */}
         <SessionProvider>
+          {/* #92: Uygulama geneli onay dialogu (native confirm yerine) */}
+          <ConfirmDialogProvider>
 
        {/* 🧭 Debug bar - sadece development ortamında görünür */}
         {process.env.NODE_ENV === "development" && <DebugNavbar />}
 
         {children}
         <Toaster richColors position="top-right" />
+          </ConfirmDialogProvider>
         </SessionProvider>
       </body>
     </html>

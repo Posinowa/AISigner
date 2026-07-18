@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { StepComments } from "@/features/messaging/ui/StepComments";
 import { StepFiles } from "@/features/files/ui/StepFiles";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 /* ─── Tipler ─── */
 type RoadmapStep = {
@@ -92,6 +93,7 @@ async function extractErrorMessage(res: Response, fallback: string): Promise<str
 
 /* ─── Sayfa ─── */
 export default function RoadmapReviewPage() {
+  const confirm = useConfirm();
   const params = useParams();
   const router = useRouter();
   const { data: sessionData } = useSession();
@@ -241,7 +243,13 @@ export default function RoadmapReviewPage() {
 
   /* ─── Adım Silme ─── */
   async function handleDeleteStep(stepId: string) {
-    if (!confirm("Bu adımı silmek istediğinize emin misiniz?")) return;
+    const ok = await confirm({
+      title: "Adımı sil",
+      description: "Bu adımı silmek istediğinize emin misiniz?",
+      confirmLabel: "Sil",
+      danger: true,
+    });
+    if (!ok) return;
     try {
       const res = await fetch(
         `/api/mentor/roadmap/${roadmapId}/steps/${stepId}`,

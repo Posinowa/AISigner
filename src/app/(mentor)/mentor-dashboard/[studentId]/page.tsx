@@ -7,6 +7,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { experienceLevelLabel } from "@/lib/experience-level";
 import { ProfileAnalysisCard, type ProfileAnalysisData } from "@/features/ai/ui/ProfileAnalysisCard";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 type ProjectTemplate = {
   id: string;
@@ -75,6 +76,7 @@ const difficultyConfig = {
 };
 
 export default function StudentDetailPage() {
+  const confirm = useConfirm();
   const params = useParams();
   const searchParams = useSearchParams();
   const studentId = params.studentId as string;
@@ -196,12 +198,13 @@ export default function StudentDetailPage() {
   }
 
   async function handleDeleteAssignment(assignedProjectId: string) {
-    if (
-      !confirm(
-        "Bu proje atamasını kaldırmak istediğinizden emin misiniz? (Bağlı yol haritası da silinir)",
-      )
-    )
-      return;
+    const ok = await confirm({
+      title: "Proje atamasını kaldır",
+      description: "Bu proje atamasını kaldırmak istediğinizden emin misiniz? Bağlı yol haritası da silinir.",
+      confirmLabel: "Kaldır",
+      danger: true,
+    });
+    if (!ok) return;
 
     async function doDelete(force: boolean) {
       const res = await fetch("/api/mentor/unassign-project", {
@@ -218,12 +221,13 @@ export default function StudentDetailPage() {
       // Backend öğrenci ilerlemesi varsa 409 döner — ek onay iste
       if (res.status === 409) {
         const data = await res.json().catch(() => ({}));
-        const msg =
-          data?.error ||
-          "Bu projede öğrenci ilerlemesi var.";
-        const confirmed = confirm(
-          `${msg}\n\nYine de silmek istediğinden EMİN misin? Tüm ilerleme ve yol haritası kaybolacak.`,
-        );
+        const msg = data?.error || "Bu projede öğrenci ilerlemesi var.";
+        const confirmed = await confirm({
+          title: "Öğrenci ilerlemesi var",
+          description: `${msg}\n\nYine de silmek istediğinden emin misin? Tüm ilerleme ve yol haritası kaybolacak.`,
+          confirmLabel: "Yine de sil",
+          danger: true,
+        });
         if (!confirmed) return;
         res = await doDelete(true);
       }
