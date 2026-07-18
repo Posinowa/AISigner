@@ -6,6 +6,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { useModalA11y } from "@/components/ui/useModalA11y";
+import { extractApiErrorMessage } from "@/lib/api-error-message";
 import { markdownPreview } from "@/lib/markdown-preview";
 
 type ProjectTemplate = {
@@ -122,16 +123,9 @@ export default function ProjectsPage() {
       }
 
       if (!res.ok) {
+        // #114: string / fieldErrors ayrımı ortak helper'da (test edilen tek kaynak).
         const data = await res.json().catch(() => null);
-        const fieldErrors = data?.error;
-        let message = "Şablon kaydedilemedi.";
-        if (fieldErrors && typeof fieldErrors === "object") {
-          const firstMessage = Object.values(fieldErrors).flat()[0];
-          if (firstMessage) message = String(firstMessage);
-        } else if (typeof fieldErrors === "string") {
-          message = fieldErrors;
-        }
-        toast.error(message);
+        toast.error(extractApiErrorMessage(data, "Şablon kaydedilemedi."));
         return;
       }
 
