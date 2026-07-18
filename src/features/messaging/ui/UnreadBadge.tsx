@@ -16,6 +16,8 @@ export function UnreadBadge({ className = "" }: Props) {
 
   useEffect(() => {
     async function fetchCount() {
+      // Sekme arka plandayken istek atma (görünürlük-farkında polling).
+      if (document.visibilityState === "hidden") return;
       try {
         const res = await fetch("/api/messages/unread-count");
         if (res.ok) {
@@ -29,14 +31,24 @@ export function UnreadBadge({ className = "" }: Props) {
 
     fetchCount();
     const interval = setInterval(fetchCount, 15000); // 15 saniyede bir kontrol
-    return () => clearInterval(interval);
+
+    // Sekme tekrar öne geldiğinde beklemeden tazele.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") fetchCount();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, []);
 
   return (
     <span className={`relative inline-flex ${className}`}>
       <MessageCircle className="w-5 h-5" />
       {count > 0 && (
-        <span className="absolute -top-1.5 -right-1.5 w-4 h-4 flex items-center justify-center text-[9px] font-bold text-white bg-red-500 rounded-full">
+        <span className="absolute -top-1.5 -right-1.5 w-4 h-4 flex items-center justify-center text-[10px] font-bold text-white bg-red-500 rounded-full">
           {count > 9 ? "9+" : count}
         </span>
       )}

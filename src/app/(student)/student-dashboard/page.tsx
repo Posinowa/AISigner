@@ -11,6 +11,7 @@ import { redirect } from "next/navigation";
 import { Progress } from "@/components/ui/progress";
 import { UnreadBadge } from "@/features/messaging/ui/UnreadBadge";
 import { SecurityQuestionsSetup } from "@/features/auth/ui/SecurityQuestionsSetup";
+import { MarkdownContent } from "@/components/ui/MarkdownContent";
 
 export const dynamic = "force-dynamic";
 
@@ -187,9 +188,10 @@ export default async function StudentDashboardPage() {
                         <h3 className="font-bold text-2xl text-slate-900 tracking-tight">
                           {project.projectTemplate.title}
                         </h3>
-                        <p className="text-slate-600 mt-2 text-sm max-w-3xl leading-relaxed">
+                        {/* #91: Açıklama markdown olarak render edilir. */}
+                        <MarkdownContent className="mt-2 max-w-3xl">
                           {project.projectTemplate.description}
-                        </p>
+                        </MarkdownContent>
                         {project.projectTemplate.githubRepoUrl && (
                           <a
                             href={project.projectTemplate.githubRepoUrl}

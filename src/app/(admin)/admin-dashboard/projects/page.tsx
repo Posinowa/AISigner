@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Plus, Pencil, Trash2, X, ArrowLeft, FolderKanban, Github, AlertCircle } from "lucide-react";
+import { Plus, Pencil, Trash2, X, ArrowLeft, FolderKanban, Github, AlertCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { useModalA11y } from "@/components/ui/useModalA11y";
 import { extractApiErrorMessage } from "@/lib/api-error-message";
+import { markdownPreview } from "@/lib/markdown-preview";
 
 type ProjectTemplate = {
   id: string;
@@ -30,6 +33,7 @@ const difficultyColors = {
 };
 
 export default function ProjectsPage() {
+  const confirm = useConfirm();
   const [templates, setTemplates] = useState<ProjectTemplate[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -75,6 +79,9 @@ export default function ProjectsPage() {
     setIsFormOpen(false);
     setEditingId(null);
   }
+
+  // Modal a11y: Escape ile kapat + açılışta panele odak.
+  const formModalRef = useModalA11y(isFormOpen, resetForm);
 
   function startEdit(template: ProjectTemplate) {
     setForm({
@@ -134,7 +141,13 @@ export default function ProjectsPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Bu proje şablonunu silmek istediğinizden emin misiniz?")) return;
+    const ok = await confirm({
+      title: "Proje şablonunu sil",
+      description: "Bu proje şablonunu silmek istediğinizden emin misiniz?",
+      confirmLabel: "Sil",
+      danger: true,
+    });
+    if (!ok) return;
 
     try {
       const res = await fetch(`/api/admin/project-templates/${id}`, { 
@@ -157,7 +170,7 @@ export default function ProjectsPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/30">
-      <div className="max-w-6xl mx-auto p-6">
+      <div className="max-w-6xl mx-auto p-4 sm:p-6">
       {/* Geri linki */}
       <Link
         href="/admin-dashboard"
@@ -190,13 +203,21 @@ export default function ProjectsPage() {
       {/* Form Modal */}
       {isFormOpen && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+          <div
+            ref={formModalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={editingId ? "Şablonu Düzenle" : "Yeni Şablon Ekle"}
+            tabIndex={-1}
+            className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto outline-none"
+          >
             <div className="flex justify-between items-center p-6 border-b">
               <h2 className="text-xl font-semibold">
                 {editingId ? "Şablonu Düzenle" : "Yeni Şablon Ekle"}
               </h2>
               <button
                 onClick={resetForm}
+                aria-label="Kapat"
                 className="text-slate-400 hover:text-slate-600"
               >
                 <X className="w-6 h-6" />
@@ -305,7 +326,7 @@ export default function ProjectsPage() {
       {/* Loading State */}
       {pageLoading ? (
         <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
           <span className="ml-3 text-slate-600">Şablonlar yükleniyor...</span>
         </div>
       ) : loadError ? (
@@ -354,8 +375,9 @@ export default function ProjectsPage() {
                       </span>
                     </div>
 
+                    {/* #91: Markdown soyulmuş, kelime sınırında ve koşullu ellipsis'li önizleme. */}
                     <p className="text-slate-600 text-sm mb-4 line-clamp-3">
-                      {template.description.slice(0, 120)}...
+                      {markdownPreview(template.description, 120)}
                     </p>
 
                     <div className="flex flex-wrap gap-1 mb-4">
@@ -391,6 +413,7 @@ export default function ProjectsPage() {
                         <button
                           onClick={() => startEdit(template)}
                           className="p-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          aria-label={`${template.title} şablonunu düzenle`}
                           title="Düzenle"
                         >
                           <Pencil className="w-4 h-4" />
@@ -398,6 +421,7 @@ export default function ProjectsPage() {
                         <button
                           onClick={() => handleDelete(template.id)}
                           className="p-2 text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          aria-label={`${template.title} şablonunu sil`}
                           title="Sil"
                         >
                           <Trash2 className="w-4 h-4" />

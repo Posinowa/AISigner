@@ -23,6 +23,7 @@ import {
 import { toast } from "sonner";
 import LogoutButton from "@/components/LogoutButton";
 import { UnreadBadge } from "@/features/messaging/ui/UnreadBadge";
+import { useModalA11y } from "@/components/ui/useModalA11y";
 import {
   ProfileAnalysisCard,
   parseProfileAnalysisApiResponse,
@@ -101,6 +102,9 @@ export default function AdminDashboard() {
   function closeAnalysisModal() {
     setAnalysisModalUser(null);
   }
+
+  // Modal a11y: Escape ile kapat + açılışta panele odak.
+  const analysisModalRef = useModalA11y(!!analysisModalUser, closeAnalysisModal);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -295,7 +299,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/30">
-      <div className="max-w-7xl mx-auto p-6">
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
         {/* Header */}
         <div className="flex items-start justify-between mb-8 pt-2 gap-4 flex-wrap">
           <div>
@@ -549,7 +553,14 @@ export default function AdminDashboard() {
       {/* #48: Admin — Detaylı AI Profil Analizi Modal'ı (lazy fetch) */}
       {analysisModalUser && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[85vh] overflow-y-auto">
+          <div
+            ref={analysisModalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="AI Profil Analizi"
+            tabIndex={-1}
+            className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[85vh] overflow-y-auto outline-none"
+          >
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 sticky top-0 bg-white rounded-t-2xl">
               <div>
                 <h2 className="text-lg font-semibold text-slate-900">AI Profil Analizi</h2>
@@ -559,6 +570,7 @@ export default function AdminDashboard() {
               </div>
               <button
                 onClick={closeAnalysisModal}
+                aria-label="Kapat"
                 className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors"
               >
                 <X className="w-5 h-5" />

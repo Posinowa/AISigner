@@ -21,9 +21,11 @@ import {
   ChevronDown,
   ChevronUp,
   Github,
+  Loader2,
 } from "lucide-react";
 import { StepComments } from "@/features/messaging/ui/StepComments";
 import { StepFiles } from "@/features/files/ui/StepFiles";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 /* ─── Tipler ─── */
 type RoadmapStep = {
@@ -92,6 +94,7 @@ async function extractErrorMessage(res: Response, fallback: string): Promise<str
 
 /* ─── Sayfa ─── */
 export default function RoadmapReviewPage() {
+  const confirm = useConfirm();
   const params = useParams();
   const router = useRouter();
   const { data: sessionData } = useSession();
@@ -241,7 +244,13 @@ export default function RoadmapReviewPage() {
 
   /* ─── Adım Silme ─── */
   async function handleDeleteStep(stepId: string) {
-    if (!confirm("Bu adımı silmek istediğinize emin misiniz?")) return;
+    const ok = await confirm({
+      title: "Adımı sil",
+      description: "Bu adımı silmek istediğinize emin misiniz?",
+      confirmLabel: "Sil",
+      danger: true,
+    });
+    if (!ok) return;
     try {
       const res = await fetch(
         `/api/mentor/roadmap/${roadmapId}/steps/${stepId}`,
@@ -333,7 +342,7 @@ export default function RoadmapReviewPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
         <span className="ml-3 text-gray-600">Yol haritası yükleniyor...</span>
       </div>
     );
@@ -357,24 +366,24 @@ export default function RoadmapReviewPage() {
 
   /* ─── Render ─── */
   return (
-    <div className="max-w-5xl mx-auto p-6">
+    <div className="max-w-5xl mx-auto p-4 sm:p-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div className="flex items-center gap-3 min-w-0">
           <button
             onClick={() => router.back()}
             className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <div>
+          <div className="min-w-0">
             {editingTitle ? (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 min-w-0">
                 <input
                   type="text"
                   value={titleValue}
                   onChange={(e) => setTitleValue(e.target.value)}
-                  className="text-xl font-bold text-gray-900 border-b-2 border-purple-500 outline-none bg-transparent py-1"
+                  className="min-w-0 flex-1 text-xl font-bold text-gray-900 border-b-2 border-purple-500 outline-none bg-transparent py-1"
                   autoFocus
                 />
                 <button onClick={handleSaveTitle} disabled={saving} className="text-purple-600 hover:text-purple-800">
@@ -422,7 +431,7 @@ export default function RoadmapReviewPage() {
             }`}
           >
             {publishing ? (
-              <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full" />
+              <Loader2 className="w-4 h-4 animate-spin" />
             ) : isDraft ? (
               <Send className="w-4 h-4" />
             ) : (
