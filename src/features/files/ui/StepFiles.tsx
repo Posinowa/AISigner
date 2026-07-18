@@ -14,6 +14,7 @@ import {
   X,
   Eye,
 } from "lucide-react";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 type StepFile = {
   id: string;
@@ -38,6 +39,7 @@ type Props = {
 };
 
 export function StepFiles({ stepId, currentUserId, currentUserRole, isDraft }: Props) {
+  const confirm = useConfirm();
   // #52: Taslak roadmap'te öğrenci dosya yükleyemez (mentor inceleme için yükleyebilir).
   const interactionLocked = isDraft && currentUserRole === "STUDENT";
   const [files, setFiles] = useState<StepFile[]>([]);
@@ -125,7 +127,13 @@ export function StepFiles({ stepId, currentUserId, currentUserRole, isDraft }: P
   }
 
   async function handleDelete(fileId: string) {
-    if (!confirm("Bu dosyayı silmek istediğinizden emin misiniz?")) return;
+    const ok = await confirm({
+      title: "Dosyayı sil",
+      description: "Bu dosyayı silmek istediğinizden emin misiniz?",
+      confirmLabel: "Sil",
+      danger: true,
+    });
+    if (!ok) return;
 
     try {
       const res = await fetch(`/api/steps/${stepId}/files/${fileId}`, {
@@ -232,7 +240,7 @@ export function StepFiles({ stepId, currentUserId, currentUserRole, isDraft }: P
           {error && (
             <div className="flex items-center justify-between text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">
               <span>{error}</span>
-              <button onClick={() => setError(null)} className="ml-2 hover:text-red-800">
+              <button onClick={() => setError(null)} aria-label="Hatayı kapat" className="ml-2 hover:text-red-800">
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -274,7 +282,7 @@ export function StepFiles({ stepId, currentUserId, currentUserRole, isDraft }: P
                   </div>
 
                   {/* Aksiyonlar */}
-                  <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-1 shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                     {/* Önizle/İndir */}
                     {file.mimeType.startsWith("image/") || file.mimeType === "application/pdf" ? (
                       <a
@@ -282,6 +290,7 @@ export function StepFiles({ stepId, currentUserId, currentUserRole, isDraft }: P
                         target="_blank"
                         rel="noreferrer"
                         className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                        aria-label={`${file.fileName} dosyasını önizle`}
                         title="Önizle"
                       >
                         <Eye className="w-3.5 h-3.5" />
@@ -291,6 +300,7 @@ export function StepFiles({ stepId, currentUserId, currentUserRole, isDraft }: P
                         href={`/api/steps/${stepId}/files/${file.id}`}
                         download
                         className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                        aria-label={`${file.fileName} dosyasını indir`}
                         title="İndir"
                       >
                         <Download className="w-3.5 h-3.5" />
@@ -302,6 +312,7 @@ export function StepFiles({ stepId, currentUserId, currentUserRole, isDraft }: P
                       <button
                         onClick={() => handleDelete(file.id)}
                         className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                        aria-label={`${file.fileName} dosyasını sil`}
                         title="Sil"
                       >
                         <Trash2 className="w-3.5 h-3.5" />

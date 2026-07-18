@@ -2,11 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { ArrowLeft, User, Calendar, Target, Clock, BookOpen, Plus, CheckCircle, AlertCircle, Trash2, Sparkles, Map, Github } from "lucide-react"; // Map ikonu eklendi
+import { ArrowLeft, User, Calendar, Target, Clock, BookOpen, Plus, CheckCircle, AlertCircle, Trash2, Sparkles, Map, Github, Loader2 } from "lucide-react"; // Map ikonu eklendi
 import Link from "next/link";
 import { toast } from "sonner";
 import { experienceLevelLabel } from "@/lib/experience-level";
 import { ProfileAnalysisCard, type ProfileAnalysisData } from "@/features/ai/ui/ProfileAnalysisCard";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { useModalA11y } from "@/components/ui/useModalA11y";
+import { stripMarkdown } from "@/lib/markdown-preview";
 
 type ProjectTemplate = {
   id: string;
@@ -75,6 +78,7 @@ const difficultyConfig = {
 };
 
 export default function StudentDetailPage() {
+  const confirm = useConfirm();
   const params = useParams();
   const searchParams = useSearchParams();
   const studentId = params.studentId as string;
@@ -85,6 +89,8 @@ export default function StudentDetailPage() {
   const [loading, setLoading] = useState(true);
   const [assigningId, setAssigningId] = useState<string | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
+  // Modal a11y: Escape ile kapat + açılışta panele odak.
+  const assignModalRef = useModalA11y(showAssignModal, () => setShowAssignModal(false));
 
   const [isAIThinking, setIsAIThinking] = useState(false);
   const [aiRecommendations, setAiRecommendations] = useState<AIRecommendation[]>([]);
@@ -196,12 +202,13 @@ export default function StudentDetailPage() {
   }
 
   async function handleDeleteAssignment(assignedProjectId: string) {
-    if (
-      !confirm(
-        "Bu proje atamasını kaldırmak istediğinizden emin misiniz? (Bağlı yol haritası da silinir)",
-      )
-    )
-      return;
+    const ok = await confirm({
+      title: "Proje atamasını kaldır",
+      description: "Bu proje atamasını kaldırmak istediğinizden emin misiniz? Bağlı yol haritası da silinir.",
+      confirmLabel: "Kaldır",
+      danger: true,
+    });
+    if (!ok) return;
 
     async function doDelete(force: boolean) {
       const res = await fetch("/api/mentor/unassign-project", {
@@ -218,12 +225,13 @@ export default function StudentDetailPage() {
       // Backend öğrenci ilerlemesi varsa 409 döner — ek onay iste
       if (res.status === 409) {
         const data = await res.json().catch(() => ({}));
-        const msg =
-          data?.error ||
-          "Bu projede öğrenci ilerlemesi var.";
-        const confirmed = confirm(
-          `${msg}\n\nYine de silmek istediğinden EMİN misin? Tüm ilerleme ve yol haritası kaybolacak.`,
-        );
+        const msg = data?.error || "Bu projede öğrenci ilerlemesi var.";
+        const confirmed = await confirm({
+          title: "Öğrenci ilerlemesi var",
+          description: `${msg}\n\nYine de silmek istediğinden emin misin? Tüm ilerleme ve yol haritası kaybolacak.`,
+          confirmLabel: "Yine de sil",
+          danger: true,
+        });
         if (!confirmed) return;
         res = await doDelete(true);
       }
@@ -287,7 +295,7 @@ export default function StudentDetailPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
         <span className="ml-3 text-gray-600">Öğrenci detayları yükleniyor...</span>
       </div>
     );
@@ -295,7 +303,7 @@ export default function StudentDetailPage() {
 
   if (!student) {
     return (
-      <div className="max-w-6xl mx-auto p-6">
+      <div className="max-w-6xl mx-auto p-4 sm:p-6">
         <div className="text-center py-12">
           <h3 className="text-lg font-medium text-gray-900 mb-2">Öğrenci bulunamadı</h3>
           <p className="text-gray-600 mb-4">Bu öğrenci size atanmamış olabilir.</p>
@@ -308,7 +316,7 @@ export default function StudentDetailPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
+    <div className="max-w-6xl mx-auto p-4 sm:p-6">
       {/* Header */}
       <div className="flex items-center mb-6">
         <Link href="/mentor-dashboard" className="mr-4 text-gray-600 hover:text-gray-900">
@@ -428,7 +436,8 @@ export default function StudentDetailPage() {
                       <div key={project.id} className="border rounded-lg p-5 relative group bg-white hover:shadow-md transition-all">
                         <button 
                          onClick={() => handleDeleteAssignment(project.id)}
-                         className="absolute top-3 right-3 p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors opacity-0 group-hover:opacity-100 z-10"
+                         className="absolute top-3 right-3 p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 z-10"
+                         aria-label="Atamayı kaldır"
                          title="Atamayı Kaldır"
                           >
                            <Trash2 className="w-4 h-4" />
@@ -447,8 +456,9 @@ export default function StudentDetailPage() {
                           </div>
                         </div>
                         
+                        {/* #91: Markdown işaretleri soyulmuş temiz önizleme (kart clamp'li). */}
                         <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-                          {project.projectTemplate.description}
+                          {stripMarkdown(project.projectTemplate.description)}
                         </p>
 
                         {project.projectTemplate.githubRepoUrl && (
@@ -505,7 +515,7 @@ export default function StudentDetailPage() {
                               >
                                 {generatingRoadmapId === project.id ? (
                                   <>
-                                    <div className="animate-spin w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full mr-2" /> 
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" />
                                     Harita Çiziliyor...
                                   </>
                                 ) : (
@@ -539,8 +549,15 @@ export default function StudentDetailPage() {
       {/* Project Assignment Modal (Aynı Kaldı) */}
       {showAssignModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-            
+          <div
+            ref={assignModalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Proje Ata"
+            tabIndex={-1}
+            className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col outline-none"
+          >
+
             <div className="flex justify-between items-center p-6 border-b bg-gray-50/80">
               <div>
                 <h2 className="text-xl font-bold text-gray-900">Proje Ata - {getStudentName()}</h2>
@@ -557,7 +574,7 @@ export default function StudentDetailPage() {
                   }`}
                 >
                   {isAIThinking || templatesLoading ? (
-                    <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full" />
+                    <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
                     <Sparkles className="w-4 h-4" />
                   )}
@@ -566,6 +583,7 @@ export default function StudentDetailPage() {
 
                 <button
                   onClick={() => setShowAssignModal(false)}
+                  aria-label="Kapat"
                   className="text-gray-400 hover:text-gray-900 p-2 hover:bg-gray-200 rounded-full transition-colors"
                 >
                   ×
@@ -630,7 +648,7 @@ export default function StudentDetailPage() {
                           </div>
                           
                           <p className="text-gray-600 text-sm mb-4 line-clamp-3 flex-1">
-                            {template.description}
+                            {stripMarkdown(template.description)}
                           </p>
                           
                           <div className="flex flex-wrap gap-1.5 mb-5">

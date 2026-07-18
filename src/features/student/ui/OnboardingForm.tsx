@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod"; // 🚀 Zod'u içeri aktarıyoruz
@@ -8,15 +8,19 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { saveOnboarding } from "@/features/student/server/onboarding";
-import { CheckCircle, User, Target, Award, ArrowRight, ArrowLeft, Rocket, Terminal, BookOpen, Clock, ClipboardList, AlertCircle } from "lucide-react";
+import { CheckCircle, User, Target, Award, ArrowRight, ArrowLeft, Rocket, Terminal, BookOpen, Clock, ClipboardList, AlertCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   buildSurveyAnswerPayload,
   extractSurveyErrorMessage,
   type SurveyQuestionView,
 } from "@/features/survey/answers";
-import { compileGoals, parseCompiledGoals } from "@/features/student/models/compiledGoals";
-import { experienceLevelToFormValue } from "@/lib/experience-level";
+import { compileGoals } from "@/features/student/models/compiledGoals";
+import {
+  buildOnboardingDefaultValues,
+  shouldShowSurveyStep,
+  type OnboardingInitialValues,
+} from "@/features/student/models/onboardingInitial";
 
 import type { FieldPath } from "react-hook-form";
 
@@ -72,18 +76,6 @@ const interests = [
   { id: "Cybersecurity", label: "Siber Güvenlik", emoji: "🛡️" }
 ];
 
-type OnboardingInitialValues = {
-  firstName?: string;
-  lastName?: string;
-  phoneNumber?: string;
-  // #55: Mevcut StudentProfile alanları — profile-setup'a dönen öğrenci için prefill.
-  birthYear?: number;
-  experienceLevel?: string;
-  interests?: string[];
-  goals?: string;
-  availability?: string;
-};
-
 export default function OnboardingForm({
   initial,
   surveyQuestions = [],
@@ -99,7 +91,7 @@ export default function OnboardingForm({
   // #46: Admin anket soruları varsa forma ek bir "Ek Sorular" adımı eklenir.
   // #83: Sorular yüklenemediyse de (gerçek boş değilse) adım gösterilir — kullanıcı
   // hatayı görsün, adımın "hiç soru yokmuş" gibi sessizce kaybolması yerine.
-  const hasSurvey = surveyQuestions.length > 0 || surveyLoadFailed;
+  const hasSurvey = shouldShowSurveyStep(surveyQuestions.length, surveyLoadFailed);
   const allSteps = hasSurvey
     ? [
         ...steps,
@@ -109,6 +101,17 @@ export default function OnboardingForm({
 
   const [step, setStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Adım geçişinde form kartını üste kaydır — kullanıcı yeni adımın ortasından
+  // değil başından (başlık + ilk alan) görsün (#10).
+  const topRef = useRef<HTMLDivElement>(null);
+  const didMountRef = useRef(false);
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
+    topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [step]);
   // Anket cevapları (questionId → cevap). RHF dışında tutulur çünkü sorular dinamiktir.
   const [answers, setAnswers] = useState<Record<string, string>>({});
   // Her adım için "kullanıcı bu adımda Sonraki Adım'a bastı mı?" flag'i.
@@ -119,33 +122,12 @@ export default function OnboardingForm({
     new Array(allSteps.length).fill(false),
   );
 
-  // #55: Mevcut StudentProfile.goals tek bir derlenmiş string — form'un üç ayrı
-  // alanına (knownTech/futureGoal/learningStyle) geri ayrıştırılır.
-  const parsedGoals = parseCompiledGoals(initial?.goals);
-
   const { register, handleSubmit, trigger, clearErrors, formState: { errors } } = useForm<EnhancedFormData>({
     resolver: zodResolver(enhancedSchema),
     mode: "onSubmit",
-    defaultValues: {
-      personal: {
-        firstName: initial?.firstName ?? "",
-        lastName: initial?.lastName ?? "",
-        birthYear: initial?.birthYear ?? undefined,
-        phoneNumber: initial?.phoneNumber ?? "",
-      },
-      experience: {
-        level: initial?.experienceLevel ? experienceLevelToFormValue(initial.experienceLevel) : "",
-        knownTech: parsedGoals.knownTech,
-      },
-      vision: {
-        interest: initial?.interests ?? [],
-        futureGoal: parsedGoals.futureGoal,
-      },
-      workingStyle: {
-        learningStyle: parsedGoals.learningStyle,
-        availability: initial?.availability ?? "",
-      },
-    },
+    // #55/#115: Prefill eşlemesi (compiled goals ayrıştırma + experienceLevel map)
+    // test edilen saf fonksiyonda — bkz. models/onboardingInitial.ts
+    defaultValues: buildOnboardingDefaultValues(initial),
   });
 
   const stepFields: FieldPath<EnhancedFormData>[][] = [
@@ -240,7 +222,7 @@ export default function OnboardingForm({
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 py-12 px-4">
-      <div className="max-w-3xl mx-auto">
+      <div ref={topRef} className="max-w-3xl mx-auto scroll-mt-6">
         
         {/* Header */}
         <div className="text-center mb-8">
@@ -517,7 +499,7 @@ export default function OnboardingForm({
                   className="h-12 px-10 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold transition-all shadow-lg shadow-blue-200 disabled:opacity-70"
                 >
                   {isSubmitting ? (
-                    <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-3" /> Kaydediliyor...</>
+                    <><Loader2 className="w-5 h-5 animate-spin mr-3" /> Kaydediliyor...</>
                   ) : (
                     <><CheckCircle className="w-5 h-5 mr-2" /> Kaydı Tamamla</>
                   )}

@@ -85,3 +85,49 @@ describe("POST /api/steps/[stepId]/files — taslak (DRAFT) guard (#52/#69)", ()
     expect(prismaMock.stepFile.count).toHaveBeenCalledOnce();
   });
 });
+
+describe("POST /api/steps/[stepId]/files — içerik imzası (#113)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    prismaMock.stepFile.count.mockResolvedValue(0);
+  });
+
+  function makeUploadRequest(fileName: string, content: Uint8Array | string) {
+    const form = new FormData();
+    form.set("file", new File([content], fileName));
+    return new Request("http://test/api/steps/step-1/files", {
+      method: "POST",
+      body: form,
+    });
+  }
+
+  it("png uzantılı ama png imzası taşımayan içerik 400 ile reddedilir", async () => {
+    authAs(MENTOR_USER, "MENTOR");
+    prismaMock.roadmapStep.findUnique.mockResolvedValue(buildStep("PUBLISHED"));
+
+    const res = await POST(makeUploadRequest("evil.png", "bu bir metin, png degil"), ctx);
+    const json = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(json.error).toContain("uzantısıyla uyuşmuyor");
+  });
+
+  it("metin dosyasında (.txt) içerik kontrolü atlanır — imza hatası dönmez", async () => {
+    authAs(MENTOR_USER, "MENTOR");
+    prismaMock.roadmapStep.findUnique.mockResolvedValue(buildStep("PUBLISHED"));
+
+    const res = await POST(makeUploadRequest("notlar.txt", "serbest metin icerik"), ctx);
+
+    // İmza kontrolüne takılmadı (400 "uzantısıyla uyuşmuyor" değil);
+    // akış diske yazma/DB aşamasına ilerledi.
+    if (res.status === 400) {
+      const json = await res.json();
+      expect(String(json.error)).not.toContain("uzantısıyla uyuşmuyor");
+    }
+  });
+});
+
+// #113: fs erişimi mock'lanır (vi.mock hoist edilir, tüm dosya için geçerli) —
+// imza testleri gerçek diske yazmasın. Önceki testler fs'e zaten ulaşmıyor.
+vi.mock("fs/promises", () => ({ writeFile: vi.fn(), mkdir: vi.fn() }));
+vi.mock("fs", () => ({ existsSync: vi.fn(() => true) }));

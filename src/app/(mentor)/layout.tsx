@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth/nextauth"
 import { redirect } from "next/navigation"
+import { AppShell } from "@/components/AppShell"
 
 // 🔐 Bu layout, sadece mentor rolüne sahip kullanıcıların erişebileceği sayfaları korur.
 
@@ -15,5 +16,10 @@ export default async function MentorLayout({ children }: { children: React.React
     redirect("/")
   }
 
-  return <>{children}</>
+  return (
+    <>
+      <AppShell role="MENTOR" />
+      {children}
+    </>
+  )
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, type ReactNode } from "react";
 import { X, Send, Loader2, GraduationCap, Minus } from "lucide-react";
 
 type ChatMessage = {
@@ -15,7 +15,7 @@ export function AIChatBot() {
     {
       role: "assistant",
       content:
-        "Merhaba! Ben Posilog. Yazılım, programlama ve proje adımların hakkında sorularını yanıtlayabilirim. Nasıl yardımcı olabilirim? 🎓",
+        "Merhaba! Ben Posilog. Ödevini senin yerine yapmam ama yazılım, programlama ve proje adımlarında yol gösteririm — kavramları açıklar, ipuçları veririm. Takıldığın yeri anlat, birlikte çözelim! 🎓",
     },
   ]);
   const [input, setInput] = useState("");
@@ -88,6 +88,7 @@ export function AIChatBot() {
       <button
         onClick={() => setIsOpen(true)}
         className="fixed bottom-6 right-6 z-50 group"
+        aria-label="Posilog asistanını aç"
         title="Posilog"
       >
         <div className="relative">
@@ -142,6 +143,7 @@ export function AIChatBot() {
           <button
             onClick={() => setIsMinimized(true)}
             className="p-1.5 text-purple-200 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
+            aria-label="Sohbeti küçült"
             title="Küçült"
           >
             <Minus className="w-4 h-4" />
@@ -149,6 +151,7 @@ export function AIChatBot() {
           <button
             onClick={() => setIsOpen(false)}
             className="p-1.5 text-purple-200 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
+            aria-label="Sohbeti kapat"
             title="Kapat"
           >
             <X className="w-4 h-4" />
@@ -171,11 +174,9 @@ export function AIChatBot() {
               }`}
             >
               {msg.role === "assistant" ? (
-                <div className="whitespace-pre-wrap">
-                  {formatMessage(msg.content)}
-                </div>
+                <div className="space-y-1">{renderMessage(msg.content)}</div>
               ) : (
-                <p>{msg.content}</p>
+                <p className="whitespace-pre-wrap">{msg.content}</p>
               )}
             </div>
           </div>
@@ -228,8 +229,95 @@ export function AIChatBot() {
 }
 
 /**
- * Basit markdown formatlama (bold, code, bullet list)
+ * Satır içi markdown → React node'ları.
+ * Desteklenen: **kalın** ve `kod`. XSS-güvenli (HTML enjeksiyonu yok, sadece
+ * React elemanları üretir).
  */
-function formatMessage(text: string): string {
-  return text;
+function renderInline(text: string, keyPrefix: string): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  const regex = /(\*\*[^*]+\*\*|`[^`]+`)/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let i = 0;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      nodes.push(text.slice(lastIndex, match.index));
+    }
+    const token = match[0];
+    if (token.startsWith("**")) {
+      nodes.push(
+        <strong key={`${keyPrefix}-b-${i}`} className="font-semibold">
+          {token.slice(2, -2)}
+        </strong>,
+      );
+    } else {
+      nodes.push(
+        <code
+          key={`${keyPrefix}-c-${i}`}
+          className="px-1 py-0.5 rounded bg-gray-100 text-purple-700 text-[13px] font-mono"
+        >
+          {token.slice(1, -1)}
+        </code>,
+      );
+    }
+    lastIndex = match.index + token.length;
+    i++;
+  }
+  if (lastIndex < text.length) {
+    nodes.push(text.slice(lastIndex));
+  }
+  return nodes;
+}
+
+/**
+ * Blok seviyesinde hafif markdown render'ı (bağımlılıksız, XSS-güvenli).
+ * Desteklenen: başlıklar, madde listeleri, paragraflar ve satır içi
+ * kalın/kod. Gemini yanıtlarındaki ham işaretleri temizler.
+ */
+function renderMessage(text: string): ReactNode {
+  const lines = text.split("\n");
+  const blocks: ReactNode[] = [];
+  let listItems: string[] = [];
+  let key = 0;
+
+  const flushList = () => {
+    if (listItems.length === 0) return;
+    const items = listItems;
+    const k = key++;
+    blocks.push(
+      <ul key={`ul-${k}`} className="list-disc pl-5 space-y-0.5">
+        {items.map((it, idx) => (
+          <li key={idx}>{renderInline(it, `li-${k}-${idx}`)}</li>
+        ))}
+      </ul>,
+    );
+    listItems = [];
+  };
+
+  for (const line of lines) {
+    const bullet = line.match(/^\s*[-*]\s+(.*)$/);
+    const heading = line.match(/^\s*#{1,6}\s+(.*)$/);
+    if (bullet) {
+      listItems.push(bullet[1]);
+      continue;
+    }
+    flushList();
+    if (heading) {
+      const k = key++;
+      blocks.push(
+        <p key={`h-${k}`} className="font-semibold">
+          {renderInline(heading[1], `h-${k}`)}
+        </p>,
+      );
+    } else if (line.trim() === "") {
+      blocks.push(<div key={`sp-${key++}`} className="h-1" />);
+    } else {
+      const k = key++;
+      blocks.push(<p key={`p-${k}`}>{renderInline(line, `p-${k}`)}</p>);
+    }
+  }
+  flushList();
+
+  return blocks;
 }
