@@ -16,6 +16,8 @@ export function UnreadBadge({ className = "" }: Props) {
 
   useEffect(() => {
     async function fetchCount() {
+      // Sekme arka plandayken istek atma (görünürlük-farkında polling).
+      if (document.visibilityState === "hidden") return;
       try {
         const res = await fetch("/api/messages/unread-count");
         if (res.ok) {
@@ -29,7 +31,17 @@ export function UnreadBadge({ className = "" }: Props) {
 
     fetchCount();
     const interval = setInterval(fetchCount, 15000); // 15 saniyede bir kontrol
-    return () => clearInterval(interval);
+
+    // Sekme tekrar öne geldiğinde beklemeden tazele.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") fetchCount();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, []);
 
   return (

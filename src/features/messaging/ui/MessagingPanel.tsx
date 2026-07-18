@@ -47,6 +47,8 @@ export function MessagingPanel({ currentUserId }: Props) {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [conversationsError, setConversationsError] = useState(false);
+  const [messagesError, setMessagesError] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -65,9 +67,13 @@ export function MessagingPanel({ currentUserId }: Props) {
       if (res.ok) {
         const data = await res.json();
         setConversations(data.conversations);
+        setConversationsError(false);
+      } else {
+        setConversationsError(true);
       }
     } catch (error) {
       console.error("Konuşmalar yüklenemedi:", error);
+      setConversationsError(true);
     } finally {
       setLoading(false);
     }
@@ -75,15 +81,22 @@ export function MessagingPanel({ currentUserId }: Props) {
 
   // Mesajları yükle
   const loadMessages = useCallback(async (partnerId: string, isPolling = false) => {
-    if (!isPolling) setLoadingMessages(true);
+    if (!isPolling) {
+      setLoadingMessages(true);
+      setMessagesError(false);
+    }
     try {
       const res = await fetch(`/api/messages?conversationWith=${partnerId}`);
       if (res.ok) {
         const data = await res.json();
         setMessages(data.messages.reverse()); // Eski → Yeni sırala
+      } else if (!isPolling) {
+        // Polling hatalarını sessiz geç — mevcut mesajları ekranda tut.
+        setMessagesError(true);
       }
     } catch (error) {
       console.error("Mesajlar yüklenemedi:", error);
+      if (!isPolling) setMessagesError(true);
     } finally {
       if (!isPolling) setLoadingMessages(false);
     }
@@ -99,9 +112,12 @@ export function MessagingPanel({ currentUserId }: Props) {
 
     loadMessages(selectedPartner.id);
 
-    // Polling: 5 saniyede bir yeni mesajları kontrol et
+    // Polling: 5 saniyede bir yeni mesajları kontrol et.
+    // Sekme arka plandayken istek atma (görünürlük-farkında).
     pollRef.current = setInterval(() => {
-      loadMessages(selectedPartner.id, true);
+      if (document.visibilityState === "visible") {
+        loadMessages(selectedPartner.id, true);
+      }
     }, 5000);
 
     return () => {
@@ -177,7 +193,21 @@ export function MessagingPanel({ currentUserId }: Props) {
           </h3>
         </div>
         <div className="flex-1 overflow-y-auto">
-          {conversations.length === 0 ? (
+          {conversationsError ? (
+            <div className="text-center py-12 px-4">
+              <MessageCircle className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+              <p className="text-sm text-gray-600">Konuşmalar yüklenemedi.</p>
+              <button
+                onClick={() => {
+                  setLoading(true);
+                  loadConversations();
+                }}
+                className="mt-3 px-4 py-1.5 text-xs font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+              >
+                Tekrar Dene
+              </button>
+            </div>
+          ) : conversations.length === 0 ? (
             <div className="text-center py-12 px-4">
               <MessageCircle className="w-10 h-10 text-gray-300 mx-auto mb-3" />
               <p className="text-sm text-gray-500">Henüz konuşma bulunmuyor.</p>
@@ -261,6 +291,18 @@ export function MessagingPanel({ currentUserId }: Props) {
               {loadingMessages ? (
                 <div className="flex items-center justify-center h-full">
                   <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                </div>
+              ) : messagesError ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <p className="text-sm text-gray-600">Mesajlar yüklenemedi.</p>
+                    <button
+                      onClick={() => loadMessages(selectedPartner.id)}
+                      className="mt-3 px-4 py-1.5 text-xs font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+                    >
+                      Tekrar Dene
+                    </button>
+                  </div>
                 </div>
               ) : messages.length === 0 ? (
                 <div className="flex items-center justify-center h-full text-gray-400">

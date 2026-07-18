@@ -7,6 +7,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { experienceLevelLabel } from "@/lib/experience-level";
 import { ProfileAnalysisCard, type ProfileAnalysisData } from "@/features/ai/ui/ProfileAnalysisCard";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { stripMarkdown } from "@/lib/markdown-preview";
 
 type ProjectTemplate = {
@@ -76,6 +77,7 @@ const difficultyConfig = {
 };
 
 export default function StudentDetailPage() {
+  const confirm = useConfirm();
   const params = useParams();
   const searchParams = useSearchParams();
   const studentId = params.studentId as string;
@@ -197,12 +199,13 @@ export default function StudentDetailPage() {
   }
 
   async function handleDeleteAssignment(assignedProjectId: string) {
-    if (
-      !confirm(
-        "Bu proje atamasını kaldırmak istediğinizden emin misiniz? (Bağlı yol haritası da silinir)",
-      )
-    )
-      return;
+    const ok = await confirm({
+      title: "Proje atamasını kaldır",
+      description: "Bu proje atamasını kaldırmak istediğinizden emin misiniz? Bağlı yol haritası da silinir.",
+      confirmLabel: "Kaldır",
+      danger: true,
+    });
+    if (!ok) return;
 
     async function doDelete(force: boolean) {
       const res = await fetch("/api/mentor/unassign-project", {
@@ -219,12 +222,13 @@ export default function StudentDetailPage() {
       // Backend öğrenci ilerlemesi varsa 409 döner — ek onay iste
       if (res.status === 409) {
         const data = await res.json().catch(() => ({}));
-        const msg =
-          data?.error ||
-          "Bu projede öğrenci ilerlemesi var.";
-        const confirmed = confirm(
-          `${msg}\n\nYine de silmek istediğinden EMİN misin? Tüm ilerleme ve yol haritası kaybolacak.`,
-        );
+        const msg = data?.error || "Bu projede öğrenci ilerlemesi var.";
+        const confirmed = await confirm({
+          title: "Öğrenci ilerlemesi var",
+          description: `${msg}\n\nYine de silmek istediğinden emin misin? Tüm ilerleme ve yol haritası kaybolacak.`,
+          confirmLabel: "Yine de sil",
+          danger: true,
+        });
         if (!confirmed) return;
         res = await doDelete(true);
       }
@@ -429,7 +433,7 @@ export default function StudentDetailPage() {
                       <div key={project.id} className="border rounded-lg p-5 relative group bg-white hover:shadow-md transition-all">
                         <button 
                          onClick={() => handleDeleteAssignment(project.id)}
-                         className="absolute top-3 right-3 p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors opacity-0 group-hover:opacity-100 z-10"
+                         className="absolute top-3 right-3 p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 z-10"
                          title="Atamayı Kaldır"
                           >
                            <Trash2 className="w-4 h-4" />

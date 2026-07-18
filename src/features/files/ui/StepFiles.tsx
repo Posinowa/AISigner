@@ -14,6 +14,7 @@ import {
   X,
   Eye,
 } from "lucide-react";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 type StepFile = {
   id: string;
@@ -38,6 +39,7 @@ type Props = {
 };
 
 export function StepFiles({ stepId, currentUserId, currentUserRole, isDraft }: Props) {
+  const confirm = useConfirm();
   // #52: Taslak roadmap'te öğrenci dosya yükleyemez (mentor inceleme için yükleyebilir).
   const interactionLocked = isDraft && currentUserRole === "STUDENT";
   const [files, setFiles] = useState<StepFile[]>([]);
@@ -125,7 +127,13 @@ export function StepFiles({ stepId, currentUserId, currentUserRole, isDraft }: P
   }
 
   async function handleDelete(fileId: string) {
-    if (!confirm("Bu dosyayı silmek istediğinizden emin misiniz?")) return;
+    const ok = await confirm({
+      title: "Dosyayı sil",
+      description: "Bu dosyayı silmek istediğinizden emin misiniz?",
+      confirmLabel: "Sil",
+      danger: true,
+    });
+    if (!ok) return;
 
     try {
       const res = await fetch(`/api/steps/${stepId}/files/${fileId}`, {
@@ -274,7 +282,7 @@ export function StepFiles({ stepId, currentUserId, currentUserRole, isDraft }: P
                   </div>
 
                   {/* Aksiyonlar */}
-                  <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-1 shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                     {/* Önizle/İndir */}
                     {file.mimeType.startsWith("image/") || file.mimeType === "application/pdf" ? (
                       <a
