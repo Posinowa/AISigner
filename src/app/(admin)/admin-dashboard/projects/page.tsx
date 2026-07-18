@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Plus, Pencil, Trash2, X, ArrowLeft, FolderKanban, Github, AlertCircle } from "lucide-react";
+import { Plus, Pencil, Trash2, X, ArrowLeft, FolderKanban, Github, AlertCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
@@ -320,7 +320,7 @@ export default function ProjectsPage() {
       {/* Loading State */}
       {pageLoading ? (
         <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
           <span className="ml-3 text-slate-600">Şablonlar yükleniyor...</span>
         </div>
       ) : loadError ? (
