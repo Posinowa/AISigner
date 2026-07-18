@@ -81,6 +81,28 @@ describe("createTemplateSchema — githubRepoUrl (#49)", () => {
     ).toBe(true);
   });
 
+  it("#111: query string içeren URL'i reddeder", () => {
+    for (const url of [
+      "https://github.com/kullanici/repo?tab=readme",
+      "https://github.com/kullanici/repo/?tab=readme",
+    ]) {
+      expect(createTemplateSchema.safeParse({ ...templateBase, githubRepoUrl: url }).success).toBe(
+        false,
+      );
+    }
+  });
+
+  it("#111: hash içeren URL'i reddeder", () => {
+    for (const url of [
+      "https://github.com/kullanici/repo#readme",
+      "https://github.com/kullanici/repo/#readme",
+    ]) {
+      expect(createTemplateSchema.safeParse({ ...templateBase, githubRepoUrl: url }).success).toBe(
+        false,
+      );
+    }
+  });
+
   it("http (https değil) reddedilir", () => {
     const result = createTemplateSchema.safeParse({
       ...templateBase,
