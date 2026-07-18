@@ -48,7 +48,7 @@ export function UnreadBadge({ className = "" }: Props) {
     <span className={`relative inline-flex ${className}`}>
       <MessageCircle className="w-5 h-5" />
       {count > 0 && (
-        <span className="absolute -top-1.5 -right-1.5 w-4 h-4 flex items-center justify-center text-[9px] font-bold text-white bg-red-500 rounded-full">
+        <span className="absolute -top-1.5 -right-1.5 w-4 h-4 flex items-center justify-center text-[10px] font-bold text-white bg-red-500 rounded-full">
           {count > 9 ? "9+" : count}
         </span>
       )}
