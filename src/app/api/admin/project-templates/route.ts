@@ -37,6 +37,13 @@ export async function POST(req: Request) {
     const newTemplate = await createTemplate(parsed.data);
     return NextResponse.json(newTemplate, { status: 201 });
   } catch (error) {
+    // #112: Aynı title ile ikinci şablon → 409 (500 değil)
+    if ((error as { code?: string })?.code === "DUPLICATE_TITLE") {
+      return NextResponse.json(
+        { error: "Bu başlıkta bir proje şablonu zaten var." },
+        { status: 409 }
+      );
+    }
     console.error("POST /api/admin/project-templates error:", error);
     return NextResponse.json(
       { error: "Failed to create template" },

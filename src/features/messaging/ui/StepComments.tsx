@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { MessageSquare, Send, Loader2, Trash2, Pencil, X, User } from "lucide-react";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { toast } from "sonner";
 
 type Comment = {
@@ -26,6 +27,7 @@ type Props = {
 };
 
 export function StepComments({ stepId, currentUserId, currentUserRole, isDraft }: Props) {
+  const confirm = useConfirm();
   // #52: Taslak roadmap'te öğrenci yorum ekleyemez (mentor inceleme için ekleyebilir).
   const interactionLocked = isDraft && currentUserRole === "STUDENT";
   const [comments, setComments] = useState<Comment[]>([]);
@@ -118,7 +120,13 @@ export function StepComments({ stepId, currentUserId, currentUserRole, isDraft }
   }
 
   async function handleDelete(commentId: string) {
-    if (!confirm("Bu yorumu silmek istediğinizden emin misiniz?")) return;
+    const ok = await confirm({
+      title: "Yorumu sil",
+      description: "Bu yorumu silmek istediğinizden emin misiniz?",
+      confirmLabel: "Sil",
+      danger: true,
+    });
+    if (!ok) return;
 
     try {
       const res = await fetch(`/api/steps/${stepId}/comments/${commentId}`, {
@@ -188,7 +196,7 @@ export function StepComments({ stepId, currentUserId, currentUserRole, isDraft }
                         <span className="text-xs font-semibold text-gray-800">
                           {getFullName(comment.author)}
                         </span>
-                        <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${roleInfo.color}`}>
+                        <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded ${roleInfo.color}`}>
                           {roleInfo.label}
                         </span>
                         <span className="text-[10px] text-gray-400">
@@ -229,7 +237,7 @@ export function StepComments({ stepId, currentUserId, currentUserRole, isDraft }
                           <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap break-words">
                             {comment.content}
                           </p>
-                          <div className="flex gap-0.5 ml-2 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                          <div className="flex gap-0.5 ml-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex-shrink-0">
                             {comment.author.id === currentUserId && (
                               <button
                                 onClick={() => { setEditingId(comment.id); setEditContent(comment.content); }}

@@ -70,3 +70,31 @@ describe("POST /api/admin/project-templates — githubRepoUrl (#49)", () => {
     expect(res.status).toBe(201);
   });
 });
+
+describe("POST /api/admin/project-templates — duplicate title (#112)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("aynı title ile ikinci şablonda 409 döner", async () => {
+    authAdmin();
+    prismaMock.projectTemplate.create.mockRejectedValue(
+      Object.assign(new Error("Unique constraint failed on title"), { code: "P2002" }),
+    );
+
+    const res = await POST(postReq(validBody));
+    const json = await res.json();
+
+    expect(res.status).toBe(409);
+    expect(json.error).toBe("Bu başlıkta bir proje şablonu zaten var.");
+  });
+
+  it("P2002 dışındaki DB hataları 500 olarak kalır", async () => {
+    authAdmin();
+    prismaMock.projectTemplate.create.mockRejectedValue(new Error("connection lost"));
+
+    const res = await POST(postReq(validBody));
+
+    expect(res.status).toBe(500);
+  });
+});
