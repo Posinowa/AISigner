@@ -117,12 +117,7 @@ function SigninForm() {
 
               {/* Şifre */}
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label htmlFor="signin-password" className="text-sm font-medium text-slate-700">Şifre</label>
-                  <Link href="/forgot-password" className="text-xs font-medium text-amber-600 hover:text-amber-700">
-                    Şifremi Unuttum
-                  </Link>
-                </div>
+                <label htmlFor="signin-password" className="mb-1.5 block text-sm font-medium text-slate-700">Şifre</label>
                 <div className="relative">
                   <input
                     id="signin-password"
@@ -145,6 +140,11 @@ function SigninForm() {
                 {state.error?.password && (
                   <p className="mt-1 text-xs text-red-500">{state.error.password[0]}</p>
                 )}
+                <div className="mt-1.5 text-right">
+                  <Link href="/forgot-password" className="text-xs font-medium text-amber-600 hover:text-amber-700">
+                    Şifremi Unuttum
+                  </Link>
+                </div>
               </div>
 
               {/* Genel hata */}
