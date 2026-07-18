@@ -10,6 +10,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { AlertTriangle } from "lucide-react";
+import { handleTabKey } from "./focus-trap";
 
 export type ConfirmOptions = {
   title: string;
@@ -40,6 +41,10 @@ type PendingState = {
 export function ConfirmDialogProvider({ children }: { children: React.ReactNode }) {
   const [pending, setPending] = useState<PendingState | null>(null);
   const confirmBtnRef = useRef<HTMLButtonElement>(null);
+  const cancelBtnRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // Dialog'u açan eleman — kapanışta odak buraya geri verilir.
+  const triggerRef = useRef<HTMLElement | null>(null);
 
   const confirm = useCallback<ConfirmFn>((options) => {
     return new Promise<boolean>((resolve) => {
@@ -57,15 +62,27 @@ export function ConfirmDialogProvider({ children }: { children: React.ReactNode 
     [],
   );
 
-  // Açılışta onay butonuna odaklan + Escape ile iptal.
+  // Açılışta odak + Escape ile iptal + Tab-trap + kapanışta odak iadesi.
   useEffect(() => {
     if (!pending) return;
-    confirmBtnRef.current?.focus();
+
+    triggerRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+    // #126-5: Tehlikeli (danger) onaylarda varsayılan odak İptal'de (güvenli varsayılan);
+    // aksi halde onay butonunda.
+    const initial = pending.options.danger ? cancelBtnRef.current : confirmBtnRef.current;
+    initial?.focus();
+
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") close(false);
+      handleTabKey(dialogRef.current, e);
     };
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      triggerRef.current?.focus({ preventScroll: true });
+    };
   }, [pending, close]);
 
   return (
@@ -78,6 +95,7 @@ export function ConfirmDialogProvider({ children }: { children: React.ReactNode 
           role="presentation"
         >
           <div
+            ref={dialogRef}
             role="alertdialog"
             aria-modal="true"
             aria-labelledby="confirm-title"
@@ -105,6 +123,7 @@ export function ConfirmDialogProvider({ children }: { children: React.ReactNode 
             </div>
             <div className="flex items-center justify-end gap-2 px-6 py-4 bg-slate-50 border-t border-slate-100">
               <button
+                ref={cancelBtnRef}
                 type="button"
                 onClick={() => close(false)}
                 className="px-4 py-2 rounded-xl text-sm font-medium text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 transition-colors"
