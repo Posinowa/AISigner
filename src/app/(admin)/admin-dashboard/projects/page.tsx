@@ -5,6 +5,7 @@ import { Plus, Pencil, Trash2, X, ArrowLeft, FolderKanban, Github, AlertCircle }
 import Link from "next/link";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { markdownPreview } from "@/lib/markdown-preview";
 
 type ProjectTemplate = {
   id: string;
@@ -368,8 +369,9 @@ export default function ProjectsPage() {
                       </span>
                     </div>
 
+                    {/* #91: Markdown soyulmuş, kelime sınırında ve koşullu ellipsis'li önizleme. */}
                     <p className="text-slate-600 text-sm mb-4 line-clamp-3">
-                      {template.description.slice(0, 120)}...
+                      {markdownPreview(template.description, 120)}
                     </p>
 
                     <div className="flex flex-wrap gap-1 mb-4">

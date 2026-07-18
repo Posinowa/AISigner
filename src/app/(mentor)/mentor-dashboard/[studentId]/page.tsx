@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { experienceLevelLabel } from "@/lib/experience-level";
 import { ProfileAnalysisCard, type ProfileAnalysisData } from "@/features/ai/ui/ProfileAnalysisCard";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { stripMarkdown } from "@/lib/markdown-preview";
 
 type ProjectTemplate = {
   id: string;
@@ -451,8 +452,9 @@ export default function StudentDetailPage() {
                           </div>
                         </div>
                         
+                        {/* #91: Markdown işaretleri soyulmuş temiz önizleme (kart clamp'li). */}
                         <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-                          {project.projectTemplate.description}
+                          {stripMarkdown(project.projectTemplate.description)}
                         </p>
 
                         {project.projectTemplate.githubRepoUrl && (
@@ -634,7 +636,7 @@ export default function StudentDetailPage() {
                           </div>
                           
                           <p className="text-gray-600 text-sm mb-4 line-clamp-3 flex-1">
-                            {template.description}
+                            {stripMarkdown(template.description)}
                           </p>
                           
                           <div className="flex flex-wrap gap-1.5 mb-5">
