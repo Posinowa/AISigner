@@ -217,6 +217,7 @@ export function StepComments({ stepId, currentUserId, currentUserRole, isDraft }
                             <button
                               onClick={() => handleUpdate(comment.id)}
                               className="p-1 text-blue-600 hover:text-blue-800"
+                              aria-label="Yorumu kaydet"
                               title="Kaydet"
                             >
                               <Send className="w-3.5 h-3.5" />
@@ -224,6 +225,7 @@ export function StepComments({ stepId, currentUserId, currentUserRole, isDraft }
                             <button
                               onClick={() => { setEditingId(null); setEditContent(""); }}
                               className="p-1 text-gray-400 hover:text-gray-600"
+                              aria-label="Düzenlemeyi iptal et"
                               title="İptal"
                             >
                               <X className="w-3.5 h-3.5" />
@@ -240,6 +242,7 @@ export function StepComments({ stepId, currentUserId, currentUserRole, isDraft }
                               <button
                                 onClick={() => { setEditingId(comment.id); setEditContent(comment.content); }}
                                 className="p-1 text-gray-400 hover:text-blue-600"
+                                aria-label="Yorumu düzenle"
                                 title="Düzenle"
                               >
                                 <Pencil className="w-3 h-3" />
@@ -249,6 +252,7 @@ export function StepComments({ stepId, currentUserId, currentUserRole, isDraft }
                               <button
                                 onClick={() => handleDelete(comment.id)}
                                 className="p-1 text-gray-400 hover:text-red-600"
+                                aria-label="Yorumu sil"
                                 title="Sil"
                               >
                                 <Trash2 className="w-3 h-3" />

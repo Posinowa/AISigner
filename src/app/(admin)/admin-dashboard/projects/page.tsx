@@ -5,6 +5,7 @@ import { Plus, Pencil, Trash2, X, ArrowLeft, FolderKanban, Github, AlertCircle, 
 import Link from "next/link";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { useModalA11y } from "@/components/ui/useModalA11y";
 import { markdownPreview } from "@/lib/markdown-preview";
 
 type ProjectTemplate = {
@@ -77,6 +78,9 @@ export default function ProjectsPage() {
     setIsFormOpen(false);
     setEditingId(null);
   }
+
+  // Modal a11y: Escape ile kapat + açılışta panele odak.
+  const formModalRef = useModalA11y(isFormOpen, resetForm);
 
   function startEdit(template: ProjectTemplate) {
     setForm({
@@ -205,13 +209,21 @@ export default function ProjectsPage() {
       {/* Form Modal */}
       {isFormOpen && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+          <div
+            ref={formModalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={editingId ? "Şablonu Düzenle" : "Yeni Şablon Ekle"}
+            tabIndex={-1}
+            className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto outline-none"
+          >
             <div className="flex justify-between items-center p-6 border-b">
               <h2 className="text-xl font-semibold">
                 {editingId ? "Şablonu Düzenle" : "Yeni Şablon Ekle"}
               </h2>
               <button
                 onClick={resetForm}
+                aria-label="Kapat"
                 className="text-slate-400 hover:text-slate-600"
               >
                 <X className="w-6 h-6" />
@@ -407,6 +419,7 @@ export default function ProjectsPage() {
                         <button
                           onClick={() => startEdit(template)}
                           className="p-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          aria-label={`${template.title} şablonunu düzenle`}
                           title="Düzenle"
                         >
                           <Pencil className="w-4 h-4" />
@@ -414,6 +427,7 @@ export default function ProjectsPage() {
                         <button
                           onClick={() => handleDelete(template.id)}
                           className="p-2 text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          aria-label={`${template.title} şablonunu sil`}
                           title="Sil"
                         >
                           <Trash2 className="w-4 h-4" />

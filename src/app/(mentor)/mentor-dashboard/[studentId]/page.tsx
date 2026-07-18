@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { experienceLevelLabel } from "@/lib/experience-level";
 import { ProfileAnalysisCard, type ProfileAnalysisData } from "@/features/ai/ui/ProfileAnalysisCard";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { useModalA11y } from "@/components/ui/useModalA11y";
 import { stripMarkdown } from "@/lib/markdown-preview";
 
 type ProjectTemplate = {
@@ -88,6 +89,8 @@ export default function StudentDetailPage() {
   const [loading, setLoading] = useState(true);
   const [assigningId, setAssigningId] = useState<string | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
+  // Modal a11y: Escape ile kapat + açılışta panele odak.
+  const assignModalRef = useModalA11y(showAssignModal, () => setShowAssignModal(false));
 
   const [isAIThinking, setIsAIThinking] = useState(false);
   const [aiRecommendations, setAiRecommendations] = useState<AIRecommendation[]>([]);
@@ -434,6 +437,7 @@ export default function StudentDetailPage() {
                         <button 
                          onClick={() => handleDeleteAssignment(project.id)}
                          className="absolute top-3 right-3 p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 z-10"
+                         aria-label="Atamayı kaldır"
                          title="Atamayı Kaldır"
                           >
                            <Trash2 className="w-4 h-4" />
@@ -545,8 +549,15 @@ export default function StudentDetailPage() {
       {/* Project Assignment Modal (Aynı Kaldı) */}
       {showAssignModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-            
+          <div
+            ref={assignModalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Proje Ata"
+            tabIndex={-1}
+            className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col outline-none"
+          >
+
             <div className="flex justify-between items-center p-6 border-b bg-gray-50/80">
               <div>
                 <h2 className="text-xl font-bold text-gray-900">Proje Ata - {getStudentName()}</h2>
@@ -572,6 +583,7 @@ export default function StudentDetailPage() {
 
                 <button
                   onClick={() => setShowAssignModal(false)}
+                  aria-label="Kapat"
                   className="text-gray-400 hover:text-gray-900 p-2 hover:bg-gray-200 rounded-full transition-colors"
                 >
                   ×

@@ -240,7 +240,7 @@ export function StepFiles({ stepId, currentUserId, currentUserRole, isDraft }: P
           {error && (
             <div className="flex items-center justify-between text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">
               <span>{error}</span>
-              <button onClick={() => setError(null)} className="ml-2 hover:text-red-800">
+              <button onClick={() => setError(null)} aria-label="Hatayı kapat" className="ml-2 hover:text-red-800">
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -290,6 +290,7 @@ export function StepFiles({ stepId, currentUserId, currentUserRole, isDraft }: P
                         target="_blank"
                         rel="noreferrer"
                         className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                        aria-label={`${file.fileName} dosyasını önizle`}
                         title="Önizle"
                       >
                         <Eye className="w-3.5 h-3.5" />
@@ -299,6 +300,7 @@ export function StepFiles({ stepId, currentUserId, currentUserRole, isDraft }: P
                         href={`/api/steps/${stepId}/files/${file.id}`}
                         download
                         className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                        aria-label={`${file.fileName} dosyasını indir`}
                         title="İndir"
                       >
                         <Download className="w-3.5 h-3.5" />
@@ -310,6 +312,7 @@ export function StepFiles({ stepId, currentUserId, currentUserRole, isDraft }: P
                       <button
                         onClick={() => handleDelete(file.id)}
                         className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                        aria-label={`${file.fileName} dosyasını sil`}
                         title="Sil"
                       >
                         <Trash2 className="w-3.5 h-3.5" />

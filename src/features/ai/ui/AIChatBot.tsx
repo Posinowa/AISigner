@@ -88,6 +88,7 @@ export function AIChatBot() {
       <button
         onClick={() => setIsOpen(true)}
         className="fixed bottom-6 right-6 z-50 group"
+        aria-label="Posilog asistanını aç"
         title="Posilog"
       >
         <div className="relative">
@@ -142,6 +143,7 @@ export function AIChatBot() {
           <button
             onClick={() => setIsMinimized(true)}
             className="p-1.5 text-purple-200 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
+            aria-label="Sohbeti küçült"
             title="Küçült"
           >
             <Minus className="w-4 h-4" />
@@ -149,6 +151,7 @@ export function AIChatBot() {
           <button
             onClick={() => setIsOpen(false)}
             className="p-1.5 text-purple-200 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
+            aria-label="Sohbeti kapat"
             title="Kapat"
           >
             <X className="w-4 h-4" />
