@@ -235,7 +235,7 @@ export function StepComments({ stepId, currentUserId, currentUserRole, isDraft }
                           <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap break-words">
                             {comment.content}
                           </p>
-                          <div className="flex gap-0.5 ml-2 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                          <div className="flex gap-0.5 ml-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex-shrink-0">
                             {comment.author.id === currentUserId && (
                               <button
                                 onClick={() => { setEditingId(comment.id); setEditContent(comment.content); }}

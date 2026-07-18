@@ -282,7 +282,7 @@ export function StepFiles({ stepId, currentUserId, currentUserRole, isDraft }: P
                   </div>
 
                   {/* Aksiyonlar */}
-                  <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-1 shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                     {/* Önizle/İndir */}
                     {file.mimeType.startsWith("image/") || file.mimeType === "application/pdf" ? (
                       <a
