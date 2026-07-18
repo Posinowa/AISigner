@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth/guard";
 import { createRateLimiter } from "@/lib/rate-limit";
+import { matchesExtensionSignature } from "@/lib/file-signature";
 import { writeFile, mkdir } from "fs/promises";
 import { existsSync } from "fs";
 import path from "path";
@@ -188,8 +189,19 @@ export async function POST(
       await mkdir(UPLOAD_DIR, { recursive: true });
     }
 
-    // Dosyayı diske yaz
     const buffer = Buffer.from(await file.arrayBuffer());
+
+    // #113: Binary formatlarda dosya içeriği (magic bytes) uzantıyla eşleşmeli.
+    // Uzantı whitelist'i tek başına yeterli değil — .png adlı bir çalıştırılabilir
+    // içerik burada reddedilir. Metin/kod dosyaları için kontrol atlanır.
+    if (!matchesExtensionSignature(ext, buffer)) {
+      return NextResponse.json(
+        { error: "Dosya içeriği uzantısıyla uyuşmuyor. Lütfen geçerli bir dosya yükleyin." },
+        { status: 400 }
+      );
+    }
+
+    // Dosyayı diske yaz
     const filePath = path.join(UPLOAD_DIR, storedName);
     await writeFile(filePath, buffer);
 
