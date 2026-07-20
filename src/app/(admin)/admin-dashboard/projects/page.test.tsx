@@ -2,8 +2,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import "@testing-library/jest-dom/vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import { ConfirmDialogProvider } from "@/components/ui/ConfirmDialog";
 
 import ProjectsPage from "./page";
+
+// #129: Sayfa artık useConfirm() kullanıyor (#95); provider olmadan render hata verir.
+function renderPage() {
+  return render(
+    <ConfirmDialogProvider>
+      <ProjectsPage />
+    </ConfirmDialogProvider>,
+  );
+}
 
 describe("Admin projects — fetch fail error state (#123 / #89-3)", () => {
   beforeEach(() => {
@@ -13,7 +23,7 @@ describe("Admin projects — fetch fail error state (#123 / #89-3)", () => {
   it("fetch reddedilirse boş liste yerine error state render edilir", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")));
 
-    render(<ProjectsPage />);
+    renderPage();
 
     expect(await screen.findByText("Şablonlar yüklenemedi")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /tekrar dene/i })).toBeInTheDocument();
@@ -31,7 +41,7 @@ describe("Admin projects — fetch fail error state (#123 / #89-3)", () => {
       });
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<ProjectsPage />);
+    renderPage();
 
     const retry = await screen.findByRole("button", { name: /tekrar dene/i });
     fireEvent.click(retry);
