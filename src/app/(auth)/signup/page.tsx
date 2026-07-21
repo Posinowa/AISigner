@@ -3,28 +3,19 @@
 import { useState } from "react"
 import { useActionState } from "react"
 import { signupAction } from "./actions"
-import { UserPlus, CheckCircle2 } from "lucide-react"
+import { UserPlus } from "lucide-react"
 import Link from "next/link"
 import { AuthCard } from "@/features/auth/ui/AuthCard"
 import { AuthField } from "@/features/auth/ui/AuthField"
 import { FormAlert } from "@/features/auth/ui/FormAlert"
 import { AuthSubmitButton } from "@/features/auth/ui/AuthSubmitButton"
+import { PasswordRules } from "@/features/auth/ui/PasswordRules"
 
 const initialState = { error: {} as Record<string, string[]> }
-
-const passwordRules = [
-  { test: (p: string) => p.length >= 8, label: "En az 8 karakter" },
-  { test: (p: string) => /[A-Z]/.test(p), label: "En az bir büyük harf" },
-  { test: (p: string) => /[a-z]/.test(p), label: "En az bir küçük harf" },
-  { test: (p: string) => /[0-9]/.test(p), label: "En az bir rakam" },
-  { test: (p: string) => /[^A-Za-z0-9]/.test(p), label: "En az bir özel karakter" },
-]
 
 export default function SignupPage() {
   const [state, formAction, isPending] = useActionState(signupAction, initialState)
   const [password, setPassword] = useState("")
-
-  const metCount = passwordRules.filter((r) => r.test(password)).length
 
   return (
     <AuthCard
@@ -103,34 +94,7 @@ export default function SignupPage() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           errors={state.error?.password}
-          belowField={
-            password.length > 0 && (
-              <>
-                {/* #153: Kurallar görsel olarak işaretleniyordu ama ekran okuyucuya
-                    hiç ulaşmıyordu. Sayaç aria-live ile özetleniyor; listenin
-                    kendisi görsel destek olarak kalıyor. */}
-                <p className="sr-only" aria-live="polite">
-                  Şifre kurallarından {metCount} / {passwordRules.length} tanesi sağlandı.
-                </p>
-                <div className="mt-2.5 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1" aria-hidden="true">
-                  {passwordRules.map((rule) => {
-                    const ok = rule.test(password)
-                    return (
-                      <p
-                        key={rule.label}
-                        className={`flex items-center text-[11px] gap-1 ${ok ? "text-emerald-600" : "text-slate-400"}`}
-                      >
-                        <CheckCircle2
-                          className={`w-3 h-3 shrink-0 ${ok ? "text-emerald-500" : "text-slate-300"}`}
-                        />
-                        {rule.label}
-                      </p>
-                    )
-                  })}
-                </div>
-              </>
-            )
-          }
+          belowField={<PasswordRules password={password} />}
         />
 
         {state.error?.general && (
