@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { ArrowLeft, User, Calendar, Target, Clock, BookOpen, Plus, CheckCircle, AlertCircle, Trash2, Sparkles, Map, Github, Loader2 } from "lucide-react"; // Map ikonu eklendi
+import { ArrowLeft, User, Clock, BookOpen, Plus, CheckCircle, AlertCircle, Trash2, Sparkles, Map, Github, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { experienceLevelLabel } from "@/lib/experience-level";
@@ -87,6 +87,10 @@ export default function StudentDetailPage() {
   const [student, setStudent] = useState<StudentDetail | null>(null);
   const [projectTemplates, setProjectTemplates] = useState<ProjectTemplate[]>([]);
   const [loading, setLoading] = useState(true);
+  // #159: İstek başarısız olduğunda "öğrenci yok" denmesin — ağ/sunucu hatası
+  // ayrı bir durum olarak tutulur ve tekrar deneme sunulur.
+  const [loadError, setLoadError] = useState(false);
+  const [templatesError, setTemplatesError] = useState(false);
   const [assigningId, setAssigningId] = useState<string | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
   // Modal a11y: Escape ile kapat + açılışta panele odak.
@@ -100,42 +104,55 @@ export default function StudentDetailPage() {
   // 🚀 SPRINT 3: Roadmap üretimi için yükleniyor state'i
   const [generatingRoadmapId, setGeneratingRoadmapId] = useState<string | null>(null);
 
+  const loadStudentDetail = useCallback(async () => {
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const res = await fetch(`/api/mentor/students/${studentId}`);
+      if (!res.ok) {
+        // #159: 404 gerçekten "bu öğrenci sana atanmamış"; diğer kodlar
+        // (500, 503...) geçici hata — ikisi ekranda ayrı gösterilir.
+        if (res.status === 404) {
+          setStudent(null);
+        } else {
+          setLoadError(true);
+        }
+        return;
+      }
+      setStudent(await res.json());
+    } catch (error) {
+      console.error("Failed to load student detail:", error);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [studentId]);
+
+  const loadProjectTemplates = useCallback(async () => {
+    setTemplatesLoading(true);
+    setTemplatesError(false);
+    try {
+      const res = await fetch("/api/admin/project-templates");
+      if (!res.ok) {
+        setTemplatesError(true);
+        return;
+      }
+      setProjectTemplates(await res.json());
+    } catch (error) {
+      console.error("Failed to load project templates:", error);
+      setTemplatesError(true);
+    } finally {
+      setTemplatesLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadStudentDetail();
     if (activeTab === "assign") {
       loadProjectTemplates();
       setShowAssignModal(true);
     }
-  }, [studentId, activeTab]);
-
-  async function loadStudentDetail() {
-    try {
-      const res = await fetch(`/api/mentor/students/${studentId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setStudent(data);
-      }
-    } catch (error) {
-      console.error("Failed to load student detail:", error);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function loadProjectTemplates() {
-    setTemplatesLoading(true);
-    try {
-      const res = await fetch("/api/admin/project-templates");
-      if (res.ok) {
-        const data = await res.json();
-        setProjectTemplates(data);
-      }
-    } catch (error) {
-      console.error("Failed to load project templates:", error);
-    } finally {
-      setTemplatesLoading(false);
-    }
-  }
+  }, [activeTab, loadStudentDetail, loadProjectTemplates]);
 
   async function handleAIRecommend() {
     if (!student?.studentProfile?.id) {
@@ -297,6 +314,33 @@ export default function StudentDetailPage() {
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
         <span className="ml-3 text-gray-600">Öğrenci detayları yükleniyor...</span>
+      </div>
+    );
+  }
+
+  // #159: Ağ/sunucu hatası ile "öğrenci yok" ayrı ekranlar. Önceden istek
+  // patladığında da "Öğrenci bulunamadı" yazıyordu ve mentörün sayfayı elle
+  // yenilemekten başka çaresi yoktu.
+  if (loadError) {
+    return (
+      <div className="max-w-6xl mx-auto p-4 sm:p-6">
+        <div className="text-center py-12">
+          <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-7 h-7 text-red-500" />
+          </div>
+          <h3 className="text-lg font-semibold text-slate-900 mb-2">
+            Öğrenci bilgileri yüklenemedi
+          </h3>
+          <p className="text-slate-500 text-sm mb-5">
+            Bağlantıda bir sorun oluştu. Lütfen tekrar deneyin.
+          </p>
+          <button
+            onClick={loadStudentDetail}
+            className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-5 py-2.5 transition-colors"
+          >
+            Tekrar Dene
+          </button>
+        </div>
       </div>
     );
   }
@@ -602,7 +646,22 @@ export default function StudentDetailPage() {
                   <button onClick={() => setAiError(null)} className="ml-auto text-red-400 hover:text-red-600">×</button>
                 </div>
               )}
-              {sortedProjectTemplates.length === 0 ? (
+              {templatesError ? (
+                /* #159: Şablon isteği patladığında "şablon yok" denmesin. */
+                <div className="text-center py-12">
+                  <AlertCircle className="w-7 h-7 text-red-500 mx-auto mb-3" />
+                  <p className="text-slate-900 font-semibold">Proje şablonları yüklenemedi</p>
+                  <p className="text-slate-500 text-sm mt-1 mb-4">
+                    Bağlantıda bir sorun oluştu.
+                  </p>
+                  <button
+                    onClick={loadProjectTemplates}
+                    className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-5 py-2.5 transition-colors"
+                  >
+                    Tekrar Dene
+                  </button>
+                </div>
+              ) : sortedProjectTemplates.length === 0 ? (
                 <div className="text-center py-12">
                   <p className="text-gray-500 text-lg">Proje şablonu bulunamadı</p>
                 </div>
