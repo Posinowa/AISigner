@@ -17,6 +17,7 @@ const navByRole: Record<Role, { home: string; links: NavLink[] }> = {
       { href: "/admin-dashboard", label: "Panel" },
       { href: "/admin-dashboard/projects", label: "Projeler" },
       { href: "/admin-dashboard/messages", label: "Mesajlar" },
+      { href: "/admin-dashboard/suggestions", label: "Öneri & İstek" },
     ],
   },
   MENTOR: {
@@ -31,6 +32,7 @@ const navByRole: Record<Role, { home: string; links: NavLink[] }> = {
     links: [
       { href: "/student-dashboard", label: "Panel" },
       { href: "/student-dashboard/messages", label: "Mesajlar" },
+      { href: "/student-dashboard/suggestions", label: "Öneri & İstek" },
     ],
   },
 };

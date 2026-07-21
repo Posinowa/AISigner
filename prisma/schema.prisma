@@ -8,27 +8,29 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
+  id            String        @id @default(cuid())
+  email         String        @unique
   name          String?
   lastName      String?
   password      String
   phone         String?
-  role          Role      @default(STUDENT)
+  role          Role          @default(STUDENT)
   accountStatus AccountStatus @default(APPROVED)
   emailVerified DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
   // Relations
-  sessions        Session[]
-  studentProfile  StudentProfile? @relation("StudentProfile_userIdToUser")
-  mentoredStudents StudentProfile[] @relation("StudentProfile_mentorIdToUser")
-  sentMessages    Message[]       @relation("Message_senderIdToUser")
-  receivedMessages Message[]      @relation("Message_receiverIdToUser")
-  stepComments    StepComment[]
-  stepFiles       StepFile[]
-  securityAnswers SecurityAnswer[]
+  sessions            Session[]
+  studentProfile      StudentProfile?  @relation("StudentProfile_userIdToUser")
+  mentoredStudents    StudentProfile[] @relation("StudentProfile_mentorIdToUser")
+  sentMessages        Message[]        @relation("Message_senderIdToUser")
+  receivedMessages    Message[]        @relation("Message_receiverIdToUser")
+  stepComments        StepComment[]
+  stepFiles           StepFile[]
+  securityAnswers     SecurityAnswer[]
+  suggestions         Suggestion[]     @relation("Suggestion_authorIdToUser")
+  reviewedSuggestions Suggestion[]     @relation("Suggestion_reviewedByIdToUser")
 }
 
 model Session {
@@ -60,27 +62,27 @@ model StudentProfile {
 }
 
 model ProjectTemplate {
-  id            String   @id @default(cuid())
+  id            String     @id @default(cuid())
   // #112: Seed idempotency title lookup'ına dayanır; DB seviyesinde de benzersiz olmalı.
-  title         String   @unique
+  title         String     @unique
   description   String
   track         String[]
   difficulty    Difficulty
   // #49: Projenin GitHub repository URL'i (opsiyonel, public repo).
   githubRepoUrl String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 
   assignedProjects AssignedProject[]
 }
 
 model AssignedProject {
-  id               String           @id @default(cuid())
-  studentProfileId String
+  id                String           @id @default(cuid())
+  studentProfileId  String
   projectTemplateId String
-  status           AssignmentStatus @default(PENDING)
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  status            AssignmentStatus @default(PENDING)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 
   studentProfile  StudentProfile  @relation(fields: [studentProfileId], references: [id])
   projectTemplate ProjectTemplate @relation(fields: [projectTemplateId], references: [id])
@@ -116,9 +118,9 @@ model RoadmapStep {
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 
-  roadmap   Roadmap       @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
-  comments  StepComment[]
-  files     StepFile[]
+  roadmap  Roadmap       @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
+  comments StepComment[]
+  files    StepFile[]
 }
 
 model Message {
@@ -226,6 +228,42 @@ model SurveyAnswer {
 
   @@unique([questionId, studentProfileId])
   @@index([studentProfileId])
+}
+
+/// #147: Stajyerin yöneticiye ilettiği öneri/istek kaydı.
+model Suggestion {
+  id       String           @id @default(cuid())
+  authorId String
+  type     SuggestionType   @default(SUGGESTION)
+  title    String
+  content  String
+  status   SuggestionStatus @default(OPEN)
+
+  /// Yöneticinin kayda düştüğü yanıt/not (öğrenciye de gösterilir).
+  adminNote String?
+
+  reviewedById String?
+  reviewedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  author     User  @relation("Suggestion_authorIdToUser", fields: [authorId], references: [id], onDelete: Cascade)
+  reviewedBy User? @relation("Suggestion_reviewedByIdToUser", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([authorId, createdAt])
+  @@index([status, createdAt])
+}
+
+enum SuggestionType {
+  SUGGESTION
+  REQUEST
+}
+
+enum SuggestionStatus {
+  OPEN
+  IN_REVIEW
+  RESOLVED
 }
 
 enum Role {

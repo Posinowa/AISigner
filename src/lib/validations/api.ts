@@ -205,3 +205,39 @@ export const updateStepCommentSchema = z.object({
     .max(1000, "Yorum en fazla 1000 karakter olabilir")
     .transform((val) => val.trim()),
 });
+
+// ==========================================
+// 📮 Öneri & İstek Şemaları (#147)
+// ==========================================
+
+export const suggestionTypeEnum = z.enum(["SUGGESTION", "REQUEST"]);
+export const suggestionStatusEnum = z.enum(["OPEN", "IN_REVIEW", "RESOLVED"]);
+
+// Stajyer yeni öneri/istek gönderir
+export const createSuggestionSchema = z.object({
+  type: suggestionTypeEnum,
+  title: z
+    .string()
+    .min(3, "Başlık en az 3 karakter olmalı")
+    .max(120, "Başlık en fazla 120 karakter olabilir")
+    .transform((val) => val.trim()),
+  content: z
+    .string()
+    .min(10, "Açıklama en az 10 karakter olmalı")
+    .max(2000, "Açıklama en fazla 2000 karakter olabilir")
+    .transform((val) => val.trim()),
+});
+
+// Yönetici durum / not günceller — en az bir alan gönderilmeli
+export const updateSuggestionSchema = z
+  .object({
+    status: suggestionStatusEnum.optional(),
+    adminNote: z
+      .string()
+      .max(2000, "Not en fazla 2000 karakter olabilir")
+      .transform((val) => val.trim())
+      .optional(),
+  })
+  .refine((data) => data.status !== undefined || data.adminNote !== undefined, {
+    message: "Güncellenecek en az bir alan gönderilmeli",
+  });

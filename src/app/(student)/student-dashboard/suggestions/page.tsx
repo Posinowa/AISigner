@@ -1,0 +1,232 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { Loader2, AlertCircle, Send, Inbox, MessageSquareQuote } from "lucide-react";
+import { toast } from "sonner";
+import { extractApiErrorMessage } from "@/lib/api-error-message";
+import {
+  typeLabels,
+  typeStyles,
+  statusLabels,
+  statusStyles,
+  type SuggestionStatus,
+  type SuggestionType,
+} from "@/features/suggestions/labels";
+
+type Suggestion = {
+  id: string;
+  type: SuggestionType;
+  title: string;
+  content: string;
+  status: SuggestionStatus;
+  adminNote: string | null;
+  createdAt: string;
+};
+
+const MAX_TITLE = 120;
+const MAX_CONTENT = 2000;
+
+export default function StudentSuggestionsPage() {
+  const [items, setItems] = useState<Suggestion[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+
+  const [type, setType] = useState<SuggestionType>("SUGGESTION");
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      setLoading(true);
+      setLoadError(false);
+      const res = await fetch("/api/suggestions");
+      if (!res.ok) throw new Error("failed");
+      setItems(await res.json());
+    } catch {
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (submitting) return;
+
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/suggestions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, title, content }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        toast.error(extractApiErrorMessage(data, "Gönderilemedi. Lütfen tekrar deneyin."));
+        return;
+      }
+
+      const created: Suggestion = await res.json();
+      setItems((prev) => [created, ...prev]);
+      setTitle("");
+      setContent("");
+      toast.success("Mesajınız yöneticiye iletildi.");
+    } catch {
+      toast.error("Bağlantı hatası. Lütfen tekrar deneyin.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const canSubmit =
+    title.trim().length >= 3 && content.trim().length >= 10 && !submitting;
+
+  return (
+    <div className="max-w-4xl mx-auto p-6 space-y-8">
+      <div className="pt-2">
+        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Öneri & İstek</h1>
+        <p className="text-slate-500 mt-1.5 text-sm">
+          Platformla ilgili bir öneriniz veya talebiniz mi var? Doğrudan yöneticiye iletin.
+        </p>
+      </div>
+
+      {/* Gönderim formu */}
+      <form
+        onSubmit={handleSubmit}
+        className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 space-y-5"
+      >
+        <div className="flex gap-2">
+          {(Object.keys(typeLabels) as SuggestionType[]).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setType(t)}
+              aria-pressed={type === t}
+              className={`px-4 py-2 rounded-xl text-sm font-medium border transition-colors ${
+                type === t
+                  ? "bg-blue-600 text-white border-blue-600"
+                  : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              {typeLabels[t]}
+            </button>
+          ))}
+        </div>
+
+        <div>
+          <label htmlFor="suggestion-title" className="block text-sm font-medium text-slate-700 mb-1.5">
+            Başlık
+          </label>
+          <input
+            id="suggestion-title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            maxLength={MAX_TITLE}
+            placeholder="Kısa ve net bir başlık"
+            className="w-full h-11 px-4 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="suggestion-content" className="block text-sm font-medium text-slate-700 mb-1.5">
+            Açıklama
+          </label>
+          <textarea
+            id="suggestion-content"
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            maxLength={MAX_CONTENT}
+            rows={5}
+            placeholder="Önerinizi veya talebinizi ayrıntılı anlatın (en az 10 karakter)."
+            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"
+          />
+          <p className="text-xs text-slate-400 mt-1.5 text-right">
+            {content.length}/{MAX_CONTENT}
+          </p>
+        </div>
+
+        <button
+          type="submit"
+          disabled={!canSubmit}
+          className="inline-flex items-center gap-2 h-11 px-6 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors"
+        >
+          {submitting ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Send className="w-4 h-4" />
+          )}
+          Gönder
+        </button>
+      </form>
+
+      {/* Geçmiş */}
+      <section>
+        <h2 className="text-xl font-bold text-slate-900 border-b border-slate-200 pb-3 mb-5 flex items-center gap-2">
+          <MessageSquareQuote className="w-5 h-5 text-slate-700" />
+          Gönderdiklerim
+        </h2>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-14 text-slate-500">
+            <Loader2 className="w-5 h-5 animate-spin mr-2" />
+            Yükleniyor...
+          </div>
+        ) : loadError ? (
+          <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center">
+            <AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-3" />
+            <p className="text-slate-900 font-semibold">Kayıtlar yüklenemedi</p>
+            <button
+              onClick={load}
+              className="mt-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-5 py-2.5 transition-colors"
+            >
+              Tekrar Dene
+            </button>
+          </div>
+        ) : items.length === 0 ? (
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-10 text-center">
+            <Inbox className="w-9 h-9 text-slate-400 mx-auto mb-3" />
+            <p className="text-slate-500 text-sm">
+              Henüz bir öneri veya istek göndermediniz.
+            </p>
+          </div>
+        ) : (
+          <ul className="space-y-4">
+            {items.map((item) => (
+              <li
+                key={item.id}
+                className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5"
+              >
+                <div className="flex flex-wrap items-center gap-2 mb-2">
+                  <span className={`px-2.5 py-0.5 rounded-md text-xs font-semibold border ${typeStyles[item.type]}`}>
+                    {typeLabels[item.type]}
+                  </span>
+                  <span className={`px-2.5 py-0.5 rounded-md text-xs font-semibold border ${statusStyles[item.status]}`}>
+                    {statusLabels[item.status]}
+                  </span>
+                  <span className="text-xs text-slate-400 ml-auto">
+                    {new Date(item.createdAt).toLocaleDateString("tr-TR")}
+                  </span>
+                </div>
+                <h3 className="font-semibold text-slate-900">{item.title}</h3>
+                <p className="text-sm text-slate-600 mt-1 whitespace-pre-wrap">{item.content}</p>
+
+                {item.adminNote && (
+                  <div className="mt-4 rounded-xl bg-slate-50 border border-slate-200 p-3">
+                    <p className="text-xs font-semibold text-slate-500 mb-1">Yönetici yanıtı</p>
+                    <p className="text-sm text-slate-700 whitespace-pre-wrap">{item.adminNote}</p>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}
