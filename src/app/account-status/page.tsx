@@ -1,8 +1,10 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/nextauth";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import LogoutButton from "@/components/LogoutButton";
-import { Clock, XCircle } from "lucide-react";
+import { prisma } from "@/lib/db";
+import { Clock, XCircle, UserPen } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +34,16 @@ export default async function AccountStatusPage() {
 
   const rejected = status === "REJECTED";
 
+  // #143: Onay artık profil tamamlandıktan SONRA anlam taşıyor. Profilini henüz
+  // doldurmamış PENDING kullanıcıyı beklemeye değil, profil tamamlamaya yönlendir.
+  const profile = rejected
+    ? null
+    : await prisma.studentProfile.findUnique({
+        where: { userId: session.user.id },
+        select: { id: true },
+      });
+  const needsProfile = !rejected && !profile;
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 px-4 py-12">
       <div className="w-full max-w-md">
@@ -51,20 +63,40 @@ export default async function AccountStatusPage() {
             >
               {rejected ? (
                 <XCircle className="w-8 h-8 text-red-600" />
+              ) : needsProfile ? (
+                <UserPen className="w-8 h-8 text-amber-600" />
               ) : (
                 <Clock className="w-8 h-8 text-amber-600" />
               )}
             </div>
 
             <h1 className="text-2xl font-bold text-slate-900">
-              {rejected ? "Başvurunuz reddedildi" : "Hesabınız onay bekliyor"}
+              {rejected
+                ? "Başvurunuz reddedildi"
+                : needsProfile
+                  ? "Profilinizi tamamlayın"
+                  : "Hesabınız inceleniyor"}
             </h1>
 
             <p className="mt-3 text-sm text-slate-600 leading-relaxed">
               {rejected
                 ? "Hesabınız bir yönetici tarafından reddedildi. Bir hata olduğunu düşünüyorsanız lütfen ekiple iletişime geçin."
-                : "Kaydınız başarıyla alındı. Bir yönetici hesabınızı onayladıktan sonra panelinize erişebileceksiniz. Teşekkürler!"}
+                : needsProfile
+                  ? "Değerlendirmeye alınabilmeniz için önce profilinizi doldurmanız gerekiyor. Profiliniz, size en uygun mentörün belirlenmesinde kullanılacak."
+                  : "Profiliniz alındı ve inceleniyor. Size uygun bir mentör atandıktan sonra panelinize erişebileceksiniz. Teşekkürler!"}
             </p>
+
+            {/* #143: Profilsiz PENDING kullanıcı için doğrudan aksiyon. */}
+            {needsProfile && (
+              <div className="mt-6">
+                <Link
+                  href="/profile-setup"
+                  className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-6 py-3 text-sm font-semibold text-white shadow-md shadow-blue-200 transition-all"
+                >
+                  Profilimi Tamamla
+                </Link>
+              </div>
+            )}
 
             {session.user.email && (
               <p className="mt-4 text-xs text-slate-400">
