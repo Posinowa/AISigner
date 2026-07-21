@@ -1,5 +1,7 @@
 // #46: İstemci ve sunucu arasında paylaşılan saf yardımcılar (prisma/React bağımlılığı yok).
 
+import { extractApiErrorMessage } from "@/lib/api-error-message";
+
 export type SurveyQuestionView = {
   id: string;
   question: string;
@@ -26,20 +28,15 @@ export function buildSurveyAnswerPayload(
 /**
  * #83: POST /api/student/survey-answers hatasını okunabilir tek mesaja indirger.
  * Hata iki şekilde gelebilir: düz string (SurveyValidationError/500) veya zod
- * fieldErrors objesi (`{ answers: ["mesaj"] }`, 400 validation). Önceki kod
- * yalnızca string'i kontrol ediyordu; obje gelince genel/anlamsız bir mesaja
- * düşüyordu — validation hatası kullanıcıya görünmüyordu.
+ * fieldErrors objesi (`{ answers: ["mesaj"] }`, 400 validation).
+ *
+ * #126-3: Ayrıştırma mantığı ortak `extractApiErrorMessage`'a delege edilir —
+ * tek kaynak. Buradaki imza *hata alanını* alır (tüm gövdeyi değil), bu yüzden
+ * helper'ın beklediği `{ error }` şekline sarmalanır.
  */
 export function extractSurveyErrorMessage(
   errorField: unknown,
   fallback: string,
 ): string {
-  if (typeof errorField === "string" && errorField.trim().length > 0) {
-    return errorField;
-  }
-  if (errorField && typeof errorField === "object") {
-    const firstMessage = Object.values(errorField as Record<string, unknown>).flat()[0];
-    if (firstMessage) return String(firstMessage);
-  }
-  return fallback;
+  return extractApiErrorMessage({ error: errorField }, fallback);
 }
