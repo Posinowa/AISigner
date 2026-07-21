@@ -5,6 +5,19 @@ import { SECURITY_QUESTIONS, REQUIRED_ANSWERS } from "@/lib/security-questions";
 import { createRateLimiter } from "@/lib/rate-limit";
 import crypto from "crypto";
 
+/**
+ * #149: Kullanıcı bulunamadığında da argon2 doğrulaması çalıştırmak için sabit
+ * bir hash. Aksi halde "hesap yok" yanıtı belirgin şekilde daha hızlı döner ve
+ * hesabın varlığı yanıt süresinden okunabilir (nextauth.ts ile aynı desen).
+ */
+let dummyHashPromise: Promise<string> | null = null;
+function getDummyHash(): Promise<string> {
+  if (!dummyHashPromise) {
+    dummyHashPromise = hash("aisigner-dummy-answer-for-constant-time-verify");
+  }
+  return dummyHashPromise;
+}
+
 const limiter = createRateLimiter("forgot-password", {
   maxRequests: 5,
   windowSeconds: 300, // 5 dakikada max 5 deneme
@@ -30,13 +43,15 @@ interface ResetToken {
 }
 const resetTokens = new Map<string, ResetToken>();
 
-// Süresi dolan tokenleri temizle (her 5 dakikada bir)
-setInterval(() => {
+// Süresi dolan tokenleri temizle (her 5 dakikada bir).
+// unref: bu zamanlayıcı tek başına prosesi ayakta tutmasın.
+const sweeper = setInterval(() => {
   const now = Date.now();
   for (const [token, data] of resetTokens) {
     if (now > data.expiresAt) resetTokens.delete(token);
   }
 }, 5 * 60 * 1000);
+sweeper.unref?.();
 
 /**
  * POST /api/auth/forgot-password/verify
@@ -50,7 +65,11 @@ export async function POST(req: Request) {
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
     "anonymous";
 
-  const rl = limiter.check(ip);
+  // #149: Kotayı **peek** ile yokla, tüketme. Meşru akış üç istek sürüyor
+  // (e-posta → cevaplar → yeni şifre); her istekte saymak kullanıcının kendi
+  // sıfırlamasını yarıda kilitliyordu. Kota yalnızca başarısız denemelerde ve
+  // hesap yoklamaya açık 1. adımda tüketilir.
+  const rl = limiter.peek(ip);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Çok fazla deneme yaptınız. Lütfen 5 dakika bekleyin." },
@@ -68,6 +87,8 @@ export async function POST(req: Request) {
     };
 
     if (!email || typeof email !== "string") {
+      // Bozuk istek de kota tüketsin — aksi halde sınırsız zorlanabilir.
+      limiter.check(ip);
       return NextResponse.json(
         { error: "Geçerli bir email adresi girin." },
         { status: 400 }
@@ -76,7 +97,14 @@ export async function POST(req: Request) {
 
     // Hesap bazlı rate limiting (IP spoofing'e karşı ek koruma)
     const normalizedEmail = email.toLowerCase().trim();
-    const accountRl = accountLimiter.check(normalizedEmail);
+
+    /** Bir denemeyi iki limitte de say (başarısızlık / hesap yoklama). */
+    const consumeAttempt = () => {
+      limiter.check(ip);
+      accountLimiter.check(normalizedEmail);
+    };
+
+    const accountRl = accountLimiter.peek(normalizedEmail);
     if (!accountRl.allowed) {
       return NextResponse.json(
         { error: "Bu hesap için çok fazla deneme yapıldı. Lütfen 1 saat bekleyin." },
@@ -93,13 +121,26 @@ export async function POST(req: Request) {
 
     // Kullanıcı bulunamasa bile aynı mesajı ver (enumeration önleme)
     if (!user || user.securityAnswers.length < REQUIRED_ANSWERS) {
-      // Soruları gösterirken rastgele sorular göster (enumeration önleme)
       if (!answers) {
+        // #149: Sahte sorular e-postadan **türetilir**, rastgele seçilmez.
+        // Rastgele seçimde aynı e-posta iki kez sorulduğunda kayıtlı hesap hep
+        // aynı üçlüyü, kayıtsız hesap her seferinde farklı üçlüyü döndürüyordu;
+        // bu tek başına hesabın var olup olmadığını ele veriyordu.
+        consumeAttempt();
         return NextResponse.json({
           step: "questions",
-          questions: getRandomQuestions(),
+          questions: getDecoyQuestions(normalizedEmail),
         });
       }
+
+      // #149: Hesap yokken de argon2 çalıştır — "hesap yok" yanıtı gerçek
+      // doğrulamadan belirgin şekilde hızlı dönmesin.
+      const dummy = await getDummyHash();
+      for (let i = 0; i < REQUIRED_ANSWERS; i++) {
+        await verify(dummy, "gecersiz-cevap").catch(() => false);
+      }
+
+      consumeAttempt();
       return NextResponse.json(
         { error: "Güvenlik sorusu cevapları yanlış." },
         { status: 400 }
@@ -108,6 +149,7 @@ export async function POST(req: Request) {
 
     // ADIM 1: Sadece email geldi → Soruları döndür
     if (!answers) {
+      consumeAttempt();
       const questionIds = user.securityAnswers.map((a) => a.questionId);
       const questions = questionIds.map((qId) => ({
         questionId: qId,
@@ -122,14 +164,21 @@ export async function POST(req: Request) {
 
     // ADIM 2: Cevaplar geldi → Doğrula
     if (!Array.isArray(answers) || answers.length < REQUIRED_ANSWERS) {
+      consumeAttempt();
       return NextResponse.json(
         { error: "Tüm güvenlik sorularını cevaplayın." },
         { status: 400 }
       );
     }
 
-    let correctCount = 0;
+    // #149: Doğru cevaplar **soru bazında tekilleştirilerek** sayılır.
+    // Önceden her dizi elemanı ayrı sayıldığı için aynı doğru cevabı üç kez
+    // göndermek doğrulamayı geçiyordu — yani üç cevaptan birini bilen biri
+    // şifreyi sıfırlayabiliyordu.
+    const correctQuestionIds = new Set<number>();
     for (const ans of answers) {
+      if (correctQuestionIds.has(ans.questionId)) continue;
+
       const stored = user.securityAnswers.find(
         (sa) => sa.questionId === ans.questionId
       );
@@ -138,22 +187,25 @@ export async function POST(req: Request) {
           stored.answer,
           ans.answer.trim().toLowerCase()
         );
-        if (isCorrect) correctCount++;
+        if (isCorrect) correctQuestionIds.add(ans.questionId);
       }
     }
 
-    if (correctCount < REQUIRED_ANSWERS) {
+    if (correctQuestionIds.size < REQUIRED_ANSWERS) {
+      consumeAttempt();
       return NextResponse.json(
         { error: "Güvenlik sorusu cevapları yanlış. Lütfen tekrar deneyin." },
         { status: 400 }
       );
     }
 
-    // ADIM 3: Token + yeni şifre → doğrula ve şifreyi güncelle
-    // NOT: Artık answers tekrar doğrulanmıyor — resetToken yeterli kanıt
+    // ADIM 3: Token + yeni şifre → doğrula ve şifreyi güncelle.
+    // Buraya ulaşmak için cevaplar yukarıda **yeniden** doğrulandı; resetToken
+    // buna ek bir kanıt (step2'yi atlayıp doğrudan step3'e gidilemesin diye).
     if (newPassword) {
       // Token olmadan step 3'e geçiş engellenir
       if (!resetToken) {
+        consumeAttempt();
         return NextResponse.json(
           { error: "Geçersiz istek. Lütfen sıfırlama işlemini baştan başlatın." },
           { status: 400 }
@@ -162,6 +214,7 @@ export async function POST(req: Request) {
       const tokenData = resetTokens.get(resetToken);
       if (!tokenData || Date.now() > tokenData.expiresAt || tokenData.userId !== user.id) {
         resetTokens.delete(resetToken);
+        consumeAttempt();
         return NextResponse.json(
           { error: "Doğrulama süresi doldu veya geçersiz. Lütfen tekrar deneyin." },
           { status: 400 }
@@ -213,6 +266,11 @@ export async function POST(req: Request) {
         data: { password: hashedPassword },
       });
 
+      // #149: Sıfırlama başarıyla bittiğine göre bu kimlikler şüpheli değil;
+      // kullanıcı hemen ardından tekrar giriş akışına girerse kilitlenmesin.
+      limiter.reset(ip);
+      accountLimiter.reset(normalizedEmail);
+
       return NextResponse.json({
         step: "success",
         message: "Şifreniz başarıyla değiştirildi. Giriş yapabilirsiniz.",
@@ -241,14 +299,28 @@ export async function POST(req: Request) {
 }
 
 /**
- * Enumeration önleme: Kullanıcı bulunamadığında rastgele sorular göster
+ * Enumeration önleme: kullanıcı bulunamadığında da soru döndürülür, ama sorular
+ * e-postadan **deterministik** olarak türetilir (#149).
+ *
+ * Rastgele seçimde aynı e-posta için ikinci istek farklı sorular getiriyordu;
+ * kayıtlı hesap ise her zaman aynı üçlüyü döndürdüğü için iki istek atmak
+ * hesabın varlığını ele veriyordu. Tohum gizli anahtarla HMAC'lenir ki
+ * saldırgan "bu üçlü sahte mi" diye çevrimdışı hesaplayamasın.
  */
-function getRandomQuestions() {
+function getDecoyQuestions(email: string) {
+  const secret = process.env.NEXTAUTH_SECRET ?? "aisigner-decoy-fallback";
+  const seed = crypto.createHmac("sha256", secret).update(email).digest();
+
   const indices: number[] = [];
-  while (indices.length < REQUIRED_ANSWERS) {
-    const idx = Math.floor(Math.random() * SECURITY_QUESTIONS.length);
+  for (let i = 0; i < seed.length && indices.length < REQUIRED_ANSWERS; i++) {
+    const idx = seed[i] % SECURITY_QUESTIONS.length;
     if (!indices.includes(idx)) indices.push(idx);
   }
+  // Teorik olarak tohum yetmezse sırayla tamamla (uzunluk garantisi).
+  for (let q = 0; indices.length < REQUIRED_ANSWERS; q++) {
+    if (!indices.includes(q)) indices.push(q);
+  }
+
   return indices.map((qId) => ({
     questionId: qId,
     question: SECURITY_QUESTIONS[qId],
