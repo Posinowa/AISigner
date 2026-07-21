@@ -19,6 +19,7 @@ Varsa ekran görüntüsü ekle.
 
 * [ ] Branch adı doğru formatta
 * [ ] PR issue’ya bağlı
+* [ ] Issue etiketleri PR’a da eklendi (en az `type:` + `priority:`)
 * [ ] Gereksiz dosya değiştirilmedi
 * [ ] Sadece ilgili issue kapsamındaki değişiklikler yapıldı
 * [ ] Local build/test kontrol edildi
