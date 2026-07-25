@@ -49,6 +49,7 @@ src/
 │   ├── ai/server/                        — profile-analysis(+store), recommendations, roadmap
 │   ├── ai/ui/                            — AIChatBot (Posilog), ProfileAnalysisCard
 │   ├── student/models/                   — onboarding, compiledGoals, onboardingInitial
+│   ├── suggestions/                      — öneri/istek: labels + server (#147)
 │   ├── survey/                           — answers + server/survey (#45/#46)
 │   └── mentors|messaging|projects|files|auth/...
 └── lib/
@@ -73,6 +74,7 @@ src/
 | `Roadmap` / `RoadmapStep` | DRAFT/PUBLISHED; step'te githubIssueUrl (#50); öğrenci DRAFT'a etkileşemez (#52) |
 | `SurveyQuestion` / `SurveyAnswer` | admin anket havuzu + stajyer cevapları (#45/#46) |
 | `ProfileAnalysis` | AI profil analizinin kalıcı hali, profile 1-1 (#47) |
+| `Suggestion` | Stajyer→admin öneri/istek; type + status + adminNote (#147) |
 | `Message` / `StepComment` / `StepFile` / `SecurityAnswer` | mesajlaşma, yorum, dosya, güvenlik soruları |
 
 ## Kritik Mimari Notlar
