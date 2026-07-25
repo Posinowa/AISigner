@@ -11,7 +11,9 @@ import { saveSurveyAnswersSchema } from "@/lib/validations/api";
  * Öğrencinin anket cevaplarını profile bağlı olarak kaydeder (soru başına upsert).
  */
 export async function POST(req: Request) {
-  const auth = await requireAuth("STUDENT");
+  // #143: Anket, profil tamamlama akışının parçası — PENDING stajyer de
+  // cevaplarını kaydedebilmeli (onaya dolu profille düşsün).
+  const auth = await requireAuth("STUDENT", { allowUnapprovedStudent: true });
   if (!auth.authorized) return auth.response;
 
   const userId = auth.session.user.id!;

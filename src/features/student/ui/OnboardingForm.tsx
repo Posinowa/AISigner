@@ -207,7 +207,10 @@ export default function OnboardingForm({
       }
 
       // Başarılı olursa yönlendirme yapılabilir.
-      window.location.href = "/student-dashboard";
+      // #143: Profil tamamlandı → durum ekranına. PENDING kullanıcı "inceleniyor /
+      // mentör atanıyor" mesajını görür; APPROVED kullanıcıyı sayfa zaten kendi
+      // paneline yönlendirir (tek hedef, iki durum da doğru çalışır).
+      window.location.href = "/account-status";
 
     } catch (err) {
       console.error("Onboarding kaydı başarısız:", err);

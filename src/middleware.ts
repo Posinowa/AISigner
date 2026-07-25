@@ -63,18 +63,25 @@ export async function middleware(request: NextRequest) {
   // Rol bazlı erişim kontrolü
   const userRole = token.role as string | undefined;
 
-  // Onaylanmamış stajyer (PENDING/REJECTED): korumalı student route'larından
-  // durum ekranına yönlendirilir. (#38 status verisi, #39 ekran)
+  // Onaylanmamış stajyer (PENDING/REJECTED) → durum ekranı. (#38 status, #39 ekran)
+  //
+  // #143: PENDING kullanıcı profilini TAMAMLAYABİLMELİ — admin boş bir profili
+  // değil, dolu profili (+ AI analizini) görerek onaylasın ve mentör atasın.
+  // Bu yüzden profil tamamlama rotaları PENDING'e açıktır; yalnızca dashboard
+  // kapalıdır. REJECTED ise hiçbirine erişemez.
   const accountStatus = token.accountStatus as string | undefined;
-  if (
-    userRole === "STUDENT" &&
-    accountStatus &&
-    accountStatus !== "APPROVED" &&
-    (pathname.startsWith("/student-dashboard") ||
-      pathname.startsWith("/student-onboarding") ||
-      pathname.startsWith("/profile-setup"))
-  ) {
-    return NextResponse.redirect(new URL("/account-status", request.url));
+  if (userRole === "STUDENT" && accountStatus && accountStatus !== "APPROVED") {
+    const isProfileCompletionRoute =
+      pathname.startsWith("/student-onboarding") || pathname.startsWith("/profile-setup");
+    const isStudentArea =
+      pathname.startsWith("/student-dashboard") || isProfileCompletionRoute;
+
+    const blocked =
+      accountStatus === "REJECTED" ? isStudentArea : isStudentArea && !isProfileCompletionRoute;
+
+    if (blocked) {
+      return NextResponse.redirect(new URL("/account-status", request.url));
+    }
   }
 
   for (const [route, requiredRole] of Object.entries(protectedRoutes)) {
