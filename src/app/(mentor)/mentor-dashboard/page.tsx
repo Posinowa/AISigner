@@ -1,10 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Users, BookOpen, Clock, CheckCircle, AlertCircle, MessageSquare, UserCircle2, ChevronRight, Loader2 } from "lucide-react";
+import { Users, BookOpen, Clock, CheckCircle, AlertCircle, UserCircle2, ChevronRight, Loader2 } from "lucide-react";
 import Link from "next/link";
-import LogoutButton from "@/components/LogoutButton";
-import { UnreadBadge } from "@/features/messaging/ui/UnreadBadge";
 import { experienceLevelLabel } from "@/lib/experience-level";
 
 type StudentWithProfile = {
@@ -124,23 +122,10 @@ export default function MentorDashboardPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/30">
       <div className="max-w-6xl mx-auto p-6">
 
-        {/* Header */}
-        <div className="flex items-start justify-between mb-8 pt-2">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Mentor Paneli</h1>
-            <p className="text-slate-500 mt-1.5 text-sm">Size atanmış öğrencileri yönetin ve proje atayın</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/mentor-dashboard/messages"
-              className="relative inline-flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-blue-50 text-blue-700 rounded-xl text-sm font-medium transition-colors border border-blue-100 shadow-sm"
-            >
-              <MessageSquare className="w-4 h-4" />
-              Mesajlar
-              <UnreadBadge />
-            </Link>
-            <LogoutButton />
-          </div>
+        {/* Sayfa başlığı — navigasyon/çıkış AppShell'de (#126-1) */}
+        <div className="mb-8 pt-2">
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Mentor Paneli</h1>
+          <p className="text-slate-500 mt-1.5 text-sm">Size atanmış öğrencileri yönetin ve proje atayın</p>
         </div>
 
         {/* Stats */}

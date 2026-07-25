@@ -2,7 +2,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { extractApiErrorMessage } from "@/lib/api-error-message";
 import {
   Users,
@@ -12,8 +11,6 @@ import {
   Search,
   AlertCircle,
   Loader2,
-  FolderKanban,
-  MessageSquare,
   CheckCircle2,
   XCircle,
   Clock,
@@ -21,8 +18,6 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
-import LogoutButton from "@/components/LogoutButton";
-import { UnreadBadge } from "@/features/messaging/ui/UnreadBadge";
 import { useModalA11y } from "@/components/ui/useModalA11y";
 import {
   ProfileAnalysisCard,
@@ -300,32 +295,12 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/30">
       <div className="max-w-7xl mx-auto p-4 sm:p-6">
-        {/* Header */}
-        <div className="flex items-start justify-between mb-8 pt-2 gap-4 flex-wrap">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Yönetici Paneli</h1>
-            <p className="text-slate-500 mt-1.5 text-sm">
-              Kullanıcı rollerini düzenle ve öğrencilere mentor ata
-            </p>
-          </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <Link
-              href="/admin-dashboard/messages"
-              className="relative inline-flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-blue-50 text-blue-700 rounded-xl text-sm font-medium transition-colors border border-blue-100 shadow-sm"
-            >
-              <MessageSquare className="w-4 h-4" />
-              Mesajlar
-              <UnreadBadge />
-            </Link>
-            <Link
-              href="/admin-dashboard/projects"
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-medium transition-colors border border-slate-200 shadow-sm"
-            >
-              <FolderKanban className="w-4 h-4" />
-              Proje Şablonları
-            </Link>
-            <LogoutButton />
-          </div>
+        {/* Sayfa başlığı — navigasyon/çıkış AppShell'de (#126-1) */}
+        <div className="mb-8 pt-2">
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Yönetici Paneli</h1>
+          <p className="text-slate-500 mt-1.5 text-sm">
+            Kullanıcı rollerini düzenle ve öğrencilere mentor ata
+          </p>
         </div>
 
         {/* Stats */}

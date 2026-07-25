@@ -1,15 +1,13 @@
-import LogoutButton from "@/components/LogoutButton";
 import { getProfileSummary } from "@/features/student/server/profileSummary";
 import { ProfileSummaryCard } from "@/features/student/ui/ProfileSummaryCard";
 import { RoadmapSteps } from "@/features/student/ui/RoadmapSteps";
 import { prisma } from "@/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/nextauth";
-import { Clock, Briefcase, Target, MessageSquare, Github } from "lucide-react";
+import { Clock, Briefcase, Target, Github } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Progress } from "@/components/ui/progress";
-import { UnreadBadge } from "@/features/messaging/ui/UnreadBadge";
 import { SecurityQuestionsSetup } from "@/features/auth/ui/SecurityQuestionsSetup";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
 
@@ -25,10 +23,7 @@ export default async function StudentDashboardPage() {
   if (accountStatus && accountStatus !== "APPROVED") {
     const rejected = accountStatus === "REJECTED";
     return (
-      <div className="min-h-[80vh] flex flex-col items-center justify-center p-6 text-center relative">
-        <div className="absolute top-4 right-4">
-          <LogoutButton />
-        </div>
+      <div className="min-h-[80vh] flex flex-col items-center justify-center p-6 text-center">
         <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-10 max-w-lg w-full space-y-4">
           <div
             className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto ${
@@ -71,10 +66,7 @@ export default async function StudentDashboardPage() {
 
   if (!profile) {
     return (
-      <div className="min-h-[80vh] flex flex-col items-center justify-center p-6 text-center relative">
-        <div className="absolute top-4 right-4">
-            <LogoutButton />
-        </div>
+      <div className="min-h-[80vh] flex flex-col items-center justify-center p-6 text-center">
         <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-10 max-w-lg w-full space-y-6">
           <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-2">
             <Briefcase className="w-10 h-10 text-blue-600" />
@@ -109,29 +101,16 @@ export default async function StudentDashboardPage() {
   return (
     <div className="max-w-5xl mx-auto mt-8 p-6 space-y-8">
       
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Hoş geldin, {firstName}</h1>
-          <p className="text-slate-500 mt-2 text-sm">
-            {profile.assignedProjects.length > 0 
-              ? "Çalışma masan hazır. Odaklanman gereken güncel görevler aşağıda listelenmiştir." 
-              : profile.mentorId 
-                ? "Mentörün gelişim planını hazırlıyor. Lütfen beklemede kal." 
-                : "Profilin inceleniyor. Yakında bir mentör ile eşleştirileceksin."}
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Link
-            href="/student-dashboard/messages"
-            className="relative inline-flex items-center gap-2 px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-sm font-medium transition-colors"
-          >
-            <MessageSquare className="w-4 h-4" />
-            Mesajlar
-            <UnreadBadge />
-          </Link>
-          <LogoutButton />
-        </div>
+      {/* Sayfa başlığı — navigasyon/çıkış AppShell'de (#126-1) */}
+      <div>
+        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Hoş geldin, {firstName}</h1>
+        <p className="text-slate-500 mt-2 text-sm">
+          {profile.assignedProjects.length > 0
+            ? "Çalışma masan hazır. Odaklanman gereken güncel görevler aşağıda listelenmiştir."
+            : profile.mentorId
+              ? "Mentörün gelişim planını hazırlıyor. Lütfen beklemede kal."
+              : "Profilin inceleniyor. Yakında bir mentör ile eşleştirileceksin."}
+        </p>
       </div>
 
       {/* Güvenlik Soruları Kurulumu */}
