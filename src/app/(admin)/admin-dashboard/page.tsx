@@ -46,15 +46,15 @@ type Mentor = {
 };
 
 const roleConfig: Record<User["role"], { label: string; color: string }> = {
-  ADMIN: { label: "Yönetici", color: "bg-purple-50 text-purple-700 border-purple-200" },
-  MENTOR: { label: "Mentor", color: "bg-blue-50 text-blue-700 border-blue-200" },
-  STUDENT: { label: "Öğrenci", color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  ADMIN: { label: "Yönetici", color: "bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border-purple-200" },
+  MENTOR: { label: "Mentor", color: "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200" },
+  STUDENT: { label: "Öğrenci", color: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200" },
 };
 
 const statusConfig: Record<User["accountStatus"], { label: string; color: string }> = {
-  PENDING: { label: "Onay Bekliyor", color: "bg-amber-50 text-amber-700 border-amber-200" },
-  APPROVED: { label: "Onaylı", color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  REJECTED: { label: "Reddedildi", color: "bg-red-50 text-red-700 border-red-200" },
+  PENDING: { label: "Onay Bekliyor", color: "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200" },
+  APPROVED: { label: "Onaylı", color: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200" },
+  REJECTED: { label: "Reddedildi", color: "bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border-red-200" },
 };
 
 export default function AdminDashboard() {
@@ -263,9 +263,9 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-50">
-        <Loader2 className="animate-spin h-7 w-7 text-blue-600 mr-3" />
-        <span className="text-slate-600 font-medium">Kullanıcılar yükleniyor...</span>
+      <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-950">
+        <Loader2 className="animate-spin h-7 w-7 text-blue-600 dark:text-blue-400 mr-3" />
+        <span className="text-slate-600 dark:text-slate-300 font-medium">Kullanıcılar yükleniyor...</span>
       </div>
     );
   }
@@ -274,12 +274,12 @@ export default function AdminDashboard() {
   // ayrı bir hata durumu (mentor-dashboard'daki desenle tutarlı).
   if (loadError) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 px-4 text-center">
-        <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mb-4">
-          <AlertCircle className="w-7 h-7 text-red-500" />
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-950 px-4 text-center">
+        <div className="w-14 h-14 rounded-2xl bg-red-50 dark:bg-red-950/40 flex items-center justify-center mb-4">
+          <AlertCircle className="w-7 h-7 text-red-500 dark:text-red-400" />
         </div>
-        <h2 className="text-lg font-semibold text-slate-900">Kullanıcılar yüklenemedi</h2>
-        <p className="text-slate-500 text-sm mt-1 mb-5">
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Kullanıcılar yüklenemedi</h2>
+        <p className="text-slate-500 dark:text-slate-400 text-sm mt-1 mb-5">
           Bağlantıda bir sorun oluştu. Lütfen tekrar deneyin.
         </p>
         <button
@@ -293,12 +293,12 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/30">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
       <div className="max-w-7xl mx-auto p-4 sm:p-6">
         {/* Sayfa başlığı — navigasyon/çıkış AppShell'de (#126-1) */}
         <div className="mb-8 pt-2">
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Yönetici Paneli</h1>
-          <p className="text-slate-500 mt-1.5 text-sm">
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Yönetici Paneli</h1>
+          <p className="text-slate-500 dark:text-slate-400 mt-1.5 text-sm">
             Kullanıcı rollerini düzenle ve öğrencilere mentor ata
           </p>
         </div>
@@ -306,21 +306,21 @@ export default function AdminDashboard() {
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {[
-            { icon: Users, color: "text-blue-600 bg-blue-50", label: "Toplam Kullanıcı", value: stats.total },
-            { icon: GraduationCap, color: "text-emerald-600 bg-emerald-50", label: "Öğrenci", value: stats.studentCount },
-            { icon: UserCog, color: "text-indigo-600 bg-indigo-50", label: "Mentor", value: stats.mentorCount },
-            { icon: ShieldCheck, color: "text-purple-600 bg-purple-50", label: "Yönetici", value: stats.adminCount },
+            { icon: Users, color: "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40", label: "Toplam Kullanıcı", value: stats.total },
+            { icon: GraduationCap, color: "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40", label: "Öğrenci", value: stats.studentCount },
+            { icon: UserCog, color: "text-indigo-600 bg-indigo-50 dark:bg-indigo-950/40", label: "Mentor", value: stats.mentorCount },
+            { icon: ShieldCheck, color: "text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40", label: "Yönetici", value: stats.adminCount },
           ].map(({ icon: Icon, color, label, value }) => (
             <div
               key={label}
-              className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm flex items-center gap-4"
+              className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 p-5 shadow-sm flex items-center gap-4"
             >
               <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${color} shrink-0`}>
                 <Icon className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-xs font-medium text-slate-500 leading-tight">{label}</p>
-                <p className="text-2xl font-bold text-slate-900 mt-0.5">{value}</p>
+                <p className="text-xs font-medium text-slate-500 dark:text-slate-400 leading-tight">{label}</p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-0.5">{value}</p>
               </div>
             </div>
           ))}
@@ -328,13 +328,13 @@ export default function AdminDashboard() {
 
         {/* Onay bekleyen stajyerler */}
         {stats.pendingCount > 0 && (
-          <div className="mb-6 flex items-start gap-3 rounded-2xl bg-blue-50 border border-blue-200 px-5 py-4">
-            <Clock className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
+          <div className="mb-6 flex items-start gap-3 rounded-2xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 px-5 py-4">
+            <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
             <div className="text-sm">
               <p className="font-semibold text-blue-900">
                 {stats.pendingCount} stajyer onay bekliyor
               </p>
-              <p className="text-blue-700 mt-0.5">
+              <p className="text-blue-700 dark:text-blue-300 mt-0.5">
                 Aşağıdaki listeden onay bekleyen stajyerleri onaylayabilir veya reddedebilirsin.
               </p>
             </div>
@@ -343,13 +343,13 @@ export default function AdminDashboard() {
 
         {/* Uyarı banner — mentor atanmamış öğrenciler */}
         {stats.studentsWithoutMentor > 0 && (
-          <div className="mb-6 flex items-start gap-3 rounded-2xl bg-amber-50 border border-amber-200 px-5 py-4">
-            <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+          <div className="mb-6 flex items-start gap-3 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 px-5 py-4">
+            <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
             <div className="text-sm">
               <p className="font-semibold text-amber-900">
                 {stats.studentsWithoutMentor} öğrencinin mentoru yok
               </p>
-              <p className="text-amber-700 mt-0.5">
+              <p className="text-amber-700 dark:text-amber-300 mt-0.5">
                 Profilini tamamlamış ancak henüz mentor atanmamış öğrenciler var. Aşağıdaki listeden atama yapabilirsin.
               </p>
             </div>
@@ -357,15 +357,15 @@ export default function AdminDashboard() {
         )}
 
         {/* Search + Filter */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 mb-5 flex flex-wrap gap-3 items-center">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-sm p-4 mb-5 flex flex-wrap gap-3 items-center">
           <div className="relative flex-1 min-w-[240px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="İsim veya e-posta ile ara..."
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-blue-500 focus:ring-3 focus:ring-blue-100 outline-none transition"
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-3 focus:ring-blue-100 outline-none transition"
             />
           </div>
           <div className="flex gap-1.5">
@@ -376,7 +376,7 @@ export default function AdminDashboard() {
                 className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-colors ${
                   roleFilter === r
                     ? "bg-slate-900 text-white"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
                 }`}
               >
                 {r === "ALL" ? "Tümü" : roleConfig[r].label}
@@ -386,13 +386,13 @@ export default function AdminDashboard() {
         </div>
 
         {/* Users List */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-sm overflow-hidden">
           {filteredUsers.length === 0 ? (
             <div className="text-center py-16">
-              <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                <Users className="w-6 h-6 text-slate-400" />
+              <div className="w-14 h-14 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                <Users className="w-6 h-6 text-slate-400 dark:text-slate-500" />
               </div>
-              <p className="text-slate-500 text-sm font-medium">
+              <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">
                 {search || roleFilter !== "ALL"
                   ? "Filtreyle eşleşen kullanıcı yok"
                   : "Henüz kullanıcı yok"}
@@ -401,7 +401,7 @@ export default function AdminDashboard() {
           ) : (
             <div className="divide-y divide-slate-100">
               {/* Header row (desktop) */}
-              <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3 bg-slate-50/60 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3 bg-slate-50/60 dark:bg-slate-950/60 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 <div className="col-span-4">Kullanıcı</div>
                 <div className="col-span-3">Rol</div>
                 <div className="col-span-5">Onay / Mentor</div>
@@ -421,10 +421,10 @@ export default function AdminDashboard() {
                         {getInitials(user)}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-slate-900 truncate">
+                        <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">
                           {getDisplayName(user)}
                         </p>
-                        <p className="text-xs text-slate-500 truncate">{user.email}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{user.email}</p>
                         {user.role === "STUDENT" && (
                           <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                             <span
@@ -435,7 +435,7 @@ export default function AdminDashboard() {
                             {user.studentProfile && (
                               <button
                                 onClick={() => openAnalysisModal(user)}
-                                className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold rounded border bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 transition-colors"
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold rounded border bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-200 hover:bg-indigo-100 transition-colors"
                               >
                                 <Sparkles className="w-2.5 h-2.5" /> Analizi Gör
                               </button>
@@ -458,13 +458,13 @@ export default function AdminDashboard() {
                           handleRoleChange(user.id, e.target.value as User["role"])
                         }
                         disabled={isUpdating}
-                        className="border border-slate-200 rounded-xl px-3 py-2 bg-white text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
+                        className="border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 bg-white dark:bg-slate-900 text-sm font-medium text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
                       >
                         <option value="ADMIN">Yönetici</option>
                         <option value="MENTOR">Mentor</option>
                         <option value="STUDENT">Öğrenci</option>
                       </select>
-                      {isUpdating && <Loader2 className="animate-spin w-3.5 h-3.5 text-blue-600" />}
+                      {isUpdating && <Loader2 className="animate-spin w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />}
                     </div>
 
                     {/* Onay / Mentor Atama */}
@@ -483,12 +483,12 @@ export default function AdminDashboard() {
                               <button
                                 onClick={() => handleAccountStatus(user.id, "REJECTED")}
                                 disabled={isUpdating}
-                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 text-xs font-semibold transition-colors disabled:opacity-60"
+                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-700 dark:text-red-300 text-xs font-semibold transition-colors disabled:opacity-60"
                               >
                                 <XCircle className="w-3.5 h-3.5" /> Reddet
                               </button>
                             )}
-                            {isUpdating && <Loader2 className="animate-spin w-3.5 h-3.5 text-blue-600" />}
+                            {isUpdating && <Loader2 className="animate-spin w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />}
                           </div>
                         ) : user.studentProfile ? (
                           <div className="flex items-center gap-2 w-full">
@@ -496,7 +496,7 @@ export default function AdminDashboard() {
                               value={user.studentProfile.mentorId || ""}
                               onChange={(e) => handleAssignMentor(user.id, e.target.value)}
                               disabled={isUpdating}
-                              className="flex-1 border border-slate-200 rounded-xl px-3 py-2 bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
+                              className="flex-1 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
                             >
                               <option value="">— Mentor seçilmedi —</option>
                               {mentors.map((mentor) => (
@@ -505,16 +505,16 @@ export default function AdminDashboard() {
                                 </option>
                               ))}
                             </select>
-                            {isUpdating && <Loader2 className="animate-spin w-3.5 h-3.5 text-blue-600" />}
+                            {isUpdating && <Loader2 className="animate-spin w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />}
                           </div>
                         ) : (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 rounded-lg">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 rounded-lg">
                             <AlertCircle className="w-3 h-3" />
                             Profil tamamlanmamış
                           </span>
                         )
                       ) : (
-                        <span className="text-slate-400 text-xs italic">—</span>
+                        <span className="text-slate-400 dark:text-slate-500 text-xs italic">—</span>
                       )}
                     </div>
                   </div>
@@ -534,19 +534,19 @@ export default function AdminDashboard() {
             aria-modal="true"
             aria-label="AI Profil Analizi"
             tabIndex={-1}
-            className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[85vh] overflow-y-auto outline-none"
+            className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl max-w-2xl w-full max-h-[85vh] overflow-y-auto outline-none"
           >
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 sticky top-0 bg-white rounded-t-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 sticky top-0 bg-white dark:bg-slate-900 rounded-t-2xl">
               <div>
-                <h2 className="text-lg font-semibold text-slate-900">AI Profil Analizi</h2>
-                <p className="text-sm text-slate-500">
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">AI Profil Analizi</h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
                   {getDisplayName(analysisModalUser)} ({analysisModalUser.email})
                 </p>
               </div>
               <button
                 onClick={closeAnalysisModal}
                 aria-label="Kapat"
-                className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors"
+                className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>

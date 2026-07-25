@@ -25,15 +25,15 @@ export default function SignupPage() {
       subtitle={
         <>
           Zaten hesabınız var mı?{" "}
-          <Link href="/signin" className="font-semibold text-blue-600 hover:text-blue-700">
+          <Link href="/signin" className="font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300">
             Giriş yapın
           </Link>
         </>
       }
       footer={
-        <p className="mt-6 text-center text-xs text-slate-500">
+        <p className="mt-6 text-center text-xs text-slate-500 dark:text-slate-400">
           Kayıt olarak{" "}
-          <Link href="/terms" className="underline hover:text-slate-700">
+          <Link href="/terms" className="underline hover:text-slate-700 dark:hover:text-slate-200">
             Kullanım Koşulları
           </Link>
           {"'nı kabul etmiş olursunuz."}

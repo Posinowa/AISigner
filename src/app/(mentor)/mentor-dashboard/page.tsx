@@ -31,15 +31,15 @@ type StudentWithProfile = {
 };
 
 const statusConfig = {
-  PENDING: { label: "Bekliyor", color: "bg-yellow-100 text-yellow-700", icon: Clock },
-  IN_PROGRESS: { label: "Devam Ediyor", color: "bg-blue-100 text-blue-700", icon: AlertCircle },
-  COMPLETED: { label: "Tamamlandı", color: "bg-emerald-100 text-emerald-700", icon: CheckCircle }
+  PENDING: { label: "Bekliyor", color: "bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-300", icon: Clock },
+  IN_PROGRESS: { label: "Devam Ediyor", color: "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300", icon: AlertCircle },
+  COMPLETED: { label: "Tamamlandı", color: "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300", icon: CheckCircle }
 };
 
 const difficultyConfig = {
-  EASY: { label: "Kolay", color: "bg-emerald-50 text-emerald-700 border border-emerald-200" },
-  MEDIUM: { label: "Orta", color: "bg-amber-50 text-amber-700 border border-amber-200" },
-  HARD: { label: "Zor", color: "bg-red-50 text-red-700 border border-red-200" }
+  EASY: { label: "Kolay", color: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200" },
+  MEDIUM: { label: "Orta", color: "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200" },
+  HARD: { label: "Zor", color: "bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border border-red-200" }
 };
 
 export default function MentorDashboardPage() {
@@ -87,21 +87,21 @@ export default function MentorDashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-50">
-        <Loader2 className="animate-spin h-7 w-7 text-blue-600 mr-3" />
-        <span className="text-slate-600 font-medium">Öğrenciler yükleniyor...</span>
+      <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-950">
+        <Loader2 className="animate-spin h-7 w-7 text-blue-600 dark:text-blue-400 mr-3" />
+        <span className="text-slate-600 dark:text-slate-300 font-medium">Öğrenciler yükleniyor...</span>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 px-4 text-center">
-        <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mb-4">
-          <AlertCircle className="w-7 h-7 text-red-500" />
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-950 px-4 text-center">
+        <div className="w-14 h-14 rounded-2xl bg-red-50 dark:bg-red-950/40 flex items-center justify-center mb-4">
+          <AlertCircle className="w-7 h-7 text-red-500 dark:text-red-400" />
         </div>
-        <h2 className="text-lg font-semibold text-slate-900">Öğrenciler yüklenemedi</h2>
-        <p className="text-slate-500 text-sm mt-1 mb-5">
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Öğrenciler yüklenemedi</h2>
+        <p className="text-slate-500 dark:text-slate-400 text-sm mt-1 mb-5">
           Bağlantıda bir sorun oluştu. Lütfen tekrar deneyin.
         </p>
         <button
@@ -119,30 +119,30 @@ export default function MentorDashboardPage() {
   const missingProfile = students.filter(s => !s.studentProfile).length;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/30">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
       <div className="max-w-6xl mx-auto p-6">
 
         {/* Sayfa başlığı — navigasyon/çıkış AppShell'de (#126-1) */}
         <div className="mb-8 pt-2">
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Mentor Paneli</h1>
-          <p className="text-slate-500 mt-1.5 text-sm">Size atanmış öğrencileri yönetin ve proje atayın</p>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Mentor Paneli</h1>
+          <p className="text-slate-500 dark:text-slate-400 mt-1.5 text-sm">Size atanmış öğrencileri yönetin ve proje atayın</p>
         </div>
 
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {[
-            { icon: Users, color: "text-blue-600 bg-blue-50", label: "Toplam Öğrenci", value: students.length },
-            { icon: BookOpen, color: "text-indigo-600 bg-indigo-50", label: "Aktif Projeler", value: totalActive },
-            { icon: CheckCircle, color: "text-emerald-600 bg-emerald-50", label: "Tamamlanan", value: totalCompleted },
-            { icon: AlertCircle, color: "text-amber-600 bg-amber-50", label: "Profil Eksik", value: missingProfile },
+            { icon: Users, color: "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40", label: "Toplam Öğrenci", value: students.length },
+            { icon: BookOpen, color: "text-indigo-600 bg-indigo-50 dark:bg-indigo-950/40", label: "Aktif Projeler", value: totalActive },
+            { icon: CheckCircle, color: "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40", label: "Tamamlanan", value: totalCompleted },
+            { icon: AlertCircle, color: "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40", label: "Profil Eksik", value: missingProfile },
           ].map(({ icon: Icon, color, label, value }) => (
-            <div key={label} className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm flex items-center gap-4">
+            <div key={label} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 p-5 shadow-sm flex items-center gap-4">
               <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${color} shrink-0`}>
                 <Icon className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-xs font-medium text-slate-500 leading-tight">{label}</p>
-                <p className="text-2xl font-bold text-slate-900 mt-0.5">{value}</p>
+                <p className="text-xs font-medium text-slate-500 dark:text-slate-400 leading-tight">{label}</p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-0.5">{value}</p>
               </div>
             </div>
           ))}
@@ -150,12 +150,12 @@ export default function MentorDashboardPage() {
 
         {/* Student List */}
         {students.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-slate-200 p-16 text-center shadow-sm">
-            <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <Users className="w-8 h-8 text-slate-400" />
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 p-16 text-center shadow-sm">
+            <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <Users className="w-8 h-8 text-slate-400 dark:text-slate-500" />
             </div>
-            <h3 className="text-lg font-semibold text-slate-900 mb-2">Henüz öğrenci yok</h3>
-            <p className="text-slate-500 text-sm">Size atanmış öğrenci bulunmuyor.</p>
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">Henüz öğrenci yok</h3>
+            <p className="text-slate-500 dark:text-slate-400 text-sm">Size atanmış öğrenci bulunmuyor.</p>
           </div>
         ) : (
           <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
@@ -170,7 +170,7 @@ export default function MentorDashboardPage() {
               return (
                 <div
                   key={student.id}
-                  className="bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden flex flex-col"
+                  className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden flex flex-col"
                 >
                   {/* Card top stripe */}
                   <div className={`h-1 ${hasProfile ? "bg-gradient-to-r from-blue-500 to-indigo-500" : "bg-gradient-to-r from-amber-400 to-orange-400"}`} />
@@ -184,11 +184,11 @@ export default function MentorDashboardPage() {
                         {getInitials(student)}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-slate-900 truncate">{getStudentName(student)}</h3>
-                        <p className="text-xs text-slate-500 truncate">{student.email}</p>
+                        <h3 className="font-semibold text-slate-900 dark:text-slate-100 truncate">{getStudentName(student)}</h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{student.email}</p>
                       </div>
                       {!hasProfile && (
-                        <span className="shrink-0 px-2 py-1 text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 rounded-lg">
+                        <span className="shrink-0 px-2 py-1 text-[10px] font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 rounded-lg">
                           Profil Yok
                         </span>
                       )}
@@ -198,17 +198,17 @@ export default function MentorDashboardPage() {
                     {hasProfile && (
                       <div className="flex flex-wrap gap-2 mb-4">
                         {expLevel && (
-                          <span className="px-2 py-1 text-xs font-medium bg-slate-100 text-slate-700 rounded-lg">
+                          <span className="px-2 py-1 text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-lg">
                             {expLevel}
                           </span>
                         )}
                         {student.studentProfile!.interests.slice(0, 2).map((interest, i) => (
-                          <span key={i} className="px-2 py-1 text-xs font-medium bg-blue-50 text-blue-700 rounded-lg">
+                          <span key={i} className="px-2 py-1 text-xs font-medium bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 rounded-lg">
                             {interest}
                           </span>
                         ))}
                         {student.studentProfile!.interests.length > 2 && (
-                          <span className="px-2 py-1 text-xs text-slate-400 rounded-lg bg-slate-50">
+                          <span className="px-2 py-1 text-xs text-slate-400 dark:text-slate-500 rounded-lg bg-slate-50 dark:bg-slate-950">
                             +{student.studentProfile!.interests.length - 2}
                           </span>
                         )}
@@ -218,13 +218,13 @@ export default function MentorDashboardPage() {
                     {/* Project stats */}
                     {hasProfile && (
                       <div className="flex gap-3 mb-4">
-                        <div className="flex-1 bg-blue-50 rounded-xl p-3 text-center">
-                          <p className="text-lg font-bold text-blue-700">{activeCount}</p>
-                          <p className="text-[11px] text-blue-600/80 font-medium mt-0.5">Aktif</p>
+                        <div className="flex-1 bg-blue-50 dark:bg-blue-950/40 rounded-xl p-3 text-center">
+                          <p className="text-lg font-bold text-blue-700 dark:text-blue-300">{activeCount}</p>
+                          <p className="text-[11px] text-blue-600/80 dark:text-blue-400/80 font-medium mt-0.5">Aktif</p>
                         </div>
-                        <div className="flex-1 bg-emerald-50 rounded-xl p-3 text-center">
-                          <p className="text-lg font-bold text-emerald-700">{completedCount}</p>
-                          <p className="text-[11px] text-emerald-600/80 font-medium mt-0.5">Tamamlandı</p>
+                        <div className="flex-1 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl p-3 text-center">
+                          <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">{completedCount}</p>
+                          <p className="text-[11px] text-emerald-600/80 dark:text-emerald-400/80 font-medium mt-0.5">Tamamlandı</p>
                         </div>
                       </div>
                     )}
@@ -236,8 +236,8 @@ export default function MentorDashboardPage() {
                           const statusInfo = statusConfig[project.status as keyof typeof statusConfig];
                           const difficultyInfo = difficultyConfig[project.projectTemplate.difficulty as keyof typeof difficultyConfig];
                           return (
-                            <div key={project.id} className="flex items-center justify-between gap-2 bg-slate-50 rounded-lg px-3 py-2">
-                              <span className="text-xs text-slate-700 truncate font-medium">
+                            <div key={project.id} className="flex items-center justify-between gap-2 bg-slate-50 dark:bg-slate-950 rounded-lg px-3 py-2">
+                              <span className="text-xs text-slate-700 dark:text-slate-200 truncate font-medium">
                                 {project.projectTemplate.title}
                               </span>
                               <div className="flex gap-1.5 shrink-0">

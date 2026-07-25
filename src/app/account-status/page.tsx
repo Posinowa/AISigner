@@ -45,9 +45,9 @@ export default async function AccountStatusPage() {
   const needsProfile = !rejected && !profile;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 px-4 py-12">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 px-4 py-12">
       <div className="w-full max-w-md">
-        <div className="bg-white rounded-3xl shadow-2xl ring-1 ring-slate-200/60 overflow-hidden">
+        <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl ring-1 ring-slate-200/60 overflow-hidden">
           <div
             className={`h-1.5 ${
               rejected
@@ -58,19 +58,19 @@ export default async function AccountStatusPage() {
           <div className="p-8 sm:p-10 text-center">
             <div
               className={`mx-auto mb-5 h-16 w-16 rounded-2xl flex items-center justify-center ${
-                rejected ? "bg-red-50" : "bg-amber-50"
+                rejected ? "bg-red-50 dark:bg-red-950/40" : "bg-amber-50 dark:bg-amber-950/40"
               }`}
             >
               {rejected ? (
-                <XCircle className="w-8 h-8 text-red-600" />
+                <XCircle className="w-8 h-8 text-red-600 dark:text-red-400" />
               ) : needsProfile ? (
-                <UserPen className="w-8 h-8 text-amber-600" />
+                <UserPen className="w-8 h-8 text-amber-600 dark:text-amber-400" />
               ) : (
-                <Clock className="w-8 h-8 text-amber-600" />
+                <Clock className="w-8 h-8 text-amber-600 dark:text-amber-400" />
               )}
             </div>
 
-            <h1 className="text-2xl font-bold text-slate-900">
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
               {rejected
                 ? "Başvurunuz reddedildi"
                 : needsProfile
@@ -78,7 +78,7 @@ export default async function AccountStatusPage() {
                   : "Hesabınız inceleniyor"}
             </h1>
 
-            <p className="mt-3 text-sm text-slate-600 leading-relaxed">
+            <p className="mt-3 text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
               {rejected
                 ? "Hesabınız bir yönetici tarafından reddedildi. Bir hata olduğunu düşünüyorsanız lütfen ekiple iletişime geçin."
                 : needsProfile
@@ -99,8 +99,8 @@ export default async function AccountStatusPage() {
             )}
 
             {session.user.email && (
-              <p className="mt-4 text-xs text-slate-400">
-                Giriş yapılan hesap: <span className="font-medium text-slate-500">{session.user.email}</span>
+              <p className="mt-4 text-xs text-slate-400 dark:text-slate-500">
+                Giriş yapılan hesap: <span className="font-medium text-slate-500 dark:text-slate-400">{session.user.email}</span>
               </p>
             )}
 

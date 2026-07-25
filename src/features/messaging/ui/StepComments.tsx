@@ -43,8 +43,8 @@ export function StepComments({ stepId, currentUserId, currentUserRole, isDraft }
     [user.name, user.lastName].filter(Boolean).join(" ") || "İsimsiz";
 
   const getRoleInfo = (role: string) => {
-    if (role === "MENTOR") return { label: "Mentor", color: "bg-purple-100 text-purple-700", ring: "ring-purple-200" };
-    return { label: "Öğrenci", color: "bg-blue-100 text-blue-700", ring: "ring-blue-200" };
+    if (role === "MENTOR") return { label: "Mentor", color: "bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300", ring: "ring-purple-200" };
+    return { label: "Öğrenci", color: "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300", ring: "ring-blue-200" };
   };
 
   async function loadComments() {
@@ -163,21 +163,21 @@ export function StepComments({ stepId, currentUserId, currentUserRole, isDraft }
     <div className="mt-3">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="inline-flex items-center text-xs font-medium text-slate-500 hover:text-blue-600 transition-colors gap-1.5"
+        className="inline-flex items-center text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors gap-1.5"
       >
         <MessageSquare className="w-3.5 h-3.5" />
         {isOpen ? "Yorumları Gizle" : `Yorumlar${comments.length > 0 ? ` (${comments.length})` : ""}`}
       </button>
 
       {isOpen && (
-        <div className="mt-3 bg-slate-50/80 rounded-lg border border-slate-200 p-4 space-y-3">
+        <div className="mt-3 bg-slate-50/80 dark:bg-slate-950/80 rounded-lg border border-slate-200 dark:border-slate-700 p-4 space-y-3">
           {loading ? (
             <div className="flex items-center justify-center py-4">
-              <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-              <span className="ml-2 text-xs text-gray-500">Yükleniyor...</span>
+              <Loader2 className="w-4 h-4 animate-spin text-blue-600 dark:text-blue-400" />
+              <span className="ml-2 text-xs text-gray-500 dark:text-slate-400">Yükleniyor...</span>
             </div>
           ) : comments.length === 0 ? (
-            <p className="text-xs text-gray-400 text-center py-2">
+            <p className="text-xs text-gray-400 dark:text-slate-500 text-center py-2">
               Henüz yorum yok. İlk yorumu ekleyin!
             </p>
           ) : (
@@ -188,18 +188,18 @@ export function StepComments({ stepId, currentUserId, currentUserRole, isDraft }
 
                 return (
                   <div key={comment.id} className="flex gap-2.5 group">
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ring-2 ${roleInfo.ring} bg-white`}>
-                      <User className="w-3.5 h-3.5 text-gray-500" />
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ring-2 ${roleInfo.ring} bg-white dark:bg-slate-900`}>
+                      <User className="w-3.5 h-3.5 text-gray-500 dark:text-slate-400" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-0.5">
-                        <span className="text-xs font-semibold text-gray-800">
+                        <span className="text-xs font-semibold text-gray-800 dark:text-slate-200">
                           {getFullName(comment.author)}
                         </span>
                         <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded ${roleInfo.color}`}>
                           {roleInfo.label}
                         </span>
-                        <span className="text-[10px] text-gray-400">
+                        <span className="text-[10px] text-gray-400 dark:text-slate-500">
                           {formatDate(comment.createdAt)}
                         </span>
                       </div>
@@ -216,7 +216,7 @@ export function StepComments({ stepId, currentUserId, currentUserRole, isDraft }
                           <div className="flex gap-1">
                             <button
                               onClick={() => handleUpdate(comment.id)}
-                              className="p-1 text-blue-600 hover:text-blue-800"
+                              className="p-1 text-blue-600 dark:text-blue-400 hover:text-blue-800"
                               aria-label="Yorumu kaydet"
                               title="Kaydet"
                             >
@@ -224,7 +224,7 @@ export function StepComments({ stepId, currentUserId, currentUserRole, isDraft }
                             </button>
                             <button
                               onClick={() => { setEditingId(null); setEditContent(""); }}
-                              className="p-1 text-gray-400 hover:text-gray-600"
+                              className="p-1 text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300"
                               aria-label="Düzenlemeyi iptal et"
                               title="İptal"
                             >
@@ -234,14 +234,14 @@ export function StepComments({ stepId, currentUserId, currentUserRole, isDraft }
                         </div>
                       ) : (
                         <div className="flex items-start justify-between">
-                          <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap break-words">
+                          <p className="text-xs text-gray-700 dark:text-slate-200 leading-relaxed whitespace-pre-wrap break-words">
                             {comment.content}
                           </p>
                           <div className="flex gap-0.5 ml-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex-shrink-0">
                             {comment.author.id === currentUserId && (
                               <button
                                 onClick={() => { setEditingId(comment.id); setEditContent(comment.content); }}
-                                className="p-1 text-gray-400 hover:text-blue-600"
+                                className="p-1 text-gray-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400"
                                 aria-label="Yorumu düzenle"
                                 title="Düzenle"
                               >
@@ -251,7 +251,7 @@ export function StepComments({ stepId, currentUserId, currentUserRole, isDraft }
                             {canDelete(comment) && (
                               <button
                                 onClick={() => handleDelete(comment.id)}
-                                className="p-1 text-gray-400 hover:text-red-600"
+                                className="p-1 text-gray-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400"
                                 aria-label="Yorumu sil"
                                 title="Sil"
                               >
@@ -270,11 +270,11 @@ export function StepComments({ stepId, currentUserId, currentUserRole, isDraft }
 
           {/* Yorum Gönder — taslak roadmap'te öğrenci etkileşim kuramaz (#52) */}
           {interactionLocked ? (
-            <p className="text-[11px] text-slate-400 text-center pt-2 border-t border-slate-200">
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 text-center pt-2 border-t border-slate-200 dark:border-slate-700">
               Bu yol haritası taslak aşamasında. Mentörünüz yayınladığında yorum ekleyebilirsiniz.
             </p>
           ) : (
-            <form onSubmit={handleSend} className="flex gap-2 items-end pt-2 border-t border-slate-200">
+            <form onSubmit={handleSend} className="flex gap-2 items-end pt-2 border-t border-slate-200 dark:border-slate-700">
               <textarea
                 ref={inputRef}
                 value={newComment}
@@ -282,7 +282,7 @@ export function StepComments({ stepId, currentUserId, currentUserRole, isDraft }
                 placeholder="Yorumunuzu yazın..."
                 maxLength={1000}
                 rows={2}
-                className="flex-1 text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                className="flex-1 text-xs px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
               />
               <button
                 type="submit"

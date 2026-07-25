@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { GraduationCap } from "lucide-react";
 import LogoutButton from "@/components/LogoutButton";
 import { UnreadBadge } from "@/features/messaging/ui/UnreadBadge";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 type Role = "ADMIN" | "MENTOR" | "STUDENT";
 type NavLink = { href: string; label: string };
@@ -55,13 +56,13 @@ export function AppShell({ role }: { role: Role }) {
     href === home ? pathname === href : pathname.startsWith(href);
 
   return (
-    <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200">
+    <header className="sticky top-0 z-40 bg-white/90 dark:bg-slate-900/90 backdrop-blur border-b border-slate-200 dark:border-slate-700">
       <nav className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-3">
         <Link href={home} className="flex items-center gap-2 shrink-0">
           <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-sm">
             <GraduationCap className="w-5 h-5" />
           </span>
-          <span className="font-bold text-slate-900 hidden sm:inline">AISigner</span>
+          <span className="font-bold text-slate-900 dark:text-slate-100 hidden sm:inline">AISigner</span>
         </Link>
 
         <div className="flex items-center gap-1 overflow-x-auto">
@@ -75,8 +76,8 @@ export function AppShell({ role }: { role: Role }) {
                 aria-current={active ? "page" : undefined}
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
                   active
-                    ? "bg-blue-50 text-blue-700"
-                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                    ? "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300"
+                    : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100"
                 }`}
               >
                 {isMessages && <UnreadBadge className="text-current" />}
@@ -86,7 +87,8 @@ export function AppShell({ role }: { role: Role }) {
           })}
         </div>
 
-        <div className="ml-auto shrink-0">
+        <div className="ml-auto shrink-0 flex items-center gap-1">
+          <ThemeToggle />
           <LogoutButton />
         </div>
       </nav>

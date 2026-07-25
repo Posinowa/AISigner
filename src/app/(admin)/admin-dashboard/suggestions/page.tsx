@@ -122,8 +122,8 @@ export default function AdminSuggestionsPage() {
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-6">
       <div className="pt-2">
-        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Öneri & İstek</h1>
-        <p className="text-slate-500 mt-1.5 text-sm">
+        <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Öneri & İstek</h1>
+        <p className="text-slate-500 dark:text-slate-400 mt-1.5 text-sm">
           Stajyerlerden gelen öneri ve talepleri inceleyin, durumlarını güncelleyin.
           Açık kayıtları görmek için <span className="font-medium">Açık</span> filtresini kullanın.
         </p>
@@ -139,7 +139,7 @@ export default function AdminSuggestionsPage() {
             className={`px-4 py-2 rounded-xl text-sm font-medium border transition-colors ${
               filter === f
                 ? "bg-slate-900 text-white border-slate-900"
-                : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
             }`}
           >
             {f === "ALL" ? "Tümü" : statusLabels[f]}
@@ -148,14 +148,14 @@ export default function AdminSuggestionsPage() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-16 text-slate-500">
+        <div className="flex items-center justify-center py-16 text-slate-500 dark:text-slate-400">
           <Loader2 className="w-5 h-5 animate-spin mr-2" />
           Yükleniyor...
         </div>
       ) : loadError ? (
-        <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center">
-          <AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-3" />
-          <p className="text-slate-900 font-semibold">Kayıtlar yüklenemedi</p>
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 p-10 text-center">
+          <AlertCircle className="w-8 h-8 text-red-500 dark:text-red-400 mx-auto mb-3" />
+          <p className="text-slate-900 dark:text-slate-100 font-semibold">Kayıtlar yüklenemedi</p>
           <button
             onClick={() => load(filter)}
             className="mt-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-5 py-2.5 transition-colors"
@@ -164,9 +164,9 @@ export default function AdminSuggestionsPage() {
           </button>
         </div>
       ) : visible.length === 0 ? (
-        <div className="bg-slate-50 border border-slate-200 rounded-xl p-12 text-center">
-          <Inbox className="w-9 h-9 text-slate-400 mx-auto mb-3" />
-          <p className="text-slate-500 text-sm">
+        <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl p-12 text-center">
+          <Inbox className="w-9 h-9 text-slate-400 dark:text-slate-500 mx-auto mb-3" />
+          <p className="text-slate-500 dark:text-slate-400 text-sm">
             {filter === "ALL"
               ? "Henüz bir öneri veya istek gelmedi."
               : "Bu durumda kayıt bulunmuyor."}
@@ -182,7 +182,7 @@ export default function AdminSuggestionsPage() {
             return (
               <li
                 key={item.id}
-                className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5"
+                className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-sm p-5"
               >
                 <div className="flex flex-wrap items-center gap-2 mb-2">
                   <span className={`px-2.5 py-0.5 rounded-md text-xs font-semibold border ${typeStyles[item.type]}`}>
@@ -191,20 +191,20 @@ export default function AdminSuggestionsPage() {
                   <span className={`px-2.5 py-0.5 rounded-md text-xs font-semibold border ${statusStyles[item.status]}`}>
                     {statusLabels[item.status]}
                   </span>
-                  <span className="text-xs text-slate-500">
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
                     {authorDisplayName(item.author)}
                   </span>
-                  <span className="text-xs text-slate-400 ml-auto">
+                  <span className="text-xs text-slate-400 dark:text-slate-500 ml-auto">
                     {new Date(item.createdAt).toLocaleDateString("tr-TR")}
                   </span>
                 </div>
 
-                <h3 className="font-semibold text-slate-900">{item.title}</h3>
-                <p className="text-sm text-slate-600 mt-1 whitespace-pre-wrap">{item.content}</p>
+                <h3 className="font-semibold text-slate-900 dark:text-slate-100">{item.title}</h3>
+                <p className="text-sm text-slate-600 dark:text-slate-300 mt-1 whitespace-pre-wrap">{item.content}</p>
 
                 {/* Durum değiştirme */}
-                <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-slate-100">
-                  <span className="text-xs font-medium text-slate-500 mr-1">Durum:</span>
+                <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400 mr-1">Durum:</span>
                   {statusOrder.map((s) => (
                     <button
                       key={s}
@@ -213,7 +213,7 @@ export default function AdminSuggestionsPage() {
                       className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
                         item.status === s
                           ? statusStyles[s]
-                          : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                          : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
                       }`}
                     >
                       {statusLabels[s]}
@@ -225,7 +225,7 @@ export default function AdminSuggestionsPage() {
                 <div className="mt-4">
                   <label
                     htmlFor={`note-${item.id}`}
-                    className="block text-xs font-medium text-slate-500 mb-1.5"
+                    className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5"
                   >
                     Yönetici yanıtı (öğrenciye gösterilir)
                   </label>
@@ -237,7 +237,7 @@ export default function AdminSuggestionsPage() {
                     }
                     maxLength={2000}
                     rows={2}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"
                   />
                   <button
                     onClick={() => patch(item.id, { adminNote: draft })}
@@ -259,7 +259,7 @@ export default function AdminSuggestionsPage() {
           <button
             onClick={loadMore}
             disabled={loadingMore}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 disabled:opacity-60 transition-colors"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-60 transition-colors"
           >
             {loadingMore && <Loader2 className="w-4 h-4 animate-spin" />}
             Daha fazla yükle

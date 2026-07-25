@@ -1,6 +1,12 @@
 @import "tailwindcss";
 
 /*
+  #dark: Sınıf tabanlı karanlık mod. `.dark` kökte olduğunda `dark:` varyantları
+  aktifleşir (sistem `prefers-color-scheme` değil; kullanıcı toggle'ı esas alınır).
+*/
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
   Tasarım tokenları (Tailwind v4 @theme).
   shadcn/ui bileşenleri bg-primary, border-input, ring-ring gibi yardımcı
   sınıflara güvenir; bunlar buradaki --color-* tokenlarından üretilir.
@@ -38,18 +44,49 @@
 }
 
 /*
-  Tema: Şu an tüm sayfalar açık temalı (slate/blue palette) olarak tasarlandı.
-  Sistem dark mode'a göre body rengini değiştirirsek, açık zeminli kartlardaki
-  varsayılan koyu metin renklerini bozar. Bu yüzden light theme sabitlenir.
-  İleride dark mode istenirse her sayfanın `dark:` varyantı eklenmeli.
+  #dark: Karanlık tema token override'ları. shadcn/ui bileşenleri (bg-card,
+  border-input, text-muted-foreground...) bu tokenlardan üretildiği için `.dark`
+  altında değerleri değiştirmek onları otomatik çevirir. Elle yazılmış
+  bg-white/text-slate-* sınıfları ise sayfalardaki `dark:` varyantlarıyla döner.
 */
+.dark {
+  --color-background: #0b1120;        /* slate-950'e yakın */
+  --color-foreground: #e2e8f0;        /* slate-200 */
+
+  --color-card: #0f172a;              /* slate-900 */
+  --color-card-foreground: #e2e8f0;
+  --color-popover: #0f172a;
+  --color-popover-foreground: #e2e8f0;
+
+  --color-primary: #3b82f6;           /* blue-500 (koyu zeminde daha canlı) */
+  --color-primary-foreground: #ffffff;
+
+  --color-secondary: #1e293b;         /* slate-800 */
+  --color-secondary-foreground: #e2e8f0;
+
+  --color-muted: #1e293b;             /* slate-800 */
+  --color-muted-foreground: #94a3b8;  /* slate-400 */
+
+  --color-accent: #1e293b;
+  --color-accent-foreground: #e2e8f0;
+
+  --color-border: #1e293b;            /* slate-800 */
+  --color-input: #334155;             /* slate-700 */
+  --color-ring: #3b82f6;
+}
+
 html {
   color-scheme: light;
+}
+html.dark {
+  color-scheme: dark;
 }
 
 body {
   background: var(--color-background);
   color: var(--color-foreground);
+  /* Tema geçişini yumuşat (toggle sırasında sert kırpma olmasın). */
+  transition: background-color 0.2s ease, color 0.2s ease;
   /* next/font/google ile yüklenen Geist'i kullan, fallback olarak sistem fontları */
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
