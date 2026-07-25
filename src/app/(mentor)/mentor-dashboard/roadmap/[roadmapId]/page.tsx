@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { extractApiErrorMessage } from "@/lib/api-error-message";
 import {
   ArrowLeft,
   Save,
@@ -79,17 +80,11 @@ function toNullableUrl(value: string): string | null {
   return trimmed === "" ? null : trimmed;
 }
 
-// #50: Zod fieldErrors ({ alan: [mesaj] }) şeklindeki hatayı okunabilir tek mesaja indirger.
+// #50: Yanıt gövdesindeki hatayı okunabilir tek mesaja indirger.
+// #126-3: Ayrıştırma (string vs zod fieldErrors) ortak helper'da — tek kaynak.
 async function extractErrorMessage(res: Response, fallback: string): Promise<string> {
   const data = await res.json().catch(() => null);
-  const fieldErrors = data?.error;
-  if (fieldErrors && typeof fieldErrors === "object") {
-    const first = Object.values(fieldErrors).flat()[0];
-    if (first) return String(first);
-  } else if (typeof fieldErrors === "string") {
-    return fieldErrors;
-  }
-  return fallback;
+  return extractApiErrorMessage(data, fallback);
 }
 
 /* ─── Sayfa ─── */
