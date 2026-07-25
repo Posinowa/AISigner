@@ -4,16 +4,19 @@
 import { Suspense, useState } from "react"
 import { validateUser } from "./actions"
 import { signIn } from "next-auth/react"
-import { Eye, EyeOff, LogIn, Loader2, CheckCircle2 } from "lucide-react"
+import { LogIn } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
+import { AuthCard } from "@/features/auth/ui/AuthCard"
+import { AuthField } from "@/features/auth/ui/AuthField"
+import { FormAlert } from "@/features/auth/ui/FormAlert"
+import { AuthSubmitButton } from "@/features/auth/ui/AuthSubmitButton"
 
 const initialState = { error: {} as Record<string, string[]> }
 
 // useSearchParams Suspense boundary gerektiriyor — iç bileşene taşındı
 function SigninForm() {
   const [state, setState] = useState(initialState)
-  const [showPassword, setShowPassword] = useState(false)
   const [isPending, setIsPending] = useState(false)
   const searchParams = useSearchParams()
   const justRegistered = searchParams.get("registered") === "true"
@@ -62,118 +65,68 @@ function SigninForm() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 px-4 py-12">
-      <div className="w-full max-w-md">
-        {/* Kart */}
-        <div className="bg-white rounded-3xl shadow-2xl ring-1 ring-slate-200/60 overflow-hidden">
-          {/* Üst şerit */}
-          <div className="h-1.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
+    <AuthCard
+      icon={LogIn}
+      title={justRegistered ? "Hoş Geldiniz!" : "Tekrar Hoşgeldiniz"}
+      subtitle={
+        <>
+          Hesabınız yok mu?{" "}
+          <Link href="/signup" className="font-semibold text-blue-600 hover:text-blue-700">
+            Kayıt olun
+          </Link>
+        </>
+      }
+    >
+      {justRegistered && (
+        <FormAlert variant="success" title="Hesabınız başarıyla oluşturuldu!">
+          Şimdi e-posta ve şifrenizle giriş yapabilirsiniz.
+        </FormAlert>
+      )}
 
-          <div className="p-8 sm:p-10">
-            {/* Başlık */}
-            <div className="mb-8 text-center">
-              <div className="mx-auto mb-4 h-14 w-14 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-200">
-                <LogIn className="w-6 h-6 text-white" />
-              </div>
-              <h1 className="text-2xl font-bold text-slate-900">
-                {justRegistered ? "Hoş Geldiniz!" : "Tekrar Hoşgeldiniz"}
-              </h1>
-              <p className="mt-1.5 text-sm text-slate-500">
-                Hesabınız yok mu?{" "}
-                <Link href="/signup" className="font-semibold text-blue-600 hover:text-blue-700">
-                  Kayıt olun
-                </Link>
-              </p>
-            </div>
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <AuthField
+          id="signin-email"
+          name="email"
+          label="E-posta"
+          type="email"
+          autoComplete="email"
+          required
+          placeholder="ornek@email.com"
+          errors={state.error?.email}
+        />
 
-            {/* Kayıt başarı banner'ı */}
-            {justRegistered && (
-              <div className="mb-6 flex items-start gap-3 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3">
-                <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-semibold text-emerald-800">Hesabınız başarıyla oluşturuldu!</p>
-                  <p className="text-xs text-emerald-600 mt-0.5">Şimdi e-posta ve şifrenizle giriş yapabilirsiniz.</p>
-                </div>
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Email */}
-              <div>
-                <label htmlFor="signin-email" className="mb-1.5 block text-sm font-medium text-slate-700">E-posta</label>
-                <input
-                  id="signin-email"
-                  type="email"
-                  name="email"
-                  autoComplete="email"
-                  required
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-slate-800 text-sm shadow-sm focus:border-blue-500 focus:bg-white focus:ring-3 focus:ring-blue-100 outline-none transition"
-                  placeholder="ornek@email.com"
-                />
-                {state.error?.email && (
-                  <p className="mt-1 text-xs text-red-500">{state.error.email[0]}</p>
-                )}
-              </div>
-
-              {/* Şifre */}
-              <div>
-                <label htmlFor="signin-password" className="mb-1.5 block text-sm font-medium text-slate-700">Şifre</label>
-                <div className="relative">
-                  <input
-                    id="signin-password"
-                    type={showPassword ? "text" : "password"}
-                    name="password"
-                    autoComplete="current-password"
-                    required
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 pr-11 text-slate-800 text-sm shadow-sm focus:border-blue-500 focus:bg-white focus:ring-3 focus:ring-blue-100 outline-none transition"
-                    placeholder="Şifrenizi girin"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    aria-label={showPassword ? "Şifreyi gizle" : "Şifreyi göster"}
-                    className="absolute inset-y-0 right-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
-                  >
-                    {showPassword ? <Eye className="w-4.5 h-4.5" /> : <EyeOff className="w-4.5 h-4.5" />}
-                  </button>
-                </div>
-                {state.error?.password && (
-                  <p className="mt-1 text-xs text-red-500">{state.error.password[0]}</p>
-                )}
-                <div className="mt-1.5 text-right">
-                  <Link href="/forgot-password" className="text-xs font-medium text-amber-600 hover:text-amber-700">
-                    Şifremi Unuttum
-                  </Link>
-                </div>
-              </div>
-
-              {/* Genel hata */}
-              {state.error?.general && (
-                <div className="rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-600">
-                  {state.error.general[0]}
-                </div>
-              )}
-
-              {/* Submit */}
-              <button
-                type="submit"
-                disabled={isPending}
-                className="w-full mt-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-4 py-3 font-semibold text-white shadow-md shadow-blue-200 transition-all focus:outline-none focus:ring-3 focus:ring-blue-300 disabled:opacity-60 flex items-center justify-center gap-2"
+        <AuthField
+          id="signin-password"
+          name="password"
+          label="Şifre"
+          revealable
+          autoComplete="current-password"
+          required
+          placeholder="Şifrenizi girin"
+          errors={state.error?.password}
+          belowField={
+            <div className="mt-1.5 text-right">
+              <Link
+                href="/forgot-password"
+                className="text-xs font-medium text-amber-600 hover:text-amber-700"
               >
-                {isPending ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Giriş yapılıyor...
-                  </>
-                ) : (
-                  "Giriş Yap"
-                )}
-              </button>
-            </form>
-          </div>
-        </div>
-      </div>
-    </div>
+                Şifremi Unuttum
+              </Link>
+            </div>
+          }
+        />
+
+        {state.error?.general && (
+          <FormAlert variant="error">{state.error.general[0]}</FormAlert>
+        )}
+
+        <AuthSubmitButton
+          pending={isPending}
+          label="Giriş Yap"
+          pendingLabel="Giriş yapılıyor..."
+        />
+      </form>
+    </AuthCard>
   )
 }
 
