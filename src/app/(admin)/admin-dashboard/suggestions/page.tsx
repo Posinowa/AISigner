@@ -36,14 +36,28 @@ export default function AdminSuggestionsPage() {
   const [savingId, setSavingId] = useState<string | null>(null);
   // Kaydedilmemiş not taslakları — kayıt id'sine göre tutulur.
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
+  // #163: Filtre artık sunucuda uygulanıyor (sayfalamayla tutarlı olsun diye).
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
 
-  const load = useCallback(async () => {
+  // Filtreye göre sorgu string'i — "ALL"da status parametresi gitmez.
+  const queryFor = (f: Filter, cursor?: string) => {
+    const params = new URLSearchParams();
+    if (f !== "ALL") params.set("status", f);
+    if (cursor) params.set("cursor", cursor);
+    const qs = params.toString();
+    return `/api/admin/suggestions${qs ? `?${qs}` : ""}`;
+  };
+
+  const load = useCallback(async (f: Filter) => {
     try {
       setLoading(true);
       setLoadError(false);
-      const res = await fetch("/api/admin/suggestions");
+      const res = await fetch(queryFor(f));
       if (!res.ok) throw new Error("failed");
-      setItems(await res.json());
+      const page = await res.json();
+      setItems(page.items);
+      setNextCursor(page.nextCursor);
     } catch {
       setLoadError(true);
     } finally {
@@ -51,9 +65,26 @@ export default function AdminSuggestionsPage() {
     }
   }, []);
 
+  const loadMore = useCallback(async () => {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const res = await fetch(queryFor(filter, nextCursor));
+      if (!res.ok) throw new Error("failed");
+      const page = await res.json();
+      setItems((prev) => [...prev, ...page.items]);
+      setNextCursor(page.nextCursor);
+    } catch {
+      toast.error("Daha fazlası yüklenemedi. Lütfen tekrar deneyin.");
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [filter, nextCursor, loadingMore]);
+
+  // Filtre değişince baştan yükle (cursor sıfırlanır).
   useEffect(() => {
-    load();
-  }, [load]);
+    load(filter);
+  }, [filter, load]);
 
   async function patch(id: string, data: { status?: SuggestionStatus; adminNote?: string }) {
     setSavingId(id);
@@ -85,8 +116,8 @@ export default function AdminSuggestionsPage() {
     }
   }
 
-  const visible = filter === "ALL" ? items : items.filter((i) => i.status === filter);
-  const openCount = items.filter((i) => i.status === "OPEN").length;
+  // #163: Filtreleme sunucuda yapıldığı için gelen liste zaten filtrelenmiş.
+  const visible = items;
 
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-6">
@@ -94,11 +125,7 @@ export default function AdminSuggestionsPage() {
         <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Öneri & İstek</h1>
         <p className="text-slate-500 mt-1.5 text-sm">
           Stajyerlerden gelen öneri ve talepleri inceleyin, durumlarını güncelleyin.
-          {openCount > 0 && (
-            <span className="ml-1 font-medium text-amber-600">
-              {openCount} açık kayıt var.
-            </span>
-          )}
+          Açık kayıtları görmek için <span className="font-medium">Açık</span> filtresini kullanın.
         </p>
       </div>
 
@@ -130,7 +157,7 @@ export default function AdminSuggestionsPage() {
           <AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-3" />
           <p className="text-slate-900 font-semibold">Kayıtlar yüklenemedi</p>
           <button
-            onClick={load}
+            onClick={() => load(filter)}
             className="mt-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-5 py-2.5 transition-colors"
           >
             Tekrar Dene
@@ -225,6 +252,19 @@ export default function AdminSuggestionsPage() {
             );
           })}
         </ul>
+      )}
+
+      {!loading && !loadError && nextCursor && (
+        <div className="text-center">
+          <button
+            onClick={loadMore}
+            disabled={loadingMore}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 disabled:opacity-60 transition-colors"
+          >
+            {loadingMore && <Loader2 className="w-4 h-4 animate-spin" />}
+            Daha fazla yükle
+          </button>
+        </div>
       )}
     </div>
   );
