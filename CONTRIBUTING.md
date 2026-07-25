@@ -186,6 +186,18 @@ Resolves #38
    - **Screenshots:** UI değişikliği varsa ekran görüntüsü
    - **Reviewer Notes:** Reviewer'ın özellikle bakması gereken yerler
 
+6. **Etiketler:** PR açarken bağlı issue'nun etiketlerini PR'a da ekleyin —
+   **en az `type:` ve `priority:`**, mümkünse `area:` de. Böylece PR listesi
+   issue'lar gibi filtrelenebilir ve önceliklendirme tek bakışta görünür.
+
+   ```bash
+   # PR açarken doğrudan:
+   gh pr create --label "type:fix,priority:P1,area:auth" ...
+
+   # Açtıktan sonra eklemek için:
+   gh pr edit <pr-no> --add-label "type:fix,priority:P1"
+   ```
+
 ### Issue Kapatma Standardı
 
 Issue'nun PR merge edildiğinde otomatik kapanması için PR body içinde şu ifadelerden biri bulunmalıdır:
