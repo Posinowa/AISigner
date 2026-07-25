@@ -20,6 +20,11 @@ const onboardingSchema = z.object({
 
 export async function saveOnboarding(rawData: unknown) {
   // 1. Kullanıcı doğrulama
+  // #143 SÖZLEŞME: Burada bilerek `requireAuth` KULLANILMAZ. requireAuth,
+  // APPROVED olmayan STUDENT'ı 403 ile engeller; oysa profil tamamlama tam da
+  // hesap PENDING iken yapılır (onay bu adımdan SONRA gelir). Doğrudan
+  // getServerSession ile yalnızca oturum kontrol edilir. Bunu `requireAuth`e
+  // çevirmek onboarding akışını kırar — detay: guard.ts `allowUnapprovedStudent`.
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) {
     throw new Error("Oturum bulunamadı")
