@@ -33,7 +33,12 @@ export function AuthField({
   errors?: string[];
   /** Etiket yanında gösterilen açıklama, ör. "(opsiyonel)". */
   hint?: string;
-  /** Şifre alanları için göster/gizle düğmesi. */
+  /**
+   * Şifre alanları için göster/gizle düğmesi. **Dikkat (#169):** `revealable`
+   * verildiğinde input tipi `password`↔`text` arasında bu bileşen tarafından
+   * yönetilir; dışarıdan geçilen `type` **yok sayılır**. Yani `revealable` + özel
+   * bir `type` (ör. `email`) birlikte anlamlı değildir — biri ya da öteki seçilir.
+   */
   revealable?: boolean;
   /** Alanın altına eklenecek içerik (ör. "Şifremi Unuttum" bağlantısı). */
   belowField?: ReactNode;

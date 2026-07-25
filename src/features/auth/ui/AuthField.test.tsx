@@ -64,4 +64,24 @@ describe("AuthField erişilebilirlik (#153)", () => {
 
     expect(screen.getByText(/opsiyonel/)).toBeInTheDocument();
   });
+
+  it("revealable, dışarıdan geçilen type'ı yok sayar — password ile başlar (#169)", () => {
+    // Belgelenmiş sözleşme: revealable + type birlikte anlamlı değil.
+    // type="email" verilse bile revealable kazanır ve password olarak başlar.
+    render(<AuthField id="p" name="password" label="Şifre" revealable type="email" />);
+
+    expect(screen.getByLabelText("Şifre")).toHaveAttribute("type", "password");
+  });
+
+  it("revealable olmayan alan verilen type'ı kullanır", () => {
+    render(<AuthField id="e" name="email" label="E-posta" type="email" />);
+
+    expect(screen.getByLabelText("E-posta")).toHaveAttribute("type", "email");
+  });
+
+  it("required prop input'a geçer (#169 — signup ad/soyad)", () => {
+    render(<AuthField id="n" name="name" label="Ad" required />);
+
+    expect(screen.getByLabelText("Ad")).toBeRequired();
+  });
 });

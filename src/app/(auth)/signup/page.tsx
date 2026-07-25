@@ -58,6 +58,7 @@ export default function SignupPage() {
             label="Ad"
             autoComplete="given-name"
             placeholder="Adınız"
+            required
             errors={state.error?.name}
           />
           <AuthField
@@ -66,6 +67,7 @@ export default function SignupPage() {
             label="Soyad"
             autoComplete="family-name"
             placeholder="Soyadınız"
+            required
             errors={state.error?.lastName}
           />
         </div>
