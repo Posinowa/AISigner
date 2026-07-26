@@ -85,6 +85,19 @@ src/
 3. `requireAuth`: rol kontrolü + APPROVED olmayan STUDENT'a 403.
 4. Middleware: onaysız stajyeri `/account-status`'a yönlendirir; `/forgot-password` public.
 
+#### ⚠️ PENDING profil-tamamlama sözleşmesi (#143 — bozmayın)
+Stajyer **PENDING iken profilini tamamlar**; onay bu adımdan *sonra* gelir. Bu yüzden
+profil-tamamlama yolları, "onaysız STUDENT'ı engelle" kuralının **bilinçli istisnasıdır**:
+- `requireAuth(role, { allowUnapprovedStudent: true })` → PENDING geçer, **REJECTED yine 403**.
+  Yalnızca profil-tamamlama uçlarında kullanılır (ör. `api/student/survey-answers`).
+- `saveOnboarding` bilerek `requireAuth` **kullanmaz**; doğrudan `getServerSession` ile yalnız
+  oturum kontrol eder (requireAuth'a çevirmek akışı kırar — dosyada açıklayıcı yorum var).
+- Middleware: PENDING → yalnız `/profile-setup` + `/student-onboarding`; `/student-dashboard`
+  engelli. REJECTED → tüm student alanı engelli.
+
+"Güvenlik sıkılaştırması" niyetiyle bu uçlara `requireAuth` eklemeden önce buranın istisna
+olduğunu hatırlayın; aksi halde onboarding tamamen çöker.
+
 ### AI Entegrasyonu
 - `gcp-credentials.json` (gitignore'da) + `GOOGLE_CLOUD_PROJECT` env gerekir; yoksa
   analiz/özet fonksiyonları **mock'a düşer** (graceful degradation), chat hata döner.
