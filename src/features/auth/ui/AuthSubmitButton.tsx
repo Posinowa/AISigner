@@ -18,7 +18,7 @@ export function AuthSubmitButton({
       type="submit"
       disabled={pending}
       aria-busy={pending}
-      className="w-full mt-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-4 py-3 font-semibold text-white shadow-md shadow-blue-200 transition-all focus:outline-none focus:ring-3 focus:ring-blue-300 disabled:opacity-60 flex items-center justify-center gap-2"
+      className="w-full mt-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 px-4 py-3 font-semibold text-white shadow-md shadow-indigo-600/20 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-60 flex items-center justify-center gap-2"
     >
       {pending ? (
         <>

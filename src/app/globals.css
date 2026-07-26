@@ -8,71 +8,67 @@
 
 /*
   Tasarım tokenları (Tailwind v4 @theme).
-  shadcn/ui bileşenleri bg-primary, border-input, ring-ring gibi yardımcı
-  sınıflara güvenir; bunlar buradaki --color-* tokenlarından üretilir.
-  Palet CLAUDE.md tasarım sistemine uygundur (slate nötr, blue-600 primary).
+  Refined Premium Theme (AI-Slop Cleaned Palette).
+  Indigo & Slate & Subtle Emerald Accents.
 */
 @theme {
-  --color-background: #f8fafc;        /* slate-50  */
-  --color-foreground: #0f172a;        /* slate-900 */
+  --color-background: #fafafa;        /* slate-50/zinc-50 ultra clean background */
+  --color-foreground: #090d16;        /* deep obsidian slate */
 
   --color-card: #ffffff;
-  --color-card-foreground: #0f172a;
+  --color-card-foreground: #090d16;
   --color-popover: #ffffff;
-  --color-popover-foreground: #0f172a;
+  --color-popover-foreground: #090d16;
 
-  --color-primary: #2563eb;           /* blue-600  */
+  --color-primary: #4338ca;           /* Refined Indigo-700 / Indigo-600 */
   --color-primary-foreground: #ffffff;
 
   --color-secondary: #f1f5f9;         /* slate-100 */
   --color-secondary-foreground: #0f172a;
 
-  --color-muted: #f1f5f9;             /* slate-100 */
+  --color-muted: #f8fafc;             /* slate-50 */
   --color-muted-foreground: #64748b;  /* slate-500 */
 
-  --color-accent: #eef2ff;            /* indigo-50 */
-  --color-accent-foreground: #1e293b; /* slate-800 */
+  --color-accent: #ecfdf5;            /* emerald-50 accent */
+  --color-accent-foreground: #047857; /* emerald-700 */
 
-  --color-destructive: #dc2626;       /* red-600   */
+  --color-destructive: #dc2626;       /* red-600 */
   --color-destructive-foreground: #ffffff;
 
   --color-border: #e2e8f0;            /* slate-200 */
   --color-input: #e2e8f0;             /* slate-200 */
-  --color-ring: #3b82f6;              /* blue-500  */
+  --color-ring: #6366f1;              /* indigo-500 */
 
-  --radius: 0.5rem;
+  --radius: 0.75rem;
 }
 
 /*
-  #dark: Karanlık tema token override'ları. shadcn/ui bileşenleri (bg-card,
-  border-input, text-muted-foreground...) bu tokenlardan üretildiği için `.dark`
-  altında değerleri değiştirmek onları otomatik çevirir. Elle yazılmış
-  bg-white/text-slate-* sınıfları ise sayfalardaki `dark:` varyantlarıyla döner.
+  Karanlık tema token override'ları.
 */
 .dark {
-  --color-background: #0b1120;        /* slate-950'e yakın */
-  --color-foreground: #e2e8f0;        /* slate-200 */
+  --color-background: #090d16;        /* deep midnight obsidian */
+  --color-foreground: #f1f5f9;        /* slate-100 */
 
   --color-card: #0f172a;              /* slate-900 */
-  --color-card-foreground: #e2e8f0;
+  --color-card-foreground: #f1f5f9;
   --color-popover: #0f172a;
-  --color-popover-foreground: #e2e8f0;
+  --color-popover-foreground: #f1f5f9;
 
-  --color-primary: #3b82f6;           /* blue-500 (koyu zeminde daha canlı) */
+  --color-primary: #6366f1;           /* indigo-500 */
   --color-primary-foreground: #ffffff;
 
   --color-secondary: #1e293b;         /* slate-800 */
-  --color-secondary-foreground: #e2e8f0;
+  --color-secondary-foreground: #f1f5f9;
 
   --color-muted: #1e293b;             /* slate-800 */
   --color-muted-foreground: #94a3b8;  /* slate-400 */
 
-  --color-accent: #1e293b;
-  --color-accent-foreground: #e2e8f0;
+  --color-accent: #064e3b;            /* emerald-900 */
+  --color-accent-foreground: #6ee7b7;
 
   --color-border: #1e293b;            /* slate-800 */
   --color-input: #334155;             /* slate-700 */
-  --color-ring: #3b82f6;
+  --color-ring: #6366f1;
 }
 
 html {
@@ -85,14 +81,32 @@ html.dark {
 body {
   background: var(--color-background);
   color: var(--color-foreground);
-  /* Tema geçişini yumuşat (toggle sırasında sert kırpma olmasın). */
   transition: background-color 0.2s ease, color 0.2s ease;
-  /* next/font/google ile yüklenen Geist'i kullan, fallback olarak sistem fontları */
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Edge ve IE'nin otomatik koyduğu şifre ikonunu gizle */
+/* Custom premium subtle card and glow utilities */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+}
+.dark .glass-panel {
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(30, 41, 59, 0.8);
+}
+
+.premium-card {
+  transition: all 0.2s ease-in-out;
+}
+.premium-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08);
+}
+
+/* Edge ve IE şifre ikonu gizleme */
 input[type="password"]::-ms-reveal,
 input[type="password"]::-ms-clear {
   display: none;

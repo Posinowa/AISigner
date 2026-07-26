@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import { Eye, EyeOff } from "lucide-react";
 
 const inputClass =
-  "w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-4 py-2.5 text-slate-800 dark:text-slate-200 text-sm shadow-sm focus:border-blue-500 focus:bg-white dark:focus:bg-slate-800 focus:ring-3 focus:ring-blue-100 outline-none transition";
+  "w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-4 py-2.5 text-slate-900 dark:text-slate-100 text-sm shadow-sm focus:border-indigo-600 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-indigo-500/20 outline-none transition";
 
 /**
  * #153: Etiket + input + hata mesajını **erişilebilir şekilde bağlayan** ortak alan.
