@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth/guard";
-import { sendMessageSchema } from "@/lib/validations/api";
+import { sendMessageSchema, getMessagesSchema } from "@/lib/validations/api";
 import { createRateLimiter } from "@/lib/rate-limit";
 
 const limiter = createRateLimiter("messages", {
@@ -17,17 +17,24 @@ export async function GET(req: Request) {
   const auth = await requireAuth(["MENTOR", "STUDENT", "ADMIN"]);
   if (!auth.authorized) return auth.response;
 
+  // #158: Parametreler elle ayrıştırılıyordu; "abc" → NaN, "-5" → negatif
+  // `take` olarak Prisma'ya geçip 500'e ve ters yönde sayfalamaya yol açıyordu.
+  // Bunun için zaten tanımlı olan (ama kullanılmayan) şema devreye alındı.
   const { searchParams } = new URL(req.url);
-  const conversationWith = searchParams.get("conversationWith");
-  const cursor = searchParams.get("cursor");
-  const limit = Math.min(parseInt(searchParams.get("limit") || "30"), 50);
+  const parsedQuery = getMessagesSchema.safeParse({
+    conversationWith: searchParams.get("conversationWith") ?? undefined,
+    cursor: searchParams.get("cursor") ?? undefined,
+    limit: searchParams.get("limit") ?? undefined,
+  });
 
-  if (!conversationWith) {
+  if (!parsedQuery.success) {
     return NextResponse.json(
-      { error: "conversationWith parametresi gerekli." },
+      { error: parsedQuery.error.flatten().fieldErrors },
       { status: 400 }
     );
   }
+
+  const { conversationWith, cursor, limit } = parsedQuery.data;
 
   const userId = auth.session.user.id!;
   const userRole = auth.session.user.role;

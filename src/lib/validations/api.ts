@@ -181,11 +181,14 @@ export const sendMessageSchema = z.object({
     .transform((val) => val.trim()),
 });
 
-// Mesaj listesi sorgusu
+// Mesaj listesi sorgusu.
+// #158: Query string'den geldiği için limit `coerce` edilir; şema önceden
+// tanımlıydı ama route elle ayrıştırdığı için hiç kullanılmıyordu —
+// "abc" NaN'a, "-5" negatif `take`e dönüşüp Prisma'ya sızıyordu.
 export const getMessagesSchema = z.object({
   conversationWith: z.string().min(1, "Konuşma partneri ID gerekli"),
   cursor: z.string().optional(),
-  limit: z.number().int().min(1).max(50).default(30),
+  limit: z.coerce.number().int().min(1).max(50).default(30),
 });
 
 // Adıma yorum ekleme
