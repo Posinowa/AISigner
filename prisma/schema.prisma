@@ -81,6 +81,9 @@ model AssignedProject {
   studentProfileId  String
   projectTemplateId String
   status            AssignmentStatus @default(PENDING)
+  githubRepoUrl     String?
+  githubStatus      String           @default("NOT_PROVISIONED")
+  provisionedAt     DateTime?
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
 
@@ -105,22 +108,39 @@ model Roadmap {
 }
 
 model RoadmapStep {
-  id             String     @id @default(cuid())
+  id             String      @id @default(cuid())
   roadmapId      String
   order          Int
   title          String
   description    String
   resources      String[]
   estimatedHours Int?
-  status         StepStatus @default(TODO)
+  status         StepStatus  @default(TODO)
   // #50: Bu adımın bağlı olduğu GitHub issue linki (opsiyonel).
   githubIssueUrl String?
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
   roadmap  Roadmap       @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
   comments StepComment[]
   files    StepFile[]
+  issues   StepIssue[]
+}
+
+model StepIssue {
+  id             String      @id @default(cuid())
+  stepId         String
+  order          Int         @default(1)
+  title          String
+  bodyMarkdown   String      @db.VarChar(4000)
+  githubIssueUrl String?
+  status         String      @default("OPEN")
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  step RoadmapStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+
+  @@index([stepId])
 }
 
 model Message {

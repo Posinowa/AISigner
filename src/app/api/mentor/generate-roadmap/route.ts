@@ -56,12 +56,20 @@ export async function POST(req: Request) {
       );
     }
 
-    // 3. İki kere aynı projeye yol haritası oluşturulmasını engelliyoruz
+    // 3. Eğer zaten bir yol haritası varsa ve overwrite istenmemişse uyarı veriyoruz
+    const bodyObj = body as { overwrite?: boolean };
     if (assignedProject.roadmap) {
-      return NextResponse.json(
-        { error: "Bu proje için zaten bir yol haritası oluşturulmuş!" }, 
-        { status: 400 }
-      );
+      if (bodyObj.overwrite) {
+        // Eski adımları ve roadmap'i temizle, Posilog ile yeniden üret
+        await prisma.roadmap.delete({
+          where: { id: assignedProject.roadmap.id },
+        });
+      } else {
+        return NextResponse.json(
+          { error: "Bu proje için zaten bir yol haritası oluşturulmuş!" }, 
+          { status: 400 }
+        );
+      }
     }
 
     // 4. Gemini AI'a verileri gönderip adımları (JSON dizisini) alıyoruz

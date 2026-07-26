@@ -120,6 +120,35 @@ export default function RoadmapReviewPage() {
     githubIssueUrl: "",
   });
 
+  // Posilog AI Asistanı State
+  const [generatingAiStep, setGeneratingAiStep] = useState(false);
+  const [showAiModal, setShowAiModal] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("");
+
+  async function handleGenerateAIStep() {
+    setGeneratingAiStep(true);
+    try {
+      const res = await fetch(`/api/mentor/roadmap/${roadmapId}/ai-step`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: aiPrompt.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "AI adımı üretilemedi");
+      }
+      toast.success(data.message || "Posilog tarafından yeni adım üretildi!");
+      setShowAiModal(false);
+      setAiPrompt("");
+      await loadRoadmap();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Hata oluştu";
+      toast.error(msg);
+    } finally {
+      setGeneratingAiStep(false);
+    }
+  }
+
   // Hangi adım açık (accordion)
   const [expandedStepId, setExpandedStepId] = useState<string | null>(null);
 
@@ -472,13 +501,22 @@ export default function RoadmapReviewPage() {
             <Sparkles className="w-5 h-5 text-purple-600 dark:text-purple-400" />
             Yol Haritası Adımları
           </h2>
-          <button
-            onClick={() => setShowAddForm(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/40 rounded-lg transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Adım Ekle
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowAiModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg transition-all shadow-sm"
+            >
+              <Sparkles className="w-4 h-4" />
+              Posilog ile Adım Üret
+            </button>
+            <button
+              onClick={() => setShowAddForm(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/40 rounded-lg transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Adım Ekle
+            </button>
+          </div>
         </div>
 
         {roadmap.steps.map((step, index) => {
@@ -813,6 +851,75 @@ export default function RoadmapReviewPage() {
           </div>
         )}
       </div>
+
+      {/* 🤖 Posilog AI Asistanı Modal */}
+      {showAiModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-purple-200 dark:border-slate-800 space-y-5">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-slate-100 flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                Posilog AI Mentör Asistanı
+              </h3>
+              <button
+                onClick={() => setShowAiModal(false)}
+                className="text-gray-400 hover:text-gray-600 text-sm font-semibold"
+              >
+                Kapat
+              </button>
+            </div>
+
+            <div className="bg-purple-50 dark:bg-purple-950/30 p-4 rounded-xl border border-purple-100 dark:border-purple-900/40 text-xs text-purple-900 dark:text-purple-200 space-y-1">
+              <div className="font-semibold text-sm">💡 Posilog Akıllı Adım Önerisi</div>
+              <p>
+                Posilog, öğrencini (<strong>{studentName}</strong>) ve projeyi (<strong>{project.title}</strong>) analiz ederek mevcut adımların arkasına sıradaki en mantıklı öğrenme fazını otomatik üretecektir.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 dark:text-slate-300 mb-1">
+                Özel İletmek İstediğiniz Konu / İpucu (Opsiyonel)
+              </label>
+              <textarea
+                value={aiPrompt}
+                onChange={(e) => setAiPrompt(e.target.value)}
+                placeholder="Örn: Docker konteynerleştirme ve CI/CD pipeline kurulumu odaklı bir adım olsun..."
+                rows={3}
+                className="w-full border rounded-xl p-3 text-xs focus:ring-2 focus:ring-purple-400 outline-none bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowAiModal(false)}
+                disabled={generatingAiStep}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition"
+              >
+                İptal
+              </button>
+              <button
+                type="button"
+                onClick={handleGenerateAIStep}
+                disabled={generatingAiStep}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs font-semibold shadow-md shadow-purple-600/20 transition disabled:opacity-50"
+              >
+                {generatingAiStep ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Posilog Üretiyor...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5" />
+                    Posilog ile Adımı Oluştur
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
