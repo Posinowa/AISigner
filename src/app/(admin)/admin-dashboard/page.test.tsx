@@ -4,10 +4,8 @@ import "@testing-library/jest-dom/vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { ConfirmDialogProvider } from "@/components/ui/ConfirmDialog";
 
-// Sayfa next-auth/UnreadBadge gibi tarayıcı-dışı bağımlılıklar içeriyor; render
-// testinin odağı hata durumu olduğundan bunlar sadeleştirilir.
-vi.mock("@/features/messaging/ui/UnreadBadge", () => ({ UnreadBadge: () => null }));
-vi.mock("@/components/LogoutButton", () => ({ default: () => null }));
+// #165: LogoutButton/UnreadBadge mock'ları #146'da sayfa header'ı AppShell'e
+// taşınınca ölü kaldı (sayfa artık ikisini de import etmiyor); kaldırıldı.
 
 import AdminDashboard from "./page";
 

@@ -6,7 +6,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/nextauth";
 import { Clock, Briefcase, Target, Github } from "lucide-react";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { Progress } from "@/components/ui/progress";
 import { SecurityQuestionsSetup } from "@/features/auth/ui/SecurityQuestionsSetup";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
