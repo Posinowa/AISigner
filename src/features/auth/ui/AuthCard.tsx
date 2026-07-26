@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 
 /**
  * #153: Giriş/kayıt/şifre sıfırlama ekranlarının ortak kart kabuğu.
@@ -15,6 +15,7 @@ export function AuthCard({
   width = "md",
   children,
   footer,
+  titleRef,
 }: {
   icon: LucideIcon;
   title: string;
@@ -23,6 +24,11 @@ export function AuthCard({
   width?: "md" | "lg";
   children: ReactNode;
   footer?: ReactNode;
+  /**
+   * #156: Çok adımlı akışlarda adım değişince odağın başlığa taşınabilmesi için.
+   * Odaklanabilir olması gerektiğinden başlık `tabIndex={-1}` alır.
+   */
+  titleRef?: Ref<HTMLHeadingElement>;
 }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 px-4 py-12">
@@ -35,7 +41,13 @@ export function AuthCard({
               <div className="mx-auto mb-4 h-14 w-14 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-200">
                 <Icon className="w-6 h-6 text-white" aria-hidden="true" />
               </div>
-              <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
+              <h1
+                ref={titleRef}
+                tabIndex={titleRef ? -1 : undefined}
+                className="text-2xl font-bold text-slate-900 outline-none"
+              >
+                {title}
+              </h1>
               {subtitle && <p className="mt-1.5 text-sm text-slate-500">{subtitle}</p>}
             </div>
 
