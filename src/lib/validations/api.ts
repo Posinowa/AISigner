@@ -231,6 +231,15 @@ export const createSuggestionSchema = z.object({
     .transform((val) => val.trim()),
 });
 
+// #163: Öneri listelerinde cursor tabanlı sayfalama. Query string'den geldiği
+// için limit coerce edilir (mesajlaşmadaki getMessagesSchema ile aynı desen).
+export const listSuggestionsQuerySchema = z.object({
+  cursor: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+  // Yalnızca admin listesinde kullanılır; öğrenci ucunda yok sayılır.
+  status: suggestionStatusEnum.optional(),
+});
+
 // Yönetici durum / not günceller — en az bir alan gönderilmeli
 export const updateSuggestionSchema = z
   .object({

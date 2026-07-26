@@ -30,6 +30,9 @@ export default function StudentSuggestionsPage() {
   const [items, setItems] = useState<Suggestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  // #163: Sayfalama — nextCursor null ise son sayfadayız.
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const [type, setType] = useState<SuggestionType>("SUGGESTION");
   const [title, setTitle] = useState("");
@@ -42,13 +45,31 @@ export default function StudentSuggestionsPage() {
       setLoadError(false);
       const res = await fetch("/api/suggestions");
       if (!res.ok) throw new Error("failed");
-      setItems(await res.json());
+      const page = await res.json();
+      setItems(page.items);
+      setNextCursor(page.nextCursor);
     } catch {
       setLoadError(true);
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const loadMore = useCallback(async () => {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const res = await fetch(`/api/suggestions?cursor=${encodeURIComponent(nextCursor)}`);
+      if (!res.ok) throw new Error("failed");
+      const page = await res.json();
+      setItems((prev) => [...prev, ...page.items]);
+      setNextCursor(page.nextCursor);
+    } catch {
+      toast.error("Daha fazlası yüklenemedi. Lütfen tekrar deneyin.");
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [nextCursor, loadingMore]);
 
   useEffect(() => {
     load();
@@ -225,6 +246,19 @@ export default function StudentSuggestionsPage() {
               </li>
             ))}
           </ul>
+        )}
+
+        {nextCursor && (
+          <div className="mt-5 text-center">
+            <button
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 disabled:opacity-60 transition-colors"
+            >
+              {loadingMore && <Loader2 className="w-4 h-4 animate-spin" />}
+              Daha fazla yükle
+            </button>
+          </div>
         )}
       </section>
     </div>

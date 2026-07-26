@@ -44,22 +44,54 @@ export async function createSuggestion(input: {
   });
 }
 
-/** Bir kullanıcının kendi gönderdiği öneri/istekler (en yeni önce). */
-export async function listOwnSuggestions(authorId: string) {
-  return prisma.suggestion.findMany({
-    where: { authorId },
-    orderBy: { createdAt: "desc" },
-    select: ownSelect,
-  });
+/**
+ * #163: Cursor tabanlı sayfalama sonucu. `nextCursor` null ise son sayfadayız.
+ * `take: limit + 1` hilesiyle "daha fazlası var mı" fazladan sorgu atmadan bulunur.
+ */
+export type SuggestionPage<T> = { items: T[]; nextCursor: string | null };
+
+type PageParams = { cursor?: string; limit?: number };
+
+function paginate<T extends { id: string }>(
+  rows: T[],
+  limit: number,
+): SuggestionPage<T> {
+  const hasMore = rows.length > limit;
+  const items = hasMore ? rows.slice(0, limit) : rows;
+  return {
+    items,
+    nextCursor: hasMore ? items[items.length - 1].id : null,
+  };
 }
 
-/** Tüm kayıtlar (admin). Açık olanlar önce gelsin diye status'e göre de sıralanır. */
-export async function listAllSuggestions(status?: SuggestionStatus) {
-  return prisma.suggestion.findMany({
+/** Bir kullanıcının kendi gönderdiği öneri/istekler (en yeni önce), sayfalanmış. */
+export async function listOwnSuggestions(
+  authorId: string,
+  { cursor, limit = 20 }: PageParams = {},
+) {
+  const rows = await prisma.suggestion.findMany({
+    where: { authorId },
+    orderBy: { createdAt: "desc" },
+    take: limit + 1,
+    // cursor verilmişse "o kayıttan sonrasını getir".
+    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    select: ownSelect,
+  });
+  return paginate(rows, limit);
+}
+
+/** Tüm kayıtlar (admin), sayfalanmış. Açık olanlar önce gelsin diye status'e göre de sıralanır. */
+export async function listAllSuggestions(
+  { status, cursor, limit = 20 }: PageParams & { status?: SuggestionStatus } = {},
+) {
+  const rows = await prisma.suggestion.findMany({
     where: status ? { status } : undefined,
     orderBy: [{ status: "asc" }, { createdAt: "desc" }],
+    take: limit + 1,
+    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     select: adminSelect,
   });
+  return paginate(rows, limit);
 }
 
 /**

@@ -89,4 +89,37 @@ describe("admin/suggestions route (#147)", () => {
     expect(select.author.select).not.toHaveProperty("password");
     expect(select.author.select).toMatchObject({ id: true, email: true });
   });
+
+  it("GET yanıtı sayfalama zarfı döner (#163)", async () => {
+    authAsAdmin();
+    prismaMock.suggestion.findMany.mockResolvedValue([{ id: "s1" }]);
+
+    const json = await (await GET(req())).json();
+
+    expect(json).toHaveProperty("items");
+    expect(json).toHaveProperty("nextCursor");
+  });
+
+  it("GET limit+1 kayıtta nextCursor üretilir (#163)", async () => {
+    authAsAdmin();
+    prismaMock.suggestion.findMany.mockResolvedValue([
+      { id: "a" },
+      { id: "b" },
+      { id: "c" },
+    ]);
+
+    const json = await (await GET(req("?limit=2"))).json();
+
+    expect(json.items).toHaveLength(2);
+    expect(json.nextCursor).toBe("b");
+  });
+
+  it("GET geçersiz limit → 400 (#163)", async () => {
+    authAsAdmin();
+
+    const res = await GET(req("?limit=999"));
+
+    expect(res.status).toBe(400);
+    expect(prismaMock.suggestion.findMany).not.toHaveBeenCalled();
+  });
 });
