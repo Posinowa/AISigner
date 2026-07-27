@@ -135,7 +135,7 @@ export default function AdminAssignmentsPage() {
             Öğrenci Proje İlerlemesi & GitHub Yönetimi
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Öğrencilerin projelerdeki canlı ilerleme durumunu takip edin, <span className="font-semibold text-indigo-600 dark:text-indigo-400">Posinowa</span> organizasyonu altında repoları ve detaylı AI Issue'larını oluşturun.
+            Öğrencilerin projelerdeki canlı ilerleme durumunu takip edin, <span className="font-semibold text-indigo-600 dark:text-indigo-400">Posinowa</span> organizasyonu altında repoları ve detaylı AI Issue&apos;larını oluşturun.
           </p>
         </div>
 
@@ -342,7 +342,7 @@ export default function AdminAssignmentsPage() {
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 transition text-xs font-semibold border border-emerald-200/60 dark:border-emerald-800"
                         >
                           <GitBranch className="w-3.5 h-3.5" />
-                          Repo'ya Git
+                          Repo&apos;ya Git
                           <ExternalLink className="w-3 h-3" />
                         </a>
                       ) : item.roadmapStatus === "PUBLISHED" || item.totalSteps > 0 ? (
@@ -414,7 +414,7 @@ export default function AdminAssignmentsPage() {
             </div>
 
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Bu işlem, <strong className="text-slate-700 dark:text-slate-200">Posinowa</strong> GitHub organizasyonunda öğrenciye özel repository oluşturacak, fazları Milestone olarak ekleyecek ve her fazın altında AI tarafından detaylandırılmış görev Issue'larını otomatik açacaktır.
+              Bu işlem, <strong className="text-slate-700 dark:text-slate-200">Posinowa</strong> GitHub organizasyonunda öğrenciye özel repository oluşturacak, fazları Milestone olarak ekleyecek ve her fazın altında AI tarafından detaylandırılmış görev Issue&apos;larını otomatik açacaktır.
             </p>
 
             <div className="flex items-center justify-end gap-3 pt-2">
@@ -440,7 +440,7 @@ export default function AdminAssignmentsPage() {
                 ) : (
                   <>
                     <Sparkles className="w-3.5 h-3.5" />
-                    Onayla ve GitHub'da Başlat
+                    Onayla ve GitHub&apos;da Başlat
                   </>
                 )}
               </button>
