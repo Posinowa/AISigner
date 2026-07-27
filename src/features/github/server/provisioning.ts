@@ -16,7 +16,14 @@ export type ProvisioningResult = {
  * detaylı AI Issue'larını oluşturan servis.
  */
 export async function provisionGitHubWorkspace(assignmentId: string): Promise<ProvisioningResult> {
-  await requireAuth(["ADMIN"]);
+  // Güvenlik: requireAuth hata FIRLATMAZ, { authorized } döndürür. Dönüş değeri
+  // kontrol edilmezse bu kontrol işlevsizdir (savunma-derinliği kaybı). Çağıran
+  // route zaten ADMIN kontrolü yapsa da, bu fonksiyon başka bir yerden
+  // çağrılırsa korumasız kalmasın diye burada da açıkça reddediyoruz.
+  const auth = await requireAuth(["ADMIN"]);
+  if (!auth.authorized) {
+    throw new Error("Bu işlem için yönetici yetkisi gerekiyor");
+  }
 
   const assignment = await prisma.assignedProject.findUnique({
     where: { id: assignmentId },
