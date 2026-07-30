@@ -10,7 +10,7 @@ export type Question = { questionId: number; question: string };
 
 /** Adımlar arasında paylaşılan "geri dön" bağlantısı görünümü. */
 const backLinkClass =
-  "inline-flex items-center text-sm text-slate-500 hover:text-slate-700 transition-colors";
+  "inline-flex items-center text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors";
 
 /** ADIM 1 — e-posta ile güvenlik sorularını iste. */
 export function EmailStep({
@@ -160,10 +160,10 @@ export function NewPasswordStep({
 export function SuccessStep() {
   return (
     <div className="text-center space-y-5">
-      <div className="mx-auto h-16 w-16 rounded-2xl bg-emerald-100 flex items-center justify-center">
-        <CheckCircle2 className="w-8 h-8 text-emerald-600" aria-hidden="true" />
+      <div className="mx-auto h-16 w-16 rounded-2xl bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center">
+        <CheckCircle2 className="w-8 h-8 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
       </div>
-      <p className="text-slate-600 text-sm">
+      <p className="text-slate-600 dark:text-slate-300 text-sm">
         Şifren başarıyla güncellendi. Artık yeni şifrenle giriş yapabilirsin.
       </p>
       <Link
