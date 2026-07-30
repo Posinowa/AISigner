@@ -56,17 +56,29 @@ export async function POST(req: Request) {
       );
     }
 
-    // 3. Eğer zaten bir yol haritası varsa ve overwrite istenmemişse uyarı veriyoruz
-    const bodyObj = body as { overwrite?: boolean };
+    // 3. Zaten bir yol haritası varsa: overwrite istenmemişse uyar; istenmişse
+    //    yalnızca DRAFT ise sil (#178-4).
     if (assignedProject.roadmap) {
-      if (bodyObj.overwrite) {
-        // Eski adımları ve roadmap'i temizle, Posilog ile yeniden üret
+      if (parsed.data.overwrite) {
+        // #178-4: PUBLISHED roadmap öğrenci erişimindedir — silme, adımlara bağlı
+        // yorum/dosya/issue kayıtlarını cascade götürür (geri dönüşsüz veri kaybı).
+        // Bu yüzden yalnızca henüz yayınlanmamış (DRAFT) roadmap silinebilir.
+        if (assignedProject.roadmap.status !== "DRAFT") {
+          return NextResponse.json(
+            {
+              error:
+                "Yayınlanmış bir yol haritası yeniden üretilerek silinemez. Öğrencinin ilerlemesini korumak için bu işlem yalnızca taslak (DRAFT) yol haritalarında yapılabilir.",
+            },
+            { status: 409 }
+          );
+        }
+        // Eski taslağı temizle, Posilog ile yeniden üret
         await prisma.roadmap.delete({
           where: { id: assignedProject.roadmap.id },
         });
       } else {
         return NextResponse.json(
-          { error: "Bu proje için zaten bir yol haritası oluşturulmuş!" }, 
+          { error: "Bu proje için zaten bir yol haritası oluşturulmuş!" },
           { status: 400 }
         );
       }
