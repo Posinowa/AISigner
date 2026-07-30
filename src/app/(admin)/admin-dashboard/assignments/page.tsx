@@ -414,8 +414,18 @@ export default function AdminAssignmentsPage() {
             </div>
 
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Bu işlem, <strong className="text-slate-700 dark:text-slate-200">Posinowa</strong> GitHub organizasyonunda öğrenciye özel repository oluşturacak, fazları Milestone olarak ekleyecek ve her fazın altında AI tarafından detaylandırılmış görev Issue&apos;larını otomatik açacaktır.
+              Bu akış, <strong className="text-slate-700 dark:text-slate-200">Posinowa</strong> organizasyonu için öğrenciye özel repo, faz (Milestone) ve AI ile detaylandırılmış görev (Issue) yapısını hazırlar.
             </p>
+
+            {/* #178-1: Bu özellik şu an ÖNİZLEME/simülasyondur — dürüstçe belirtilir. */}
+            <div className="mt-3 flex items-start gap-2 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
+              <span>
+                <strong>Önizleme:</strong> Bu işlem şu an bir <strong>simülasyondur</strong>. AI görev
+                içerikleri gerçekten üretilip kaydedilir, ancak GitHub&apos;da fiziksel bir repo/issue
+                <strong> oluşturulmaz</strong> — üretilen linkler yer tutucudur. Gerçek GitHub entegrasyonu ayrı olarak planlanmaktadır.
+              </span>
+            </div>
 
             <div className="flex items-center justify-end gap-3 pt-2">
               <button
