@@ -15,7 +15,15 @@ export async function POST(
 
   try {
     const body = await req.json().catch(() => ({}));
-    const customPrompt = body.prompt ? String(body.prompt).trim() : null;
+    // #191: Mentör serbest istem girer; sınırsız/serbest metin prompt'a gömülmesin.
+    // - Uzunluk tavanı: kötüye kullanım ve gereksiz token maliyetini engeller.
+    // - Çift tırnaklar temizlenir: girdi `"..."` delimiter'ı içine konduğu için
+    //   bütünlüğü korunur (istem sınırından kaçış zorlaşır).
+    const MAX_PROMPT_LEN = 500;
+    const rawPrompt = body.prompt ? String(body.prompt).trim() : "";
+    const customPrompt = rawPrompt
+      ? rawPrompt.replace(/["\r\n]+/g, " ").slice(0, MAX_PROMPT_LEN)
+      : null;
 
     const roadmap = await prisma.roadmap.findUnique({
       where: { id: roadmapId },
