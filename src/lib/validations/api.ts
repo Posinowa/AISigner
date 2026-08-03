@@ -106,6 +106,9 @@ export const assignProjectSchema = z.object({
 // Mentor: Roadmap oluşturma
 export const generateRoadmapSchema = z.object({
   assignedProjectId: z.string().min(1, "Atanmış proje ID gerekli"),
+  // #178-4: Var olan yol haritasını silip yeniden üretme. Ham `as` cast yerine
+  // şemadan geçer; route yalnızca DRAFT roadmap için siler (PUBLISHED korunur).
+  overwrite: z.boolean().optional(),
 });
 
 // Mentor: AI proje önerisi

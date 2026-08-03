@@ -31,7 +31,14 @@ export type StudentAssignmentProgress = {
  * Admin için tüm öğrencilerin projedeki canlı ilerleme durumunu ve atamalarını çeker.
  */
 export async function getStudentAssignmentsProgress(): Promise<StudentAssignmentProgress[]> {
-  await requireAuth(["ADMIN"]);
+  // Güvenlik (#178-2): requireAuth hata FIRLATMAZ, { authorized } döndürür.
+  // Dönüş değeri kontrol edilmezse kontrol işlevsizdir. provisioning.ts ile
+  // birebir aynı desen — çağıran route ADMIN kontrolü yapsa da savunma-derinliği
+  // için burada da açıkça reddediyoruz.
+  const auth = await requireAuth(["ADMIN"]);
+  if (!auth.authorized) {
+    throw new Error("Bu işlem için yönetici yetkisi gerekiyor");
+  }
 
   const assignments = await prisma.assignedProject.findMany({
     include: {

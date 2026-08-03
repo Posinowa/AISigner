@@ -9,11 +9,23 @@ export type ProvisioningResult = {
   createdMilestonesCount: number;
   createdIssuesCount: number;
   message: string;
+  /** #178-1: Bu sonucun gerçek GitHub değil, ÖNİZLEME (simülasyon) olduğunu belirtir. */
+  simulated: true;
 };
 
 /**
- * Admin tarafından onaylanan proje için GitHub Reposunu, Milestones (Fazlar) ve
- * detaylı AI Issue'larını oluşturan servis.
+ * ⚠️ #178-1: SİMÜLASYON / ÖNİZLEME — GERÇEK GITHUB ENTEGRASYONU DEĞİLDİR.
+ *
+ * Bu servis GERÇEK GitHub API'sine (Octokit/GITHUB_TOKEN) bağlanmaz. Repo,
+ * Milestone ve Issue URL'lerini yalnızca **string olarak türetir** ve DB'ye yazar;
+ * GitHub'da fiziksel olarak hiçbir şey oluşturmaz. Bu yüzden üretilen "Repo'ya Git"
+ * ve issue linkleri gerçek hayatta 404 verir — akışın önizlemesini göstermek içindir.
+ *
+ * AI ile üretilen görev (Issue) içerikleri gerçektir ve DB'de saklanır; yalnızca
+ * GitHub'a **push edilmeleri** simüledir.
+ *
+ * Gerçek entegrasyon (Octokit + GitHub App/token, org izinleri, hata/rate-limit
+ * yönetimi) ayrı bir issue'da ele alınacaktır — bkz. #179.
  */
 export async function provisionGitHubWorkspace(assignmentId: string): Promise<ProvisioningResult> {
   // Güvenlik: requireAuth hata FIRLATMAZ, { authorized } döndürür. Dönüş değeri
@@ -130,7 +142,9 @@ export async function provisionGitHubWorkspace(assignmentId: string): Promise<Pr
       githubRepoUrl,
       createdMilestonesCount: milestonesCount,
       createdIssuesCount,
-      message: `${githubRepoUrl} de deposu, ${milestonesCount} faz ve ${createdIssuesCount} detaylı issue oluşturuldu.`,
+      simulated: true,
+      // #178-1: "oluşturuldu" değil "önizlendi" — GitHub'da fiziksel bir şey yaratılmadı.
+      message: `Önizleme: ${milestonesCount} faz ve ${createdIssuesCount} detaylı issue hazırlandı. (Not: Bu bir simülasyondur; GitHub'da gerçek repo/issue oluşturulmaz.)`,
     };
   } catch (error) {
     logger.error("GitHub workspace oluşturulurken hata oluştu", { assignmentId, error });
