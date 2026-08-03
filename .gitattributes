@@ -1,0 +1,4 @@
+# Shell script'leri her platformda LF ile tut — CRLF, Linux konteynerinde
+# şebang'ı (#!/bin/sh) bozar ve entrypoint "not found" hatası verir.
+*.sh text eol=lf
+docker-entrypoint.sh text eol=lf
