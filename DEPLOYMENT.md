@@ -1,0 +1,106 @@
+# AISigner — Dağıtım (Deployment) Rehberi
+
+Bu belge AISigner'ı **Out Plane** (yönetilen PostgreSQL + Docker/GitHub build) veya
+benzeri bir PaaS üzerinde **güvenli** biçimde canlıya almak içindir.
+
+> Mimari özet için `CLAUDE.md`, çok-instance/ölçekleme notları için ilgili başlığa bakın.
+
+---
+
+## 1. Mimari ve gereksinimler
+
+| Bileşen | Değer |
+|---|---|
+| Runtime | Node 20 (Docker imajı: `node:20-bookworm-slim`) |
+| Uygulama | Next.js 15 standalone, port **3000** |
+| Veritabanı | PostgreSQL 14–18, **SSL zorunlu** |
+| AI (opsiyonel) | Google Vertex AI / Gemini — kimlik JSON'u env'den |
+| Dosya yükleme | Yerel disk `/app/uploads` (kalıcılık için Volume gerekir) |
+
+Konteyner açılışta şunu yapar (`docker-entrypoint.sh`):
+1. `GCP_CREDENTIALS_JSON` env'i varsa `/app/gcp-credentials.json`'a **600 izinle** yazar.
+2. `npx prisma migrate deploy` — bekleyen şema göçlerini uygular.
+3. Uygulamayı başlatır. **Root değil, `node` kullanıcısı** olarak koşar.
+
+---
+
+## 2. Ortam değişkenleri (Environment variables)
+
+Out Plane konsolunda servisin **Variables** bölümüne girilir.
+
+### Zorunlu
+
+| Değişken | Açıklama | Örnek / Not |
+|---|---|---|
+| `DATABASE_URL` | Postgres bağlantısı. **`?sslmode=require` ekleyin.** | `postgresql://user:pass@host:5432/aisigner?sslmode=require` |
+| `AUTH_SECRET` | **JWT imzalama sırrı** (oturum + middleware). Yoksa uygulama prod'da açılmaz. **Yeni ve güçlü üretin.** | `openssl rand -base64 32` çıktısı |
+| `NEXTAUTH_URL` | Uygulamanın public URL'i (NextAuth callback'leri). | `https://aisigner.example.com` |
+
+> **Dikkat:** Bu proje NextAuth v4 ile **`AUTH_SECRET`** kullanır (`NEXTAUTH_SECRET` DEĞİL).
+> Bir platform şablonu `NEXTAUTH_SECRET` isterse, `AUTH_SECRET`'i mutlaka ayrıca girin.
+
+### Güvenlik için önerilen
+
+| Değişken | Açıklama |
+|---|---|
+| `NEXTAUTH_SECRET` | Parola-sıfırlama token'larının imzalanmasında kullanılır. Verilmezse sabit bir decoy fallback devreye girer → token'lar tahmin edilebilir olur. **Ayrı, güçlü bir değer girin.** |
+
+### AI için (opsiyonel — verilmezse AI özellikleri mock'a düşer)
+
+| Değişken | Açıklama |
+|---|---|
+| `GOOGLE_CLOUD_PROJECT` | GCP proje kimliği (ör. `projects-498900`). |
+| `GCP_CREDENTIALS_JSON` | Service-account JSON'unun **tam içeriği** (dosya değil). Açılışta dosyaya yazılır. |
+
+> **`GOOGLE_APPLICATION_CREDENTIALS` girmeyin** — entrypoint onu otomatik `/app/gcp-credentials.json`'a ayarlar.
+
+### Diğer (opsiyonel)
+
+| Değişken | Varsayılan | Açıklama |
+|---|---|---|
+| `GITHUB_ORG` | `Posinowa` | GitHub çalışma alanı URL'lerinde kullanılan org. |
+| `PORT` | `3000` | Platform farklı bir port dayatıyorsa. |
+
+---
+
+## 3. Out Plane adımları
+
+1. **PostgreSQL oluştur**: Out Plane'de yönetilen Postgres ekle; bağlantı dizesini al,
+   sonuna `?sslmode=require` ekleyip `DATABASE_URL` olarak kaydet.
+2. **Servis oluştur**: Repo'yu (`Posinowa/AISigner`) bağla — Out Plane kök dizindeki
+   `Dockerfile` ile imajı kendisi build eder. (Alternatif: hazır imaj push'la.)
+3. **Değişkenleri gir**: Yukarıdaki tablodaki tüm zorunlu + kullanacağın opsiyonel değişkenler.
+4. **Deploy et.** İlk açılışta `migrate deploy` şemayı kurar. Logda şunları görmelisin:
+   `→ Prisma migrate deploy çalışıyor...` ve `→ Uygulama başlatılıyor...`.
+5. **Doğrula**: `https://<url>/api/health` 200 dönmeli; ardından `/signin`.
+
+### İlk admin'i güvenli oluştur
+
+`npm run seed` **prod'da ÇALIŞTIRILMAZ** (aşağıdaki güvenlik listesine bakın). İlk yönetici için:
+tek seferlik güvenli bir script ile veya DB'ye elle, **güçlü ve benzersiz** bir parolayla
+(argon2 hash — `@node-rs/argon2`'nin `hash()` fonksiyonu; `scripts/seed.ts` örnek alınabilir)
+bir ADMIN kullanıcı ekleyin.
+
+---
+
+## 4. 🔒 Güvenlik kontrol listesi (deploy öncesi)
+
+- [ ] **`gcp-credentials.json` repoda YOK.** `.gitignore` + `.dockerignore` korur; imaja da girmez.
+- [ ] **`.env` repoda YOK.** Tüm sırlar platformun Variables bölümünde.
+- [ ] **`NEXTAUTH_SECRET` yeni üretildi** (`openssl rand -base64 32`) — demo/örnek değer DEĞİL.
+- [ ] **`DATABASE_URL` içinde `sslmode=require`** var.
+- [ ] **Prod'da `npm run seed` çalıştırılmadı.** Seed; `admin@example.com` / `mentor@example.com`
+      / `student@example.com` kullanıcılarını **sabit zayıf parola** ile açar — canlıda arka kapı olur.
+- [ ] İlk admin **güçlü, benzersiz parolayla** oluşturuldu.
+- [ ] Konteyner **root değil** (`node` kullanıcısı) — Dockerfile bunu sağlar.
+- [ ] `GCP_CREDENTIALS_JSON` yalnızca platform secret'ı olarak duruyor; logda içeriği görünmüyor.
+
+---
+
+## 5. Kalıcılık ve ölçekleme (dikkat)
+
+- **Dosya yüklemeleri** `/app/uploads`'a yazılır. Volume bağlanmazsa **her deploy'da silinir**.
+  Kalıcılık için Out Plane Volume'ünü `/app/uploads`'a bağlayın veya GCS/S3'e geçin.
+- **Tek-instance varsayımı**: `rate-limit.ts`, forgot-password token'ları ve `metrics.ts`
+  bellek-içi (process-local) tutulur. **Birden çok instance** çalıştıracaksanız bunlar
+  instance'lar arasında paylaşılmaz → Redis'e taşıyın. Tek instance ile sorun yok.

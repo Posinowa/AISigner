@@ -8,3 +8,9 @@ Dockerfile*
 docker-compose*.yml
 README.md
 KURULUM.md
+# GÜVENLİK: kimlik bilgisi ve kullanıcı yüklemeleri ASLA imaj katmanına girmemeli.
+# (gcp-credentials.json .gitignore'da olduğu için repo'da yoktur; ama lokalde
+#  varken `docker build` yapılırsa COPY . . ile imaja sızardı — burada engelliyoruz.)
+gcp-credentials.json
+uploads
+
