@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { MessageSquare, Send, Loader2, Trash2, Pencil, X, User } from "lucide-react";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { toast } from "sonner";
@@ -47,7 +47,7 @@ export function StepComments({ stepId, currentUserId, currentUserRole, isDraft }
     return { label: "Öğrenci", color: "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300", ring: "ring-blue-200" };
   };
 
-  async function loadComments() {
+  const loadComments = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch(`/api/steps/${stepId}/comments`);
@@ -60,11 +60,11 @@ export function StepComments({ stepId, currentUserId, currentUserRole, isDraft }
     } finally {
       setLoading(false);
     }
-  }
+  }, [stepId]);
 
   useEffect(() => {
     if (isOpen) loadComments();
-  }, [isOpen, stepId]);
+  }, [isOpen, loadComments]);
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();

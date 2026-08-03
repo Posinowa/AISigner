@@ -94,7 +94,7 @@ describe("POST /api/steps/[stepId]/files — içerik imzası (#113)", () => {
 
   function makeUploadRequest(fileName: string, content: Uint8Array | string) {
     const form = new FormData();
-    form.set("file", new File([content], fileName));
+    form.set("file", new File([content as BlobPart], fileName));
     return new Request("http://test/api/steps/step-1/files", {
       method: "POST",
       body: form,

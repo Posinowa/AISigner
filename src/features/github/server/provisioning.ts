@@ -93,7 +93,7 @@ export async function provisionGitHubWorkspace(assignmentId: string): Promise<Pr
 
     // Her bir adım için (Milestone/Faz) detaylı Issue'ları AI ile üretip kaydedelim
     for (const step of assignment.roadmap.steps) {
-      const generatedIssues = await generateStepIssues({
+      await generateStepIssues({
         stepId: step.id,
         stepTitle: step.title,
         stepDescription: step.description,

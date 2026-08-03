@@ -41,8 +41,9 @@ export async function PUT(
       return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
     }
 
-    // Status alanını mentor tarafından güncellenebilir alanlardan çıkar (_status kasıtlı kullanılmıyor)
-    const { status: _status, ...safeData } = parsed.data;
+    // Status alanını mentor tarafından güncellenebilir alanlardan çıkar
+    const safeData = { ...parsed.data };
+    delete (safeData as { status?: string }).status;
 
     const step = await prisma.roadmapStep.update({
       where: { id: stepId },

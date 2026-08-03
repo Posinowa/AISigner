@@ -95,9 +95,11 @@ describe("POST /api/student/ai-chat — fallback + telemetry (#51/#70/#71)", () 
 
     await POST(makeRequest("ödevimi sen yaz"));
 
-    const history = startChat.mock.calls[0][0].history;
-    const systemText: string = history[0].parts[0].text;
-    const introText: string = history[1].parts[0].text;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const calls = startChat.mock.calls as any[];
+    const history = calls[0]?.[0]?.history ?? [];
+    const systemText: string = history[0]?.parts?.[0]?.text ?? "";
+    const introText: string = history[1]?.parts?.[0]?.text ?? "";
 
     // Sistem promptu "yerine iş yapma / tam çözüm üretme" kısıtını içermeli
     expect(systemText).toContain("REHBERLİK");

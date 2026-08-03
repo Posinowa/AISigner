@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { saveOnboarding } from "@/features/student/server/onboarding";
-import { CheckCircle, User, Target, Award, ArrowRight, ArrowLeft, Rocket, Terminal, BookOpen, Clock, ClipboardList, AlertCircle, Loader2 } from "lucide-react";
+import { CheckCircle, User, ArrowRight, ArrowLeft, Rocket, Terminal, BookOpen, Clock, ClipboardList, AlertCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   buildSurveyAnswerPayload,
