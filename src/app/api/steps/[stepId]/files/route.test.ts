@@ -129,5 +129,5 @@ describe("POST /api/steps/[stepId]/files — içerik imzası (#113)", () => {
 
 // #113: fs erişimi mock'lanır (vi.mock hoist edilir, tüm dosya için geçerli) —
 // imza testleri gerçek diske yazmasın. Önceki testler fs'e zaten ulaşmıyor.
-vi.mock("fs/promises", () => ({ writeFile: vi.fn(), mkdir: vi.fn() }));
-vi.mock("fs", () => ({ existsSync: vi.fn(() => true) }));
+// #197: Depolama katmanı mock'lanır — imza testleri gerçek diske/GCS'e yazmasın.
+vi.mock("@/lib/storage/step-files", () => ({ saveStepFile: vi.fn() }));

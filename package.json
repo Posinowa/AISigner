@@ -16,6 +16,7 @@
     "test:ai": "tsx --env-file=.env scripts/test-ai.ts"
   },
   "dependencies": {
+    "@google-cloud/storage": "^7.21.0",
     "@google-cloud/vertexai": "^1.10.0",
     "@hookform/resolvers": "^5.2.1",
     "@node-rs/argon2": "^2.0.2",

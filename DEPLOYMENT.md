@@ -58,6 +58,7 @@ Out Plane konsolunda servisin **Variables** bölümüne girilir.
 
 | Değişken | Varsayılan | Açıklama |
 |---|---|---|
+| `GCS_BUCKET` | _(yok)_ | **#197** — Dosya yüklemelerinin kalıcılığı. Verilirse yüklemeler bu GCS bucket'ına yazılır (deploy'da silinmez, çok-instance ölçeklenir). Kimlik: mevcut `GCP_CREDENTIALS_JSON` (ADC). Verilmezse yerel disk. |
 | `GITHUB_ORG` | `Posinowa` | GitHub çalışma alanı URL'lerinde kullanılan org. |
 | `PORT` | `3000` | Platform farklı bir port dayatıyorsa. |
 
@@ -99,8 +100,12 @@ bir ADMIN kullanıcı ekleyin.
 
 ## 5. Kalıcılık ve ölçekleme (dikkat)
 
-- **Dosya yüklemeleri** `/app/uploads`'a yazılır. Volume bağlanmazsa **her deploy'da silinir**.
-  Kalıcılık için Out Plane Volume'ünü `/app/uploads`'a bağlayın veya GCS/S3'e geçin.
+- **Dosya yüklemeleri (kalıcılık)** — iki seçenek (#197):
+  - **`GCS_BUCKET` ver (önerilen):** yüklemeler GCS'e yazılır, deploy'da silinmez, çok-instance
+    ölçeklenir. Ek kimlik gerekmez (mevcut `GCP_CREDENTIALS_JSON` kullanılır). Bucket'ı önceden
+    oluştur; servis hesabına `Storage Object Admin` yetkisi ver.
+  - **`GCS_BUCKET` verme:** yerel disk `/app/uploads`. Volume bağlanmazsa **her deploy'da silinir**;
+    kalıcılık için Out Plane Volume'ünü `/app/uploads`'a bağla (tek-instance).
 - **Tek-instance varsayımı**: `rate-limit.ts`, forgot-password token'ları ve `metrics.ts`
   bellek-içi (process-local) tutulur. **Birden çok instance** çalıştıracaksanız bunlar
   instance'lar arasında paylaşılmaz → Redis'e taşıyın. Tek instance ile sorun yok.

@@ -2,11 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth/guard";
 import { isAssignedMentor } from "@/lib/auth/mentor-access";
-import { readFile, unlink } from "fs/promises";
-import { existsSync } from "fs";
-import path from "path";
-
-const UPLOAD_DIR = path.join(process.cwd(), "uploads", "steps");
+import { readStepFile, deleteStepFile } from "@/lib/storage/step-files";
 
 /**
  * GET /api/steps/[stepId]/files/[fileId]
@@ -61,15 +57,15 @@ export async function GET(
       );
     }
 
-    const filePath = path.join(UPLOAD_DIR, stepFile.storedName);
-    if (!existsSync(filePath)) {
+    // #197: GCS veya yerel diskten oku (backend env'e göre).
+    const buffer = await readStepFile(stepFile.storedName);
+    if (!buffer) {
       return NextResponse.json(
         { error: "Dosya sunucuda bulunamadı." },
         { status: 404 }
       );
     }
 
-    const buffer = await readFile(filePath);
     const uint8 = new Uint8Array(buffer);
 
     // Resim ve PDF için inline, diğerleri için attachment
@@ -154,11 +150,8 @@ export async function DELETE(
       );
     }
 
-    // Dosyayı diskten sil
-    const filePath = path.join(UPLOAD_DIR, stepFile.storedName);
-    if (existsSync(filePath)) {
-      await unlink(filePath);
-    }
+    // #197: GCS veya yerel diskten sil (backend env'e göre).
+    await deleteStepFile(stepFile.storedName);
 
     // Veritabanından sil
     await prisma.stepFile.delete({ where: { id: fileId } });

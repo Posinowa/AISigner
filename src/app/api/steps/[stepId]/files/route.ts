@@ -4,8 +4,7 @@ import { requireAuth } from "@/lib/auth/guard";
 import { isAssignedMentor } from "@/lib/auth/mentor-access";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { matchesExtensionSignature } from "@/lib/file-signature";
-import { writeFile, mkdir } from "fs/promises";
-import { existsSync } from "fs";
+import { saveStepFile } from "@/lib/storage/step-files";
 import path from "path";
 import crypto from "crypto";
 
@@ -45,9 +44,8 @@ const SAFE_MIME_MAP: Record<string, string> = {
 const ALLOWED_EXTENSIONS = Object.keys(SAFE_MIME_MAP);
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
-// ⚠️ ÖLÇEKLEME: Yerel disk. Tek instance'ta kalıcı volume ile çalışır; çok
-// instance/serverless'ta GCS/S3'e taşıyın (bkz. DEPLOYMENT.md).
-const UPLOAD_DIR = path.join(process.cwd(), "uploads", "steps");
+// #197: Depolama artık `@/lib/storage/step-files` üzerinden — GCS_BUCKET varsa
+// GCS, yoksa yerel disk. (Yerel disk çok-instance/deploy'da kalıcı değildir.)
 
 /**
  * GET /api/steps/[stepId]/files
@@ -185,11 +183,6 @@ export async function POST(
     const safeExt = ext.replace(/[^a-z0-9.]/gi, "");
     const storedName = `${stepId}_${uniqueId}${safeExt}`;
 
-    // Upload dizinini oluştur
-    if (!existsSync(UPLOAD_DIR)) {
-      await mkdir(UPLOAD_DIR, { recursive: true });
-    }
-
     const buffer = Buffer.from(await file.arrayBuffer());
 
     // #113: Binary formatlarda dosya içeriği (magic bytes) uzantıyla eşleşmeli.
@@ -202,9 +195,8 @@ export async function POST(
       );
     }
 
-    // Dosyayı diske yaz
-    const filePath = path.join(UPLOAD_DIR, storedName);
-    await writeFile(filePath, buffer);
+    // #197: GCS veya yerel diske yaz (backend env'e göre seçilir).
+    await saveStepFile(storedName, buffer, mimeType);
 
     // Veritabanına kaydet
     const stepFile = await prisma.stepFile.create({

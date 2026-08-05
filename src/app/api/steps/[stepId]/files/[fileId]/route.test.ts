@@ -1,21 +1,20 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-const { requireAuthMock, prismaMock, unlinkMock, existsMock, readFileMock } = vi.hoisted(() => ({
+// #197: fs yerine depolama katmanı (`@/lib/storage/step-files`) mock'lanır.
+const { requireAuthMock, prismaMock, deleteStepFileMock, readStepFileMock } = vi.hoisted(() => ({
   requireAuthMock: vi.fn(),
   prismaMock: { stepFile: { findUnique: vi.fn(), delete: vi.fn() } },
-  unlinkMock: vi.fn(),
-  existsMock: vi.fn(() => false),
-  readFileMock: vi.fn(),
+  deleteStepFileMock: vi.fn(),
+  readStepFileMock: vi.fn(() => Promise.resolve(null)),
 }));
 vi.mock("@/lib/auth/guard", () => ({
   requireAuth: (...a: unknown[]) => requireAuthMock(...a),
 }));
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
-vi.mock("fs/promises", () => ({
-  unlink: (...a: unknown[]) => unlinkMock(...a),
-  readFile: (...a: unknown[]) => readFileMock(...a),
+vi.mock("@/lib/storage/step-files", () => ({
+  deleteStepFile: (...a: unknown[]) => deleteStepFileMock(...a),
+  readStepFile: (...a: unknown[]) => readStepFileMock(...a),
 }));
-vi.mock("fs", () => ({ existsSync: (...a: unknown[]) => existsMock(...a) }));
 
 import { DELETE, GET } from "./route";
 
@@ -50,7 +49,7 @@ function stepFile(over: { uploaderId: string; ownerUserId: string; mentorId: str
 describe("dosya sil/indir — yetki sınırları (#181)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    existsMock.mockReturnValue(false);
+    readStepFileMock.mockResolvedValue(null); // varsayılan: dosya yok
   });
 
   // ---- DELETE ----
@@ -88,7 +87,7 @@ describe("dosya sil/indir — yetki sınırları (#181)", () => {
 
     expect(res.status).toBe(403);
     expect(prismaMock.stepFile.delete).not.toHaveBeenCalled();
-    expect(unlinkMock).not.toHaveBeenCalled();
+    expect(deleteStepFileMock).not.toHaveBeenCalled();
   });
 
   it("DELETE: başka öğrenci mentör rolüyle gelse de (o öğrencinin mentörü değil) → 403", async () => {
@@ -141,8 +140,7 @@ describe("dosya sil/indir — yetki sınırları (#181)", () => {
     prismaMock.stepFile.findUnique.mockResolvedValue(
       stepFile({ uploaderId: "student-1", ownerUserId: "student-1", mentorId: "mentor-1" }),
     );
-    existsMock.mockReturnValue(true);
-    readFileMock.mockResolvedValue(Buffer.from("veri"));
+    readStepFileMock.mockResolvedValue(Buffer.from("veri"));
 
     const res = await GET(new Request("http://t"), { params: params() });
 
