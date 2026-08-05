@@ -1,5 +1,7 @@
 -- #195: Öğrenci↔Mentör ilişkisini tek-mentor (StudentProfile.mentorId) yerine
 -- M:N (MentorAssignment join tablosu) yap. Mevcut atamalar backfill ile taşınır.
+-- migration-safety-ack: mentorId drop'u backfill SONRASI yapılıyor (veri kaybı yok) ve
+--   proje henüz canlıda değil (ilk deploy — çakışacak eski sürüm yok). Detay: docs/MIGRATIONS.md (#198)
 
 -- CreateTable
 CREATE TABLE "MentorAssignment" (
