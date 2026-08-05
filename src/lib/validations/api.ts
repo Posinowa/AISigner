@@ -8,10 +8,11 @@ export const updateRoleSchema = z.object({
   }),
 });
 
-// Admin: Mentor atama (mentorId null → atamayı kaldır)
+// #195: Admin — öğrencinin mentor LİSTESİNİ ayarla (M:N). Gelen dizi "olması
+// gereken tam küme"dir; boş dizi → tüm mentorlar kaldırılır.
 export const assignMentorSchema = z.object({
   studentId: z.string().min(1, "Öğrenci ID gerekli"),
-  mentorId: z.string().nullable(),
+  mentorIds: z.array(z.string().min(1)).max(20, "En fazla 20 mentor atanabilir"),
 });
 
 // ==========================================

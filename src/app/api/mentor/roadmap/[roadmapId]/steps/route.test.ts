@@ -35,7 +35,7 @@ describe("POST /api/mentor/roadmap/[roadmapId]/steps — githubIssueUrl (#50)", 
     vi.clearAllMocks();
     prismaMock.roadmap.findUnique.mockResolvedValue({
       id: "rm-1",
-      assignedProject: { studentProfile: { mentorId: "mentor-1" } },
+      assignedProject: { studentProfile: { mentorAssignments: [{ mentorId: "mentor-1" }] } },
     });
     prismaMock.roadmapStep.findFirst.mockResolvedValue(null);
     prismaMock.roadmapStep.create.mockResolvedValue({ id: "step-1" });
@@ -77,7 +77,7 @@ describe("POST /api/mentor/roadmap/[roadmapId]/steps — githubIssueUrl (#50)", 
     authMentor();
     prismaMock.roadmap.findUnique.mockResolvedValue({
       id: "rm-1",
-      assignedProject: { studentProfile: { mentorId: "baska-mentor" } },
+      assignedProject: { studentProfile: { mentorAssignments: [{ mentorId: "baska-mentor" }] } },
     });
 
     const res = await POST(postReq(validBody), ctx);

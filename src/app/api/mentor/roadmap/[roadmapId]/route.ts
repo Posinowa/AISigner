@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth/guard";
+import { isAssignedMentor } from "@/lib/auth/mentor-access";
 import { updateRoadmapSchema } from "@/lib/validations/api";
 
 // GET: Roadmap detayını getir
@@ -26,6 +27,8 @@ export async function GET(
                 user: {
                   select: { name: true, lastName: true, email: true },
                 },
+                // #195: M:N yetki kontrolü için atanmış mentorlar.
+                mentorAssignments: { select: { mentorId: true } },
               },
             },
           },
@@ -40,8 +43,8 @@ export async function GET(
       );
     }
 
-    // Mentor ownership kontrolü
-    if (roadmap.assignedProject.studentProfile.mentorId !== auth.session.user.id) {
+    // Mentor ownership kontrolü — #195: öğrencinin mentorlarından biri mi?
+    if (!isAssignedMentor(roadmap.assignedProject.studentProfile.mentorAssignments, auth.session.user.id)) {
       return NextResponse.json(
         { error: "Bu yol haritasına erişim yetkiniz yok." },
         { status: 403 }
@@ -79,7 +82,11 @@ export async function PUT(
       where: { id: roadmapId },
       include: {
         assignedProject: {
-          include: { studentProfile: true },
+          include: {
+            studentProfile: {
+              include: { mentorAssignments: { select: { mentorId: true } } },
+            },
+          },
         },
       },
     });
@@ -88,7 +95,8 @@ export async function PUT(
       return NextResponse.json({ error: "Yol haritası bulunamadı!" }, { status: 404 });
     }
 
-    if (existingRoadmap.assignedProject.studentProfile.mentorId !== auth.session.user.id) {
+    // #195: öğrencinin mentorlarından biri mi?
+    if (!isAssignedMentor(existingRoadmap.assignedProject.studentProfile.mentorAssignments, auth.session.user.id)) {
       return NextResponse.json(
         { error: "Bu yol haritasını güncelleme yetkiniz yok." },
         { status: 403 }

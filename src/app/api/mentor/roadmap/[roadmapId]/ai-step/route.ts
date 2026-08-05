@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getModel } from "@/lib/ai/gemini-client";
 import { requireAuth } from "@/lib/auth/guard";
+import { isAssignedMentor } from "@/lib/auth/mentor-access";
 import { experienceLevelLabel } from "@/lib/experience-level";
 
 export async function POST(
@@ -32,7 +33,11 @@ export async function POST(
         assignedProject: {
           include: {
             studentProfile: {
-              include: { user: true },
+              include: {
+                user: true,
+                // #195: M:N yetki kontrolü için atanmış mentorlar.
+                mentorAssignments: { select: { mentorId: true } },
+              },
             },
             projectTemplate: true,
           },
@@ -44,7 +49,8 @@ export async function POST(
       return NextResponse.json({ error: "Yol haritası bulunamadı" }, { status: 404 });
     }
 
-    if (roadmap.assignedProject.studentProfile.mentorId !== auth.session.user.id) {
+    // #195: öğrencinin mentorlarından biri mi?
+    if (!isAssignedMentor(roadmap.assignedProject.studentProfile.mentorAssignments, auth.session.user.id)) {
       return NextResponse.json({ error: "Yetkisiz işlem" }, { status: 403 });
     }
 

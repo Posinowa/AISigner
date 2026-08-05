@@ -43,9 +43,9 @@ describe("messages/conversations (#158)", () => {
     const res = await GET();
     const json = await res.json();
 
-    // Kapsam kritik: sorgu mentorId ile sınırlanmalı
+    // Kapsam kritik: sorgu bu mentörün atamalarıyla sınırlanmalı (#195 M:N)
     expect(prismaMock.studentProfile.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { mentorId: "mentor-1" } }),
+      expect.objectContaining({ where: { mentorAssignments: { some: { mentorId: "mentor-1" } } } }),
     );
     expect(res.status).toBe(200);
     expect(json.conversations.map((c: { partner: { id: string } }) => c.partner.id)).toContain(
@@ -55,8 +55,11 @@ describe("messages/conversations (#158)", () => {
 
   it("STUDENT yalnızca kendi mentörünü görür", async () => {
     authAs("ogrenci-1", "STUDENT");
+    // #195: M:N — öğrencinin mentorları mentorAssignments üzerinden gelir.
     prismaMock.studentProfile.findUnique.mockResolvedValue({
-      mentor: { id: "mentor-1", name: "Ayşe", lastName: null, role: "MENTOR" },
+      mentorAssignments: [
+        { mentor: { id: "mentor-1", name: "Ayşe", lastName: null, role: "MENTOR" } },
+      ],
     });
 
     const res = await GET();

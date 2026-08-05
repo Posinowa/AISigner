@@ -3,69 +3,74 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 // prisma'yı mock'la (gerçek DB gerekmez)
 const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
-    user: { findUnique: vi.fn() },
+    user: { findUnique: vi.fn(), findMany: vi.fn() },
     studentProfile: { upsert: vi.fn() },
+    mentorAssignment: { deleteMany: vi.fn(), createMany: vi.fn() },
+    $transaction: vi.fn(),
   },
 }));
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 
-import { assignMentor, AssignmentValidationError } from "./user";
+import { setStudentMentors, AssignmentValidationError } from "./user";
 
-/** user.findUnique için id→rol eşlemesi kuran yardımcı. */
-function mockRoles(roles: Record<string, "STUDENT" | "MENTOR" | "ADMIN">) {
-  prismaMock.user.findUnique.mockImplementation(
-    ({ where: { id } }: { where: { id: string } }) =>
-      Promise.resolve(roles[id] ? { role: roles[id] } : null),
-  );
-}
-
-describe("assignMentor — rol doğrulaması (#43)", () => {
+// #195: assignMentor (tek mentor) → setStudentMentors (M:N liste reconcile).
+describe("setStudentMentors — rol doğrulaması + M:N reconcile (#43/#195)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     prismaMock.studentProfile.upsert.mockResolvedValue({ id: "sp-1" });
+    prismaMock.mentorAssignment.deleteMany.mockReturnValue("del-op");
+    prismaMock.mentorAssignment.createMany.mockReturnValue("create-op");
+    prismaMock.$transaction.mockResolvedValue([]);
   });
 
-  it("geçerli STUDENT + MENTOR → upsert çağrılır", async () => {
-    mockRoles({ s1: "STUDENT", m1: "MENTOR" });
+  it("geçerli STUDENT + MENTOR listesi → reconcile ($transaction) çağrılır", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({ role: "STUDENT" });
+    prismaMock.user.findMany.mockResolvedValue([{ id: "m1" }]);
 
-    await assignMentor("s1", "m1");
+    await setStudentMentors("s1", ["m1"]);
 
     expect(prismaMock.studentProfile.upsert).toHaveBeenCalledOnce();
+    expect(prismaMock.$transaction).toHaveBeenCalledOnce();
   });
 
-  it("studentId STUDENT değilse → AssignmentValidationError, upsert yok", async () => {
-    mockRoles({ s1: "MENTOR", m1: "MENTOR" });
+  it("studentId STUDENT değilse → hata, reconcile yok", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({ role: "MENTOR" });
 
-    await expect(assignMentor("s1", "m1")).rejects.toBeInstanceOf(AssignmentValidationError);
-    expect(prismaMock.studentProfile.upsert).not.toHaveBeenCalled();
+    await expect(setStudentMentors("s1", ["m1"])).rejects.toBeInstanceOf(AssignmentValidationError);
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
   });
 
-  it("mentorId MENTOR değilse → AssignmentValidationError, upsert yok", async () => {
-    mockRoles({ s1: "STUDENT", m1: "STUDENT" });
+  it("listedeki id MENTOR değilse → hata, reconcile yok", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({ role: "STUDENT" });
+    prismaMock.user.findMany.mockResolvedValue([]); // m1 MENTOR değil → doğrulama düşer
 
-    await expect(assignMentor("s1", "m1")).rejects.toBeInstanceOf(AssignmentValidationError);
-    expect(prismaMock.studentProfile.upsert).not.toHaveBeenCalled();
+    await expect(setStudentMentors("s1", ["m1"])).rejects.toBeInstanceOf(AssignmentValidationError);
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
   });
 
-  it("öğrenci bulunamazsa → AssignmentValidationError", async () => {
-    mockRoles({});
+  it("öğrenci bulunamazsa → hata", async () => {
+    prismaMock.user.findUnique.mockResolvedValue(null);
 
-    await expect(assignMentor("yok", "m1")).rejects.toBeInstanceOf(AssignmentValidationError);
+    await expect(setStudentMentors("yok", ["m1"])).rejects.toBeInstanceOf(AssignmentValidationError);
   });
 
-  it("mentor bulunamazsa → AssignmentValidationError", async () => {
-    mockRoles({ s1: "STUDENT" });
+  it("boş liste (tüm mentorları kaldır) → mentor doğrulaması yok, reconcile çağrılır", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({ role: "STUDENT" });
 
-    await expect(assignMentor("s1", "yok")).rejects.toBeInstanceOf(AssignmentValidationError);
+    await setStudentMentors("s1", []);
+
+    // Boş listede MENTOR-rol sorgusu (findMany) YAPILMAZ.
+    expect(prismaMock.user.findMany).not.toHaveBeenCalled();
+    expect(prismaMock.$transaction).toHaveBeenCalledOnce();
   });
 
-  it("mentorId null (atama kaldırma) → mentor kontrolü yok, upsert çağrılır", async () => {
-    mockRoles({ s1: "STUDENT" });
+  it("aynı mentor iki kez verilse → tekilleştirilir", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({ role: "STUDENT" });
+    prismaMock.user.findMany.mockResolvedValue([{ id: "m1" }]);
 
-    await assignMentor("s1", null);
+    await setStudentMentors("s1", ["m1", "m1"]);
 
-    // Yalnızca öğrenci için 1 findUnique; mentor sorgusu yapılmaz
-    expect(prismaMock.user.findUnique).toHaveBeenCalledOnce();
-    expect(prismaMock.studentProfile.upsert).toHaveBeenCalledOnce();
+    const arg = prismaMock.user.findMany.mock.calls[0][0] as { where: { id: { in: string[] } } };
+    expect(arg.where.id.in).toEqual(["m1"]);
   });
 });

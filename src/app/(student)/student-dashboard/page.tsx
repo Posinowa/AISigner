@@ -60,6 +60,8 @@ export default async function StudentDashboardPage() {
         },
         orderBy: { createdAt: "desc" },
       },
+      // #195: M:N — "mentörün var mı?" kontrolü için atamalar.
+      mentorAssignments: { select: { mentorId: true } },
     },
   });
 
@@ -106,7 +108,7 @@ export default async function StudentDashboardPage() {
         <p className="text-slate-500 dark:text-slate-400 mt-2 text-sm">
           {profile.assignedProjects.length > 0
             ? "Çalışma masan hazır. Odaklanman gereken güncel görevler aşağıda listelenmiştir."
-            : profile.mentorId
+            : profile.mentorAssignments.length > 0
               ? "Mentörün gelişim planını hazırlıyor. Lütfen beklemede kal."
               : "Profilin inceleniyor. Yakında bir mentör ile eşleştirileceksin."}
         </p>

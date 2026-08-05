@@ -190,13 +190,15 @@ async function verifyConversationAccess(
   });
   if (other?.role === "ADMIN") return true;
 
+  // #195: M:N — karşı taraf, benim (mentör) öğrencilerimden biri mi?
   const asMentor = await prisma.studentProfile.findFirst({
-    where: { userId: otherUserId, mentorId: userId },
+    where: { userId: otherUserId, mentorAssignments: { some: { mentorId: userId } } },
   });
   if (asMentor) return true;
 
+  // #195: M:N — karşı taraf, benim (öğrenci) mentorlarımdan biri mi?
   const asStudent = await prisma.studentProfile.findFirst({
-    where: { userId, mentorId: otherUserId },
+    where: { userId, mentorAssignments: { some: { mentorId: otherUserId } } },
   });
   if (asStudent) return true;
 

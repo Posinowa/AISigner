@@ -22,8 +22,8 @@ export type StudentAssignmentProgress = {
   studentName: string;
   studentEmail: string;
   experienceLevel: string;
-  mentorId: string | null;
-  mentorName: string | null;
+  // #195: M:N — atanmış mentorlar (0..n).
+  mentors: { id: string; name: string }[];
   projectTemplateId: string;
   projectTitle: string;
   projectDifficulty: string;
@@ -267,9 +267,11 @@ export default function AdminAssignmentsPage() {
                           {item.experienceLevel}
                         </span>
                       </div>
-                      {item.mentorName && (
+                      {item.mentors.length > 0 && (
                         <div className="text-xs text-indigo-600 dark:text-indigo-400 mt-1 flex items-center gap-1">
-                          <Users className="w-3 h-3" /> Mentör: {item.mentorName}
+                          <Users className="w-3 h-3" />{" "}
+                          {item.mentors.length > 1 ? "Mentörler" : "Mentör"}:{" "}
+                          {item.mentors.map((m) => m.name).join(", ")}
                         </div>
                       )}
                     </td>

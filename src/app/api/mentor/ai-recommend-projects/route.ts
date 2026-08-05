@@ -37,7 +37,8 @@ export async function POST(req: Request) {
     const studentProfile = await prisma.studentProfile.findFirst({
       where: {
         id: studentProfileId,
-        mentorId: auth.session.user.id,
+        // #195: M:N — bu mentör öğrencinin mentorlarından biri mi?
+        mentorAssignments: { some: { mentorId: auth.session.user.id } },
       },
     });
 

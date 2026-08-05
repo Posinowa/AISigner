@@ -22,9 +22,10 @@ model User {
 
   // Relations
   sessions            Session[]
-  studentProfile      StudentProfile?  @relation("StudentProfile_userIdToUser")
-  mentoredStudents    StudentProfile[] @relation("StudentProfile_mentorIdToUser")
-  sentMessages        Message[]        @relation("Message_senderIdToUser")
+  studentProfile      StudentProfile?    @relation("StudentProfile_userIdToUser")
+  // #195: Mentor→öğrenci artık M:N (join tablosu). Bir mentörün öğrencileri buradan.
+  mentorAssignments   MentorAssignment[] @relation("MentorAssignment_mentorIdToUser")
+  sentMessages        Message[]          @relation("Message_senderIdToUser")
   receivedMessages    Message[]        @relation("Message_receiverIdToUser")
   stepComments        StepComment[]
   stepFiles           StepFile[]
@@ -49,16 +50,31 @@ model StudentProfile {
   goals           String?
   availability    String?
   birthYear       Int?
-  mentorId        String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   // Relations
-  user             User              @relation("StudentProfile_userIdToUser", fields: [userId], references: [id], onDelete: Cascade)
-  mentor           User?             @relation("StudentProfile_mentorIdToUser", fields: [mentorId], references: [id])
+  user             User               @relation("StudentProfile_userIdToUser", fields: [userId], references: [id], onDelete: Cascade)
+  // #195: Tek mentorId yerine M:N. Bir öğrencinin mentorları buradan.
+  mentorAssignments MentorAssignment[]
   assignedProjects AssignedProject[]
   surveyAnswers    SurveyAnswer[]
   profileAnalysis  ProfileAnalysis?
+}
+
+// #195: Öğrenci↔Mentör M:N eşleştirmesi. Mentorlar eşit yetkili (birincil yok).
+model MentorAssignment {
+  id               String   @id @default(cuid())
+  studentProfileId String
+  mentorId         String
+  assignedAt       DateTime @default(now())
+
+  studentProfile StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  mentor         User           @relation("MentorAssignment_mentorIdToUser", fields: [mentorId], references: [id], onDelete: Cascade)
+
+  // Aynı mentor bir öğrenciye iki kez atanamaz.
+  @@unique([studentProfileId, mentorId])
+  @@index([mentorId])
 }
 
 model ProjectTemplate {

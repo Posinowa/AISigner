@@ -19,7 +19,13 @@ function mentor(id: string) {
 }
 const params = (roadmapId = "rm-1", stepId = "s-1") => Promise.resolve({ roadmapId, stepId });
 function roadmap(mentorId: string | null) {
-  return { id: "rm-1", assignedProject: { studentProfile: { mentorId } } };
+  // #195: M:N — mentorId varsa tek elemanlı atama listesi, yoksa boş.
+  return {
+    id: "rm-1",
+    assignedProject: {
+      studentProfile: { mentorAssignments: mentorId ? [{ mentorId }] : [] },
+    },
+  };
 }
 function putReq(body: unknown) {
   return new Request("http://t", {

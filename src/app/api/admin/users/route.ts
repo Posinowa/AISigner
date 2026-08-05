@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAllUsers, updateUserRole, assignMentor, AssignmentValidationError } from "@/features/admin/server/user";
+import { getAllUsers, updateUserRole, setStudentMentors, AssignmentValidationError } from "@/features/admin/server/user";
 import { requireAuth } from "@/lib/auth/guard";
 import { updateRoleSchema, assignMentorSchema } from "@/lib/validations/api";
 
@@ -44,7 +44,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const updated = await assignMentor(parsed.data.studentId, parsed.data.mentorId);
+    const updated = await setStudentMentors(parsed.data.studentId, parsed.data.mentorIds);
     return NextResponse.json(updated);
   } catch (error) {
     // #43: Geçersiz rol → 400 (anlamlı mesaj). Diğer hatalar → 500.

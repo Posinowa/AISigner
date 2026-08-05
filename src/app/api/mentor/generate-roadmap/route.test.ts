@@ -37,7 +37,8 @@ function req(body: unknown) {
 function assignedProject(roadmap: { id: string; status: string } | null) {
   return {
     id: "ap-1",
-    studentProfile: { mentorId: MENTOR_ID },
+    // #195: M:N — bu mentöre atanmış öğrenci.
+    studentProfile: { mentorAssignments: [{ mentorId: MENTOR_ID }] },
     projectTemplate: { title: "Proje" },
     roadmap,
   };
@@ -61,7 +62,7 @@ describe("generate-roadmap overwrite koruması (#178-4)", () => {
     mentor();
     prismaMock.assignedProject.findUnique.mockResolvedValue({
       ...assignedProject(null),
-      studentProfile: { mentorId: "baska-mentor" },
+      studentProfile: { mentorAssignments: [{ mentorId: "baska-mentor" }] },
     });
     const res = await POST(req({ assignedProjectId: "ap-1" }));
     expect(res.status).toBe(403);

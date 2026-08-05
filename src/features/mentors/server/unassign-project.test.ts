@@ -46,7 +46,7 @@ describe("unassignProject action — sahiplik + force (#184)", () => {
     await unassignProject("ap-1", "mentor-1", false);
 
     const where = prismaMock.assignedProject.findFirst.mock.calls[0][0].where;
-    expect(where).toMatchObject({ id: "ap-1", studentProfile: { mentorId: "mentor-1" } });
+    expect(where).toMatchObject({ id: "ap-1", studentProfile: { mentorAssignments: { some: { mentorId: "mentor-1" } } } });
   });
 
   it("ilerleme yoksa (PENDING, DRAFT) force'suz → siler", async () => {
