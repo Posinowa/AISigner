@@ -119,9 +119,14 @@ Redis gerekir → `DEPLOYMENT.md`.
 npm run dev / build / lint / test
 npm run seed          # idempotent demo verisi (kullanıcılar + şablonlar)
 npm run test:ai       # Vertex AI bağlantı testi (.env gerekli)
+npm run check:migrations   # yıkıcı migration guard (#198, CI'da zorunlu)
 npx prisma migrate dev --name <ad>   # yeni şema değişikliği (db push kullanmayın)
 docker compose up -d  # db (+app) — uploads kalıcı volume'da
 ```
+
+> **Migration güvenliği (#198):** kolon/tablo silme, rename, NOT NULL gibi **yıkıcı**
+> değişiklikleri tek deploy'da yapmayın — **expand/contract** ile bölün. Kural + guard +
+> onay mekanizması: `docs/MIGRATIONS.md`. CI, onaysız yıkıcı migration'ı FAIL eder.
 
 ## Tasarım Sistemi
 
