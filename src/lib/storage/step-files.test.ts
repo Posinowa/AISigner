@@ -1,5 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
+// Bu birim test yerel-disk branch'ini kapsar (CI'da bağımlılıksız).
+//
+// GCS branch'i manuel bir emülatörle uçtan uca doğrulandı (fake-gcs-server):
+//   docker run -d --name fake-gcs -p 4443:4443 fsouza/fake-gcs-server -scheme http -port 4443
+//   curl -X POST "http://localhost:4443/storage/v1/b?project=test" -d '{"name":"aisigner-test"}'
+//   GCS_BUCKET=aisigner-test GCS_API_ENDPOINT=http://localhost:4443 GOOGLE_CLOUD_PROJECT=test \
+//     tsx -e "<saveStepFile→readStepFile→deleteStepFile round-trip>"
+// Sonuç: save/read/delete + eksik-dosya→null uçtan uca ✓.
+
 // #197: fs mock'lanır — testler gerçek diske dokunmaz.
 const { writeFileMock, readFileMock, unlinkMock, mkdirMock, existsMock } = vi.hoisted(() => ({
   writeFileMock: vi.fn(),

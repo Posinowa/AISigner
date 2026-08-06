@@ -23,12 +23,17 @@ const GCS_PREFIX = "steps/";
 const UPLOAD_DIR = path.join(process.cwd(), "uploads", "steps");
 
 // GCS istemcisi tembel yüklenir — env yoksa paket hiç import edilmez.
+// GCS_API_ENDPOINT: yalnızca yerel emülatör/test içindir (ör. fake-gcs-server).
+// Prod'da tanımlanmaz → gerçek GCS'e ADC ile bağlanılır.
 let bucketPromise: Promise<Bucket> | null = null;
 async function getBucket(): Promise<Bucket> {
   if (!bucketPromise) {
-    bucketPromise = import("@google-cloud/storage").then(
-      ({ Storage }) => new Storage().bucket(GCS_BUCKET as string),
-    );
+    bucketPromise = import("@google-cloud/storage").then(({ Storage }) => {
+      const opts = process.env.GCS_API_ENDPOINT
+        ? { apiEndpoint: process.env.GCS_API_ENDPOINT, projectId: process.env.GOOGLE_CLOUD_PROJECT || "local" }
+        : {};
+      return new Storage(opts).bucket(GCS_BUCKET as string);
+    });
   }
   return bucketPromise;
 }
