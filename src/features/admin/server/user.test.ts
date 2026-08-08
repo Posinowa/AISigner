@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 // prisma'yı mock'la (gerçek DB gerekmez)
-const { prismaMock } = vi.hoisted(() => ({
+const { prismaMock, deleteStepFileMock } = vi.hoisted(() => ({
   prismaMock: {
     user: {
       findUnique: vi.fn(),
@@ -12,10 +12,13 @@ const { prismaMock } = vi.hoisted(() => ({
     },
     studentProfile: { upsert: vi.fn() },
     mentorAssignment: { deleteMany: vi.fn(), createMany: vi.fn() },
+    stepFile: { findMany: vi.fn() },
     $transaction: vi.fn(),
   },
+  deleteStepFileMock: vi.fn(),
 }));
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
+vi.mock("@/lib/storage/step-files", () => ({ deleteStepFile: deleteStepFileMock }));
 
 import {
   setStudentMentors,
@@ -160,6 +163,7 @@ describe("deleteUser — güvenli hesap silme", () => {
       role: "STUDENT",
       email: "student1@test.com",
     });
+    prismaMock.stepFile.findMany.mockResolvedValue([]);
     prismaMock.user.delete.mockResolvedValue({
       id: "student-1",
       email: "student1@test.com",
@@ -174,5 +178,39 @@ describe("deleteUser — güvenli hesap silme", () => {
       select: { id: true, email: true, name: true, lastName: true },
     });
     expect(deleted.id).toBe("student-1");
+  });
+
+  it("#204: silmeden önce toplanan StepFile'lar storage'dan da silinir (öksüz dosya yok)", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: "student-1",
+      role: "STUDENT",
+      email: "student1@test.com",
+    });
+    prismaMock.stepFile.findMany.mockResolvedValue([
+      { storedName: "step-1_aaa.png" },
+      { storedName: "step-1_bbb.pdf" },
+    ]);
+    prismaMock.user.delete.mockResolvedValue({ id: "student-1" });
+
+    await deleteUser("student-1", "admin-1");
+
+    // Her iki fiziksel dosya için de storage silme çağrılır.
+    expect(deleteStepFileMock).toHaveBeenCalledTimes(2);
+    expect(deleteStepFileMock).toHaveBeenCalledWith("step-1_aaa.png");
+    expect(deleteStepFileMock).toHaveBeenCalledWith("step-1_bbb.pdf");
+  });
+
+  it("#204: bir dosya storage'dan silinemese bile kullanıcı silme başarısız SAYILMAZ", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: "student-1",
+      role: "STUDENT",
+      email: "student1@test.com",
+    });
+    prismaMock.stepFile.findMany.mockResolvedValue([{ storedName: "x.png" }]);
+    prismaMock.user.delete.mockResolvedValue({ id: "student-1" });
+    deleteStepFileMock.mockRejectedValueOnce(new Error("GCS down"));
+
+    // Hata yutulur (best-effort) → çözümlenir.
+    await expect(deleteUser("student-1", "admin-1")).resolves.toMatchObject({ id: "student-1" });
   });
 });
