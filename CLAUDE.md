@@ -108,7 +108,9 @@ olduğunu hatırlayın; aksi halde onboarding tamamen çöker.
 ### Dosya Yükleme (`/api/steps/[stepId]/files`)
 - Uzantı whitelist + **magic-byte içerik doğrulaması** (#113) + 10MB/10 dosya limiti.
 - Erişim: öğrenci(sahip) veya mentoru; öğrenci yalnızca PUBLISHED roadmap'e yükler.
-- Yerel disk (`uploads/`, docker volume). Çok-instance → GCS/S3: `DEPLOYMENT.md`.
+- **Depolama soyutlaması** `lib/storage/step-files.ts` (#197): `GCS_BUCKET` env varsa
+  **GCS**, yoksa **yerel disk** (graceful degradation). İndirme signed URL değil **proxy**
+  (route dosyayı okuyup akıtır) → per-request yetki kontrolü korunur. Detay: `DEPLOYMENT.md`.
 
 ### Process-local durumlar (tek instance varsayımı)
 `rate-limit.ts`, forgot-password `resetTokens`, `metrics.ts` — çok-instance/serverless'ta
