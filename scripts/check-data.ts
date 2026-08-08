@@ -13,6 +13,8 @@ async function main() {
   const profiles = await p.studentProfile.findMany({
     include: {
       user: { select: { name: true, email: true } },
+      // #195: M:N — atanmış mentorlar.
+      mentorAssignments: { include: { mentor: { select: { email: true } } } },
       assignedProjects: {
         include: {
           projectTemplate: { select: { title: true } },
@@ -30,7 +32,8 @@ async function main() {
 
   for (const p of profiles) {
     console.log(`\n👤 ${p.user.name} (${p.user.email})`);
-    console.log(`   Profile ID: ${p.id}, Mentor: ${p.mentorId || "YOK"}`);
+    const mentorList = p.mentorAssignments.map((a) => a.mentor.email).join(", ") || "YOK";
+    console.log(`   Profile ID: ${p.id}, Mentorlar: ${mentorList}`);
     
     if (p.assignedProjects.length === 0) {
       console.log("   📂 Atanmış proje yok");

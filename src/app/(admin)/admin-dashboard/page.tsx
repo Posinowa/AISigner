@@ -34,7 +34,8 @@ type User = {
   accountStatus: "PENDING" | "APPROVED" | "REJECTED";
   studentProfile?: {
     id: string;
-    mentorId?: string | null;
+    // #195: M:N — atanmış mentorlar (0..n).
+    mentors: { id: string; name: string | null; lastName: string | null }[];
   } | null;
 };
 
@@ -154,32 +155,29 @@ export default function AdminDashboard() {
     }
   }
 
-  async function handleAssignMentor(studentId: string, mentorId: string) {
+  // #195: Öğrencinin mentor LİSTESİNİ ayarla (M:N). mentorIds = olması gereken tam küme.
+  async function handleSetMentors(studentId: string, mentorIds: string[]) {
     setUpdating(studentId);
     try {
       const response = await fetch("/api/admin/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          studentId,
-          mentorId: mentorId === "" ? null : mentorId,
-        }),
+        body: JSON.stringify({ studentId, mentorIds }),
       });
       if (response.ok) {
+        // Seçili id'leri mentor nesnelerine çevirip yerel state'i güncelle.
+        const newMentors = mentorIds
+          .map((id) => mentors.find((m) => m.id === id))
+          .filter((m): m is Mentor => Boolean(m))
+          .map((m) => ({ id: m.id, name: m.name, lastName: m.lastName }));
         setUsers((prev) =>
           prev.map((u) =>
             u.id === studentId && u.studentProfile
-              ? {
-                  ...u,
-                  studentProfile: {
-                    ...u.studentProfile,
-                    mentorId: mentorId === "" ? null : mentorId,
-                  },
-                }
+              ? { ...u, studentProfile: { ...u.studentProfile, mentors: newMentors } }
               : u,
           ),
         );
-        toast.success(mentorId === "" ? "Mentor ataması kaldırıldı." : "Mentor atandı.");
+        toast.success("Mentor atamaları güncellendi.");
       } else {
         // #43/#114: Geçersiz rol gibi 4xx hatalarında anlamlı mesajı göster.
         const data = await response.json().catch(() => null);
@@ -242,7 +240,8 @@ export default function AdminDashboard() {
       (u) => u.role === "STUDENT" && u.studentProfile,
     ).length;
     const studentsWithoutMentor = users.filter(
-      (u) => u.role === "STUDENT" && u.studentProfile && !u.studentProfile.mentorId,
+      // #195: M:N — hiç mentoru olmayan öğrenciler.
+      (u) => u.role === "STUDENT" && u.studentProfile && u.studentProfile.mentors.length === 0,
     ).length;
     const pendingCount = users.filter(
       (u) => u.role === "STUDENT" && u.accountStatus === "PENDING",
@@ -250,9 +249,9 @@ export default function AdminDashboard() {
     return { total, studentCount, mentorCount, adminCount, studentsWithProfile, studentsWithoutMentor, pendingCount };
   }, [users]);
 
-  const getDisplayName = (u: { name: string | null; lastName: string | null; email: string }) => {
+  const getDisplayName = (u: { name: string | null; lastName: string | null; email?: string }) => {
     const full = `${u.name ?? ""} ${u.lastName ?? ""}`.trim();
-    return full || u.email.split("@")[0];
+    return full || u.email?.split("@")[0] || "İsimsiz";
   };
 
   const getInitials = (u: { name: string | null; lastName: string | null; email: string }) => {
@@ -500,21 +499,65 @@ export default function AdminDashboard() {
                             {isUpdating && <Loader2 className="animate-spin w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />}
                           </div>
                         ) : user.studentProfile ? (
-                          <div className="flex items-center gap-2 w-full">
-                            <select
-                              value={user.studentProfile.mentorId || ""}
-                              onChange={(e) => handleAssignMentor(user.id, e.target.value)}
-                              disabled={isUpdating}
-                              className="flex-1 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
-                            >
-                              <option value="">— Mentor seçilmedi —</option>
-                              {mentors.map((mentor) => (
-                                <option key={mentor.id} value={mentor.id}>
-                                  {getDisplayName(mentor)} ({mentor.email})
-                                </option>
-                              ))}
-                            </select>
-                            {isUpdating && <Loader2 className="animate-spin w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />}
+                          <div className="flex flex-col gap-2 w-full">
+                            {/* #195: Atanmış mentorlar — chip + kaldır (x) */}
+                            {user.studentProfile.mentors.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5">
+                                {user.studentProfile.mentors.map((m) => (
+                                  <span
+                                    key={m.id}
+                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200"
+                                  >
+                                    {getDisplayName(m)}
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleSetMentors(
+                                          user.id,
+                                          user.studentProfile!.mentors
+                                            .filter((x) => x.id !== m.id)
+                                            .map((x) => x.id),
+                                        )
+                                      }
+                                      disabled={isUpdating}
+                                      aria-label={`${getDisplayName(m)} mentörünü kaldır`}
+                                      className="hover:text-red-600 disabled:opacity-60"
+                                    >
+                                      <XCircle className="w-3 h-3" />
+                                    </button>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            {/* Mentor ekle — yalnız henüz atanmamış mentorları göster */}
+                            <div className="flex items-center gap-2 w-full">
+                              <select
+                                value=""
+                                onChange={(e) => {
+                                  if (e.target.value) {
+                                    handleSetMentors(user.id, [
+                                      ...user.studentProfile!.mentors.map((x) => x.id),
+                                      e.target.value,
+                                    ]);
+                                  }
+                                }}
+                                disabled={isUpdating}
+                                className="flex-1 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
+                              >
+                                <option value="">+ Mentor ekle…</option>
+                                {mentors
+                                  .filter(
+                                    (mentor) =>
+                                      !user.studentProfile!.mentors.some((x) => x.id === mentor.id),
+                                  )
+                                  .map((mentor) => (
+                                    <option key={mentor.id} value={mentor.id}>
+                                      {getDisplayName(mentor)} ({mentor.email})
+                                    </option>
+                                  ))}
+                              </select>
+                              {isUpdating && <Loader2 className="animate-spin w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />}
+                            </div>
                           </div>
                         ) : (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 rounded-lg">

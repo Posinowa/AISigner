@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { generateRoadmap } from "@/features/ai/server/generate-roadmap";
 import { requireAuth } from "@/lib/auth/guard";
+import { isAssignedMentor } from "@/lib/auth/mentor-access";
 import { generateRoadmapSchema } from "@/lib/validations/api";
 import { createRateLimiter } from "@/lib/rate-limit";
 
@@ -38,7 +39,9 @@ export async function POST(req: Request) {
     const assignedProject = await prisma.assignedProject.findUnique({
       where: { id: assignedProjectId },
       include: {
-        studentProfile: true,
+        studentProfile: {
+          include: { mentorAssignments: { select: { mentorId: true } } },
+        },
         projectTemplate: true,
         roadmap: true // Zaten bir yol haritası var mı diye kontrol etmek için
       }
@@ -48,8 +51,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Atanmış proje bulunamadı!" }, { status: 404 });
     }
 
-    // Mentor ownership kontrolü: Proje, bu mentörün öğrencisine ait mi?
-    if (assignedProject.studentProfile.mentorId !== auth.session.user.id) {
+    // Mentor ownership kontrolü — #195: öğrencinin mentorlarından biri mi?
+    if (!isAssignedMentor(assignedProject.studentProfile.mentorAssignments, auth.session.user.id)) {
       return NextResponse.json(
         { error: "Bu proje üzerinde işlem yapma yetkiniz yok." },
         { status: 403 }

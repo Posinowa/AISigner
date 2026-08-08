@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth/guard";
+import { isAssignedMentor } from "@/lib/auth/mentor-access";
 import { updateStepSchema } from "@/lib/validations/api";
 
 // PUT: Adımı güncelle
@@ -19,7 +20,11 @@ export async function PUT(
       where: { id: roadmapId },
       include: {
         assignedProject: {
-          include: { studentProfile: true },
+          include: {
+            studentProfile: {
+              include: { mentorAssignments: { select: { mentorId: true } } },
+            },
+          },
         },
       },
     });
@@ -28,7 +33,7 @@ export async function PUT(
       return NextResponse.json({ error: "Yol haritası bulunamadı!" }, { status: 404 });
     }
 
-    if (roadmap.assignedProject.studentProfile.mentorId !== auth.session.user.id) {
+    if (!isAssignedMentor(roadmap.assignedProject.studentProfile.mentorAssignments, auth.session.user.id)) {
       return NextResponse.json(
         { error: "Bu adımı güncelleme yetkiniz yok." },
         { status: 403 }
@@ -76,7 +81,11 @@ export async function DELETE(
       where: { id: roadmapId },
       include: {
         assignedProject: {
-          include: { studentProfile: true },
+          include: {
+            studentProfile: {
+              include: { mentorAssignments: { select: { mentorId: true } } },
+            },
+          },
         },
       },
     });
@@ -85,7 +94,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Yol haritası bulunamadı!" }, { status: 404 });
     }
 
-    if (roadmap.assignedProject.studentProfile.mentorId !== auth.session.user.id) {
+    if (!isAssignedMentor(roadmap.assignedProject.studentProfile.mentorAssignments, auth.session.user.id)) {
       return NextResponse.json(
         { error: "Bu adımı silme yetkiniz yok." },
         { status: 403 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth/guard";
+import { isAssignedMentor } from "@/lib/auth/mentor-access";
 import { updateStepCommentSchema } from "@/lib/validations/api";
 
 /**
@@ -109,14 +110,19 @@ export async function DELETE(
         roadmap: {
           include: {
             assignedProject: {
-              include: { studentProfile: true },
+              include: {
+                studentProfile: {
+                  include: { mentorAssignments: { select: { mentorId: true } } },
+                },
+              },
             },
           },
         },
       },
     });
 
-    if (step?.roadmap.assignedProject.studentProfile.mentorId === userId) {
+    // #195: M:N — öğrencinin mentorlarından biri mi?
+    if (isAssignedMentor(step?.roadmap.assignedProject.studentProfile.mentorAssignments, userId)) {
       await prisma.stepComment.delete({ where: { id: commentId } });
       return NextResponse.json({ success: true });
     }

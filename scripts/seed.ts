@@ -43,18 +43,29 @@ async function main() {
     select: { id: true },
   });
 
-  await prisma.studentProfile.upsert({
+  const demoProfile = await prisma.studentProfile.upsert({
     where: { userId: student.id },
-    update: { mentorId: mentor.id },
+    update: {},
     create: {
       userId: student.id,
-      mentorId: mentor.id,
       experienceLevel: "BEGINNER", // #54: kanonik UPPERCASE
       interests: ["Web Development"],
       goals: "Demo amaçlı örnek stajyer profili — full-stack bir proje geliştirmeyi hedefliyor.",
       availability: "part-time",
       birthYear: 2002,
     },
+  });
+
+  // #195: Mentor ataması artık M:N join tablosunda (idempotent — @@unique).
+  await prisma.mentorAssignment.upsert({
+    where: {
+      studentProfileId_mentorId: {
+        studentProfileId: demoProfile.id,
+        mentorId: mentor.id,
+      },
+    },
+    update: {},
+    create: { studentProfileId: demoProfile.id, mentorId: mentor.id },
   });
   console.log(`✅ Student, mentor'a atandı: student@example.com → mentor@example.com`);
 

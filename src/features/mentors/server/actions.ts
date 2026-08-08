@@ -42,7 +42,8 @@ export async function getMentorStudents(mentorId: string): Promise<StudentWithPr
       where: {
         role: "STUDENT",
         studentProfile: {
-          mentorId: mentorId,
+          // #195: M:N — bu mentörün atandığı öğrenciler.
+          mentorAssignments: { some: { mentorId } },
         },
       },
       include: {
@@ -87,7 +88,8 @@ export async function getStudentDetail(studentId: string, mentorId: string) {
         id: studentId,
         role: "STUDENT",
         studentProfile: {
-          mentorId: mentorId,
+          // #195: M:N — öğrencinin mentorlarından biri bu mentör mü?
+          mentorAssignments: { some: { mentorId } },
         },
       },
       include: {
@@ -138,7 +140,8 @@ export async function assignProjectToStudent(
     const studentProfile = await prisma.studentProfile.findFirst({
       where: {
         id: studentProfileId,
-        mentorId: mentorId,
+        // #195: M:N — bu mentör öğrencinin mentorlarından biri mi?
+        mentorAssignments: { some: { mentorId } },
       },
     });
 
@@ -212,7 +215,8 @@ export async function updateProjectStatus(
       where: {
         id: assignedProjectId,
         studentProfile: {
-          mentorId: mentorId,
+          // #195: M:N — öğrencinin mentorlarından biri mi?
+          mentorAssignments: { some: { mentorId } },
         },
       },
     });
@@ -250,7 +254,8 @@ export async function unassignProject(
   const assignedProject = await prisma.assignedProject.findFirst({
     where: {
       id: assignedProjectId,
-      studentProfile: { mentorId },
+      // #195: M:N — öğrencinin mentorlarından biri mi?
+      studentProfile: { mentorAssignments: { some: { mentorId } } },
     },
     include: {
       roadmap: {

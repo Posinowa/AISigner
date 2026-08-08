@@ -25,8 +25,9 @@ export async function GET() {
       });
       conversationPartners = users;
     } else if (userRole === "MENTOR") {
+      // #195: M:N — bu mentörün atandığı öğrenciler.
       const profiles = await prisma.studentProfile.findMany({
-        where: { mentorId: userId },
+        where: { mentorAssignments: { some: { mentorId: userId } } },
         include: {
           user: {
             select: { id: true, name: true, lastName: true, role: true },
@@ -42,16 +43,21 @@ export async function GET() {
       });
       conversationPartners = [...conversationPartners, ...admins];
     } else if (userRole === "STUDENT") {
+      // #195: M:N — öğrencinin TÜM mentorları konuşma partneri olur.
       const profile = await prisma.studentProfile.findUnique({
         where: { userId },
         include: {
-          mentor: {
-            select: { id: true, name: true, lastName: true, role: true },
+          mentorAssignments: {
+            include: {
+              mentor: {
+                select: { id: true, name: true, lastName: true, role: true },
+              },
+            },
           },
         },
       });
-      if (profile?.mentor) {
-        conversationPartners = [profile.mentor];
+      if (profile) {
+        conversationPartners = profile.mentorAssignments.map((a) => a.mentor);
       }
 
       // ADMIN'lerle de mesajlaşabilir

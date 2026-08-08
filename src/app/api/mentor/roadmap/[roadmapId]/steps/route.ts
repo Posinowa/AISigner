@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth/guard";
+import { isAssignedMentor } from "@/lib/auth/mentor-access";
 import { createStepSchema } from "@/lib/validations/api";
 
 // POST: Roadmap'e yeni adım ekle
@@ -19,7 +20,11 @@ export async function POST(
       where: { id: roadmapId },
       include: {
         assignedProject: {
-          include: { studentProfile: true },
+          include: {
+            studentProfile: {
+              include: { mentorAssignments: { select: { mentorId: true } } },
+            },
+          },
         },
       },
     });
@@ -28,7 +33,8 @@ export async function POST(
       return NextResponse.json({ error: "Yol haritası bulunamadı!" }, { status: 404 });
     }
 
-    if (roadmap.assignedProject.studentProfile.mentorId !== auth.session.user.id) {
+    // #195: öğrencinin mentorlarından biri mi?
+    if (!isAssignedMentor(roadmap.assignedProject.studentProfile.mentorAssignments, auth.session.user.id)) {
       return NextResponse.json(
         { error: "Bu yol haritasına adım ekleme yetkiniz yok." },
         { status: 403 }

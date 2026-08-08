@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth/guard";
+import { isAssignedMentor } from "@/lib/auth/mentor-access";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { matchesExtensionSignature } from "@/lib/file-signature";
 import { writeFile, mkdir } from "fs/promises";
@@ -242,7 +243,11 @@ async function getStepWithAccess(stepId: string, userId: string) {
       roadmap: {
         include: {
           assignedProject: {
-            include: { studentProfile: true },
+            include: {
+              studentProfile: {
+                include: { mentorAssignments: { select: { mentorId: true } } },
+              },
+            },
           },
         },
       },
@@ -253,7 +258,8 @@ async function getStepWithAccess(stepId: string, userId: string) {
 
   const profile = step.roadmap.assignedProject.studentProfile;
   if (profile.userId === userId) return step;
-  if (profile.mentorId === userId) return step;
+  // #195: M:N — öğrencinin mentorlarından biri mi?
+  if (isAssignedMentor(profile.mentorAssignments, userId)) return step;
 
   return null;
 }

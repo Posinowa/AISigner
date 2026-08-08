@@ -68,7 +68,8 @@ src/
 | Model | Not |
 |---|---|
 | `User` | rol (ADMIN/MENTOR/STUDENT) + **accountStatus** (PENDING/APPROVED/REJECTED, #38) |
-| `StudentProfile` | mentorId FK; goals = **compiled** tek string (compiledGoals ile 3 alana ayrışır) |
+| `StudentProfile` | goals = **compiled** tek string (compiledGoals ile 3 alana ayrışır). **Mentör artık M:N** (#195) — `mentorId` FK KALDIRILDI |
+| `MentorAssignment` | **#195** — Öğrenci↔Mentör M:N join tablosu; `@@unique([studentProfileId, mentorId])`. Mentorlar **eşit yetkili** (birincil yok). Yetki: `mentorAssignments: { some: { mentorId } }` / `isAssignedMentor()` (`lib/auth/mentor-access.ts`) |
 | `ProjectTemplate` | **title @unique** (#112); githubRepoUrl (#49) |
 | `AssignedProject` | `@@unique([studentProfileId, projectTemplateId])` (#58) |
 | `Roadmap` / `RoadmapStep` | DRAFT/PUBLISHED; step'te githubIssueUrl (#50); öğrenci DRAFT'a etkileşemez (#52) |

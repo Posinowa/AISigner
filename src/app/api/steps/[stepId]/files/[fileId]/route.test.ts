@@ -36,7 +36,11 @@ function stepFile(over: { uploaderId: string; ownerUserId: string; mentorId: str
     step: {
       roadmap: {
         assignedProject: {
-          studentProfile: { userId: over.ownerUserId, mentorId: over.mentorId },
+          studentProfile: {
+            userId: over.ownerUserId,
+            // #195: M:N — mentorId varsa tek elemanlı atama listesi, yoksa boş.
+            mentorAssignments: over.mentorId ? [{ mentorId: over.mentorId }] : [],
+          },
         },
       },
     },

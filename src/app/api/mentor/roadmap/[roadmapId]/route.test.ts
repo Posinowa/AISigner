@@ -26,7 +26,11 @@ function putReq(body: unknown) {
 function roadmap(mentorId: string | null) {
   return {
     id: "rm-1",
-    assignedProject: { studentProfile: { mentorId }, projectTemplate: {} },
+    // #195: M:N — mentorId varsa tek elemanlı atama listesi, yoksa boş.
+    assignedProject: {
+      studentProfile: { mentorAssignments: mentorId ? [{ mentorId }] : [] },
+      projectTemplate: {},
+    },
     steps: [],
   };
 }
@@ -63,6 +67,30 @@ describe("mentor roadmap GET/PUT — sahiplik (#184)", () => {
     prismaMock.roadmap.findUnique.mockResolvedValue(roadmap("mentor-1"));
     const res = await GET(new Request("http://t"), { params: params() });
     expect(res.status).toBe(200);
+  });
+
+  // #195: Çoklu mentor — aynı öğrenciye iki mentor atanmışsa ikisi de erişir.
+  const roadmapMulti = (mentorIds: string[]) => ({
+    id: "rm-1",
+    assignedProject: {
+      studentProfile: { mentorAssignments: mentorIds.map((mentorId) => ({ mentorId })) },
+      projectTemplate: {},
+    },
+    steps: [],
+  });
+
+  it("GET: öğrencinin İKİNCİ mentörü de erişebilir → 200 (#195)", async () => {
+    mentor("mentor-2");
+    prismaMock.roadmap.findUnique.mockResolvedValue(roadmapMulti(["mentor-1", "mentor-2"]));
+    const res = await GET(new Request("http://t"), { params: params() });
+    expect(res.status).toBe(200);
+  });
+
+  it("GET: atanmamış üçüncü mentör erişemez → 403 (#195)", async () => {
+    mentor("mentor-3");
+    prismaMock.roadmap.findUnique.mockResolvedValue(roadmapMulti(["mentor-1", "mentor-2"]));
+    const res = await GET(new Request("http://t"), { params: params() });
+    expect(res.status).toBe(403);
   });
 
   it("PUT: başka mentörün roadmap'i → 403, güncelleme YOK", async () => {

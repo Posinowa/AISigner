@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth/guard";
+import { isAssignedMentor } from "@/lib/auth/mentor-access";
 import { readFile, unlink } from "fs/promises";
 import { existsSync } from "fs";
 import path from "path";
@@ -30,7 +31,11 @@ export async function GET(
             roadmap: {
               include: {
                 assignedProject: {
-                  include: { studentProfile: true },
+                  include: {
+                    studentProfile: {
+                      include: { mentorAssignments: { select: { mentorId: true } } },
+                    },
+                  },
                 },
               },
             },
@@ -48,7 +53,8 @@ export async function GET(
 
     // Erişim kontrolü
     const profile = stepFile.step.roadmap.assignedProject.studentProfile;
-    if (profile.userId !== userId && profile.mentorId !== userId) {
+    // #195: M:N — sahibi ya da mentorlarından biri değilse reddet.
+    if (profile.userId !== userId && !isAssignedMentor(profile.mentorAssignments, userId)) {
       return NextResponse.json(
         { error: "Bu dosyaya erişim yetkiniz yok." },
         { status: 403 }
@@ -115,7 +121,11 @@ export async function DELETE(
             roadmap: {
               include: {
                 assignedProject: {
-                  include: { studentProfile: true },
+                  include: {
+                    studentProfile: {
+                      include: { mentorAssignments: { select: { mentorId: true } } },
+                    },
+                  },
                 },
               },
             },
@@ -134,7 +144,8 @@ export async function DELETE(
     // Erişim kontrolü: yükleyen veya mentor silebilir
     const profile = stepFile.step.roadmap.assignedProject.studentProfile;
     const isUploader = stepFile.uploaderId === userId;
-    const isMentor = userRole === "MENTOR" && profile.mentorId === userId;
+    // #195: M:N — mentör, öğrencinin mentorlarından biri mi?
+    const isMentor = userRole === "MENTOR" && isAssignedMentor(profile.mentorAssignments, userId);
 
     if (!isUploader && !isMentor) {
       return NextResponse.json(

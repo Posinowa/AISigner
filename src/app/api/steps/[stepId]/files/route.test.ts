@@ -25,7 +25,7 @@ function buildStep(status: "DRAFT" | "PUBLISHED") {
     roadmap: {
       status,
       assignedProject: {
-        studentProfile: { userId: STUDENT_USER, mentorId: MENTOR_USER },
+        studentProfile: { userId: STUDENT_USER, mentorAssignments: [{ mentorId: MENTOR_USER }] },
       },
     },
   };

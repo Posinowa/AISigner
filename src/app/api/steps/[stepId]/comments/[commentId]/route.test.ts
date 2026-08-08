@@ -84,7 +84,7 @@ describe("yorum düzenle/sil — yetki sınırları (#181)", () => {
     authAs("mentor-1", "MENTOR");
     prismaMock.stepComment.findUnique.mockResolvedValue({ id: "c-1", stepId: "step-1", authorId: "student-1" });
     prismaMock.roadmapStep.findUnique.mockResolvedValue({
-      roadmap: { assignedProject: { studentProfile: { mentorId: "mentor-1" } } },
+      roadmap: { assignedProject: { studentProfile: { mentorAssignments: [{ mentorId: "mentor-1" }] } } },
     });
 
     const res = await DELETE(req({}), { params: params() });
@@ -97,7 +97,7 @@ describe("yorum düzenle/sil — yetki sınırları (#181)", () => {
     authAs("baska-mentor", "MENTOR");
     prismaMock.stepComment.findUnique.mockResolvedValue({ id: "c-1", stepId: "step-1", authorId: "student-1" });
     prismaMock.roadmapStep.findUnique.mockResolvedValue({
-      roadmap: { assignedProject: { studentProfile: { mentorId: "gercek-mentor" } } },
+      roadmap: { assignedProject: { studentProfile: { mentorAssignments: [{ mentorId: "gercek-mentor" }] } } },
     });
 
     const res = await DELETE(req({}), { params: params() });

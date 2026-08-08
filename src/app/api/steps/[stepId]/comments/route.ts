@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth/guard";
+import { isAssignedMentor } from "@/lib/auth/mentor-access";
 import { createStepCommentSchema } from "@/lib/validations/api";
 import { createRateLimiter } from "@/lib/rate-limit";
 
@@ -142,7 +143,9 @@ async function getStepWithAccess(stepId: string, userId: string) {
         include: {
           assignedProject: {
             include: {
-              studentProfile: true,
+              studentProfile: {
+                include: { mentorAssignments: { select: { mentorId: true } } },
+              },
             },
           },
         },
@@ -157,8 +160,8 @@ async function getStepWithAccess(stepId: string, userId: string) {
   // Öğrenci kendi adımına erişebilir
   if (profile.userId === userId) return step;
 
-  // Mentor, atanmış öğrencisinin adımına erişebilir
-  if (profile.mentorId === userId) return step;
+  // #195: M:N — mentor, atanmış öğrencisinin adımına erişebilir (mentorlardan biri mi?)
+  if (isAssignedMentor(profile.mentorAssignments, userId)) return step;
 
   return null;
 }

@@ -7,8 +7,8 @@ export type StudentAssignmentProgress = {
   studentName: string;
   studentEmail: string;
   experienceLevel: string;
-  mentorId: string | null;
-  mentorName: string | null;
+  // #195: M:N — öğrenciye atanmış mentorlar (0..n).
+  mentors: { id: string; name: string }[];
   projectTemplateId: string;
   projectTitle: string;
   projectDifficulty: string;
@@ -52,12 +52,12 @@ export async function getStudentAssignmentsProgress(): Promise<StudentAssignment
               email: true,
             },
           },
-          mentor: {
-            select: {
-              id: true,
-              name: true,
-              lastName: true,
-              email: true,
+          // #195: M:N — atanmış mentorlar.
+          mentorAssignments: {
+            include: {
+              mentor: {
+                select: { id: true, name: true, lastName: true, email: true },
+              },
             },
           },
         },
@@ -96,10 +96,11 @@ export async function getStudentAssignmentsProgress(): Promise<StudentAssignment
       .filter(Boolean)
       .join(" ") || studentUser.email;
 
-    const mentorUser = assignment.studentProfile.mentor;
-    const mentorName = mentorUser
-      ? [mentorUser.name, mentorUser.lastName].filter(Boolean).join(" ") || mentorUser.email
-      : null;
+    // #195: M:N — atanmış mentorların görünen adları.
+    const mentors = assignment.studentProfile.mentorAssignments.map((a) => ({
+      id: a.mentor.id,
+      name: [a.mentor.name, a.mentor.lastName].filter(Boolean).join(" ") || a.mentor.email,
+    }));
 
     const steps = assignment.roadmap?.steps ?? [];
     const totalSteps = steps.length;
@@ -120,8 +121,7 @@ export async function getStudentAssignmentsProgress(): Promise<StudentAssignment
       studentName,
       studentEmail: studentUser.email,
       experienceLevel: assignment.studentProfile.experienceLevel,
-      mentorId: assignment.studentProfile.mentorId,
-      mentorName,
+      mentors,
       projectTemplateId: assignment.projectTemplate.id,
       projectTitle: assignment.projectTemplate.title,
       projectDifficulty: assignment.projectTemplate.difficulty,
