@@ -83,7 +83,7 @@ export function CertificateModal({
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-md flex items-start justify-center p-2 sm:p-6 print:p-0 print:bg-white print:static print:inset-auto">
-      <div className="relative w-full max-w-4xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden my-8 print:my-0 print:border-none print:shadow-none print:w-full print:max-w-none">
+      <div className="relative w-full max-w-4xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden my-8 print:my-0 print:border-none print:shadow-none print:w-full print:max-w-none print:static print:overflow-visible">
         
         {/* Üst Eylem Araç Çubuğu (Yazdırmada gizlenir) */}
         <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-950/70 print:hidden">
@@ -259,7 +259,8 @@ export function CertificateModal({
         )}
 
         {/* 📜 SERTİFİKA GÖVDESİ (A4 Baskı ve İndirme İçin Kusursuz Hizalanmış Şablon) */}
-        <div className="p-6 sm:p-12 print:p-6 bg-gradient-to-b from-slate-50 via-white to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 print:bg-white text-slate-800 dark:text-slate-100 print:text-black relative">
+        {/* #204: id → yazdırmada yalnız bu alan basılır (bkz. globals.css @media print). */}
+        <div id="certificate-print-area" className="p-6 sm:p-12 print:p-6 bg-gradient-to-b from-slate-50 via-white to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 print:bg-white text-slate-800 dark:text-slate-100 print:text-black relative">
           
           {/* Çerçeve & Güvenlik Deseni */}
           <div className="border-[6px] border-double border-indigo-900/30 dark:border-indigo-400/30 print:border-indigo-900 p-6 sm:p-10 rounded-2xl relative bg-white/80 dark:bg-slate-900/80 print:bg-white shadow-inner">

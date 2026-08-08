@@ -111,3 +111,27 @@ input[type="password"]::-ms-reveal,
 input[type="password"]::-ms-clear {
   display: none;
 }
+
+/* #204: Sertifika PDF / yazdırma izolasyonu.
+   window.print() tüm sayfayı bastığından, arkadaki uygulamayı (nav, dashboard,
+   modal backdrop) gizleyip YALNIZ sertifika alanını basıyoruz. Aksi halde PDF
+   dashboard içeriğiyle karışıp kullanılamaz çıkıyordu. */
+@media print {
+  @page {
+    margin: 1cm;
+  }
+  body * {
+    visibility: hidden !important;
+  }
+  #certificate-print-area,
+  #certificate-print-area * {
+    visibility: visible !important;
+  }
+  #certificate-print-area {
+    position: absolute !important;
+    left: 0;
+    top: 0;
+    width: 100%;
+    box-shadow: none !important;
+  }
+}
