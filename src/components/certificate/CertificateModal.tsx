@@ -14,6 +14,7 @@ import {
   Loader2,
   Edit3,
   Eye,
+  Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { CertificateData } from "@/features/certificate/server/certificate";
@@ -51,11 +52,183 @@ export function CertificateModal({
   if (!isOpen) return null;
 
   const handlePrint = () => {
-    // Yazdırma öncesi önizleme moduna geçip yazdır
     setActiveTab("preview");
-    setTimeout(() => {
+    toast.info("Yazdırma penceresinde 'Hedef' olarak 'PDF olarak kaydet'i seçebilirsiniz.", {
+      duration: 4000,
+    });
+
+    // İzole yazdırma: ana sayfa layout'undan tamamen bağımsız A4 iframe oluştur
+    const printArea = document.getElementById("certificate-print-area");
+    if (!printArea) {
       window.print();
-    }, 100);
+      return;
+    }
+
+    try {
+      const iframe = document.createElement("iframe");
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "none";
+      iframe.setAttribute("aria-hidden", "true");
+      document.body.appendChild(iframe);
+
+      const doc = iframe.contentWindow?.document;
+      if (!doc) {
+        window.print();
+        return;
+      }
+
+      // Ana sayfadaki tüm Tailwind ve font stillerini iframe'e kopyala
+      let stylesHtml = "";
+      document.querySelectorAll("style, link[rel='stylesheet']").forEach((node) => {
+        stylesHtml += node.outerHTML;
+      });
+
+      doc.open();
+      doc.write(`
+        <!DOCTYPE html>
+        <html lang="tr">
+          <head>
+            <meta charset="utf-8" />
+            <title>Sertifika - ${certificate.studentName}</title>
+            ${stylesHtml}
+            <style>
+              @page {
+                size: A4 portrait;
+                margin: 6mm;
+              }
+              *, *::before, *::after {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                color-adjust: exact !important;
+              }
+              body {
+                background: #ffffff !important;
+                color: #0f172a !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+              }
+              #certificate-print-area {
+                padding: 4px !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 0 auto !important;
+                display: block !important;
+                background: #ffffff !important;
+              }
+            </style>
+          </head>
+          <body>
+            ${printArea.outerHTML}
+          </body>
+        </html>
+      `);
+      doc.close();
+
+      iframe.contentWindow?.focus();
+      setTimeout(() => {
+        iframe.contentWindow?.print();
+        setTimeout(() => {
+          document.body.removeChild(iframe);
+        }, 1000);
+      }, 250);
+    } catch (e) {
+      console.error("Print error:", e);
+      window.print();
+    }
+  };
+
+  const handleDownloadDocument = () => {
+    const printArea = document.getElementById("certificate-print-area");
+    if (!printArea) {
+      toast.error("Sertifika alanı bulunamadı.");
+      return;
+    }
+
+    try {
+      let stylesHtml = "";
+      document.querySelectorAll("style, link[rel='stylesheet']").forEach((node) => {
+        stylesHtml += node.outerHTML;
+      });
+
+      const fullHtml = `<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Posinowa Staj Başarı Sertifikası - ${certificate.studentName}</title>
+  ${stylesHtml}
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 8mm;
+    }
+    *, *::before, *::after {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
+    }
+    body {
+      background: #f8fafc;
+      color: #0f172a;
+      margin: 0;
+      padding: 24px 12px;
+      font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+    }
+    .cert-wrapper {
+      width: 100%;
+      max-width: 900px;
+      margin: 0 auto;
+      background: #ffffff;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+      border-radius: 24px;
+      overflow: hidden;
+    }
+    @media print {
+      body {
+        background: #ffffff !important;
+        padding: 0 !important;
+      }
+      .cert-wrapper {
+        box-shadow: none !important;
+        border-radius: 0 !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="cert-wrapper">
+    ${printArea.outerHTML}
+  </div>
+</body>
+</html>`;
+
+      const safeName = (certificate.studentName || "Stajyer")
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]/gi, "-");
+      const blob = new Blob([fullHtml], { type: "text/html;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Posinowa-Sertifika-${safeName}.html`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success("Sertifika belgesi başarıyla indirildi!");
+    } catch (err) {
+      console.error("Download error:", err);
+      toast.error("İndirme sırasında bir hata oluştu.");
+    }
   };
 
   const handleSaveDetails = async () => {
@@ -82,8 +255,14 @@ export function CertificateModal({
   );
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-md flex items-start justify-center p-2 sm:p-6 print:p-0 print:bg-white print:static print:inset-auto">
-      <div className="relative w-full max-w-4xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden my-8 print:my-0 print:border-none print:shadow-none print:w-full print:max-w-none print:static print:overflow-visible">
+    <div
+      id="certificate-modal-portal"
+      className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-md flex items-start justify-center p-2 sm:p-6 print:p-0 print:bg-white print:static print:inset-auto"
+    >
+      <div
+        id="certificate-modal-container"
+        className="relative w-full max-w-4xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden my-8 print:my-0 print:border-none print:shadow-none print:w-full print:max-w-none print:static print:overflow-visible"
+      >
         
         {/* Üst Eylem Araç Çubuğu (Yazdırmada gizlenir) */}
         <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-950/70 print:hidden">
@@ -133,13 +312,25 @@ export function CertificateModal({
               </div>
             )}
 
+            {/* 📥 Doğrudan Dosya İndirme Butonu */}
+            <button
+              type="button"
+              onClick={handleDownloadDocument}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-xs font-semibold shadow-sm transition"
+              title="Sertifikayı doğrudan bağımsız dosya olarak indir"
+            >
+              <Download className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+              Sertifikayı İndir
+            </button>
+
+            {/* 🖨️ PDF / Yazdır Butonu */}
             <button
               type="button"
               onClick={handlePrint}
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition"
             >
               <Printer className="w-4 h-4" />
-              PDF İndir / Yazdır
+              PDF / Yazdır
             </button>
 
             <button

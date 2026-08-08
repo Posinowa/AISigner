@@ -16,9 +16,55 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://aisigner.com";
+
 export const metadata: Metadata = {
-  title: "AISigner - AI Destekli Stajyer Mentorluk Platformu",
-  description: "Stajyer ve öğrencilerin AI destekli profil analizi, mentor eşleştirmesi ve kişiselleştirilmiş öğrenme yol haritası ile gelişimini destekleyen açık kaynak platform.",
+  metadataBase: new URL(baseUrl),
+  title: {
+    default: "AISigner - AI Destekli Stajyer ve Mentörlük Platformu",
+    template: "%s | AISigner",
+  },
+  description:
+    "Stajyer ve öğrencilerin AI destekli profil analizi, mentör eşleştirmesi ve kişiselleştirilmiş öğrenme yol haritası ile gelişimini destekleyen açık kaynak platform.",
+  keywords: [
+    "AISigner",
+    "staj",
+    "stajyer",
+    "mentörlük",
+    "yapay zeka",
+    "yol haritası",
+    "yazılım stajı",
+    "kariyer gelişimi",
+  ],
+  authors: [{ name: "Posinowa Akademi", url: baseUrl }],
+  creator: "Posinowa",
+  publisher: "Posinowa",
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+    },
+  },
+  openGraph: {
+    type: "website",
+    locale: "tr_TR",
+    url: baseUrl,
+    title: "AISigner - AI Destekli Stajyer ve Mentörlük Platformu",
+    description:
+      "Stajyer ve öğrencilerin AI destekli profil analizi, mentör eşleştirmesi ve kişiselleştirilmiş öğrenme yol haritası platformu.",
+    siteName: "AISigner",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "AISigner - AI Destekli Stajyer ve Mentörlük Platformu",
+    description:
+      "Stajyer ve öğrencilerin AI destekli profil analizi, mentör eşleştirmesi ve kişiselleştirilmiş öğrenme yol haritası platformu.",
+  },
+  icons: {
+    icon: "/favicon.ico",
+  },
 };
 
 export default function RootLayout({
