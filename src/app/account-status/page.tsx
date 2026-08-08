@@ -4,14 +4,15 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import LogoutButton from "@/components/LogoutButton";
 import { prisma } from "@/lib/db";
-import { Clock, XCircle, UserPen } from "lucide-react";
+import { Clock, XCircle, UserPen, GraduationCap, Sparkles, Award } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Onaylanmamış stajyer hesapları için durum ekranı.
+ * Onaylanmamış / Mezun stajyer hesapları için durum ekranı.
  * - PENDING → onay bekleme ekranı
  * - REJECTED → reddedilme ekranı
+ * - GRADUATED → staj tamamlama tebrik ekranı
  * - APPROVED (veya status yok) → kullanıcı kendi paneline yönlendirilir
  */
 export default async function AccountStatusPage() {
@@ -32,36 +33,45 @@ export default async function AccountStatusPage() {
     );
   }
 
+  const isGraduated = status === "GRADUATED";
   const rejected = status === "REJECTED";
 
   // #143: Onay artık profil tamamlandıktan SONRA anlam taşıyor. Profilini henüz
   // doldurmamış PENDING kullanıcıyı beklemeye değil, profil tamamlamaya yönlendir.
-  const profile = rejected
+  const profile = rejected || isGraduated
     ? null
     : await prisma.studentProfile.findUnique({
         where: { userId: session.user.id },
         select: { id: true },
       });
-  const needsProfile = !rejected && !profile;
+  const needsProfile = !rejected && !isGraduated && !profile;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 px-4 py-12">
-      <div className="w-full max-w-md">
-        <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl ring-1 ring-slate-200/60 overflow-hidden">
+      <div className="w-full max-w-lg">
+        <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl ring-1 ring-slate-200/60 dark:ring-slate-800 overflow-hidden">
           <div
-            className={`h-1.5 ${
-              rejected
-                ? "bg-gradient-to-r from-red-500 via-rose-500 to-orange-500"
-                : "bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500"
+            className={`h-2 ${
+              isGraduated
+                ? "bg-gradient-to-r from-purple-500 via-indigo-500 to-emerald-500"
+                : rejected
+                  ? "bg-gradient-to-r from-red-500 via-rose-500 to-orange-500"
+                  : "bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500"
             }`}
           />
           <div className="p-8 sm:p-10 text-center">
             <div
-              className={`mx-auto mb-5 h-16 w-16 rounded-2xl flex items-center justify-center ${
-                rejected ? "bg-red-50 dark:bg-red-950/40" : "bg-amber-50 dark:bg-amber-950/40"
+              className={`mx-auto mb-5 h-20 w-20 rounded-3xl flex items-center justify-center shadow-inner ${
+                isGraduated
+                  ? "bg-gradient-to-br from-purple-50 to-emerald-50 dark:from-purple-950/50 dark:to-emerald-950/50 ring-4 ring-purple-100 dark:ring-purple-900/40"
+                  : rejected
+                    ? "bg-red-50 dark:bg-red-950/40"
+                    : "bg-amber-50 dark:bg-amber-950/40"
               }`}
             >
-              {rejected ? (
+              {isGraduated ? (
+                <GraduationCap className="w-10 h-10 text-purple-600 dark:text-purple-400 animate-pulse" />
+              ) : rejected ? (
                 <XCircle className="w-8 h-8 text-red-600 dark:text-red-400" />
               ) : needsProfile ? (
                 <UserPen className="w-8 h-8 text-amber-600 dark:text-amber-400" />
@@ -70,21 +80,51 @@ export default async function AccountStatusPage() {
               )}
             </div>
 
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-              {rejected
-                ? "Başvurunuz reddedildi"
-                : needsProfile
-                  ? "Profilinizi tamamlayın"
-                  : "Hesabınız inceleniyor"}
+            {isGraduated && (
+              <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-purple-100 dark:bg-purple-950/70 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 mb-3">
+                <Sparkles className="w-3.5 h-3.5" />
+                Tebrikler • Staj Tamamlandı
+              </span>
+            )}
+
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
+              {isGraduated
+                ? "Stajınız Başarıyla Tamamlandı!"
+                : rejected
+                  ? "Başvurunuz reddedildi"
+                  : needsProfile
+                    ? "Profilinizi tamamlayın"
+                    : "Hesabınız inceleniyor"}
             </h1>
 
-            <p className="mt-3 text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-              {rejected
-                ? "Hesabınız bir yönetici tarafından reddedildi. Bir hata olduğunu düşünüyorsanız lütfen ekiple iletişime geçin."
-                : needsProfile
-                  ? "Değerlendirmeye alınabilmeniz için önce profilinizi doldurmanız gerekiyor. Profiliniz, size en uygun mentörün belirlenmesinde kullanılacak."
-                  : "Profiliniz alındı ve inceleniyor. Size uygun bir mentör atandıktan sonra panelinize erişebileceksiniz. Teşekkürler!"}
+            <p className="mt-3.5 text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed font-normal">
+              {isGraduated ? (
+                <>
+                  <span className="font-semibold text-slate-900 dark:text-slate-100">
+                    Posinowa bünyesinde yaptığınız staj başarıyla tamamlanmıştır.
+                  </span>{" "}
+                  Gelecek kariyerinizde ve profesyonel hayatınızda başarılarınızın devamını dileriz!
+                </>
+              ) : rejected ? (
+                "Hesabınız bir yönetici tarafından reddedildi. Bir hata olduğunu düşünüyorsanız lütfen ekiple iletişime geçin."
+              ) : needsProfile ? (
+                "Değerlendirmeye alınabilmeniz için önce profilinizi doldurmanız gerekiyor. Profiliniz, size en uygun mentörün belirlenmesinde kullanılacak."
+              ) : (
+                "Profiliniz alındı ve inceleniyor. Size uygun bir mentör atandıktan sonra panelinize erişebileceksiniz. Teşekkürler!"
+              )}
             </p>
+
+            {isGraduated && (
+              <div className="mt-6 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 text-left text-xs space-y-2">
+                <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 font-semibold">
+                  <Award className="w-4 h-4" />
+                  <span>Staj Süreci & Yol Haritası Tamamlandı</span>
+                </div>
+                <p className="text-slate-500 dark:text-slate-400 leading-relaxed">
+                  Staj süresince göstermiş olduğunuz özveri ve emekleriniz için teşekkür ederiz. Hesabınız mezun statüsünde arşivlenmiştir.
+                </p>
+              </div>
+            )}
 
             {/* #143: Profilsiz PENDING kullanıcı için doğrudan aksiyon. */}
             {needsProfile && (
@@ -99,7 +139,7 @@ export default async function AccountStatusPage() {
             )}
 
             {session.user.email && (
-              <p className="mt-4 text-xs text-slate-400 dark:text-slate-500">
+              <p className="mt-5 text-xs text-slate-400 dark:text-slate-500">
                 Giriş yapılan hesap: <span className="font-medium text-slate-500 dark:text-slate-400">{session.user.email}</span>
               </p>
             )}

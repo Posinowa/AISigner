@@ -50,6 +50,11 @@ model StudentProfile {
   goals           String?
   availability    String?
   birthYear       Int?
+  // #204: Staj başarı sertifikası alanları.
+  certificateNumber String?
+  mentorNote        String?   @db.VarChar(2000)
+  completionGrade   String?   @default("Üstün Başarı")
+  issuedAt          DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -314,6 +319,7 @@ enum AccountStatus {
   PENDING
   APPROVED
   REJECTED
+  GRADUATED
 }
 
 enum AssignmentStatus {

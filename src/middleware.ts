@@ -71,7 +71,12 @@ export async function middleware(request: NextRequest) {
   // Bu yüzden profil tamamlama rotaları PENDING'e açıktır; yalnızca dashboard
   // kapalıdır. REJECTED ise hiçbirine erişemez.
   const accountStatus = token.accountStatus as string | undefined;
-  if (userRole === "STUDENT" && accountStatus && accountStatus !== "APPROVED") {
+  if (
+    userRole === "STUDENT" &&
+    accountStatus &&
+    accountStatus !== "APPROVED" &&
+    accountStatus !== "GRADUATED"
+  ) {
     const isProfileCompletionRoute =
       pathname.startsWith("/student-onboarding") || pathname.startsWith("/profile-setup");
     const isStudentArea =

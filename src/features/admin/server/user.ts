@@ -7,7 +7,7 @@ export type UserWithProfile = {
   name: string | null;
   lastName: string | null;
   role: "ADMIN" | "MENTOR" | "STUDENT";
-  accountStatus: "PENDING" | "APPROVED" | "REJECTED";
+  accountStatus: "PENDING" | "APPROVED" | "REJECTED" | "GRADUATED";
   studentProfile?: {
     id: string;
     experienceLevel?: string | null;
@@ -82,15 +82,48 @@ export async function updateUserRole(userId: string, role: "ADMIN" | "MENTOR" | 
 }
 
 // ------------------------------------
-// Stajyer hesap onay durumunu güncelle (approve/reject)
+// Stajyer hesap onay durumunu güncelle (approve/reject/graduated)
 export async function updateAccountStatus(
   userId: string,
-  accountStatus: "PENDING" | "APPROVED" | "REJECTED",
+  accountStatus: "PENDING" | "APPROVED" | "REJECTED" | "GRADUATED",
 ) {
   return prisma.user.update({
     where: { id: userId },
     data: { accountStatus },
     select: { id: true, email: true, name: true, lastName: true, role: true, accountStatus: true },
+  });
+}
+
+// ------------------------------------
+// Kullanıcıyı ve ilişkili tüm verilerini güvenle sil
+export async function deleteUser(userId: string, currentAdminId: string) {
+  if (userId === currentAdminId) {
+    throw new AssignmentValidationError("Kendi hesabınızı silemezsiniz.");
+  }
+
+  const targetUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, role: true, email: true },
+  });
+
+  if (!targetUser) {
+    throw new AssignmentValidationError("Silinecek kullanıcı bulunamadı.");
+  }
+
+  // Son admin'in silinmesini engelle
+  if (targetUser.role === "ADMIN") {
+    const adminCount = await prisma.user.count({
+      where: { role: "ADMIN" },
+    });
+    if (adminCount <= 1) {
+      throw new AssignmentValidationError("Sistemdeki son yönetici hesabı silinemez.");
+    }
+  }
+
+  // Prisma cascading deletes Sessions, StudentProfile, Messages, SecurityAnswers, etc.
+  return prisma.user.delete({
+    where: { id: userId },
+    select: { id: true, email: true, name: true, lastName: true },
   });
 }
 

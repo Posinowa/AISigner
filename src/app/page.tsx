@@ -15,7 +15,7 @@ export default async function Home() {
   const role = session.user.role;
   const accountStatus = session.user.accountStatus;
 
-  if (accountStatus && accountStatus !== "APPROVED") {
+  if (accountStatus === "PENDING" || accountStatus === "REJECTED") {
     redirect("/account-status");
   }
   if (role === "ADMIN") {
