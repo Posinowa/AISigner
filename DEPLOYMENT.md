@@ -58,9 +58,15 @@ Out Plane konsolunda servisin **Variables** bölümüne girilir.
 
 | Değişken | Varsayılan | Açıklama |
 |---|---|---|
+| `NEXT_PUBLIC_APP_URL` | `https://aisigner.com` | **#204/SEO** — `robots.txt`, `sitemap.xml` ve canonical/OG URL'lerinin taban adresi. Gerçek domain'e ayarlanmazsa fallback kullanılır. ⚠️ **`NEXT_PUBLIC_` = build-time**: değeri **imaj build edilirken** mevcut olmalı (yalnız runtime env yetmez). Aşağıya bak. |
 | `GCS_BUCKET` | _(yok)_ | **#197** — Dosya yüklemelerinin kalıcılığı. Verilirse yüklemeler bu GCS bucket'ına yazılır (deploy'da silinmez, çok-instance ölçeklenir). Kimlik: mevcut `GCP_CREDENTIALS_JSON` (ADC). Verilmezse yerel disk. |
 | `GITHUB_ORG` | `Posinowa` | GitHub çalışma alanı URL'lerinde kullanılan org. |
 | `PORT` | `3000` | Platform farklı bir port dayatıyorsa. |
+
+> **`NEXT_PUBLIC_APP_URL` build-time notu:** Next.js `NEXT_PUBLIC_*` değişkenlerini **build sırasında**
+> bundle'a gömer. Out Plane GitHub-connect ile build ederken servis değişkenlerini build'e de
+> enjekte ediyorsa değeri girmen yeterlidir. Değilse (ör. saf `docker build`), Dockerfile'ın builder
+> aşamasına build-arg olarak geçmen gerekir. Verilmezse robots/sitemap `https://aisigner.com`'a işaret eder.
 
 ---
 
