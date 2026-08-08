@@ -42,12 +42,16 @@ describe("Certificate Service — Staj Başarı Sertifikası", () => {
         completionGrade: "Üstün Başarı",
         mentorNote: "Tebrikler, harika bir staj dönemiydi.",
         issuedAt: new Date("2026-08-08"),
-        mentor: {
-          id: "m-1",
-          name: "Can",
-          lastName: "Demir",
-          email: "mentor@posinowa.com",
-        },
+        mentorAssignments: [
+          {
+            mentor: {
+              id: "m-1",
+              name: "Can",
+              lastName: "Demir",
+              email: "mentor@posinowa.com",
+            },
+          },
+        ],
         assignedProjects: [
           {
             id: "ap-1",

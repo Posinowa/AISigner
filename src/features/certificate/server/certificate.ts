@@ -37,8 +37,13 @@ export async function getStudentCertificate(userId: string): Promise<Certificate
     include: {
       studentProfile: {
         include: {
-          mentor: {
-            select: { id: true, name: true, lastName: true, email: true },
+          // #195: M:N — öğrencinin mentorları join tablosu üzerinden.
+          mentorAssignments: {
+            include: {
+              mentor: {
+                select: { id: true, name: true, lastName: true, email: true },
+              },
+            },
           },
           assignedProjects: {
             include: {
@@ -69,10 +74,15 @@ export async function getStudentCertificate(userId: string): Promise<Certificate
   const studentName =
     [user.name, user.lastName].filter(Boolean).join(" ") || user.email.split("@")[0];
 
-  const mentorName = profile.mentor
-    ? [profile.mentor.name, profile.mentor.lastName].filter(Boolean).join(" ") ||
-      profile.mentor.email
-    : null;
+  // #195: M:N — sertifikada tüm atanmış mentorlar gösterilir.
+  const mentorsList = profile.mentorAssignments.map((a) => a.mentor);
+  const mentorName =
+    mentorsList.length > 0
+      ? mentorsList
+          .map((m) => [m.name, m.lastName].filter(Boolean).join(" ") || m.email)
+          .join(", ")
+      : null;
+  const mentorEmail = mentorsList[0]?.email ?? null;
 
   const completedProjects = profile.assignedProjects.map((p) => {
     const steps = p.roadmap?.steps || [];
@@ -99,7 +109,7 @@ export async function getStudentCertificate(userId: string): Promise<Certificate
     studentName,
     studentEmail: user.email,
     mentorName,
-    mentorEmail: profile.mentor?.email ?? null,
+    mentorEmail,
     certificateNumber: certNumber,
     completionGrade: profile.completionGrade || "Üstün Başarı",
     mentorNote: profile.mentorNote,
