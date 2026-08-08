@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth/guard";
 import {
   getStudentCertificate,
@@ -22,6 +23,24 @@ export async function GET(
   const { studentId } = await params;
   if (!studentId) {
     return NextResponse.json({ error: "Öğrenci ID gerekli." }, { status: 400 });
+  }
+
+  // #204 IDOR: Mentör yalnızca KENDİ öğrencisinin sertifikasını görebilir (admin hepsini).
+  // studentId = öğrencinin User.id'si; M:N atama üzerinden sahiplik doğrulanır.
+  if (auth.session.user.role === "MENTOR") {
+    const owns = await prisma.studentProfile.findFirst({
+      where: {
+        userId: studentId,
+        mentorAssignments: { some: { mentorId: auth.session.user.id } },
+      },
+      select: { id: true },
+    });
+    if (!owns) {
+      return NextResponse.json(
+        { error: "Bu öğrencinin sertifikasına erişim yetkiniz yok." },
+        { status: 403 },
+      );
+    }
   }
 
   try {

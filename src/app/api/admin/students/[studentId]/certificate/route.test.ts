@@ -1,16 +1,19 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { mockRequireAuth, mockGetStudentCertificate, mockUpdateCertificateDetails } =
+const { mockRequireAuth, mockGetStudentCertificate, mockUpdateCertificateDetails, mockPrisma } =
   vi.hoisted(() => ({
     mockRequireAuth: vi.fn(),
     mockGetStudentCertificate: vi.fn(),
     mockUpdateCertificateDetails: vi.fn(),
+    mockPrisma: { studentProfile: { findFirst: vi.fn() } },
   }));
 
 vi.mock("@/lib/auth/guard", () => ({
   requireAuth: mockRequireAuth,
 }));
+
+vi.mock("@/lib/db", () => ({ prisma: mockPrisma }));
 
 vi.mock("@/features/certificate/server/certificate", () => ({
   getStudentCertificate: mockGetStudentCertificate,
@@ -50,6 +53,32 @@ describe("GET & POST /api/admin/students/[studentId]/certificate", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.success).toBe(true);
+  });
+
+  it("GET: atanmış mentör kendi öğrencisinin sertifikasını görür → 200", async () => {
+    mockRequireAuth.mockResolvedValue({
+      authorized: true,
+      session: { user: { id: "mentor-1", role: "MENTOR" } },
+    });
+    mockPrisma.studentProfile.findFirst.mockResolvedValue({ id: "sp-1" }); // atanmış
+    mockGetStudentCertificate.mockResolvedValue({ id: "sp-1", studentName: "Örnek" });
+
+    const req = new Request("http://localhost/api/admin/students/s1/certificate");
+    const res = await GET(req, { params: Promise.resolve({ studentId: "s1" }) });
+    expect(res.status).toBe(200);
+  });
+
+  it("GET: BAŞKA öğrencinin mentörü → 403, sertifika derlenmez (IDOR kilidi)", async () => {
+    mockRequireAuth.mockResolvedValue({
+      authorized: true,
+      session: { user: { id: "baska-mentor", role: "MENTOR" } },
+    });
+    mockPrisma.studentProfile.findFirst.mockResolvedValue(null); // atanmamış
+
+    const req = new Request("http://localhost/api/admin/students/s1/certificate");
+    const res = await GET(req, { params: Promise.resolve({ studentId: "s1" }) });
+    expect(res.status).toBe(403);
+    expect(mockGetStudentCertificate).not.toHaveBeenCalled();
   });
 
   it("POST: geçerli veriyle sertifika detaylarını ve referans notunu günceller", async () => {
