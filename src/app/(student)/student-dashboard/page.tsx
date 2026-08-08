@@ -9,6 +9,7 @@ import Link from "next/link";
 import { Progress } from "@/components/ui/progress";
 import { SecurityQuestionsSetup } from "@/features/auth/ui/SecurityQuestionsSetup";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
+import { StudentCertificateTrigger } from "@/features/student/ui/StudentCertificateTrigger";
 
 export const dynamic = "force-dynamic";
 
@@ -125,10 +126,11 @@ export default async function StudentDashboardPage() {
                 </p>
               </div>
             </div>
-            <div className="shrink-0 flex items-center gap-2">
+            <div className="shrink-0 flex flex-col sm:flex-row items-start sm:items-center gap-3">
               <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold text-xs">
                 <CheckCircle2 className="w-4 h-4" /> Staj Tamamlandı
               </span>
+              <StudentCertificateTrigger />
             </div>
           </div>
         </div>

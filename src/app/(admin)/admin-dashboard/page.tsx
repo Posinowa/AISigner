@@ -28,6 +28,8 @@ import {
   parseProfileAnalysisApiResponse,
   type ProfileAnalysisData,
 } from "@/features/ai/ui/ProfileAnalysisCard";
+import { CertificateModal } from "@/components/certificate/CertificateModal";
+import type { CertificateData } from "@/features/certificate/server/certificate";
 
 type User = {
   id: string;
@@ -123,6 +125,10 @@ export default function AdminDashboard() {
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
 
+  // Sertifika & Referans modal'ı
+  const [certModalUser, setCertModalUser] = useState<User | null>(null);
+  const [certModalData, setCertModalData] = useState<CertificateData | null>(null);
+
   async function openAnalysisModal(user: User) {
     setAnalysisModalUser(user);
     setAnalysisData(null);
@@ -138,6 +144,40 @@ export default function AdminDashboard() {
       setAnalysisError("Bağlantı hatası. Lütfen tekrar deneyin.");
     } finally {
       setAnalysisLoading(false);
+    }
+  }
+
+  async function openCertificateModal(user: User) {
+    setCertModalUser(user);
+    setCertModalData(null);
+    try {
+      const res = await fetch(`/api/admin/students/${user.id}/certificate`);
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.certificate) {
+        setCertModalData(data.certificate);
+      } else {
+        toast.error(data?.error || "Sertifika verisi alınamadı.");
+        setCertModalUser(null);
+      }
+    } catch {
+      toast.error("Bağlantı hatası. Lütfen tekrar deneyin.");
+      setCertModalUser(null);
+    }
+  }
+
+  async function handleSaveCertificateDetails(details: {
+    mentorNote: string;
+    completionGrade: string;
+  }) {
+    if (!certModalUser) return;
+    const res = await fetch(`/api/admin/students/${certModalUser.id}/certificate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(details),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      throw new Error(data?.error || "Kayıt başarısız.");
     }
   }
 
@@ -860,6 +900,17 @@ export default function AdminDashboard() {
                                   <RefreshCw className="w-3.5 h-3.5" /> Aktifleştir
                                 </button>
                               )}
+
+                              {/* Sertifika ve Mentör Referans Notu Yönetimi */}
+                              {user.studentProfile && (
+                                <button
+                                  onClick={() => openCertificateModal(user)}
+                                  title="Sertifika & Mentör Notu Yönetimi"
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 text-xs font-semibold border border-indigo-200 dark:border-indigo-800 transition-colors"
+                                >
+                                  <Award className="w-3.5 h-3.5" /> Sertifika & Not
+                                </button>
+                              )}
                             </>
                           )}
 
@@ -919,6 +970,20 @@ export default function AdminDashboard() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Admin — Sertifika & Referans Notu Modal'ı */}
+      {certModalData && certModalUser && (
+        <CertificateModal
+          certificate={certModalData}
+          isOpen={!!certModalUser}
+          onClose={() => {
+            setCertModalUser(null);
+            setCertModalData(null);
+          }}
+          isAdmin={true}
+          onSave={handleSaveCertificateDetails}
+        />
       )}
     </div>
   );
