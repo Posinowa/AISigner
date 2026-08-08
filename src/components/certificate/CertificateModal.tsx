@@ -82,7 +82,7 @@ export function CertificateModal({
   );
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-6 print:p-0 print:bg-white print:static print:inset-auto">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-md flex items-start justify-center p-2 sm:p-6 print:p-0 print:bg-white print:static print:inset-auto">
       <div className="relative w-full max-w-4xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden my-8 print:my-0 print:border-none print:shadow-none print:w-full print:max-w-none">
         
         {/* Üst Eylem Araç Çubuğu (Yazdırmada gizlenir) */}

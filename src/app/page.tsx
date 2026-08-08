@@ -8,7 +8,9 @@ import { authOptions } from "@/lib/auth/nextauth";
 export default async function Home() {
   const session = await getServerSession(authOptions);
 
-  if (!session?.user) {
+  // Rolü olmayan oturum = geçersiz (ör. hesabı SİLİNMİŞ kullanıcı; JWT callback rol'ü
+  // undefined yapar ama token durur). signin'e gönder → sonsuz yönlendirme döngüsü olmaz.
+  if (!session?.user?.role) {
     redirect("/signin");
   }
 

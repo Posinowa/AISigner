@@ -24,12 +24,14 @@ export async function middleware(request: NextRequest) {
     // /signin veya /signup'a giden oturum açık kullanıcıyı kendi paneline yönlendir
     if (pathname === "/signin" || pathname === "/signup") {
       const token = await getToken({ req: request, secret: process.env.AUTH_SECRET });
-      if (token) {
-        const role = token.role as string | undefined;
-        if (role === "ADMIN") return NextResponse.redirect(new URL("/admin-dashboard", request.url));
-        if (role === "MENTOR") return NextResponse.redirect(new URL("/mentor-dashboard", request.url));
-        return NextResponse.redirect(new URL("/student-dashboard", request.url));
-      }
+      // Yalnız GEÇERLİ rolü olan (canlı) oturumu panele yönlendir. Rolü olmayan token
+      // (ör. hesabı SİLİNMİŞ kullanıcı — JWT callback rol'ü undefined yapar) burada
+      // yönlendirilmez → signin'de kalır. Aksi halde /signin ↔ /dashboard sonsuz
+      // yönlendirme döngüsüne girilir (ERR_TOO_MANY_REDIRECTS).
+      const role = token?.role as string | undefined;
+      if (role === "ADMIN") return NextResponse.redirect(new URL("/admin-dashboard", request.url));
+      if (role === "MENTOR") return NextResponse.redirect(new URL("/mentor-dashboard", request.url));
+      if (role === "STUDENT") return NextResponse.redirect(new URL("/student-dashboard", request.url));
     }
     return NextResponse.next();
   }
