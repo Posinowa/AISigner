@@ -11,6 +11,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
+    "check:migrations": "node scripts/check-migrations.mjs",
     "seed": "tsx scripts/seed.ts",
     "test:ai": "tsx --env-file=.env scripts/test-ai.ts"
   },

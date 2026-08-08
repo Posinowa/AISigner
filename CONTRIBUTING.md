@@ -149,7 +149,8 @@ refactor: prisma client singleton'ı birleştir
 - [ ] Kodunuz lint kontrolünden geçiyor: `npm run lint`
 - [ ] Build başarıyla tamamlanıyor: `npm run build`
 - [ ] Testler geçiyor: `npm test`
-- [ ] İlgili migration varsa eklenmiş
+- [ ] İlgili migration varsa eklenmiş — ve **yıkıcı** (drop/rename/NOT NULL) ise
+      expand/contract'a bölünmüş: `npm run check:migrations` yeşil (bkz. `docs/MIGRATIONS.md`)
 - [ ] Gereksiz dosya değişikliği yok
 - [ ] `.env`, private key veya service account dosyası commit edilmedi
 

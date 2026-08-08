@@ -33,6 +33,10 @@ jobs:
           node-version: 20
           cache: npm
 
+      # #198: Yıkıcı (geriye-uyumsuz) migration guard — bağımlılık gerektirmez.
+      - name: Migration safety check
+        run: node scripts/check-migrations.mjs
+
       - name: Detect package scripts
         shell: bash
         run: |
