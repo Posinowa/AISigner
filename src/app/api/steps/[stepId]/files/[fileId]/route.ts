@@ -150,11 +150,15 @@ export async function DELETE(
       );
     }
 
-    // #197: GCS veya yerel diskten sil (backend env'e göre).
-    await deleteStepFile(stepFile.storedName);
-
-    // Veritabanından sil
+    // #201: Önce veritabanı kaydını sil (tutarlılık garantisi)
     await prisma.stepFile.delete({ where: { id: fileId } });
+
+    // #197: GCS veya yerel diskten sil (backend env'e göre)
+    try {
+      await deleteStepFile(stepFile.storedName);
+    } catch (delErr) {
+      console.error("Storage delete failed for", stepFile.storedName, delErr);
+    }
 
     return NextResponse.json({ message: "Dosya başarıyla silindi." });
   } catch (error) {

@@ -4,7 +4,7 @@ import { requireAuth } from "@/lib/auth/guard";
 import { isAssignedMentor } from "@/lib/auth/mentor-access";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { matchesExtensionSignature } from "@/lib/file-signature";
-import { saveStepFile } from "@/lib/storage/step-files";
+import { saveStepFile, deleteStepFile } from "@/lib/storage/step-files";
 import path from "path";
 import crypto from "crypto";
 
@@ -198,22 +198,33 @@ export async function POST(
     // #197: GCS veya yerel diske yaz (backend env'e göre seçilir).
     await saveStepFile(storedName, buffer, mimeType);
 
-    // Veritabanına kaydet
-    const stepFile = await prisma.stepFile.create({
-      data: {
-        stepId,
-        uploaderId: userId,
-        fileName: file.name.slice(0, 255), // Max 255 karakter
-        storedName,
-        mimeType,
-        fileSize: file.size,
-      },
-      include: {
-        uploader: {
-          select: { id: true, name: true, lastName: true, role: true },
+    let stepFile;
+    try {
+      // Veritabanına kaydet
+      stepFile = await prisma.stepFile.create({
+        data: {
+          stepId,
+          uploaderId: userId,
+          fileName: file.name.slice(0, 255), // Max 255 karakter
+          storedName,
+          mimeType,
+          fileSize: file.size,
         },
-      },
-    });
+        include: {
+          uploader: {
+            select: { id: true, name: true, lastName: true, role: true },
+          },
+        },
+      });
+    } catch (dbError) {
+      // #201: DB insert başarısız olursa storage'daki dosyayı temizle (orphan compensation).
+      try {
+        await deleteStepFile(storedName);
+      } catch (delErr) {
+        console.error("Orphan step file cleanup failed:", storedName, delErr);
+      }
+      throw dbError;
+    }
 
     return NextResponse.json({ file: stepFile }, { status: 201 });
   } catch (error) {

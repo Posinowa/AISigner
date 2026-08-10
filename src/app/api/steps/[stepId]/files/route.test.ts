@@ -2,17 +2,23 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 // --- Bağımlılıkları mock'la ---
 // vi.mock fabrikleri hoist edildiği için mock'ları vi.hoisted ile tanımlıyoruz.
-const { requireAuthMock, prismaMock } = vi.hoisted(() => ({
+const { requireAuthMock, prismaMock, saveStepFileMock, deleteStepFileMock } = vi.hoisted(() => ({
   requireAuthMock: vi.fn(),
   prismaMock: {
     roadmapStep: { findUnique: vi.fn() },
-    stepFile: { count: vi.fn() },
+    stepFile: { count: vi.fn(), create: vi.fn() },
   },
+  saveStepFileMock: vi.fn(),
+  deleteStepFileMock: vi.fn(),
 }));
 vi.mock("@/lib/auth/guard", () => ({
   requireAuth: (...args: unknown[]) => requireAuthMock(...args),
 }));
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
+vi.mock("@/lib/storage/step-files", () => ({
+  saveStepFile: (...args: unknown[]) => saveStepFileMock(...args),
+  deleteStepFile: (...args: unknown[]) => deleteStepFileMock(...args),
+}));
 
 import { POST } from "./route";
 
@@ -115,19 +121,42 @@ describe("POST /api/steps/[stepId]/files — içerik imzası (#113)", () => {
   it("metin dosyasında (.txt) içerik kontrolü atlanır — imza hatası dönmez", async () => {
     authAs(MENTOR_USER, "MENTOR");
     prismaMock.roadmapStep.findUnique.mockResolvedValue(buildStep("PUBLISHED"));
+    prismaMock.stepFile.create.mockResolvedValue({ id: "f-1" });
 
     const res = await POST(makeUploadRequest("notlar.txt", "serbest metin icerik"), ctx);
 
-    // İmza kontrolüne takılmadı (400 "uzantısıyla uyuşmuyor" değil);
-    // akış diske yazma/DB aşamasına ilerledi.
-    if (res.status === 400) {
-      const json = await res.json();
-      expect(String(json.error)).not.toContain("uzantısıyla uyuşmuyor");
-    }
+    // İmza kontrolüne takılmadı; başarılı oluşturuldu (201).
+    expect(res.status).toBe(201);
   });
 });
 
-// #113: fs erişimi mock'lanır (vi.mock hoist edilir, tüm dosya için geçerli) —
-// imza testleri gerçek diske yazmasın. Önceki testler fs'e zaten ulaşmıyor.
-// #197: Depolama katmanı mock'lanır — imza testleri gerçek diske/GCS'e yazmasın.
-vi.mock("@/lib/storage/step-files", () => ({ saveStepFile: vi.fn() }));
+describe("POST /api/steps/[stepId]/files — orphan compensation (#201)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    prismaMock.stepFile.count.mockResolvedValue(0);
+  });
+
+  function makeUploadRequest(fileName: string, content: Uint8Array | string) {
+    const form = new FormData();
+    form.set("file", new File([content as BlobPart], fileName));
+    return new Request("http://test/api/steps/step-1/files", {
+      method: "POST",
+      body: form,
+    });
+  }
+
+  it("DB create hata verirse saveStepFile ile kaydedilen dosya deleteStepFile ile temizlenir", async () => {
+    authAs(MENTOR_USER, "MENTOR");
+    prismaMock.roadmapStep.findUnique.mockResolvedValue(buildStep("PUBLISHED"));
+    saveStepFileMock.mockResolvedValue(undefined);
+    deleteStepFileMock.mockResolvedValue(undefined);
+    prismaMock.stepFile.create.mockRejectedValue(new Error("DB connection lost"));
+
+    const res = await POST(makeUploadRequest("test.txt", "dosya icerigi"), ctx);
+
+    expect(res.status).toBe(500);
+    expect(saveStepFileMock).toHaveBeenCalledOnce();
+    expect(deleteStepFileMock).toHaveBeenCalledOnce();
+  });
+});
+
