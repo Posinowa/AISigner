@@ -13,6 +13,7 @@
     "test:watch": "vitest",
     "check:migrations": "node scripts/check-migrations.mjs",
     "seed": "tsx scripts/seed.ts",
+    "create:admin": "tsx scripts/create-admin.ts",
     "test:ai": "tsx --env-file=.env scripts/test-ai.ts"
   },
   "dependencies": {
