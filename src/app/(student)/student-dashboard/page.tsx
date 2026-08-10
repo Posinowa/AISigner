@@ -4,11 +4,12 @@ import { RoadmapSteps } from "@/features/student/ui/RoadmapSteps";
 import { prisma } from "@/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/nextauth";
-import { Clock, Briefcase, Target, Github } from "lucide-react";
+import { Clock, Briefcase, Target, Github, GraduationCap, Sparkles, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { Progress } from "@/components/ui/progress";
 import { SecurityQuestionsSetup } from "@/features/auth/ui/SecurityQuestionsSetup";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
+import { StudentCertificateTrigger } from "@/features/student/ui/StudentCertificateTrigger";
 
 export const dynamic = "force-dynamic";
 
@@ -17,9 +18,10 @@ export default async function StudentDashboardPage() {
   if (!session?.user?.id) return <p>Oturum açmanız gerekiyor.</p>;
 
   // #38: Onaylanmamış stajyer (PENDING/REJECTED) panele erişemez.
-  // (#39 bu bloğu tam ekran pending/rejected tasarımlarıyla değiştirecek.)
+  // GRADUATED stajyerler projelerini ve adımlarını incelemeye devam edebilir.
   const accountStatus = session.user.accountStatus;
-  if (accountStatus && accountStatus !== "APPROVED") {
+  const isGraduated = accountStatus === "GRADUATED";
+  if (accountStatus && accountStatus !== "APPROVED" && !isGraduated) {
     const rejected = accountStatus === "REJECTED";
     return (
       <div className="min-h-[80vh] flex flex-col items-center justify-center p-6 text-center">
@@ -101,16 +103,52 @@ export default async function StudentDashboardPage() {
 
   return (
     <div className="max-w-5xl mx-auto mt-8 p-6 space-y-8">
-      
+      {/* 🎓 Mezun Stajyer Tebrik & Başarı Kartı */}
+      {isGraduated && (
+        <div className="rounded-3xl bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-white p-6 sm:p-8 shadow-xl border border-purple-500/30 relative overflow-hidden">
+          <div className="absolute top-0 right-0 -mt-10 -mr-10 w-48 h-48 bg-purple-500/20 rounded-full blur-3xl" />
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 relative z-10">
+            <div className="flex items-start gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500 to-emerald-400 p-0.5 shrink-0 shadow-lg">
+                <div className="w-full h-full bg-slate-900 rounded-[14px] flex items-center justify-center">
+                  <GraduationCap className="w-7 h-7 text-purple-400 animate-pulse" />
+                </div>
+              </div>
+              <div>
+                <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-400/30 mb-2">
+                  <Sparkles className="w-3.5 h-3.5" /> Posinowa Staj Mezuniyeti
+                </div>
+                <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+                  Stajınız Başarıyla Tamamlandı!
+                </h2>
+                <p className="mt-2 text-purple-100/90 text-sm sm:text-base leading-relaxed max-w-2xl">
+                  Posinowa bünyesinde yaptığınız staj başarıyla tamamlanmıştır. Çalıştığınız projeleri, tamamladığınız yol haritası adımlarını ve tüm dosya/geliştirme geçmişinizi aşağıda incelemeye devam edebilirsiniz. Gelecek kariyerinizde ve profesyonel hayatınızda başarılarınızın devamını dileriz!
+                </p>
+              </div>
+            </div>
+            <div className="shrink-0 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+              <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold text-xs">
+                <CheckCircle2 className="w-4 h-4" /> Staj Tamamlandı
+              </span>
+              <StudentCertificateTrigger />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Sayfa başlığı — navigasyon/çıkış AppShell'de (#126-1) */}
       <div>
-        <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Hoş geldin, {firstName}</h1>
+        <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
+          {isGraduated ? `Mezun Stajyer Portfolyosu: ${firstName}` : `Hoş geldin, ${firstName}`}
+        </h1>
         <p className="text-slate-500 dark:text-slate-400 mt-2 text-sm">
-          {profile.assignedProjects.length > 0
-            ? "Çalışma masan hazır. Odaklanman gereken güncel görevler aşağıda listelenmiştir."
-            : profile.mentorAssignments.length > 0
-              ? "Mentörün gelişim planını hazırlıyor. Lütfen beklemede kal."
-              : "Profilin inceleniyor. Yakında bir mentör ile eşleştirileceksin."}
+          {isGraduated
+            ? "Staj süreciniz boyunca geliştirdiğiniz projeler, tamamlanan adımlar ve çıktılar aşağıda arşivlenmiştir."
+            : profile.assignedProjects.length > 0
+              ? "Çalışma masan hazır. Odaklanman gereken güncel görevler aşağıda listelenmiştir."
+              : profile.mentorAssignments.length > 0
+                ? "Mentörün gelişim planını hazırlıyor. Lütfen beklemede kal."
+                : "Profilin inceleniyor. Yakında bir mentör ile eşleştirileceksin."}
         </p>
       </div>
 

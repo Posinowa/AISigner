@@ -1,17 +1,31 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 // prisma'yı mock'la (gerçek DB gerekmez)
-const { prismaMock } = vi.hoisted(() => ({
+const { prismaMock, deleteStepFileMock } = vi.hoisted(() => ({
   prismaMock: {
-    user: { findUnique: vi.fn(), findMany: vi.fn() },
+    user: {
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      count: vi.fn(),
+    },
     studentProfile: { upsert: vi.fn() },
     mentorAssignment: { deleteMany: vi.fn(), createMany: vi.fn() },
+    stepFile: { findMany: vi.fn() },
     $transaction: vi.fn(),
   },
+  deleteStepFileMock: vi.fn(),
 }));
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
+vi.mock("@/lib/storage/step-files", () => ({ deleteStepFile: deleteStepFileMock }));
 
-import { setStudentMentors, AssignmentValidationError } from "./user";
+import {
+  setStudentMentors,
+  updateAccountStatus,
+  deleteUser,
+  AssignmentValidationError,
+} from "./user";
 
 // #195: assignMentor (tek mentor) → setStudentMentors (M:N liste reconcile).
 describe("setStudentMentors — rol doğrulaması + M:N reconcile (#43/#195)", () => {
@@ -72,5 +86,131 @@ describe("setStudentMentors — rol doğrulaması + M:N reconcile (#43/#195)", (
 
     const arg = prismaMock.user.findMany.mock.calls[0][0] as { where: { id: { in: string[] } } };
     expect(arg.where.id.in).toEqual(["m1"]);
+  });
+});
+
+describe("updateAccountStatus — stajyer onay, mezuniyet ve red durumları", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("GRADUATED durumu başarıyla güncellenir", async () => {
+    prismaMock.user.update.mockResolvedValue({
+      id: "u-1",
+      email: "student@test.com",
+      name: "Ali",
+      lastName: "Veli",
+      role: "STUDENT",
+      accountStatus: "GRADUATED",
+    });
+
+    const result = await updateAccountStatus("u-1", "GRADUATED");
+
+    expect(prismaMock.user.update).toHaveBeenCalledWith({
+      where: { id: "u-1" },
+      data: { accountStatus: "GRADUATED" },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        lastName: true,
+        role: true,
+        accountStatus: true,
+      },
+    });
+    expect(result.accountStatus).toBe("GRADUATED");
+  });
+});
+
+describe("deleteUser — güvenli hesap silme", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("admin kendi hesabını silmeye çalışırsa hata fırlatır", async () => {
+    await expect(deleteUser("admin-1", "admin-1")).rejects.toThrow(
+      "Kendi hesabınızı silemezsiniz.",
+    );
+    expect(prismaMock.user.delete).not.toHaveBeenCalled();
+  });
+
+  it("silinecek kullanıcı bulunamazsa hata fırlatır", async () => {
+    prismaMock.user.findUnique.mockResolvedValue(null);
+
+    await expect(deleteUser("not-found", "admin-1")).rejects.toThrow(
+      "Silinecek kullanıcı bulunamadı.",
+    );
+    expect(prismaMock.user.delete).not.toHaveBeenCalled();
+  });
+
+  it("sistemdeki tek admin silinmeye çalışılırsa hata fırlatır", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: "admin-2",
+      role: "ADMIN",
+      email: "admin2@test.com",
+    });
+    prismaMock.user.count.mockResolvedValue(1);
+
+    await expect(deleteUser("admin-2", "admin-1")).rejects.toThrow(
+      "Sistemdeki son yönetici hesabı silinemez.",
+    );
+    expect(prismaMock.user.delete).not.toHaveBeenCalled();
+  });
+
+  it("öğrenci veya mentor hesabı başarıyla silinir", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: "student-1",
+      role: "STUDENT",
+      email: "student1@test.com",
+    });
+    prismaMock.stepFile.findMany.mockResolvedValue([]);
+    prismaMock.user.delete.mockResolvedValue({
+      id: "student-1",
+      email: "student1@test.com",
+      name: "Ahmet",
+      lastName: "Yılmaz",
+    });
+
+    const deleted = await deleteUser("student-1", "admin-1");
+
+    expect(prismaMock.user.delete).toHaveBeenCalledWith({
+      where: { id: "student-1" },
+      select: { id: true, email: true, name: true, lastName: true },
+    });
+    expect(deleted.id).toBe("student-1");
+  });
+
+  it("#204: silmeden önce toplanan StepFile'lar storage'dan da silinir (öksüz dosya yok)", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: "student-1",
+      role: "STUDENT",
+      email: "student1@test.com",
+    });
+    prismaMock.stepFile.findMany.mockResolvedValue([
+      { storedName: "step-1_aaa.png" },
+      { storedName: "step-1_bbb.pdf" },
+    ]);
+    prismaMock.user.delete.mockResolvedValue({ id: "student-1" });
+
+    await deleteUser("student-1", "admin-1");
+
+    // Her iki fiziksel dosya için de storage silme çağrılır.
+    expect(deleteStepFileMock).toHaveBeenCalledTimes(2);
+    expect(deleteStepFileMock).toHaveBeenCalledWith("step-1_aaa.png");
+    expect(deleteStepFileMock).toHaveBeenCalledWith("step-1_bbb.pdf");
+  });
+
+  it("#204: bir dosya storage'dan silinemese bile kullanıcı silme başarısız SAYILMAZ", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: "student-1",
+      role: "STUDENT",
+      email: "student1@test.com",
+    });
+    prismaMock.stepFile.findMany.mockResolvedValue([{ storedName: "x.png" }]);
+    prismaMock.user.delete.mockResolvedValue({ id: "student-1" });
+    deleteStepFileMock.mockRejectedValueOnce(new Error("GCS down"));
+
+    // Hata yutulur (best-effort) → çözümlenir.
+    await expect(deleteUser("student-1", "admin-1")).resolves.toMatchObject({ id: "student-1" });
   });
 });

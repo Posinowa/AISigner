@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/db";
+import { deleteStepFile } from "@/lib/storage/step-files";
+import { logger } from "@/lib/logger";
 
 // Type export
 export type UserWithProfile = {
@@ -7,7 +9,7 @@ export type UserWithProfile = {
   name: string | null;
   lastName: string | null;
   role: "ADMIN" | "MENTOR" | "STUDENT";
-  accountStatus: "PENDING" | "APPROVED" | "REJECTED";
+  accountStatus: "PENDING" | "APPROVED" | "REJECTED" | "GRADUATED";
   studentProfile?: {
     id: string;
     experienceLevel?: string | null;
@@ -82,16 +84,78 @@ export async function updateUserRole(userId: string, role: "ADMIN" | "MENTOR" | 
 }
 
 // ------------------------------------
-// Stajyer hesap onay durumunu güncelle (approve/reject)
+// Stajyer hesap onay durumunu güncelle (approve/reject/graduated)
 export async function updateAccountStatus(
   userId: string,
-  accountStatus: "PENDING" | "APPROVED" | "REJECTED",
+  accountStatus: "PENDING" | "APPROVED" | "REJECTED" | "GRADUATED",
 ) {
   return prisma.user.update({
     where: { id: userId },
     data: { accountStatus },
     select: { id: true, email: true, name: true, lastName: true, role: true, accountStatus: true },
   });
+}
+
+// ------------------------------------
+// Kullanıcıyı ve ilişkili tüm verilerini güvenle sil
+export async function deleteUser(userId: string, currentAdminId: string) {
+  if (userId === currentAdminId) {
+    throw new AssignmentValidationError("Kendi hesabınızı silemezsiniz.");
+  }
+
+  const targetUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, role: true, email: true },
+  });
+
+  if (!targetUser) {
+    throw new AssignmentValidationError("Silinecek kullanıcı bulunamadı.");
+  }
+
+  // Son admin'in silinmesini engelle
+  if (targetUser.role === "ADMIN") {
+    const adminCount = await prisma.user.count({
+      where: { role: "ADMIN" },
+    });
+    if (adminCount <= 1) {
+      throw new AssignmentValidationError("Sistemdeki son yönetici hesabı silinemez.");
+    }
+  }
+
+  // #204: DB kaydı cascade ile silinince StepFile satırları da gider ama fiziksel
+  // dosyalar (disk/GCS) öksüz kalır. Silmeden ÖNCE etkilenecek dosyaların
+  // storedName'lerini topla: (1) bu kullanıcının yüklediği dosyalar + (2) öğrenciyse
+  // kendi yol haritası adımlarındaki tüm dosyalar (mentörün yüklediği dahil).
+  const orphanFiles = await prisma.stepFile.findMany({
+    where: {
+      OR: [
+        { uploaderId: userId },
+        { step: { roadmap: { assignedProject: { studentProfile: { userId } } } } },
+      ],
+    },
+    select: { storedName: true },
+  });
+
+  // Prisma cascading deletes Sessions, StudentProfile, Messages, SecurityAnswers, StepFile, etc.
+  const deleted = await prisma.user.delete({
+    where: { id: userId },
+    select: { id: true, email: true, name: true, lastName: true },
+  });
+
+  // DB silme başarılı → fiziksel dosyaları best-effort temizle (biri hata verse de
+  // kullanıcı silme işlemini başarısız SAYMA; yalnız logla).
+  for (const f of orphanFiles) {
+    try {
+      await deleteStepFile(f.storedName);
+    } catch (err) {
+      logger.warn("Kullanıcı silinirken öksüz dosya temizlenemedi", {
+        storedName: f.storedName,
+        err,
+      });
+    }
+  }
+
+  return deleted;
 }
 
 // ------------------------------------

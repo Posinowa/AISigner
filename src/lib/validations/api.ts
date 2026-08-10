@@ -47,11 +47,11 @@ export const saveSurveyAnswersSchema = z.object({
     .min(1, "En az bir cevap gerekli"),
 });
 
-// Admin: Stajyer hesap onay durumu güncelleme (approve/reject)
+// Admin: Stajyer hesap onay durumu güncelleme (approve/reject/graduated)
 export const updateAccountStatusSchema = z.object({
   userId: z.string().min(1, "Kullanıcı ID gerekli"),
-  accountStatus: z.enum(["PENDING", "APPROVED", "REJECTED"], {
-    error: "Geçersiz durum. PENDING, APPROVED veya REJECTED olmalı.",
+  accountStatus: z.enum(["PENDING", "APPROVED", "REJECTED", "GRADUATED"], {
+    error: "Geçersiz durum. PENDING, APPROVED, REJECTED veya GRADUATED olmalı.",
   }),
 });
 

@@ -61,6 +61,7 @@ export async function requireAuth(
     session.user.role === "STUDENT" &&
     session.user.accountStatus &&
     session.user.accountStatus !== "APPROVED" &&
+    session.user.accountStatus !== "GRADUATED" &&
     !isPendingButAllowed
   ) {
     return {
