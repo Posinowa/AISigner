@@ -20,6 +20,19 @@ export async function GET() {
       );
     }
 
+    // #208: Öğrenci rolündeyse yalnızca mezun edilmişse veya resmi issuedAt varsa sertifika alabilir.
+    if (auth.session.user.role === "STUDENT") {
+      const isGraduated = auth.session.user.accountStatus === "GRADUATED";
+      const isIssued = certificate.issuedAt !== null;
+
+      if (!isGraduated && !isIssued) {
+        return NextResponse.json(
+          { error: "Henüz mezun durumunda değilsiniz veya resmi sertifikanız düzenlenmedi." },
+          { status: 403 },
+        );
+      }
+    }
+
     return NextResponse.json({ success: true, certificate });
   } catch (error) {
     console.error("Error loading certificate:", error);
@@ -29,3 +42,4 @@ export async function GET() {
     );
   }
 }
+

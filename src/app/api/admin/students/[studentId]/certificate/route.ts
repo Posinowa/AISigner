@@ -5,13 +5,7 @@ import {
   getStudentCertificate,
   updateCertificateDetails,
 } from "@/features/certificate/server/certificate";
-import { z } from "zod";
-
-const updateCertificateSchema = z.object({
-  certificateNumber: z.string().optional(),
-  mentorNote: z.string().max(2000, "Referans notu en fazla 2000 karakter olabilir.").optional(),
-  completionGrade: z.string().optional(),
-});
+import { updateCertificateSchema } from "@/lib/validations/api";
 
 export async function GET(
   _request: Request,

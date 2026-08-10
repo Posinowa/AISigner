@@ -16,6 +16,14 @@ export async function PATCH(
   const auth = await requireAuth("STUDENT");
   if (!auth.authorized) return auth.response;
 
+  // #208: Mezun stajyerler için portfolyo salt-okunurdur (Seçenek A).
+  if (auth.session.user.accountStatus === "GRADUATED") {
+    return NextResponse.json(
+      { error: "Mezun öğrenciler tamamlanan staj adımlarının durumunu değiştiremez." },
+      { status: 403 }
+    );
+  }
+
   const { stepId } = await params;
 
   try {

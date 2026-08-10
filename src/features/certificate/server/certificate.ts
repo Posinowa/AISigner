@@ -7,9 +7,9 @@ export type CertificateData = {
   mentorName: string | null;
   mentorEmail: string | null;
   certificateNumber: string;
-  completionGrade: string;
+  completionGrade: string | null;
   mentorNote: string | null;
-  issuedAt: string;
+  issuedAt: string | null;
   completedProjects: {
     id: string;
     title: string;
@@ -22,12 +22,38 @@ export type CertificateData = {
   verificationUrl: string;
 };
 
+export type PublicCertificateVerification = {
+  isValid: boolean;
+  certificate?: {
+    certificateNumber: string;
+    studentName: string;
+    issuedAt: string | null;
+    completionGrade: string | null;
+    mentorName: string | null;
+    completedProjects: {
+      id: string;
+      title: string;
+      difficulty: string;
+      track: string[];
+      completedStepsCount: number;
+      totalStepsCount: number;
+    }[];
+  };
+  message?: string;
+};
+
 /** Benzersiz sertifika seri no üretir: POS-2026-XXXX */
 export function generateCertificateNumber(userId: string): string {
   const cleanId = userId.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
   const suffix = cleanId.slice(-5).padStart(5, "X");
   const year = new Date().getFullYear();
   return `POS-${year}-${suffix}`;
+}
+
+/** Doğrulama URL'i üretir. */
+export function getCertificateVerificationUrl(certNumber: string): string {
+  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://posinowa.com").replace(/\/+$/, "");
+  return `${baseUrl}/verify-certificate/${encodeURIComponent(certNumber)}`;
 }
 
 /** Öğrencinin sertifika verilerini derler. */
@@ -102,7 +128,7 @@ export async function getStudentCertificate(userId: string): Promise<Certificate
 
   const issuedDate = profile.issuedAt
     ? profile.issuedAt.toISOString()
-    : new Date().toISOString();
+    : null;
 
   return {
     id: profile.id,
@@ -111,11 +137,11 @@ export async function getStudentCertificate(userId: string): Promise<Certificate
     mentorName,
     mentorEmail,
     certificateNumber: certNumber,
-    completionGrade: profile.completionGrade || "Üstün Başarı",
+    completionGrade: profile.completionGrade ?? null,
     mentorNote: profile.mentorNote,
     issuedAt: issuedDate,
     completedProjects,
-    verificationUrl: `https://posinowa.com/verify-certificate/${certNumber}`,
+    verificationUrl: getCertificateVerificationUrl(certNumber),
   };
 }
 
@@ -124,9 +150,9 @@ export async function updateCertificateDetails(
   studentProfileId: string,
   data: {
     certificateNumber?: string;
-    mentorNote?: string;
-    completionGrade?: string;
-    issuedAt?: Date;
+    mentorNote?: string | null;
+    completionGrade?: string | null;
+    issuedAt?: Date | null;
   },
 ) {
   return prisma.studentProfile.update({
@@ -135,7 +161,115 @@ export async function updateCertificateDetails(
       certificateNumber: data.certificateNumber,
       mentorNote: data.mentorNote,
       completionGrade: data.completionGrade,
-      issuedAt: data.issuedAt ?? new Date(),
+      issuedAt: data.issuedAt !== undefined ? data.issuedAt : new Date(),
     },
   });
 }
+
+/** #208: Kamu / 3. taraf sertifika doğrulama sorgusu. */
+export async function verifyCertificate(
+  certificateNumber: string,
+): Promise<PublicCertificateVerification> {
+  const trimmedNumber = certificateNumber.trim();
+  if (!trimmedNumber) {
+    return { isValid: false, message: "Geçersiz sertifika numarası." };
+  }
+
+  const profile = await prisma.studentProfile.findFirst({
+    where: {
+      certificateNumber: {
+        equals: trimmedNumber,
+        mode: "insensitive",
+      },
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          lastName: true,
+          email: true,
+          accountStatus: true,
+        },
+      },
+      mentorAssignments: {
+        include: {
+          mentor: {
+            select: { name: true, lastName: true, email: true },
+          },
+        },
+      },
+      assignedProjects: {
+        include: {
+          projectTemplate: true,
+          roadmap: {
+            include: {
+              steps: {
+                select: { id: true, status: true },
+              },
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      },
+    },
+  });
+
+  if (!profile || !profile.user) {
+    return {
+      isValid: false,
+      message: "Bu seri numarasına ait kayıtlı sertifika bulunamadı.",
+    };
+  }
+
+  // Yalnızca mezun edilmiş veya resmi issuedAt tarihi bulunan belgeler geçerlidir.
+  const isOfficiallyIssued =
+    profile.user.accountStatus === "GRADUATED" || profile.issuedAt !== null;
+
+  if (!isOfficiallyIssued) {
+    return {
+      isValid: false,
+      message: "Bu sertifika henüz resmi olarak onaylanmamış veya yayınlanmamıştır.",
+    };
+  }
+
+  const studentName =
+    [profile.user.name, profile.user.lastName].filter(Boolean).join(" ") ||
+    profile.user.email.split("@")[0];
+
+  const mentorsList = profile.mentorAssignments.map((a) => a.mentor);
+  const mentorName =
+    mentorsList.length > 0
+      ? mentorsList
+          .map((m) => [m.name, m.lastName].filter(Boolean).join(" ") || m.email)
+          .join(", ")
+      : null;
+
+  const completedProjects = profile.assignedProjects.map((p) => {
+    const steps = p.roadmap?.steps || [];
+    const totalStepsCount = steps.length;
+    const completedStepsCount = steps.filter((s) => s.status === "COMPLETED").length;
+
+    return {
+      id: p.id,
+      title: p.projectTemplate.title,
+      difficulty: p.projectTemplate.difficulty,
+      track: p.projectTemplate.track,
+      completedStepsCount,
+      totalStepsCount,
+    };
+  });
+
+  return {
+    isValid: true,
+    certificate: {
+      certificateNumber: profile.certificateNumber || trimmedNumber,
+      studentName,
+      issuedAt: profile.issuedAt ? profile.issuedAt.toISOString() : null,
+      completionGrade: profile.completionGrade ?? null,
+      mentorName,
+      completedProjects,
+    },
+  };
+}
+

@@ -4,6 +4,7 @@ import {
   updateTemplateSchema,
   createStepSchema,
   updateStepSchema,
+  updateCertificateSchema,
 } from "./api";
 
 const templateBase = {
@@ -198,3 +199,44 @@ describe("updateStepSchema — githubIssueUrl (#50)", () => {
     expect(result.success).toBe(false);
   });
 });
+
+describe("updateCertificateSchema (#208)", () => {
+  it("geçerli derece ve not ile doğrulamayı geçer", () => {
+    const result = updateCertificateSchema.safeParse({
+      completionGrade: "Üstün Başarı",
+      mentorNote: "Tebrikler, başarılı bir staj süreciydi.",
+      certificateNumber: "POS-2026-TEST1",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("tüm geçerli enum derecelerini kabul eder", () => {
+    for (const grade of ["Üstün Başarı", "Onur Derecesi", "Yüksek Başarı", "Başarılı"]) {
+      const result = updateCertificateSchema.safeParse({ completionGrade: grade });
+      expect(result.success).toBe(true);
+    }
+  });
+
+  it("geçersiz başarı derecesini reddeder", () => {
+    const result = updateCertificateSchema.safeParse({
+      completionGrade: "Geçersiz Derece",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("null veya undefined değerleri kabul eder", () => {
+    const result = updateCertificateSchema.safeParse({
+      completionGrade: null,
+      mentorNote: null,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("2000 karakterden uzun referans notunu reddeder", () => {
+    const result = updateCertificateSchema.safeParse({
+      mentorNote: "a".repeat(2001),
+    });
+    expect(result.success).toBe(false);
+  });
+});
+

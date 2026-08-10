@@ -36,12 +36,13 @@ type Props = {
   currentUserId: string;
   currentUserRole: string;
   isDraft?: boolean;
+  readOnly?: boolean;
 };
 
-export function StepFiles({ stepId, currentUserId, currentUserRole, isDraft }: Props) {
+export function StepFiles({ stepId, currentUserId, currentUserRole, isDraft, readOnly }: Props) {
   const confirm = useConfirm();
-  // #52: Taslak roadmap'te öğrenci dosya yükleyemez (mentor inceleme için yükleyebilir).
-  const interactionLocked = isDraft && currentUserRole === "STUDENT";
+  // #52: Taslak roadmap'te öğrenci dosya yükleyemez. #208: Mezun portfolyoda salt-okunurdur.
+  const interactionLocked = (isDraft && currentUserRole === "STUDENT") || (readOnly && currentUserRole === "STUDENT");
   const [files, setFiles] = useState<StepFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -166,6 +167,8 @@ export function StepFiles({ stepId, currentUserId, currentUserRole, isDraft }: P
   }
 
   function canDelete(file: StepFile) {
+    if (readOnly && currentUserRole === "STUDENT") return false;
+    // Yükleyen veya mentor silebilir
     return file.uploader.id === currentUserId || currentUserRole === "MENTOR";
   }
 

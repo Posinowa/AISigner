@@ -255,7 +255,13 @@ export default async function StudentDashboardPage() {
                         <p className="text-slate-500 dark:text-slate-400 text-sm">İş akışı oluşturuluyor...</p>
                       </div>
                     ) : (
-                      <RoadmapSteps steps={steps} isDraft={isDraft} currentUserId={session.user.id} currentUserRole={session.user.role} />
+                      <RoadmapSteps
+                        steps={steps}
+                        isDraft={isDraft}
+                        isGraduated={isGraduated}
+                        currentUserId={session.user.id}
+                        currentUserRole={session.user.role}
+                      />
                     )}
                   </div>
 

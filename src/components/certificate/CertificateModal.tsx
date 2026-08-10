@@ -45,7 +45,7 @@ export function CertificateModal({
     certificate.mentorNote || DEFAULT_NOTE_TEMPLATES[0],
   );
   const [completionGrade, setCompletionGrade] = useState(
-    certificate.completionGrade || "Üstün Başarı",
+    certificate.completionGrade || "",
   );
   const [saving, setSaving] = useState(false);
 
@@ -245,14 +245,17 @@ export function CertificateModal({
     }
   };
 
-  const formattedDate = new Date(certificate.issuedAt).toLocaleDateString(
-    "tr-TR",
-    {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    },
-  );
+  const formattedDate = certificate.issuedAt
+    ? new Date(certificate.issuedAt).toLocaleDateString("tr-TR", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })
+    : new Date().toLocaleDateString("tr-TR", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      });
 
   return (
     <div
@@ -370,6 +373,7 @@ export function CertificateModal({
                   onChange={(e) => setCompletionGrade(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3.5 py-2.5 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
+                  <option value="">Belirlenmedi (Seçilmedi)</option>
                   <option value="Üstün Başarı">🎖️ Üstün Başarı (High Honors)</option>
                   <option value="Onur Derecesi">🌟 Onur Derecesi (Honors)</option>
                   <option value="Yüksek Başarı">🚀 Yüksek Başarı (Excellence)</option>
@@ -497,7 +501,7 @@ export function CertificateModal({
               <div>
                 <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800 text-purple-800 dark:text-purple-300 font-bold text-xs">
                   <Award className="w-3.5 h-3.5 text-purple-600" />
-                  Başarı Derecesi: <span className="font-extrabold">{completionGrade}</span>
+                  Başarı Derecesi: <span className="font-extrabold">{completionGrade || "Belirlenmedi"}</span>
                 </span>
               </div>
             </div>

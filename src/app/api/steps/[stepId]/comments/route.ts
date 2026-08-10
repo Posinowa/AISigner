@@ -88,6 +88,14 @@ export async function POST(
       );
     }
 
+    // #208: Mezun stajyerler için portfolyo salt-okunurdur (Seçenek A).
+    if (auth.session.user.role === "STUDENT" && auth.session.user.accountStatus === "GRADUATED") {
+      return NextResponse.json(
+        { error: "Mezun öğrenciler staj adımlarına yorum ekleyemez." },
+        { status: 403 }
+      );
+    }
+
     // #52: Öğrenci yalnızca PUBLISHED roadmap adımına yorum ekleyebilir.
     // Mentor, taslağı (DRAFT) düzenleme/inceleme için yorum yapabilir.
     const isStudent = step.roadmap.assignedProject.studentProfile.userId === userId;

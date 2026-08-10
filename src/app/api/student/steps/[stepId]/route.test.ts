@@ -14,8 +14,11 @@ vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 
 import { PATCH } from "./route";
 
-function student(id: string) {
-  requireAuthMock.mockResolvedValue({ authorized: true, session: { user: { id, role: "STUDENT" } } });
+function student(id: string, accountStatus = "APPROVED") {
+  requireAuthMock.mockResolvedValue({
+    authorized: true,
+    session: { user: { id, role: "STUDENT", accountStatus } },
+  });
 }
 const params = (stepId = "s-1") => Promise.resolve({ stepId });
 function req(body: unknown) {
@@ -143,4 +146,14 @@ describe("student steps PATCH — IDOR + kurallar (#184)", () => {
     const res = await PATCH(req({ status: "IN_PROGRESS" }), { params: params() });
     expect(res.status).toBe(400);
   });
+
+  it("GRADUATED öğrenci adım durumunu değiştiremez → 403 (#208)", async () => {
+    student("student-1", "GRADUATED");
+    const res = await PATCH(req({ status: "IN_PROGRESS" }), { params: params() });
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toContain("Mezun öğrenciler");
+    expect(prismaMock.roadmapStep.findUnique).not.toHaveBeenCalled();
+  });
 });
+

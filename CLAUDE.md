@@ -116,6 +116,12 @@ olduğunu hatırlayın; aksi halde onboarding tamamen çöker.
 `rate-limit.ts`, forgot-password `resetTokens`, `metrics.ts` — çok-instance/serverless'ta
 Redis gerekir → `DEPLOYMENT.md`.
 
+### Mezuniyet & Sertifika Doğrulama Sistemi (#208)
+- **Mezuniyet Durumu (`accountStatus: GRADUATED`)**: Portfolyo salt-okunur (Seçenek A). Öğrenci dashboard, yol haritası adımları, dosyaları, yorumları ve sertifikasını görüntüleyebilir; ancak adım durumu değiştirme, dosya yükleme/silme ve yorum ekleme/düzenleme/silme API'leri 403 ile engellenir.
+- **Sertifika Doğrulama**: `/verify-certificate/[certificateNumber]` public doğrulama sayfası (`middleware.ts` `publicPaths` içinde). QR kod veya link üzerinden herkes sertifikanın geçerliliğini teyit edebilir.
+- **Sertifika Notu (`completionGrade`)**: Varsayılan "Üstün Başarı" kaldırıldı (nullable). Admin mezun ederken veya sertifika düzenlerken açıkça seçer (`Üstün Başarı`, `Onur Derecesi`, `Yüksek Başarı`, `Başarılı` veya boş/belirlenmedi).
+- **Stajyer Sertifika Erişimi**: Yalnızca `GRADUATED` durumundaki veya sertifikası düzenlenmiş (`issuedAt !== null`) öğrenciler sertifikalarını görüntüleyebilir (aktif öğrencilere 403).
+
 ## Komutlar
 
 ```bash
@@ -140,4 +146,6 @@ docker compose up -d  # db (+app) — uploads kalıcı volume'da
 
 ---
 
-*Son güncelleme: Temmuz 2026 — kapsamlı tarama + #111–#116 düzeltme oturumu*
+*Son güncelleme: Ağustos 2026 — #208 Mezuniyet sertifikası, doğrulama sayfası ve salt-okunur mezun portfolyo erişimi*
+
+
