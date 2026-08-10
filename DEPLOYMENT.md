@@ -60,7 +60,8 @@ Out Plane konsolunda servisin **Variables** bölümüne girilir.
 |---|---|---|
 | `NEXT_PUBLIC_APP_URL` | `https://aisigner.com` | **#204/SEO** — `robots.txt`, `sitemap.xml` ve canonical/OG URL'lerinin taban adresi. Gerçek domain'e ayarlanmazsa fallback kullanılır. ⚠️ **`NEXT_PUBLIC_` = build-time**: değeri **imaj build edilirken** mevcut olmalı (yalnız runtime env yetmez). Aşağıya bak. |
 | `GCS_BUCKET` | _(yok)_ | **#197** — Dosya yüklemelerinin kalıcılığı. Verilirse yüklemeler bu GCS bucket'ına yazılır (deploy'da silinmez, çok-instance ölçeklenir). Kimlik: mevcut `GCP_CREDENTIALS_JSON` (ADC). Verilmezse yerel disk. |
-| `GITHUB_ORG` | `Posinowa` | GitHub çalışma alanı URL'lerinde kullanılan org. |
+| `GITHUB_TOKEN` | _(yok)_ | **#179** — Gerçek GitHub entegrasyonu (PAT / Fine-grained token / GitHub App). Verilirse öğrenci çalışma alanı reposu, milestone ve AI issue'ları GitHub'da fiziksel olarak açılır (`repo`, `admin:org` izinleri gerekir). Verilmezse simülasyon/önizleme fallback devreye girer. |
+| `GITHUB_ORG` | `Posinowa` | GitHub çalışma alanı URL'lerinde ve repo oluşturma işlemlerinde kullanılan organizasyon veya kullanıcı adı. |
 | `PORT` | `3000` | Platform farklı bir port dayatıyorsa. |
 
 > **`NEXT_PUBLIC_APP_URL` build-time notu:** Next.js `NEXT_PUBLIC_*` değişkenlerini **build sırasında**

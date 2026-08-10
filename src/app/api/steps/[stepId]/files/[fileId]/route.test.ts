@@ -5,15 +5,15 @@ const { requireAuthMock, prismaMock, deleteStepFileMock, readStepFileMock } = vi
   requireAuthMock: vi.fn(),
   prismaMock: { stepFile: { findUnique: vi.fn(), delete: vi.fn() } },
   deleteStepFileMock: vi.fn(),
-  readStepFileMock: vi.fn(() => Promise.resolve(null)),
+  readStepFileMock: vi.fn<(...args: unknown[]) => Promise<Buffer | null>>(() => Promise.resolve(null)),
 }));
 vi.mock("@/lib/auth/guard", () => ({
-  requireAuth: (...a: unknown[]) => requireAuthMock(...a),
+  requireAuth: (...a: unknown[]) => requireAuthMock(a[0], a[1]),
 }));
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 vi.mock("@/lib/storage/step-files", () => ({
-  deleteStepFile: (...a: unknown[]) => deleteStepFileMock(...a),
-  readStepFile: (...a: unknown[]) => readStepFileMock(...a),
+  deleteStepFile: (fileName: string) => deleteStepFileMock(fileName),
+  readStepFile: (fileName: string) => readStepFileMock(fileName),
 }));
 
 import { DELETE, GET } from "./route";
