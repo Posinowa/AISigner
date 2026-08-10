@@ -184,18 +184,18 @@ export async function verifyCertificate(
     },
     include: {
       user: {
+        // #208: Public sayfa — email/PII ÇEKİLMEZ (name yoksa nötr etikete düşülür).
         select: {
           id: true,
           name: true,
           lastName: true,
-          email: true,
           accountStatus: true,
         },
       },
       mentorAssignments: {
         include: {
           mentor: {
-            select: { name: true, lastName: true, email: true },
+            select: { name: true, lastName: true },
           },
         },
       },
@@ -233,15 +233,16 @@ export async function verifyCertificate(
     };
   }
 
+  // #208: Public sayfada isim yoksa email'e DÜŞÜLMEZ (PII sızıntısı) — nötr etiket.
   const studentName =
     [profile.user.name, profile.user.lastName].filter(Boolean).join(" ") ||
-    profile.user.email.split("@")[0];
+    "İsimsiz Stajyer";
 
   const mentorsList = profile.mentorAssignments.map((a) => a.mentor);
   const mentorName =
     mentorsList.length > 0
       ? mentorsList
-          .map((m) => [m.name, m.lastName].filter(Boolean).join(" ") || m.email)
+          .map((m) => [m.name, m.lastName].filter(Boolean).join(" ") || "Mentör")
           .join(", ")
       : null;
 
