@@ -75,12 +75,26 @@ Out Plane konsolunda servisin **Variables** bölümüne girilir.
    `→ Prisma migrate deploy çalışıyor...` ve `→ Uygulama başlatılıyor...`.
 5. **Doğrula**: `https://<url>/api/health` 200 dönmeli; ardından `/signin`.
 
-### İlk admin'i güvenli oluştur
+### İlk admin'i güvenli oluştur (#206)
 
-`npm run seed` **prod'da ÇALIŞTIRILMAZ** (aşağıdaki güvenlik listesine bakın). İlk yönetici için:
-tek seferlik güvenli bir script ile veya DB'ye elle, **güçlü ve benzersiz** bir parolayla
-(argon2 hash — `@node-rs/argon2`'nin `hash()` fonksiyonu; `scripts/seed.ts` örnek alınabilir)
-bir ADMIN kullanıcı ekleyin.
+`npm run seed` **prod'da ÇALIŞTIRILMAZ** — zayıf demo admin (`admin@example.com`) açar.
+Gerçek yöneticiyi **`scripts/create-admin.ts`** ile oluştur: kimlik bilgileri **ortam
+değişkeninden** okunur (repoya hardcode edilmez, parola loglanmaz), argon2 ile hash'lenir,
+ADMIN + APPROVED olarak **idempotent** upsert edilir (aynı komut parola sıfırlamak için de
+kullanılabilir).
+
+Bir **dev makineden**, prod DB'ye SSL ile bağlanarak tek sefer çalıştır:
+
+```bash
+DATABASE_URL="postgresql://user:pass@host:5432/db?sslmode=require" \
+ADMIN_EMAIL="admin@posinowa.com" \
+ADMIN_PASSWORD="<güçlü-parola>" \
+npm run create:admin
+```
+
+> **Not:** `tsx` bir dev bağımlılığıdır; prod imajında (`--omit=dev`) yoktur. Bu yüzden script,
+> imaj içinde değil, `tsx`'in bulunduğu bir dev makineden prod `DATABASE_URL`'ine karşı çalıştırılır.
+> `ADMIN_PASSWORD`'ü terminal geçmişine yazmamak için tek satırda inline env olarak ver.
 
 ---
 
