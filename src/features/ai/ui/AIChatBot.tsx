@@ -175,9 +175,8 @@ export function AIChatBot() {
               }`}
             >
               {msg.role === "assistant" ? (
-                // #126-2: Ortak markdown yolu — sıralı liste, link, blockquote,
-                // tablo gibi yapılar da doğru render edilir (react-markdown + gfm).
-                <MarkdownContent>{msg.content}</MarkdownContent>
+                // #126-2 & #160: Ortak markdown yolu (compact mod ile sohbet balonlarında dar aralık)
+                <MarkdownContent compact>{msg.content}</MarkdownContent>
               ) : (
                 <p className="whitespace-pre-wrap">{msg.content}</p>
               )}

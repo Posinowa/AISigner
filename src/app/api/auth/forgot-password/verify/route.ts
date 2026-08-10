@@ -316,8 +316,8 @@ function getDecoyQuestions(email: string) {
     const idx = seed[i] % SECURITY_QUESTIONS.length;
     if (!indices.includes(idx)) indices.push(idx);
   }
-  // Teorik olarak tohum yetmezse sırayla tamamla (uzunluk garantisi).
-  for (let q = 0; indices.length < REQUIRED_ANSWERS; q++) {
+  // Teorik olarak tohum yetmezse sırayla tamamla (uzunluk garantisi, dizi sınırları korumalı).
+  for (let q = 0; q < SECURITY_QUESTIONS.length && indices.length < REQUIRED_ANSWERS; q++) {
     if (!indices.includes(q)) indices.push(q);
   }
 

@@ -15,15 +15,15 @@ const { writeFileMock, readFileMock, unlinkMock, mkdirMock, existsMock } = vi.ho
   readFileMock: vi.fn(),
   unlinkMock: vi.fn(),
   mkdirMock: vi.fn(),
-  existsMock: vi.fn(() => true),
+  existsMock: vi.fn<(...args: unknown[]) => boolean>(() => true),
 }));
 vi.mock("fs/promises", () => ({
-  writeFile: (...a: unknown[]) => writeFileMock(...a),
-  readFile: (...a: unknown[]) => readFileMock(...a),
-  unlink: (...a: unknown[]) => unlinkMock(...a),
-  mkdir: (...a: unknown[]) => mkdirMock(...a),
+  writeFile: (path: string, data: unknown) => writeFileMock(path, data),
+  readFile: (path: string) => readFileMock(path),
+  unlink: (path: string) => unlinkMock(path),
+  mkdir: (path: string, options?: unknown) => mkdirMock(path, options),
 }));
-vi.mock("fs", () => ({ existsSync: (...a: unknown[]) => existsMock(...a) }));
+vi.mock("fs", () => ({ existsSync: (path: string) => existsMock(path) }));
 
 // GCS_BUCKET tanımsız (test ortamı) → yerel disk branch'i doğrulanır.
 import { saveStepFile, readStepFile, deleteStepFile, usingGcs } from "./step-files";
