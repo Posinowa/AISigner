@@ -99,4 +99,28 @@ describe("AuthField — revealable şifre göster/gizle (#153 / #169)", () => {
     const input = screen.getByLabelText("Şifre");
     expect(input).toHaveAttribute("type", "password");
   });
+
+  // #153/#169 sözleşmesi — bu üç kapsam silinmemeli (review talebi):
+  // toggle formu göndermemeli, revealable olmayan alan verilen type'ı kullanmalı,
+  // required prop input'a geçmeli (signup ad/soyad zorunluluğu).
+  it("göster/gizle düğmesi formu göndermez (type=button) (#153)", () => {
+    render(<AuthField id="pass" name="password" label="Şifre" revealable />);
+
+    expect(screen.getByRole("button", { name: "Şifreyi göster" })).toHaveAttribute(
+      "type",
+      "button",
+    );
+  });
+
+  it("revealable olmayan alan verilen type'ı kullanır (#169)", () => {
+    render(<AuthField id="e" name="email" label="E-posta" type="email" />);
+
+    expect(screen.getByLabelText("E-posta")).toHaveAttribute("type", "email");
+  });
+
+  it("required prop input'a geçer (#169 — signup ad/soyad)", () => {
+    render(<AuthField id="n" name="name" label="Ad" required />);
+
+    expect(screen.getByLabelText("Ad")).toBeRequired();
+  });
 });
