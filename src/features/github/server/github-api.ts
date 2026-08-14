@@ -2,6 +2,12 @@ import { logger } from "@/lib/logger";
 
 const GITHUB_API_BASE = "https://api.github.com";
 
+// #179 review: Rate-limit / geçici hatalar için ÜST SINIRLI retry.
+// Sınırsız retry provisioning'i süresiz bloke edebilir.
+const MAX_ATTEMPTS = 3;
+const BASE_BACKOFF_MS = 500;
+const MAX_BACKOFF_MS = 8000;
+
 export function isGitHubConfigured(): boolean {
   return Boolean(process.env.GITHUB_TOKEN);
 }
@@ -20,15 +26,82 @@ function getHeaders(): HeadersInit {
   };
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** 429, secondary rate-limit (403 + remaining=0) ve 5xx geçici kabul edilir. */
+function isRetryable(res: Response): boolean {
+  if (res.status === 429) return true;
+  if (res.status >= 500) return true;
+  if (res.status === 403 && res.headers.get("x-ratelimit-remaining") === "0") return true;
+  return false;
+}
+
+/** Retry-After (saniye) → ms; yoksa x-ratelimit-reset; yoksa üstel backoff (tavanlı). */
+function retryDelayMs(res: Response, attempt: number): number {
+  const retryAfter = res.headers.get("retry-after");
+  if (retryAfter !== null) {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds) && seconds >= 0) {
+      return Math.min(seconds * 1000, MAX_BACKOFF_MS);
+    }
+  }
+
+  const reset = res.headers.get("x-ratelimit-reset");
+  if (reset !== null) {
+    const resetMs = Number(reset) * 1000 - Date.now();
+    if (Number.isFinite(resetMs) && resetMs > 0) {
+      return Math.min(resetMs, MAX_BACKOFF_MS);
+    }
+  }
+
+  return Math.min(BASE_BACKOFF_MS * 2 ** (attempt - 1), MAX_BACKOFF_MS);
+}
+
+/**
+ * #179: GitHub rate-limit (429 / secondary limit) ve geçici 5xx durumlarında
+ * ÜST SINIRLI retry yapan fetch sarmalayıcısı. `Retry-After` / `x-ratelimit-reset`
+ * başlıklarına saygı duyar. Sınır aşılırsa son yanıt döner; çağıran hatayı üretir.
+ */
+async function githubFetch(url: string, init?: RequestInit): Promise<Response> {
+  let lastRes: Response | undefined;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const res = await fetch(url, init);
+    lastRes = res;
+
+    if (!isRetryable(res) || attempt === MAX_ATTEMPTS) {
+      return res;
+    }
+
+    const waitMs = retryDelayMs(res, attempt);
+    logger.warn("GitHub API rate-limit/geçici hata — yeniden denenecek", {
+      url,
+      status: res.status,
+      attempt,
+      maxAttempts: MAX_ATTEMPTS,
+      waitMs,
+    });
+    await sleep(waitMs);
+  }
+
+  return lastRes as Response;
+}
+
 export type GitHubRepoResult = {
   repoUrl: string;
   owner: string;
   repo: string;
+  /** #179: Repo bu çağrıda mı açıldı, yoksa zaten var mıydı (422 → yeniden kullanıldı)? */
+  alreadyExisted: boolean;
 };
 
 export type GitHubMilestoneResult = {
   milestoneNumber: number;
   htmlUrl: string;
+  /** #179: Aynı başlıklı milestone zaten varsa yeniden kullanıldı. */
+  alreadyExisted: boolean;
 };
 
 export type GitHubIssueResult = {
@@ -56,7 +129,7 @@ export async function createGitHubRepository(params: {
   };
 
   // Önce organizasyon reposu olarak oluşturmayı dene
-  let res = await fetch(`${GITHUB_API_BASE}/orgs/${encodeURIComponent(orgOrOwner)}/repos`, {
+  let res = await githubFetch(`${GITHUB_API_BASE}/orgs/${encodeURIComponent(orgOrOwner)}/repos`, {
     method: "POST",
     headers,
     body: JSON.stringify(payload),
@@ -64,16 +137,16 @@ export async function createGitHubRepository(params: {
 
   // 404 dönerse org değil kişisel kullanıcı hesabıdır, /user/repos ile dene
   if (res.status === 404) {
-    res = await fetch(`${GITHUB_API_BASE}/user/repos`, {
+    res = await githubFetch(`${GITHUB_API_BASE}/user/repos`, {
       method: "POST",
       headers,
       body: JSON.stringify(payload),
     });
   }
 
-  // 422: Repo zaten var olabilir
+  // 422: Repo zaten var olabilir → idempotent yeniden kullanım
   if (res.status === 422) {
-    const existingRes = await fetch(`${GITHUB_API_BASE}/repos/${encodeURIComponent(orgOrOwner)}/${encodeURIComponent(repoName)}`, {
+    const existingRes = await githubFetch(`${GITHUB_API_BASE}/repos/${encodeURIComponent(orgOrOwner)}/${encodeURIComponent(repoName)}`, {
       headers,
     });
     if (existingRes.ok) {
@@ -82,6 +155,7 @@ export async function createGitHubRepository(params: {
         repoUrl: existingData.html_url,
         owner: existingData.owner?.login || orgOrOwner,
         repo: existingData.name || repoName,
+        alreadyExisted: true,
       };
     }
   }
@@ -97,6 +171,7 @@ export async function createGitHubRepository(params: {
     repoUrl: data.html_url,
     owner: data.owner?.login || orgOrOwner,
     repo: data.name || repoName,
+    alreadyExisted: false,
   };
 }
 
@@ -112,7 +187,7 @@ export async function createGitHubMilestone(params: {
   const { owner, repo, title, description } = params;
   const headers = getHeaders();
 
-  const res = await fetch(`${GITHUB_API_BASE}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/milestones`, {
+  const res = await githubFetch(`${GITHUB_API_BASE}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/milestones`, {
     method: "POST",
     headers,
     body: JSON.stringify({
@@ -122,9 +197,9 @@ export async function createGitHubMilestone(params: {
     }),
   });
 
-  // 422: Aynı başlıklı milestone zaten varsa listele ve bul
+  // 422: Aynı başlıklı milestone zaten varsa listele ve bul (idempotent)
   if (res.status === 422) {
-    const listRes = await fetch(`${GITHUB_API_BASE}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/milestones?state=all`, {
+    const listRes = await githubFetch(`${GITHUB_API_BASE}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/milestones?state=all`, {
       headers,
     });
     if (listRes.ok) {
@@ -134,6 +209,7 @@ export async function createGitHubMilestone(params: {
         return {
           milestoneNumber: match.number,
           htmlUrl: match.html_url,
+          alreadyExisted: true,
         };
       }
     }
@@ -149,6 +225,7 @@ export async function createGitHubMilestone(params: {
   return {
     milestoneNumber: data.number,
     htmlUrl: data.html_url,
+    alreadyExisted: false,
   };
 }
 
@@ -165,7 +242,7 @@ export async function createGitHubIssue(params: {
   const { owner, repo, title, body, milestoneNumber } = params;
   const headers = getHeaders();
 
-  const res = await fetch(`${GITHUB_API_BASE}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues`, {
+  const res = await githubFetch(`${GITHUB_API_BASE}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues`, {
     method: "POST",
     headers,
     body: JSON.stringify({
@@ -186,4 +263,66 @@ export async function createGitHubIssue(params: {
     issueNumber: data.number,
     htmlUrl: data.html_url,
   };
+}
+
+/**
+ * #179 telafi: Bu çalışmada açılan issue'yu kapatır (best-effort — hata fırlatmaz).
+ *
+ * Repo/milestone SİLİNMEZ: repo öğrenci çalışması içerebilir ve idempotent yeniden
+ * deneme onu tekrar kullanır. Amaç, yarım kalan provisioning'de "açık görev" gibi
+ * görünen artıkları kapatmak.
+ */
+export async function closeGitHubIssue(params: {
+  owner: string;
+  repo: string;
+  issueNumber: number;
+}): Promise<boolean> {
+  const { owner, repo, issueNumber } = params;
+  try {
+    const res = await githubFetch(
+      `${GITHUB_API_BASE}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${issueNumber}`,
+      {
+        method: "PATCH",
+        headers: getHeaders(),
+        body: JSON.stringify({ state: "closed", state_reason: "not_planned" }),
+      },
+    );
+    if (!res.ok) {
+      logger.warn("Telafi: GitHub issue kapatılamadı", { status: res.status, issueNumber, repo });
+      return false;
+    }
+    return true;
+  } catch (err) {
+    logger.warn("Telafi: GitHub issue kapatma hatası", { issueNumber, repo, err });
+    return false;
+  }
+}
+
+/**
+ * #179 telafi: Bu çalışmada açılan milestone'u kapatır (best-effort).
+ */
+export async function closeGitHubMilestone(params: {
+  owner: string;
+  repo: string;
+  milestoneNumber: number;
+}): Promise<boolean> {
+  const { owner, repo, milestoneNumber } = params;
+  try {
+    const res = await githubFetch(
+      `${GITHUB_API_BASE}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/milestones/${milestoneNumber}`,
+      {
+        method: "PATCH",
+        headers: getHeaders(),
+        body: JSON.stringify({ state: "closed" }),
+      },
+    );
+    if (!res.ok) {
+      logger.warn("Telafi: GitHub milestone kapatılamadı", { status: res.status, milestoneNumber, repo });
+      return false;
+    }
+    return true;
+  } catch (err) {
+    logger.warn("Telafi: GitHub milestone kapatma hatası", { milestoneNumber, repo, err });
+    return false;
+  }
 }

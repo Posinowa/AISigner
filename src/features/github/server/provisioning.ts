@@ -7,6 +7,8 @@ import {
   createGitHubRepository,
   createGitHubMilestone,
   createGitHubIssue,
+  closeGitHubIssue,
+  closeGitHubMilestone,
 } from "./github-api";
 
 export type ProvisioningResult = {
@@ -73,23 +75,33 @@ export async function provisionGitHubWorkspace(assignmentId: string): Promise<Pr
     },
   });
 
+  const studentUser = assignment.studentProfile.user;
+  const studentSlug = (studentUser.name || "student")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+  const projectSlug = assignment.projectTemplate.title
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "-");
+
+  const repoName = `aisigner-${studentSlug}-${projectSlug}`;
+  const orgName = process.env.GITHUB_ORG || "Posinowa";
+  const realGitHub = isGitHubConfigured();
+
+  let githubRepoUrl = `https://github.com/${orgName}/${repoName}`;
+  let owner = orgName;
+  let repo = repoName;
+
+  // #179 review: Kısmi başarı telafisi için BU ÇALIŞMADA açılan kaynakları izle.
+  // Hata olursa açılan issue/milestone'lar kapatılır ve envanter loglanır
+  // (repo silinmez — öğrenci çalışması içerebilir, yeniden deneme onu kullanır).
+  // catch bloğundan erişilebilmesi için try DIŞINDA tanımlanır.
+  const createdThisRun: {
+    repoCreated: boolean;
+    milestones: number[];
+    issues: number[];
+  } = { repoCreated: false, milestones: [], issues: [] };
+
   try {
-    const studentUser = assignment.studentProfile.user;
-    const studentSlug = (studentUser.name || "student")
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, "");
-    const projectSlug = assignment.projectTemplate.title
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, "-");
-
-    const repoName = `aisigner-${studentSlug}-${projectSlug}`;
-    const orgName = process.env.GITHUB_ORG || "Posinowa";
-    const realGitHub = isGitHubConfigured();
-
-    let githubRepoUrl = `https://github.com/${orgName}/${repoName}`;
-    let owner = orgName;
-    let repo = repoName;
-
     // #179: GITHUB_TOKEN tanımlıysa gerçek GitHub reposu aç
     if (realGitHub) {
       const repoResult = await createGitHubRepository({
@@ -100,9 +112,12 @@ export async function provisionGitHubWorkspace(assignmentId: string): Promise<Pr
       githubRepoUrl = repoResult.repoUrl;
       owner = repoResult.owner;
       repo = repoResult.repo;
+      createdThisRun.repoCreated = !repoResult.alreadyExisted;
     }
 
     let createdIssuesCount = 0;
+    // #179: idempotent re-run'da atlanan (zaten GitHub'da açık) issue sayısı.
+    let skippedIssuesCount = 0;
     const milestonesCount = assignment.roadmap.steps.length;
 
     // Her bir adım için (Milestone/Faz) detaylı Issue'ları AI ile üretip kaydedelim
@@ -127,6 +142,9 @@ export async function provisionGitHubWorkspace(assignmentId: string): Promise<Pr
         });
         milestoneNumber = milestoneResult.milestoneNumber;
         stepIssueUrl = milestoneResult.htmlUrl;
+        if (!milestoneResult.alreadyExisted) {
+          createdThisRun.milestones.push(milestoneResult.milestoneNumber);
+        }
       }
 
       await prisma.roadmapStep.update({
@@ -139,6 +157,13 @@ export async function provisionGitHubWorkspace(assignmentId: string): Promise<Pr
       // Issue kayıtlarını güncelle
       const stepIssues = await prisma.stepIssue.findMany({ where: { stepId: step.id } });
       for (const [index, dbIssue] of stepIssues.entries()) {
+        // #179 review: İdempotent yeniden çalıştırma — bu issue GitHub'da zaten
+        // açılıp URL'i kaydedilmişse tekrar açma (duplicate issue önlemi).
+        if (realGitHub && dbIssue.githubIssueUrl) {
+          skippedIssuesCount++;
+          continue;
+        }
+
         let issueUrl = `${githubRepoUrl}/issues/${index + 1}`;
 
         if (realGitHub) {
@@ -152,6 +177,7 @@ export async function provisionGitHubWorkspace(assignmentId: string): Promise<Pr
             milestoneNumber,
           });
           issueUrl = createdIssue.htmlUrl;
+          createdThisRun.issues.push(createdIssue.issueNumber);
         }
 
         await prisma.stepIssue.update({
@@ -184,11 +210,58 @@ export async function provisionGitHubWorkspace(assignmentId: string): Promise<Pr
       createdIssuesCount,
       simulated: !realGitHub,
       message: realGitHub
-        ? `GitHub çalışma alanı (${milestonesCount} faz, ${createdIssuesCount} issue) başarıyla oluşturuldu.`
+        ? `GitHub çalışma alanı (${milestonesCount} faz, ${createdIssuesCount} issue) başarıyla oluşturuldu.` +
+          // #179: İdempotent yeniden çalıştırmada zaten açık olan issue'lar atlanır.
+          (skippedIssuesCount > 0
+            ? ` ${skippedIssuesCount} issue daha önce açıldığı için atlandı.`
+            : "")
         : `Önizleme: ${milestonesCount} faz ve ${createdIssuesCount} detaylı issue hazırlandı. (Not: GITHUB_TOKEN tanımlı olmadığı için simülasyon modunda çalıştırıldı.)`,
     };
   } catch (error) {
     logger.error("GitHub workspace oluşturulurken hata oluştu", { assignmentId, error });
+
+    // #179 review: Kısmi başarı telafisi. Bu çalışmada açılan issue ve milestone'lar
+    // best-effort kapatılır ki GitHub'da yarım kalmış "açık görev" artığı kalmasın.
+    // Repo BİLİNÇLİ olarak silinmez: öğrenci çalışması içerebilir ve idempotent
+    // yeniden deneme (422 → yeniden kullan) onu tekrar kullanır.
+    if (realGitHub && (createdThisRun.issues.length > 0 || createdThisRun.milestones.length > 0)) {
+      const closedIssues: number[] = [];
+      const failedIssues: number[] = [];
+      for (const issueNumber of createdThisRun.issues) {
+        const ok = await closeGitHubIssue({ owner, repo, issueNumber });
+        (ok ? closedIssues : failedIssues).push(issueNumber);
+      }
+
+      const closedMilestones: number[] = [];
+      const failedMilestones: number[] = [];
+      for (const milestoneNumber of createdThisRun.milestones) {
+        const ok = await closeGitHubMilestone({ owner, repo, milestoneNumber });
+        (ok ? closedMilestones : failedMilestones).push(milestoneNumber);
+      }
+
+      logger.warn("GitHub provisioning telafisi uygulandı (kısmi başarı geri alındı)", {
+        assignmentId,
+        owner,
+        repo,
+        repoCreatedThisRun: createdThisRun.repoCreated,
+        closedIssues,
+        failedIssues,
+        closedMilestones,
+        failedMilestones,
+      });
+    }
+
+    // Telafi edilemeyen/temizlenemeyen kaynakların envanteri — güvenli yeniden
+    // deneme ve manuel inceleme için kayıt altına alınır.
+    if (realGitHub) {
+      logger.error("GitHub provisioning envanteri (yeniden deneme güvenli: repo/milestone 422 ile, issue kayıtlı URL ile atlanır)", {
+        assignmentId,
+        githubRepoUrl,
+        repoCreatedThisRun: createdThisRun.repoCreated,
+        createdMilestones: createdThisRun.milestones,
+        createdIssues: createdThisRun.issues,
+      });
+    }
 
     await prisma.assignedProject.update({
       where: { id: assignmentId },

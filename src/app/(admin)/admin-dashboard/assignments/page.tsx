@@ -92,9 +92,18 @@ export default function AdminAssignmentsPage() {
         throw new Error(data.error || "GitHub çalışma alanı oluşturulamadı");
       }
 
-      toast.success("GitHub Çalışma Alanı Başarıyla Oluşturuldu!", {
-        description: data.message,
-      });
+      // #179 review: Simülasyon modunda "başarıyla oluşturuldu" demek yanıltıcı —
+      // GitHub'da fiziksel repo/issue açılmaz. Uyarı tonunda ve net ayırt edilir göster.
+      if (data.simulated) {
+        toast.warning("Önizleme (simülasyon) modunda hazırlandı", {
+          description: `${data.message} GitHub'da gerçek repo/issue açılması için GITHUB_TOKEN tanımlanmalıdır.`,
+          duration: 8000,
+        });
+      } else {
+        toast.success("GitHub Çalışma Alanı Başarıyla Oluşturuldu!", {
+          description: data.message,
+        });
+      }
       setSelectedAssignment(null);
       await loadData();
     } catch (err: unknown) {
