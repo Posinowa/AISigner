@@ -1,7 +1,22 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from "vitest";
 
-// GCS branch'ini test etmek için GCS_BUCKET env ayarlanır.
-process.env.GCS_BUCKET = "aisigner-unit-test-bucket";
+// GCS branch'ini test etmek için GCS_BUCKET gerekir. #201 review: env'i modül
+// seviyesinde set etmek TÜM worker'ı kirletiyordu — `usingGcs()` runtime okuduğu
+// için aynı worker'daki yerel-disk testleri GCS yoluna kayabiliyordu (flaky CI).
+// Bu yüzden env yalnız bu suite süresince set edilir ve sonra eski değerine döner.
+const PREV_GCS_BUCKET = process.env.GCS_BUCKET;
+
+beforeAll(() => {
+  process.env.GCS_BUCKET = "aisigner-unit-test-bucket";
+});
+
+afterAll(() => {
+  if (PREV_GCS_BUCKET === undefined) {
+    delete process.env.GCS_BUCKET;
+  } else {
+    process.env.GCS_BUCKET = PREV_GCS_BUCKET;
+  }
+});
 
 const { saveMock, downloadMock, deleteMock, bucketFileMock } = vi.hoisted(() => {
   const saveMock = vi.fn();

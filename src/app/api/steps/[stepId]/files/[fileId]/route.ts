@@ -3,6 +3,8 @@ import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth/guard";
 import { isAssignedMentor } from "@/lib/auth/mentor-access";
 import { readStepFile, deleteStepFile } from "@/lib/storage/step-files";
+import { logger } from "@/lib/logger";
+import { incrementCounter } from "@/lib/metrics";
 
 /**
  * GET /api/steps/[stepId]/files/[fileId]
@@ -157,7 +159,14 @@ export async function DELETE(
     try {
       await deleteStepFile(stepFile.storedName);
     } catch (delErr) {
-      console.error("Storage delete failed for", stepFile.storedName, delErr);
+      // DB kaydı zaten silindi; storage silinemezse dosya öksüz kalır → operasyonel
+      // takip için logger + metrik (#201 review: sessiz console.error yerine).
+      incrementCounter("storage.delete.failure");
+      logger.error("Adım dosyası storage'dan silinemedi (DB kaydı silindi)", {
+        storedName: stepFile.storedName,
+        fileId,
+        err: delErr,
+      });
     }
 
     return NextResponse.json({ message: "Dosya başarıyla silindi." });

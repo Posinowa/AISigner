@@ -5,6 +5,8 @@ import { isAssignedMentor } from "@/lib/auth/mentor-access";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { matchesExtensionSignature } from "@/lib/file-signature";
 import { saveStepFile, deleteStepFile } from "@/lib/storage/step-files";
+import { logger } from "@/lib/logger";
+import { incrementCounter } from "@/lib/metrics";
 import path from "path";
 import crypto from "crypto";
 
@@ -220,8 +222,16 @@ export async function POST(
       // #201: DB insert başarısız olursa storage'daki dosyayı temizle (orphan compensation).
       try {
         await deleteStepFile(storedName);
+        incrementCounter("storage.orphan_cleanup.success");
       } catch (delErr) {
-        console.error("Orphan step file cleanup failed:", storedName, delErr);
+        // Temizlik de başarısız → dosya storage'da öksüz kalır; operasyonel takip için
+        // logger + metrik (sessiz console.error yerine).
+        incrementCounter("storage.orphan_cleanup.failure");
+        logger.error("Öksüz adım dosyası temizlenemedi (upload rollback)", {
+          storedName,
+          stepId,
+          err: delErr,
+        });
       }
       throw dbError;
     }
