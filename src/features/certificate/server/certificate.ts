@@ -20,6 +20,12 @@ export type CertificateData = {
     totalStepsCount: number;
   }[];
   verificationUrl: string;
+  /**
+   * #208 review: Sertifika RESMİ olarak yayınlandı mı (seri no + issuedAt DB'de kayıtlı)?
+   * false ise `certificateNumber`/`verificationUrl` yalnızca ÖNİZLEME'dir — o numarayla
+   * `/verify-certificate` sorgusu "bulunamadı" döner, çünkü DB'de kayıtlı değildir.
+   */
+  isIssued: boolean;
 };
 
 export type PublicCertificateVerification = {
@@ -130,6 +136,10 @@ export async function getStudentCertificate(userId: string): Promise<Certificate
     ? profile.issuedAt.toISOString()
     : null;
 
+  // #208 review: Belge ancak seri no VE issuedAt DB'de kayıtlıysa resmidir.
+  // Aksi halde (admin önizlemesi) numara türetilmiştir ve doğrulama sorgusu bulamaz.
+  const isIssued = Boolean(profile.certificateNumber && profile.issuedAt);
+
   return {
     id: profile.id,
     studentName,
@@ -142,7 +152,34 @@ export async function getStudentCertificate(userId: string): Promise<Certificate
     issuedAt: issuedDate,
     completedProjects,
     verificationUrl: getCertificateVerificationUrl(certNumber),
+    isIssued,
   };
+}
+
+/**
+ * #208 review: Sertifikayı RESMİLEŞTİR — seri no ve düzenlenme tarihini KALICI yazar.
+ *
+ * Mezuniyet anında çağrılır. Böylece öğrenciye/QR'a gösterilen numara DB'de kayıtlı
+ * olur ve public `/verify-certificate/<no>` sorgusu belgeyi bulur. İdempotent: zaten
+ * kayıtlı alanlara dokunmaz (yeniden mezun etme numarayı değiştirmez).
+ */
+export async function ensureCertificateIssued(userId: string): Promise<void> {
+  const profile = await prisma.studentProfile.findUnique({
+    where: { userId },
+    select: { id: true, certificateNumber: true, issuedAt: true },
+  });
+
+  // Profil yoksa yapacak bir şey yok (sertifika profile bağlı).
+  if (!profile) return;
+  if (profile.certificateNumber && profile.issuedAt) return;
+
+  await prisma.studentProfile.update({
+    where: { id: profile.id },
+    data: {
+      certificateNumber: profile.certificateNumber ?? generateCertificateNumber(userId),
+      issuedAt: profile.issuedAt ?? new Date(),
+    },
+  });
 }
 
 /** Yönetici sertifika bilgilerini (referans notu, başarı derecesi vb.) günceller. */

@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
     user: { findUnique: vi.fn() },
-    studentProfile: { update: vi.fn(), findFirst: vi.fn() },
+    studentProfile: { update: vi.fn(), findFirst: vi.fn(), findUnique: vi.fn() },
   },
 }));
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
@@ -14,6 +14,7 @@ import {
   getStudentCertificate,
   updateCertificateDetails,
   verifyCertificate,
+  ensureCertificateIssued,
 } from "./certificate";
 
 describe("Certificate Service — Staj Başarı Sertifikası", () => {
@@ -181,6 +182,86 @@ describe("Certificate Service — Staj Başarı Sertifikası", () => {
       expect(res.certificate?.studentName).toBe("Ayşe Yılmaz");
       expect(res.certificate?.completionGrade).toBe("Onur Derecesi");
       expect(res.certificate?.mentorName).toBe("Mehmet Öz");
+    });
+  });
+
+  // #208 review: doğrulanabilirlik sözleşmesi — seri no DB'ye YAZILMADAN "resmi" sayılmaz.
+  describe("ensureCertificateIssued — sertifikayı resmileştirme (#208 review)", () => {
+    it("seri no/issuedAt yoksa üretir ve KALICI yazar", async () => {
+      prismaMock.studentProfile.findUnique.mockResolvedValue({
+        id: "sp-1",
+        certificateNumber: null,
+        issuedAt: null,
+      });
+
+      await ensureCertificateIssued("user-abc12");
+
+      expect(prismaMock.studentProfile.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: "sp-1" },
+          data: expect.objectContaining({
+            certificateNumber: expect.stringMatching(/^POS-\d{4}-/),
+            issuedAt: expect.any(Date),
+          }),
+        }),
+      );
+    });
+
+    it("zaten resmileşmişse DOKUNMAZ (idempotent — numara değişmez)", async () => {
+      prismaMock.studentProfile.findUnique.mockResolvedValue({
+        id: "sp-1",
+        certificateNumber: "POS-2026-EXIST",
+        issuedAt: new Date("2026-01-01"),
+      });
+
+      await ensureCertificateIssued("user-abc12");
+
+      expect(prismaMock.studentProfile.update).not.toHaveBeenCalled();
+    });
+
+    it("öğrenci profili yoksa sessizce geçer", async () => {
+      prismaMock.studentProfile.findUnique.mockResolvedValue(null);
+
+      await ensureCertificateIssued("yok");
+
+      expect(prismaMock.studentProfile.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("isIssued bayrağı (#208 review)", () => {
+    /** getStudentCertificate için minimum user fixture. */
+    function mockProfile(over: { certificateNumber: string | null; issuedAt: Date | null }) {
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: "u-1",
+        email: "s@test.com",
+        name: "Ali",
+        lastName: "Veli",
+        studentProfile: {
+          id: "sp-1",
+          certificateNumber: over.certificateNumber,
+          issuedAt: over.issuedAt,
+          completionGrade: null,
+          mentorNote: null,
+          mentorAssignments: [],
+          assignedProjects: [],
+        },
+      });
+    }
+
+    it("seri no + issuedAt kayıtlıysa isIssued=true", async () => {
+      mockProfile({ certificateNumber: "POS-2026-AAAAA", issuedAt: new Date("2026-08-01") });
+
+      const cert = await getStudentCertificate("u-1");
+
+      expect(cert?.isIssued).toBe(true);
+    });
+
+    it("kayıtlı değilse isIssued=false (önizleme — doğrulama sorgusu bulamaz)", async () => {
+      mockProfile({ certificateNumber: null, issuedAt: null });
+
+      const cert = await getStudentCertificate("u-1");
+
+      expect(cert?.isIssued).toBe(false);
     });
   });
 });

@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth/guard";
-import { getStudentCertificate } from "@/features/certificate/server/certificate";
+import {
+  getStudentCertificate,
+  ensureCertificateIssued,
+} from "@/features/certificate/server/certificate";
 
 export async function GET() {
   const auth = await requireAuth(["STUDENT", "ADMIN", "MENTOR"]);
@@ -12,7 +15,7 @@ export async function GET() {
   }
 
   try {
-    const certificate = await getStudentCertificate(studentUserId);
+    let certificate = await getStudentCertificate(studentUserId);
     if (!certificate) {
       return NextResponse.json(
         { error: "Sertifika verisi bulunamadı." },
@@ -30,6 +33,14 @@ export async function GET() {
           { error: "Henüz mezun durumunda değilsiniz veya resmi sertifikanız düzenlenmedi." },
           { status: 403 },
         );
+      }
+
+      // #208 review: Öğrenciye ASLA kayıtlı olmayan (doğrulanamayan) seri no gösterme.
+      // Bu düzeltmeden ÖNCE mezun edilmiş kayıtlarda seri no/issuedAt boş olabilir —
+      // burada kendi kendini onarır, böylece QR/verificationUrl gerçekten çalışır.
+      if (isGraduated && !certificate.isIssued) {
+        await ensureCertificateIssued(studentUserId);
+        certificate = (await getStudentCertificate(studentUserId)) ?? certificate;
       }
     }
 

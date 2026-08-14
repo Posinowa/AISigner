@@ -11,6 +11,11 @@ vi.mock("@/features/certificate/server/certificate", () => ({
   verifyCertificate: mockVerifyCertificate,
 }));
 
+// #208 review: sayfa artık rate-limit için istek başlıklarını okuyor.
+vi.mock("next/headers", () => ({
+  headers: async () => new Headers({ "x-forwarded-for": "203.0.113.10" }),
+}));
+
 import VerifyCertificatePage, { generateMetadata } from "./page";
 
 describe("VerifyCertificatePage (#208)", () => {

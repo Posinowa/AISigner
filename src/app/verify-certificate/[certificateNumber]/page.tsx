@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
+import { cache } from "react";
+import { headers } from "next/headers";
 import Link from "next/link";
+import { createRateLimiter } from "@/lib/rate-limit";
 import {
   ShieldCheck,
   Award,
@@ -17,10 +20,30 @@ type Props = {
   params: Promise<{ certificateNumber: string }>;
 };
 
+// #208 review: Public uç → seri no enumeration'a karşı IP başına basit rate-limit.
+const verifyLimiter = createRateLimiter("verify-certificate", {
+  maxRequests: 20,
+  windowSeconds: 60,
+});
+
+function getClientIp(h: Headers): string {
+  const fwd = h.get("x-forwarded-for");
+  if (fwd) return fwd.split(",")[0]!.trim();
+  return h.get("x-real-ip")?.trim() || "anonymous";
+}
+
+/**
+ * #208 review: `generateMetadata` ve sayfa gövdesi aynı isteği iki kez sorguluyordu.
+ * React `cache` ile istek başına tek DB sorgusu (aynı argümanda dedupe).
+ */
+const getVerification = cache(async (certificateNumber: string) => {
+  return verifyCertificate(certificateNumber);
+});
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { certificateNumber } = await params;
   const decodedNumber = decodeURIComponent(certificateNumber);
-  const result = await verifyCertificate(decodedNumber);
+  const result = await getVerification(decodedNumber);
 
   if (result.isValid && result.certificate) {
     return {
@@ -38,7 +61,32 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function VerifyCertificatePage({ params }: Props) {
   const { certificateNumber } = await params;
   const decodedNumber = decodeURIComponent(certificateNumber);
-  const result = await verifyCertificate(decodedNumber);
+
+  // #208 review: Enumeration koruması — IP başına dakikada 20 sorgu.
+  const ip = getClientIp(await headers());
+  const rl = verifyLimiter.check(ip);
+  if (!rl.allowed) {
+    return (
+      <main className="min-h-screen flex flex-col items-center justify-center p-6 text-center bg-slate-50 dark:bg-slate-950">
+        <div className="max-w-md w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-lg p-8 space-y-3">
+          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+            Çok fazla doğrulama denemesi
+          </h1>
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            Güvenlik nedeniyle sorgu sayısı sınırlandırılmıştır. Lütfen bir dakika sonra tekrar deneyin.
+          </p>
+          <Link
+            href="/"
+            className="inline-flex items-center justify-center h-11 px-6 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium transition-colors"
+          >
+            Ana Sayfaya Dön
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
+  const result = await getVerification(decodedNumber);
 
   const formattedDate =
     result.isValid && result.certificate?.issuedAt

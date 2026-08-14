@@ -1,9 +1,10 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { mockRequireAuth, mockGetStudentCertificate } = vi.hoisted(() => ({
+const { mockRequireAuth, mockGetStudentCertificate, mockEnsureCertificateIssued } = vi.hoisted(() => ({
   mockRequireAuth: vi.fn(),
   mockGetStudentCertificate: vi.fn(),
+  mockEnsureCertificateIssued: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/guard", () => ({
@@ -12,6 +13,7 @@ vi.mock("@/lib/auth/guard", () => ({
 
 vi.mock("@/features/certificate/server/certificate", () => ({
   getStudentCertificate: mockGetStudentCertificate,
+  ensureCertificateIssued: mockEnsureCertificateIssued,
 }));
 
 import { GET } from "./route";

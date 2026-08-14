@@ -121,6 +121,18 @@ Redis gerekir → `DEPLOYMENT.md`.
 - **Sertifika Doğrulama**: `/verify-certificate/[certificateNumber]` public doğrulama sayfası (`middleware.ts` `publicPaths` içinde). QR kod veya link üzerinden herkes sertifikanın geçerliliğini teyit edebilir.
 - **Sertifika Notu (`completionGrade`)**: Varsayılan "Üstün Başarı" kaldırıldı (nullable). Admin mezun ederken veya sertifika düzenlerken açıkça seçer (`Üstün Başarı`, `Onur Derecesi`, `Yüksek Başarı`, `Başarılı` veya boş/belirlenmedi).
 - **Stajyer Sertifika Erişimi**: Yalnızca `GRADUATED` durumundaki veya sertifikası düzenlenmiş (`issuedAt !== null`) öğrenciler sertifikalarını görüntüleyebilir (aktif öğrencilere 403).
+- **⚠️ Sertifika persist sözleşmesi (bozmayın)**: Bir belge ancak `certificateNumber` **ve** `issuedAt`
+  DB'de kayıtlıysa **resmidir** (`CertificateData.isIssued`). Mezuniyet (`updateAccountStatus →
+  GRADUATED`) `ensureCertificateIssued()` ile bunları **kalıcı yazar**; öğrenci ucu eski kayıtlar
+  için kendi kendini onarır. Aksi halde öğrenciye/QR'a **kayıtlı olmayan** bir seri no gösterilir
+  ve `/verify-certificate` "bulunamadı" der — doğrulama özelliğinin değeri kaybolur.
+- **Public verify rate-limit**: `/verify-certificate` IP başına 60 sn'de 20 sorgu (seri no
+  enumeration koruması). `generateMetadata` + sayfa React `cache` ile **tek DB sorgusu** paylaşır.
+- **Mezun yazma yetkisi — bilinçli kararlar (#208)**:
+  - **Kapalı**: adım durumu, dosya yükleme/silme, yorum ekleme/düzenleme/silme, **AI chat**
+    (her mesaj Gemini maliyeti + aktif staja bağlı araç) → 403.
+  - **Açık (bilinçli)**: **öneri/istek (suggestions)** — mezun geri bildirimi meşru ve düşük riskli.
+    Ürün bunu daraltmak isterse `api/suggestions` POST'una GRADUATED kontrolü eklenmeli.
 
 ## Komutlar
 
