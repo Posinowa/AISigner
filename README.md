@@ -128,6 +128,14 @@ npm run seed
 >| Student | student@example.com | geçici_şifre    |
 
 > Bu kullanıcılarla `/signin` üzerinden giriş yapabilir, yönlendirme ve layout guard’ları test edebilirsin.
+>
+> **Şifre (#216):** Varsayılan yukarıdaki gibidir. Farklı bir şifre istersen `DEMO_PASSWORD` env'i ile
+> geçebilirsin (`DEMO_PASSWORD='...' npm run seed`) — bu durumda değer **konsola yazılmaz**, yalnızca
+> `DEMO_PASSWORD env'inden` ibaresi görünür. `npm run seed` tekrar çalıştırıldığında demo hesapların
+> şifre/rol/`accountStatus` bilgisi **tazelenir** (şifreni unutursan kurtarır).
+>
+> ⚠️ `npm run seed` **production'da çalışmaz** (kod seviyesinde engellenir). Canlıda gerçek yönetici
+> hesabı için `npm run create:admin` kullanılır — bkz. `DEPLOYMENT.md`.
 
 ---
 
