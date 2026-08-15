@@ -129,3 +129,26 @@ npm run create:admin
 - **Tek-instance varsayımı**: `rate-limit.ts`, forgot-password token'ları ve `metrics.ts`
   bellek-içi (process-local) tutulur. **Birden çok instance** çalıştıracaksanız bunlar
   instance'lar arasında paylaşılmaz → Redis'e taşıyın. Tek instance ile sorun yok.
+
+---
+
+## 6. 🚀 Canlıya Alma (Cutover) Kontrol Listesi (#201)
+
+Canlı ortama ilk çıkış veya ana sürüm geçişlerinde şu adımlar sırayla tamamlanmalıdır:
+
+1. **GCS Depolama Doğrulaması:**
+   - [ ] GCP Cloud Storage üzerinde bucket oluşturuldu (ör. `aisigner-prod-uploads`).
+   - [ ] Service account'a `roles/storage.objectAdmin` yetkisi verildi.
+   - [ ] Out Plane değişkenlerine `GCS_BUCKET=aisigner-prod-uploads` eklendi.
+   - [ ] Bir dosya yüklenip indirildiği ve DB bağlantı kesintisinde orphan dosya temizliğinin çalıştığı doğrulandı.
+
+2. **Veritabanı ve Şema Geçişi:**
+   - [ ] `DATABASE_URL`'in `sslmode=require` parametresi taşıdığı teyit edildi.
+   - [ ] `npx prisma migrate deploy`'un `docker-entrypoint.sh` üzerinden hatasız tamamlandığı loglandı.
+   - [ ] M:N mentör atama tablosu (`MentorAssignment`) kayıtlarının sağlıklı ilişkilendirildiği doğrulandı.
+
+3. **İlk Yönetici & Sistem Kontrolü:**
+   - [ ] `ADMIN_EMAIL` ve `ADMIN_PASSWORD` ile `npm run create:admin` çalıştırılarak ilk yönetici açıldı.
+   - [ ] `/api/health` uç noktası `200 OK` döndü.
+   - [ ] Admin dashboard ve mentör/öğrenci akışları canlı ortamda duman testinden (smoke test) geçirildi.
+

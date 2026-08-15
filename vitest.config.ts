@@ -11,6 +11,6 @@ export default defineConfig({
     // başına `// @vitest-environment jsdom` docblock'u ile jsdom kullanır (#123).
     environment: "node",
     globals: true,
-    include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    include: ["src/**/*.{test,spec}.{ts,tsx}", "scripts/**/*.{test,spec}.{ts,tsx}"],
   },
 });

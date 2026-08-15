@@ -15,7 +15,10 @@ import { existsSync } from "fs";
 import path from "path";
 import type { Bucket } from "@google-cloud/storage";
 
-const GCS_BUCKET = process.env.GCS_BUCKET;
+function getGcsBucketName(): string | undefined {
+  return process.env.GCS_BUCKET;
+}
+
 // Bucket içinde adım dosyaları için klasör öneki.
 const GCS_PREFIX = "steps/";
 
@@ -27,12 +30,16 @@ const UPLOAD_DIR = path.join(process.cwd(), "uploads", "steps");
 // Prod'da tanımlanmaz → gerçek GCS'e ADC ile bağlanılır.
 let bucketPromise: Promise<Bucket> | null = null;
 async function getBucket(): Promise<Bucket> {
+  const bucketName = getGcsBucketName();
+  if (!bucketName) {
+    throw new Error("GCS_BUCKET is not configured.");
+  }
   if (!bucketPromise) {
     bucketPromise = import("@google-cloud/storage").then(({ Storage }) => {
       const opts = process.env.GCS_API_ENDPOINT
         ? { apiEndpoint: process.env.GCS_API_ENDPOINT, projectId: process.env.GOOGLE_CLOUD_PROJECT || "local" }
         : {};
-      return new Storage(opts).bucket(GCS_BUCKET as string);
+      return new Storage(opts).bucket(bucketName);
     });
   }
   return bucketPromise;
@@ -40,7 +47,7 @@ async function getBucket(): Promise<Bucket> {
 
 /** Depolama backend'i GCS mi (true) yoksa yerel disk mi (false)? */
 export function usingGcs(): boolean {
-  return Boolean(GCS_BUCKET);
+  return Boolean(getGcsBucketName());
 }
 
 /** Dosyayı kaydeder (GCS veya yerel disk). */
@@ -49,7 +56,7 @@ export async function saveStepFile(
   buffer: Buffer,
   mimeType: string,
 ): Promise<void> {
-  if (GCS_BUCKET) {
+  if (usingGcs()) {
     const bucket = await getBucket();
     await bucket.file(GCS_PREFIX + storedName).save(buffer, {
       resumable: false,
@@ -63,7 +70,7 @@ export async function saveStepFile(
 
 /** Dosyayı okur; yoksa null döner (404'e çevirmek çağıranın işi). */
 export async function readStepFile(storedName: string): Promise<Buffer | null> {
-  if (GCS_BUCKET) {
+  if (usingGcs()) {
     const bucket = await getBucket();
     try {
       const [buf] = await bucket.file(GCS_PREFIX + storedName).download();
@@ -81,7 +88,7 @@ export async function readStepFile(storedName: string): Promise<Buffer | null> {
 
 /** Dosyayı siler (yoksa sessizce geçer). */
 export async function deleteStepFile(storedName: string): Promise<void> {
-  if (GCS_BUCKET) {
+  if (usingGcs()) {
     const bucket = await getBucket();
     await bucket.file(GCS_PREFIX + storedName).delete({ ignoreNotFound: true });
     return;
