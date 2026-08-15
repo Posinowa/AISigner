@@ -9,7 +9,42 @@ import {
   createGitHubIssue,
   closeGitHubIssue,
   closeGitHubMilestone,
+  ensureGitHubIssueOpen,
 } from "./github-api";
+
+/** Telafi takip listesinden bir numarayı çıkarır (persist edilenler kapatılmaz). */
+function removeFrom(list: number[], value: number): void {
+  const i = list.indexOf(value);
+  if (i !== -1) list.splice(i, 1);
+}
+
+/** Türkçe/aksanlı harfleri ASCII'ye indirger. */
+const TR_MAP: Record<string, string> = {
+  ç: "c", ğ: "g", ı: "i", ö: "o", ş: "s", ü: "u", â: "a", î: "i", û: "u",
+};
+
+/**
+ * #179 review: GitHub repo adı için ASCII-güvenli slug.
+ * Türkçe harfler karşılığına çevrilir (silinmez), kalan geçersiz karakterler tireye
+ * dönüşür, baştaki/sondaki tireler kırpılır. Boş sonuç çağıran tarafta fallback'lenir.
+ */
+export function toAsciiSlug(input: string | null | undefined): string {
+  if (!input) return "";
+  return input
+    .toLowerCase()
+    .replace(/[çğıöşüâîû]/g, (ch) => TR_MAP[ch] ?? ch)
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "") // kalan aksanlar
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+}
+
+/** Atama id'sinden deterministik, kısa ve ASCII-güvenli benzersiz sonek. */
+export function shortId(id: string): string {
+  const clean = id.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+  return clean.slice(-6) || "000000";
+}
 
 export type ProvisioningResult = {
   success: boolean;
@@ -76,14 +111,16 @@ export async function provisionGitHubWorkspace(assignmentId: string): Promise<Pr
   });
 
   const studentUser = assignment.studentProfile.user;
-  const studentSlug = (studentUser.name || "student")
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "");
-  const projectSlug = assignment.projectTemplate.title
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "-");
+  // #179 review: Eski slug Türkçe karakterleri SİLİYORDU ("Öğrenci" → "" gibi) ve
+  // repo adında benzersizlik yoktu. Aynı şablona atanan iki öğrenci aynı repo adına
+  // düşüyor, 422 "zaten var" ise ÖTEKİNİN reposu yanlışlıkla yeniden kullanılıyordu.
+  // Çözüm: Türkçe harfleri ASCII'ye çevir, boş kalırsa fallback, sonuna atamaya özel
+  // (deterministik → re-run aynı adı üretir) benzersiz sonek ekle.
+  const studentSlug = toAsciiSlug(studentUser.name) || "student";
+  const projectSlug = toAsciiSlug(assignment.projectTemplate.title) || "proje";
+  const uniqueSuffix = shortId(assignment.id);
 
-  const repoName = `aisigner-${studentSlug}-${projectSlug}`;
+  const repoName = `aisigner-${studentSlug}-${projectSlug}-${uniqueSuffix}`;
   const orgName = process.env.GITHUB_ORG || "Posinowa";
   const realGitHub = isGitHubConfigured();
 
@@ -154,17 +191,28 @@ export async function provisionGitHubWorkspace(assignmentId: string): Promise<Pr
         },
       });
 
+      // #179 review: URL DB'ye yazıldı → bu milestone artık "persist edilmiş"tir ve
+      // telafide KAPATILMAMALIDIR (aksi halde öğrenci kapalı bir faza yönlenir ve
+      // idempotent re-run onu diriltmez). Takip listesinden çıkarıyoruz.
+      if (milestoneNumber !== undefined) {
+        removeFrom(createdThisRun.milestones, milestoneNumber);
+      }
+
       // Issue kayıtlarını güncelle
       const stepIssues = await prisma.stepIssue.findMany({ where: { stepId: step.id } });
       for (const [index, dbIssue] of stepIssues.entries()) {
         // #179 review: İdempotent yeniden çalıştırma — bu issue GitHub'da zaten
-        // açılıp URL'i kaydedilmişse tekrar açma (duplicate issue önlemi).
+        // açılıp URL'i kaydedilmişse tekrar AÇMA (duplicate önlemi). Ancak issue
+        // bir önceki denemede kapatılmış olabilir; öğrenci kapalı göreve yönlenmesin
+        // diye kapalıysa YENİDEN AÇ.
         if (realGitHub && dbIssue.githubIssueUrl) {
+          await ensureGitHubIssueOpen({ owner, repo, issueUrl: dbIssue.githubIssueUrl });
           skippedIssuesCount++;
           continue;
         }
 
         let issueUrl = `${githubRepoUrl}/issues/${index + 1}`;
+        let createdIssueNumber: number | undefined;
 
         if (realGitHub) {
           const spec = generatedIssues.find((g) => g.title === dbIssue.title) || generatedIssues[index];
@@ -177,6 +225,7 @@ export async function provisionGitHubWorkspace(assignmentId: string): Promise<Pr
             milestoneNumber,
           });
           issueUrl = createdIssue.htmlUrl;
+          createdIssueNumber = createdIssue.issueNumber;
           createdThisRun.issues.push(createdIssue.issueNumber);
         }
 
@@ -186,6 +235,12 @@ export async function provisionGitHubWorkspace(assignmentId: string): Promise<Pr
             githubIssueUrl: issueUrl,
           },
         });
+
+        // #179 review: URL persist edildi → telafide bu issue KAPATILMAZ.
+        // (Yalnızca "açıldı ama DB'ye yazılamadı" olanlar kapatılır.)
+        if (createdIssueNumber !== undefined) {
+          removeFrom(createdThisRun.issues, createdIssueNumber);
+        }
         createdIssuesCount++;
       }
     }
@@ -220,10 +275,15 @@ export async function provisionGitHubWorkspace(assignmentId: string): Promise<Pr
   } catch (error) {
     logger.error("GitHub workspace oluşturulurken hata oluştu", { assignmentId, error });
 
-    // #179 review: Kısmi başarı telafisi. Bu çalışmada açılan issue ve milestone'lar
-    // best-effort kapatılır ki GitHub'da yarım kalmış "açık görev" artığı kalmasın.
-    // Repo BİLİNÇLİ olarak silinmez: öğrenci çalışması içerebilir ve idempotent
-    // yeniden deneme (422 → yeniden kullan) onu tekrar kullanır.
+    // #179 review: Kısmi başarı telafisi — YALNIZCA PERSIST EDİLMEMİŞ kaynaklar.
+    //
+    // Sözleşme: GitHub'da açıldı ama URL'i DB'ye yazılamadı → öksüz, kapatılır.
+    // URL'i DB'ye yazılanlar listeden çıkarıldığı için burada KAPATILMAZ; aksi halde
+    // öğrenci kapalı bir issue/milestone linkine giderdi ve idempotent re-run
+    // (URL var → atla) onu diriltmezdi.
+    //
+    // Repo BİLİNÇLİ olarak silinmez: öğrenci çalışması içerebilir ve yeniden deneme
+    // (422 → yeniden kullan) onu tekrar kullanır.
     if (realGitHub && (createdThisRun.issues.length > 0 || createdThisRun.milestones.length > 0)) {
       const closedIssues: number[] = [];
       const failedIssues: number[] = [];

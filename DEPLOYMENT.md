@@ -60,7 +60,17 @@ Out Plane konsolunda servisin **Variables** bölümüne girilir.
 |---|---|---|
 | `NEXT_PUBLIC_APP_URL` | `https://aisigner.com` | **#204/SEO** — `robots.txt`, `sitemap.xml` ve canonical/OG URL'lerinin taban adresi. Gerçek domain'e ayarlanmazsa fallback kullanılır. ⚠️ **`NEXT_PUBLIC_` = build-time**: değeri **imaj build edilirken** mevcut olmalı (yalnız runtime env yetmez). Aşağıya bak. |
 | `GCS_BUCKET` | _(yok)_ | **#197** — Dosya yüklemelerinin kalıcılığı. Verilirse yüklemeler bu GCS bucket'ına yazılır (deploy'da silinmez, çok-instance ölçeklenir). Kimlik: mevcut `GCP_CREDENTIALS_JSON` (ADC). Verilmezse yerel disk. |
-| `GITHUB_TOKEN` | _(yok)_ | **#179** — Gerçek GitHub entegrasyonu (PAT / Fine-grained token / GitHub App). Verilirse öğrenci çalışma alanı reposu, milestone ve AI issue'ları GitHub'da fiziksel olarak açılır (`repo`, `admin:org` izinleri gerekir). Verilmezse simülasyon/önizleme fallback devreye girer. |
+| `GITHUB_TOKEN` | _(yok)_ | **#179** — Gerçek GitHub entegrasyonu. Verilirse öğrenci çalışma alanı reposu, milestone ve AI issue'ları GitHub'da fiziksel olarak açılır. Verilmezse simülasyon/önizleme fallback devreye girer. **Minimum yetki** için aşağıya bakın. |
+
+> **`GITHUB_TOKEN` — en az yetki ilkesi (#179):** Uygulama yalnızca **repo oluşturur** ve
+> **issue/milestone yazar**; organizasyon üyeliği/ayarı yönetmez. Bu yüzden **`admin:org`
+> VERMEYİN** (gereğinden fazla yetki).
+> - **Fine-grained token (önerilen):** Repository → *Contents: Read & write*, *Issues: Read & write*,
+>   *Metadata: Read*. Org altında repo açacaksa Organization → *Administration: Read & write*
+>   (yalnız repo oluşturma için).
+> - **Klasik PAT:** `repo` yeterlidir (org repo oluşturma izni org ayarlarından verilir).
+>
+> Token yalnızca platform secret'ı olarak tutulur; kodda loglanmaz.
 | `GITHUB_ORG` | `Posinowa` | GitHub çalışma alanı URL'lerinde ve repo oluşturma işlemlerinde kullanılan organizasyon veya kullanıcı adı. |
 | `PORT` | `3000` | Platform farklı bir port dayatıyorsa. |
 

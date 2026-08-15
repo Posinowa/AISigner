@@ -266,6 +266,57 @@ export async function createGitHubIssue(params: {
 }
 
 /**
+ * #179 review: Kayıtlı bir issue URL'inin GitHub'da HÂLÂ AÇIK olduğundan emin olur.
+ *
+ * Neden: Bir önceki denemede telafi (veya elle) kapatılmış bir issue'nun URL'i DB'de
+ * kayıtlıysa, idempotent re-run onu atlar ve öğrenci **kapalı** bir göreve yönlenir.
+ * Bu fonksiyon kapalıysa yeniden açar. Best-effort: hata fırlatmaz.
+ *
+ * @returns `true` → açık (veya açıldı), `false` → durum belirlenemedi/açılamadı.
+ */
+export async function ensureGitHubIssueOpen(params: {
+  owner: string;
+  repo: string;
+  issueUrl: string;
+}): Promise<boolean> {
+  const { owner, repo, issueUrl } = params;
+  const issueNumber = parseIssueNumber(issueUrl);
+  if (issueNumber === null) return false;
+
+  try {
+    const base = `${GITHUB_API_BASE}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${issueNumber}`;
+    const res = await githubFetch(base, { headers: getHeaders() });
+    if (!res.ok) return false;
+
+    const data = (await res.json()) as { state?: string };
+    if (data.state !== "closed") return true; // zaten açık
+
+    const reopen = await githubFetch(base, {
+      method: "PATCH",
+      headers: getHeaders(),
+      body: JSON.stringify({ state: "open" }),
+    });
+    if (!reopen.ok) {
+      logger.warn("Kapalı issue yeniden açılamadı", { status: reopen.status, issueNumber, repo });
+      return false;
+    }
+    logger.info("Kapalı issue yeniden açıldı (idempotent re-run)", { issueNumber, repo });
+    return true;
+  } catch (err) {
+    logger.warn("Issue durumu kontrol edilemedi", { issueUrl, err });
+    return false;
+  }
+}
+
+/** `https://github.com/<owner>/<repo>/issues/<n>` → n (yoksa null). */
+export function parseIssueNumber(issueUrl: string): number | null {
+  const match = /\/issues\/(\d+)(?:[?#].*)?$/.exec(issueUrl.trim());
+  if (!match) return null;
+  const n = Number(match[1]);
+  return Number.isSafeInteger(n) && n > 0 ? n : null;
+}
+
+/**
  * #179 telafi: Bu çalışmada açılan issue'yu kapatır (best-effort — hata fırlatmaz).
  *
  * Repo/milestone SİLİNMEZ: repo öğrenci çalışması içerebilir ve idempotent yeniden
