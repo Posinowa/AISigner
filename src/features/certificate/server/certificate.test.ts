@@ -126,13 +126,15 @@ describe("Certificate Service — Staj Başarı Sertifikası", () => {
       mentorNote: "Çok başarılı.",
     });
 
+    // #208 review (P3): issuedAt GÖNDERİLMEDİYSE dokunulmaz — not kaydetmek belgeyi
+    // yayınlamaz (aksi halde mezun olmayan öğrenci public doğrulamada geçerli görünürdü).
     expect(prismaMock.studentProfile.update).toHaveBeenCalledWith({
       where: { id: "sp-1" },
       data: {
         certificateNumber: "POS-2026-9999",
         completionGrade: "Onur Derecesi",
         mentorNote: "Çok başarılı.",
-        issuedAt: expect.any(Date),
+        issuedAt: undefined,
       },
     });
     expect(updated.certificateNumber).toBe("POS-2026-9999");
@@ -225,6 +227,41 @@ describe("Certificate Service — Staj Başarı Sertifikası", () => {
       await ensureCertificateIssued("yok");
 
       expect(prismaMock.studentProfile.update).not.toHaveBeenCalled();
+    });
+
+    it("seri no VARSA numara değişmez, yalnız issuedAt tamamlanır", async () => {
+      prismaMock.studentProfile.findUnique.mockResolvedValue({
+        id: "sp-1",
+        certificateNumber: "POS-2026-KEEPME",
+        issuedAt: null,
+      });
+
+      await ensureCertificateIssued("user-abc12");
+
+      expect(prismaMock.studentProfile.update).toHaveBeenCalledWith({
+        where: { id: "sp-1" },
+        data: { issuedAt: expect.any(Date) },
+      });
+    });
+
+    it("seri no ÇAKIŞIRSA (P2002) yeni numara üretip yeniden dener", async () => {
+      prismaMock.studentProfile.findUnique.mockResolvedValue({
+        id: "sp-1",
+        certificateNumber: null,
+        issuedAt: null,
+      });
+      const conflict = Object.assign(new Error("Unique constraint"), { code: "P2002" });
+      prismaMock.studentProfile.update
+        .mockRejectedValueOnce(conflict) // ilk aday çakıştı
+        .mockResolvedValueOnce({ id: "sp-1" }); // ikinci aday başarılı
+
+      await ensureCertificateIssued("user-abc12");
+
+      expect(prismaMock.studentProfile.update).toHaveBeenCalledTimes(2);
+      const first = prismaMock.studentProfile.update.mock.calls[0][0].data.certificateNumber;
+      const second = prismaMock.studentProfile.update.mock.calls[1][0].data.certificateNumber;
+      expect(second).not.toBe(first); // yeni aday üretildi
+      expect(second).toMatch(/^POS-\d{4}-[A-Z0-9]{5}$/);
     });
   });
 

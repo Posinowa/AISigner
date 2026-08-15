@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { logger } from "@/lib/logger";
 
 export type CertificateData = {
   id: string;
@@ -54,6 +55,28 @@ export function generateCertificateNumber(userId: string): string {
   const suffix = cleanId.slice(-5).padStart(5, "X");
   const year = new Date().getFullYear();
   return `POS-${year}-${suffix}`;
+}
+
+/** #208 review: Seri no çakışmasında kaç kez yeniden denenecek. */
+const MAX_CERT_NUMBER_ATTEMPTS = 5;
+
+/** Çakışma durumunda kullanılan tamamen rastgele seri no (aynı POS-YYYY-XXXXX formatı). */
+function generateRandomCertificateNumber(): string {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let suffix = "";
+  for (let i = 0; i < 5; i++) {
+    suffix += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+  return `POS-${new Date().getFullYear()}-${suffix}`;
+}
+
+/** Prisma unique-constraint (P2002) ihlali mi? */
+function isUniqueViolation(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    (err as { code?: string }).code === "P2002"
+  );
 }
 
 /** Doğrulama URL'i üretir. */
@@ -173,16 +196,45 @@ export async function ensureCertificateIssued(userId: string): Promise<void> {
   if (!profile) return;
   if (profile.certificateNumber && profile.issuedAt) return;
 
-  await prisma.studentProfile.update({
-    where: { id: profile.id },
-    data: {
-      certificateNumber: profile.certificateNumber ?? generateCertificateNumber(userId),
-      issuedAt: profile.issuedAt ?? new Date(),
-    },
-  });
+  // Seri no zaten varsa yalnız tarihi tamamla (numara ASLA değiştirilmez).
+  if (profile.certificateNumber) {
+    await prisma.studentProfile.update({
+      where: { id: profile.id },
+      data: { issuedAt: profile.issuedAt ?? new Date() },
+    });
+    return;
+  }
+
+  // #208 review: `certificateNumber` artık @unique. Seri no userId'nin son 5
+  // karakterinden türediği için nadir de olsa çakışabilir → unique ihlalinde (P2002)
+  // yeni bir aday üretip sınırlı sayıda yeniden dene.
+  for (let attempt = 0; attempt < MAX_CERT_NUMBER_ATTEMPTS; attempt++) {
+    const candidate =
+      attempt === 0 ? generateCertificateNumber(userId) : generateRandomCertificateNumber();
+    try {
+      await prisma.studentProfile.update({
+        where: { id: profile.id },
+        data: { certificateNumber: candidate, issuedAt: profile.issuedAt ?? new Date() },
+      });
+      return;
+    } catch (err) {
+      if (!isUniqueViolation(err)) throw err;
+      logger.warn("Sertifika seri no çakıştı, yeniden üretiliyor", { userId, attempt });
+    }
+  }
+
+  throw new Error("Benzersiz sertifika numarası üretilemedi (çakışma sınırı aşıldı).");
 }
 
-/** Yönetici sertifika bilgilerini (referans notu, başarı derecesi vb.) günceller. */
+/**
+ * Yönetici sertifika bilgilerini (referans notu, başarı derecesi vb.) günceller.
+ *
+ * #208 review (P3 tuzağı): Eskiden `issuedAt` verilmediğinde otomatik `new Date()`
+ * yazılıyordu — yani admin sadece NOT kaydettiğinde, mezun olmayan öğrencinin belgesi
+ * public doğrulamada "geçerli" hale geliyordu (`GRADUATED || issuedAt`). Artık
+ * `issuedAt` YALNIZCA açıkça gönderildiğinde değişir; belge resmileştirme tek bir
+ * yerde olur: mezuniyet → `ensureCertificateIssued()`.
+ */
 export async function updateCertificateDetails(
   studentProfileId: string,
   data: {
@@ -198,7 +250,8 @@ export async function updateCertificateDetails(
       certificateNumber: data.certificateNumber,
       mentorNote: data.mentorNote,
       completionGrade: data.completionGrade,
-      issuedAt: data.issuedAt !== undefined ? data.issuedAt : new Date(),
+      // undefined → Prisma alanı DEĞİŞTİRMEZ (otomatik yayınlama yok).
+      issuedAt: data.issuedAt,
     },
   });
 }

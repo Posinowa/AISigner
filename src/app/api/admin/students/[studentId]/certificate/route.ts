@@ -85,11 +85,12 @@ export async function POST(
       );
     }
 
+    // #208 review (P3): Not/derece kaydetmek belgeyi YAYINLAMAZ. `issuedAt`
+    // gönderilmez → belge yalnız mezuniyette resmileşir (ensureCertificateIssued).
     const updated = await updateCertificateDetails(certificate.id, {
       certificateNumber: parsed.data.certificateNumber,
       mentorNote: parsed.data.mentorNote,
       completionGrade: parsed.data.completionGrade,
-      issuedAt: new Date(),
     });
 
     return NextResponse.json({

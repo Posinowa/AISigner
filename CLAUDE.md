@@ -131,8 +131,18 @@ Redis gerekir → `DEPLOYMENT.md`.
 - **Mezun yazma yetkisi — bilinçli kararlar (#208)**:
   - **Kapalı**: adım durumu, dosya yükleme/silme, yorum ekleme/düzenleme/silme, **AI chat**
     (her mesaj Gemini maliyeti + aktif staja bağlı araç) → 403.
-  - **Açık (bilinçli)**: **öneri/istek (suggestions)** — mezun geri bildirimi meşru ve düşük riskli.
-    Ürün bunu daraltmak isterse `api/suggestions` POST'una GRADUATED kontrolü eklenmeli.
+  - **Açık (bilinçli)**: **öneri/istek (suggestions)** ve **mesajlaşma (`POST /api/messages`)** —
+    ikisi de *insan iletişimi* kanalıdır; mezunun mentörüne/admin'e yazabilmesi meşru ve düşük
+    riskli. Ürün daraltmak isterse ilgili POST uçlarına GRADUATED kontrolü eklenmeli.
+  - **Ayrım ilkesi**: *sistem durumunu değiştiren* (adım/dosya/yorum) ve *ücretli AI* uçları
+    kapalı; *insan iletişimi* açık.
+- **⚠️ Sertifika yayınlama tek noktadan**: Belgeyi resmileştiren tek yer **mezuniyettir**
+  (`ensureCertificateIssued`). Admin'in not/derece kaydetmesi (`updateCertificateDetails`)
+  `issuedAt` **yazmaz** — aksi halde mezun olmayan öğrencinin belgesi public doğrulamada
+  geçerli görünürdü. `certificateNumber` **@unique**; çakışmada seri no yeniden üretilir.
+- **Public verify PII/enumeration**: rate-limit kontrolü `getVerification` **içinde** —
+  Next.js `generateMetadata`'yı sayfadan önce çalıştırdığı için limit yalnız gövdede olsaydı
+  `<title>` üzerinden ad + seri no sızardı. Tüm metadata `robots: noindex` (PII sayfası).
 
 ## Komutlar
 

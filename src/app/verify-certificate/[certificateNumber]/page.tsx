@@ -26,46 +26,85 @@ const verifyLimiter = createRateLimiter("verify-certificate", {
   windowSeconds: 60,
 });
 
+// Not: `x-real-ip` proxy tarafından set edilir; `x-forwarded-for`'un ilk hop'u
+// proxy arkasında değilsek istemci tarafından uydurulabilir. Bu limit tek başına
+// bir kimlik kontrolü değil, enumeration'ı pahalılaştıran savunma-derinliği katmanıdır.
 function getClientIp(h: Headers): string {
+  const realIp = h.get("x-real-ip")?.trim();
+  if (realIp) return realIp;
   const fwd = h.get("x-forwarded-for");
   if (fwd) return fwd.split(",")[0]!.trim();
-  return h.get("x-real-ip")?.trim() || "anonymous";
+  return "anonymous";
 }
 
 /**
- * #208 review: `generateMetadata` ve sayfa gövdesi aynı isteği iki kez sorguluyordu.
- * React `cache` ile istek başına tek DB sorgusu (aynı argümanda dedupe).
+ * #208 review: Rate-limit kontrolü DOĞRULAMA SORGUSUNUN İÇİNDE.
+ *
+ * Next.js `generateMetadata`'yı sayfa gövdesinden ÖNCE çalıştırır. Limit yalnız
+ * sayfa gövdesinde olsaydı, limiti aşan istek yine de metadata üzerinden DB'ye
+ * gidip `<title>`'a **öğrenci adı + seri no** yazardı (enumeration + PII sızıntısı).
+ * Kontrolü buraya alarak her iki yolu da kapsıyoruz.
+ *
+ * `cache` sayesinde istek başına yalnız BİR kez çalışır → limiter tek sayılır ve
+ * DB'ye tek sorgu gider (metadata + gövde paylaşır).
  */
-const getVerification = cache(async (certificateNumber: string) => {
-  return verifyCertificate(certificateNumber);
-});
+const getVerification = cache(
+  async (
+    certificateNumber: string,
+  ): Promise<
+    | { rateLimited: true }
+    | { rateLimited: false; result: Awaited<ReturnType<typeof verifyCertificate>> }
+  > => {
+    const ip = getClientIp(await headers());
+    if (!verifyLimiter.check(ip).allowed) {
+      return { rateLimited: true };
+    }
+    return { rateLimited: false, result: await verifyCertificate(certificateNumber) };
+  },
+);
+
+// #208 review: Bu sayfa kişisel veri (ad + seri no) gösterir → arama motorlarına
+// ASLA indekslenmemeli. Tüm metadata yanıtlarında geçerli.
+const NOINDEX = { index: false, follow: false } as const;
+
+const GENERIC_METADATA: Metadata = {
+  title: "Sertifika Doğrulama — Posinowa Teknoloji Akademisi",
+  description: "Posinowa staj başarı belgesi ve sertifika doğrulama sistemi.",
+  robots: NOINDEX,
+};
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { certificateNumber } = await params;
   const decodedNumber = decodeURIComponent(certificateNumber);
-  const result = await getVerification(decodedNumber);
+  const verification = await getVerification(decodedNumber);
 
+  // Limit aşıldıysa metadata'da ad/seri no OLMAZ — aksi halde 429 ekranı gösterilse
+  // bile <title> üzerinden belge varlığı + öğrenci adı sızardı.
+  if (verification.rateLimited) {
+    return GENERIC_METADATA;
+  }
+
+  const result = verification.result;
   if (result.isValid && result.certificate) {
     return {
       title: `Sertifika Doğrulandı: ${result.certificate.studentName} (${result.certificate.certificateNumber}) — Posinowa`,
       description: `Posinowa Akademi staj başarı sertifikası doğrulaması: ${result.certificate.studentName}. Seri No: ${result.certificate.certificateNumber}.`,
+      robots: NOINDEX,
     };
   }
 
-  return {
-    title: "Sertifika Doğrulama — Posinowa Teknoloji Akademisi",
-    description: "Posinowa staj başarı belgesi ve sertifika doğrulama sistemi.",
-  };
+  return GENERIC_METADATA;
 }
 
 export default async function VerifyCertificatePage({ params }: Props) {
   const { certificateNumber } = await params;
   const decodedNumber = decodeURIComponent(certificateNumber);
 
-  // #208 review: Enumeration koruması — IP başına dakikada 20 sorgu.
-  const ip = getClientIp(await headers());
-  const rl = verifyLimiter.check(ip);
-  if (!rl.allowed) {
+  // #208 review: Enumeration koruması — IP başına dakikada 20 sorgu. Kontrol
+  // `getVerification` içinde (metadata yolu da kapsansın diye); burada yalnız sonucu
+  // ekrana çeviriyoruz. `cache` sayesinde limiter istek başına bir kez sayılır.
+  const verification = await getVerification(decodedNumber);
+  if (verification.rateLimited) {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center p-6 text-center bg-slate-50 dark:bg-slate-950">
         <div className="max-w-md w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-lg p-8 space-y-3">
@@ -86,7 +125,7 @@ export default async function VerifyCertificatePage({ params }: Props) {
     );
   }
 
-  const result = await getVerification(decodedNumber);
+  const result = verification.result;
 
   const formattedDate =
     result.isValid && result.certificate?.issuedAt

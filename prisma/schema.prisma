@@ -51,7 +51,9 @@ model StudentProfile {
   availability    String?
   birthYear       Int?
   // #204: Staj başarı sertifikası alanları.
-  certificateNumber String?
+  // #208 review: Seri no belgeyi TEKİL tanımlar; public doğrulama `findFirst` ile
+  // arar. Çakışma olursa yanlış belge "geçerli" sayılabilirdi → DB seviyesinde unique.
+  certificateNumber String?  @unique
   mentorNote        String?   @db.VarChar(2000)
   completionGrade   String?
   issuedAt          DateTime?
