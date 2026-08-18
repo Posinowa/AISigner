@@ -178,7 +178,11 @@ export function TurkeyMap() {
   const sayac = durum.yandi.size;
 
   return (
-    <div className="relative overflow-hidden rounded-[10px] border border-[var(--landing-line-soft)] bg-[var(--landing-stage)] p-[clamp(10px,1.5vw,16px)]">
+    <div>
+      <div
+        className="relative overflow-hidden rounded-[10px] border border-[var(--landing-line-soft)] bg-[var(--landing-stage)] p-[clamp(10px,1.5vw,16px)]"
+        onPointerLeave={() => setUzerinde(null)}
+      >
       <div
         ref={kutu}
         className="w-full overflow-x-auto [scrollbar-width:thin]"
@@ -260,8 +264,23 @@ export function TurkeyMap() {
         Tekrar oynat
       </button>
 
-      <p className="sr-only" aria-live="polite">
-        {sayac} il boyandı
+        <p className="sr-only" aria-live="polite">
+          {sayac} il boyandı
+        </p>
+      </div>
+
+      {/*
+        Harita durumunu gosteren okuma satiri. Hover durumu bu bilesende
+        yasadigi icin satir da burada duruyor — ust bilesene taşınırsa
+        il adi gosterilemez.
+      */}
+      <p
+        data-testid="il-okuma"
+        className="mt-[11px] flex flex-wrap gap-x-[18px] gap-y-1.5 font-mono text-[11.5px] uppercase tracking-[0.1em] text-[var(--landing-muted)]"
+      >
+        <span>Kapsam hedefi: 81 il</span>
+        <span>Her ilde en az bir eşleşme</span>
+        <span>{uzerinde ?? "İlin adı için üzerine gelin"}</span>
       </p>
     </div>
   );

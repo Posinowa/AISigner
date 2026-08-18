@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
-import { render, screen, act, cleanup } from "@testing-library/react";
+import { render, screen, act, cleanup, fireEvent } from "@testing-library/react";
 import { TurkeyMap } from "./TurkeyMap";
 import { PROVINCES, SEED_PROVINCES } from "../data/tr-provinces";
 
@@ -189,5 +189,45 @@ describe("TurkeyMap — veri tutarlılığı", () => {
       .sort();
     const beklenen = PROVINCES.map((p) => p.name).sort();
     expect(cizilen).toEqual(beklenen);
+  });
+});
+
+describe("TurkeyMap — il adi okuma satiri", () => {
+  const okuma = () =>
+    screen.getByTestId("il-okuma").textContent ?? "";
+
+  it("baslangicta ipucu metnini gosterir", () => {
+    render(<TurkeyMap />);
+    expect(okuma()).toContain("İlin adı için üzerine gelin");
+  });
+
+  it("il uzerine gelince o ilin adini yazar", () => {
+    render(<TurkeyMap />);
+    const ankara = document.querySelector('[data-il="Ankara"]')!;
+    act(() => {
+      fireEvent.pointerOver(ankara);
+    });
+    expect(okuma()).toContain("Ankara");
+    expect(okuma()).not.toContain("İlin adı için üzerine gelin");
+  });
+
+  it("ilden ayrilinca ipucu metnine doner", () => {
+    render(<TurkeyMap />);
+    const il = document.querySelector('[data-il="Diyarbakır"]')!;
+    act(() => {
+      fireEvent.pointerOver(il);
+    });
+    expect(okuma()).toContain("Diyarbakır");
+
+    act(() => {
+      fireEvent.pointerOut(il);
+    });
+    expect(okuma()).toContain("İlin adı için üzerine gelin");
+  });
+
+  it("sabit bilgiler her durumda satirda kalir", () => {
+    render(<TurkeyMap />);
+    expect(okuma()).toContain("Kapsam hedefi: 81 il");
+    expect(okuma()).toContain("Her ilde en az bir eşleşme");
   });
 });
