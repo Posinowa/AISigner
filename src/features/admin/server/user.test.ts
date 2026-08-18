@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 // prisma'yı mock'la (gerçek DB gerekmez)
-const { prismaMock, deleteStepFileMock } = vi.hoisted(() => ({
+const { prismaMock, deleteStepFileMock, ensureCertificateIssuedMock } = vi.hoisted(() => ({
   prismaMock: {
     user: {
       findUnique: vi.fn(),
@@ -16,9 +16,14 @@ const { prismaMock, deleteStepFileMock } = vi.hoisted(() => ({
     $transaction: vi.fn(),
   },
   deleteStepFileMock: vi.fn(),
+  ensureCertificateIssuedMock: vi.fn(),
 }));
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 vi.mock("@/lib/storage/step-files", () => ({ deleteStepFile: deleteStepFileMock }));
+// #208: mezuniyet artık sertifikayı resmileştiriyor (seri no + issuedAt persist).
+vi.mock("@/features/certificate/server/certificate", () => ({
+  ensureCertificateIssued: ensureCertificateIssuedMock,
+}));
 
 import {
   setStudentMentors,
@@ -119,6 +124,24 @@ describe("updateAccountStatus — stajyer onay, mezuniyet ve red durumları", ()
       },
     });
     expect(result.accountStatus).toBe("GRADUATED");
+    // #208 review: mezuniyet sertifikayı RESMİLEŞTİRİR (seri no + issuedAt persist)
+    // → öğrenciye/QR'a gösterilen numara doğrulanabilir olur.
+    expect(ensureCertificateIssuedMock).toHaveBeenCalledWith("u-1");
+  });
+
+  it("#208: GRADUATED olmayan durumda sertifika resmileştirilmez", async () => {
+    prismaMock.user.update.mockResolvedValue({
+      id: "u-2",
+      email: "s@test.com",
+      name: "Ali",
+      lastName: "Veli",
+      role: "STUDENT",
+      accountStatus: "APPROVED",
+    });
+
+    await updateAccountStatus("u-2", "APPROVED");
+
+    expect(ensureCertificateIssuedMock).not.toHaveBeenCalled();
   });
 });
 

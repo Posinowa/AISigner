@@ -37,10 +37,10 @@ function buildStep(status: "DRAFT" | "PUBLISHED") {
   };
 }
 
-function authAs(userId: string, role: "STUDENT" | "MENTOR") {
+function authAs(userId: string, role: "STUDENT" | "MENTOR", accountStatus = "APPROVED") {
   requireAuthMock.mockResolvedValue({
     authorized: true,
-    session: { user: { id: userId, role } },
+    session: { user: { id: userId, role, accountStatus } },
   });
 }
 
@@ -54,10 +54,21 @@ function makeEmptyUploadRequest() {
 
 const ctx = { params: Promise.resolve({ stepId: "step-1" }) };
 
-describe("POST /api/steps/[stepId]/files — taslak (DRAFT) guard (#52/#69)", () => {
+describe("POST /api/steps/[stepId]/files — taslak (DRAFT) guard (#52/#69) & GRADUATED (#208)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     prismaMock.stepFile.count.mockResolvedValue(0);
+  });
+
+  it("GRADUATED öğrenci dosya yükleyemez → 403 (#208)", async () => {
+    authAs(STUDENT_USER, "STUDENT", "GRADUATED");
+    prismaMock.roadmapStep.findUnique.mockResolvedValue(buildStep("PUBLISHED"));
+
+    const res = await POST(makeEmptyUploadRequest(), ctx);
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toContain("Mezun öğrenciler");
   });
 
   it("öğrenci + DRAFT roadmap → 403 (dosya sayımına bile gitmeden reddeder)", async () => {

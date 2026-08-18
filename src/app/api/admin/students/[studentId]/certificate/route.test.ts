@@ -110,4 +110,23 @@ describe("GET & POST /api/admin/students/[studentId]/certificate", () => {
     expect(body.success).toBe(true);
     expect(mockUpdateCertificateDetails).toHaveBeenCalled();
   });
+
+  it("POST: geçersiz completionGrade durumunda 400 döner", async () => {
+    mockRequireAuth.mockResolvedValue({
+      authorized: true,
+      session: { user: { id: "admin-1", role: "ADMIN" } },
+    });
+
+    const req = new Request("http://localhost/api/admin/students/s1/certificate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        completionGrade: "GecersizDeger",
+      }),
+    });
+
+    const res = await POST(req, { params: Promise.resolve({ studentId: "s1" }) });
+    expect(res.status).toBe(400);
+  });
 });
+

@@ -5,13 +5,7 @@ import {
   getStudentCertificate,
   updateCertificateDetails,
 } from "@/features/certificate/server/certificate";
-import { z } from "zod";
-
-const updateCertificateSchema = z.object({
-  certificateNumber: z.string().optional(),
-  mentorNote: z.string().max(2000, "Referans notu en fazla 2000 karakter olabilir.").optional(),
-  completionGrade: z.string().optional(),
-});
+import { updateCertificateSchema } from "@/lib/validations/api";
 
 export async function GET(
   _request: Request,
@@ -91,11 +85,12 @@ export async function POST(
       );
     }
 
+    // #208 review (P3): Not/derece kaydetmek belgeyi YAYINLAMAZ. `issuedAt`
+    // gönderilmez → belge yalnız mezuniyette resmileşir (ensureCertificateIssued).
     const updated = await updateCertificateDetails(certificate.id, {
       certificateNumber: parsed.data.certificateNumber,
       mentorNote: parsed.data.mentorNote,
       completionGrade: parsed.data.completionGrade,
-      issuedAt: new Date(),
     });
 
     return NextResponse.json({

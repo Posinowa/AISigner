@@ -24,12 +24,13 @@ type Props = {
   currentUserId: string;
   currentUserRole: string;
   isDraft?: boolean;
+  readOnly?: boolean;
 };
 
-export function StepComments({ stepId, currentUserId, currentUserRole, isDraft }: Props) {
+export function StepComments({ stepId, currentUserId, currentUserRole, isDraft, readOnly }: Props) {
   const confirm = useConfirm();
-  // #52: Taslak roadmap'te öğrenci yorum ekleyemez (mentor inceleme için ekleyebilir).
-  const interactionLocked = isDraft && currentUserRole === "STUDENT";
+  // #52: Taslak roadmap'te öğrenci yorum ekleyemez. #208: Mezun portfolyoda salt-okunurdur.
+  const interactionLocked = (isDraft && currentUserRole === "STUDENT") || (readOnly && currentUserRole === "STUDENT");
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
   const [loading, setLoading] = useState(false);
@@ -154,10 +155,11 @@ export function StepComments({ stepId, currentUserId, currentUserRole, isDraft }
     });
   }
 
-  function canDelete(comment: Comment) {
-    // Yorum sahibi veya mentor silebilir
-    return comment.author.id === currentUserId || currentUserRole === "MENTOR";
-  }
+  const canDelete = (comment: Comment) => {
+    if (readOnly && currentUserRole === "STUDENT") return false;
+    if (currentUserRole === "MENTOR") return true;
+    return comment.author.id === currentUserId;
+  };
 
   return (
     <div className="mt-3">
@@ -238,7 +240,7 @@ export function StepComments({ stepId, currentUserId, currentUserRole, isDraft }
                             {comment.content}
                           </p>
                           <div className="flex gap-0.5 ml-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex-shrink-0">
-                            {comment.author.id === currentUserId && (
+                            {comment.author.id === currentUserId && !readOnly && (
                               <button
                                 onClick={() => { setEditingId(comment.id); setEditContent(comment.content); }}
                                 className="p-1 text-gray-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400"

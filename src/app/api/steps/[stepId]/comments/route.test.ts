@@ -32,10 +32,10 @@ function buildStep(status: "DRAFT" | "PUBLISHED") {
   };
 }
 
-function authAs(userId: string, role: "STUDENT" | "MENTOR") {
+function authAs(userId: string, role: "STUDENT" | "MENTOR", accountStatus = "APPROVED") {
   requireAuthMock.mockResolvedValue({
     authorized: true,
-    session: { user: { id: userId, role } },
+    session: { user: { id: userId, role, accountStatus } },
   });
 }
 
@@ -49,9 +49,21 @@ function makeRequest(body: unknown) {
 
 const ctx = { params: Promise.resolve({ stepId: "step-1" }) };
 
-describe("POST /api/steps/[stepId]/comments — taslak (DRAFT) guard (#52/#69)", () => {
+describe("POST /api/steps/[stepId]/comments — taslak (DRAFT) guard (#52/#69) & GRADUATED (#208)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("GRADUATED öğrenci yorum ekleyemez → 403 (#208)", async () => {
+    authAs(STUDENT_USER, "STUDENT", "GRADUATED");
+    prismaMock.roadmapStep.findUnique.mockResolvedValue(buildStep("PUBLISHED"));
+
+    const res = await POST(makeRequest({ content: "merhaba" }), ctx);
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toContain("Mezun öğrenciler");
+    expect(prismaMock.stepComment.create).not.toHaveBeenCalled();
   });
 
   it("öğrenci + DRAFT roadmap → 403 döner ve yorum oluşturulmaz", async () => {

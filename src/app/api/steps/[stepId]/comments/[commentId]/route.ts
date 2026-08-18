@@ -15,6 +15,14 @@ export async function PUT(
   const auth = await requireAuth(["MENTOR", "STUDENT"]);
   if (!auth.authorized) return auth.response;
 
+  // #208: Mezun stajyerler için portfolyo salt-okunurdur (Seçenek A).
+  if (auth.session.user.role === "STUDENT" && auth.session.user.accountStatus === "GRADUATED") {
+    return NextResponse.json(
+      { error: "Mezun öğrenciler staj adımlarındaki yorumları düzenleyemez." },
+      { status: 403 }
+    );
+  }
+
   const { stepId, commentId } = await params;
   const userId = auth.session.user.id!;
 
@@ -79,6 +87,14 @@ export async function DELETE(
 ) {
   const auth = await requireAuth(["MENTOR", "STUDENT"]);
   if (!auth.authorized) return auth.response;
+
+  // #208: Mezun stajyerler için portfolyo salt-okunurdur (Seçenek A).
+  if (auth.session.user.role === "STUDENT" && auth.session.user.accountStatus === "GRADUATED") {
+    return NextResponse.json(
+      { error: "Mezun öğrenciler staj adımlarındaki yorumları silemez." },
+      { status: 403 }
+    );
+  }
 
   const { stepId, commentId } = await params;
   const userId = auth.session.user.id!;

@@ -21,16 +21,21 @@ type Step = {
 type Props = {
   steps: Step[];
   isDraft: boolean;
+  isGraduated?: boolean;
   currentUserId?: string;
   currentUserRole?: string;
 };
 
-export function RoadmapSteps({ steps, isDraft, currentUserId, currentUserRole }: Props) {
+export function RoadmapSteps({ steps, isDraft, isGraduated = false, currentUserId, currentUserRole }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   async function updateStepStatus(stepId: string, newStatus: "IN_PROGRESS" | "COMPLETED") {
+    if (isGraduated) {
+      toast.info("Mezuniyet sonrası staj adımları salt-okunur durumdadır.");
+      return;
+    }
     setUpdatingId(stepId);
     try {
       const res = await fetch(`/api/student/steps/${stepId}`, {
@@ -186,8 +191,8 @@ export function RoadmapSteps({ steps, isDraft, currentUserId, currentUserRole }:
                   </div>
                 )}
 
-                {/* Aksiyon Butonları */}
-                {!isDraft && !isLocked && !isCompleted && (
+                {/* Aksiyon Butonları — Mezun olmayan ve yayınlanmış adımlarda aktif */}
+                {!isGraduated && !isDraft && !isLocked && !isCompleted && (
                   <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
                     {isTodo && isActionable && (
                       <button
@@ -227,6 +232,7 @@ export function RoadmapSteps({ steps, isDraft, currentUserId, currentUserRole }:
                     currentUserId={currentUserId}
                     currentUserRole={currentUserRole}
                     isDraft={isDraft}
+                    readOnly={isGraduated}
                   />
                 )}
 
@@ -237,6 +243,7 @@ export function RoadmapSteps({ steps, isDraft, currentUserId, currentUserRole }:
                     currentUserId={currentUserId}
                     currentUserRole={currentUserRole}
                     isDraft={isDraft}
+                    readOnly={isGraduated}
                   />
                 )}
               </div>
@@ -247,3 +254,4 @@ export function RoadmapSteps({ steps, isDraft, currentUserId, currentUserRole }:
     </div>
   );
 }
+

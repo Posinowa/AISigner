@@ -257,3 +257,25 @@ export const updateSuggestionSchema = z
   .refine((data) => data.status !== undefined || data.adminNote !== undefined, {
     message: "Güncellenecek en az bir alan gönderilmeli",
   });
+
+// ==========================================
+// 🎓 Sertifika ve Mezuniyet Şemaları (#204, #208)
+// ==========================================
+
+export const completionGradeEnum = z.enum([
+  "Üstün Başarı",
+  "Onur Derecesi",
+  "Yüksek Başarı",
+  "Başarılı",
+]);
+
+export const updateCertificateSchema = z.object({
+  certificateNumber: z.string().min(1).max(50).optional(),
+  mentorNote: z
+    .string()
+    .max(2000, "Referans notu en fazla 2000 karakter olabilir.")
+    .optional()
+    .nullable(),
+  completionGrade: completionGradeEnum.optional().nullable(),
+});
+

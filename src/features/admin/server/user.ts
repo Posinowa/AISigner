@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { deleteStepFile } from "@/lib/storage/step-files";
+import { ensureCertificateIssued } from "@/features/certificate/server/certificate";
 import { logger } from "@/lib/logger";
 
 // Type export
@@ -89,11 +90,20 @@ export async function updateAccountStatus(
   userId: string,
   accountStatus: "PENDING" | "APPROVED" | "REJECTED" | "GRADUATED",
 ) {
-  return prisma.user.update({
+  const updated = await prisma.user.update({
     where: { id: userId },
     data: { accountStatus },
     select: { id: true, email: true, name: true, lastName: true, role: true, accountStatus: true },
   });
+
+  // #208 review: Mezun edilen stajyerin sertifikası ANINDA resmileştirilir —
+  // seri no + issuedAt DB'ye yazılır. Aksi halde öğrenciye/QR'a türetilmiş ama
+  // kayıtlı OLMAYAN bir numara gösterilir ve /verify-certificate "bulunamadı" der.
+  if (accountStatus === "GRADUATED") {
+    await ensureCertificateIssued(userId);
+  }
+
+  return updated;
 }
 
 // ------------------------------------

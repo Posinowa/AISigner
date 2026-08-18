@@ -116,6 +116,34 @@ olduğunu hatırlayın; aksi halde onboarding tamamen çöker.
 `rate-limit.ts`, forgot-password `resetTokens`, `metrics.ts` — çok-instance/serverless'ta
 Redis gerekir → `DEPLOYMENT.md`.
 
+### Mezuniyet & Sertifika Doğrulama Sistemi (#208)
+- **Mezuniyet Durumu (`accountStatus: GRADUATED`)**: Portfolyo salt-okunur (Seçenek A). Öğrenci dashboard, yol haritası adımları, dosyaları, yorumları ve sertifikasını görüntüleyebilir; ancak adım durumu değiştirme, dosya yükleme/silme ve yorum ekleme/düzenleme/silme API'leri 403 ile engellenir.
+- **Sertifika Doğrulama**: `/verify-certificate/[certificateNumber]` public doğrulama sayfası (`middleware.ts` `publicPaths` içinde). QR kod veya link üzerinden herkes sertifikanın geçerliliğini teyit edebilir.
+- **Sertifika Notu (`completionGrade`)**: Varsayılan "Üstün Başarı" kaldırıldı (nullable). Admin mezun ederken veya sertifika düzenlerken açıkça seçer (`Üstün Başarı`, `Onur Derecesi`, `Yüksek Başarı`, `Başarılı` veya boş/belirlenmedi).
+- **Stajyer Sertifika Erişimi**: Yalnızca `GRADUATED` durumundaki veya sertifikası düzenlenmiş (`issuedAt !== null`) öğrenciler sertifikalarını görüntüleyebilir (aktif öğrencilere 403).
+- **⚠️ Sertifika persist sözleşmesi (bozmayın)**: Bir belge ancak `certificateNumber` **ve** `issuedAt`
+  DB'de kayıtlıysa **resmidir** (`CertificateData.isIssued`). Mezuniyet (`updateAccountStatus →
+  GRADUATED`) `ensureCertificateIssued()` ile bunları **kalıcı yazar**; öğrenci ucu eski kayıtlar
+  için kendi kendini onarır. Aksi halde öğrenciye/QR'a **kayıtlı olmayan** bir seri no gösterilir
+  ve `/verify-certificate` "bulunamadı" der — doğrulama özelliğinin değeri kaybolur.
+- **Public verify rate-limit**: `/verify-certificate` IP başına 60 sn'de 20 sorgu (seri no
+  enumeration koruması). `generateMetadata` + sayfa React `cache` ile **tek DB sorgusu** paylaşır.
+- **Mezun yazma yetkisi — bilinçli kararlar (#208)**:
+  - **Kapalı**: adım durumu, dosya yükleme/silme, yorum ekleme/düzenleme/silme, **AI chat**
+    (her mesaj Gemini maliyeti + aktif staja bağlı araç) → 403.
+  - **Açık (bilinçli)**: **öneri/istek (suggestions)** ve **mesajlaşma (`POST /api/messages`)** —
+    ikisi de *insan iletişimi* kanalıdır; mezunun mentörüne/admin'e yazabilmesi meşru ve düşük
+    riskli. Ürün daraltmak isterse ilgili POST uçlarına GRADUATED kontrolü eklenmeli.
+  - **Ayrım ilkesi**: *sistem durumunu değiştiren* (adım/dosya/yorum) ve *ücretli AI* uçları
+    kapalı; *insan iletişimi* açık.
+- **⚠️ Sertifika yayınlama tek noktadan**: Belgeyi resmileştiren tek yer **mezuniyettir**
+  (`ensureCertificateIssued`). Admin'in not/derece kaydetmesi (`updateCertificateDetails`)
+  `issuedAt` **yazmaz** — aksi halde mezun olmayan öğrencinin belgesi public doğrulamada
+  geçerli görünürdü. `certificateNumber` **@unique**; çakışmada seri no yeniden üretilir.
+- **Public verify PII/enumeration**: rate-limit kontrolü `getVerification` **içinde** —
+  Next.js `generateMetadata`'yı sayfadan önce çalıştırdığı için limit yalnız gövdede olsaydı
+  `<title>` üzerinden ad + seri no sızardı. Tüm metadata `robots: noindex` (PII sayfası).
+
 ## Komutlar
 
 ```bash
@@ -140,4 +168,6 @@ docker compose up -d  # db (+app) — uploads kalıcı volume'da
 
 ---
 
-*Son güncelleme: Temmuz 2026 — kapsamlı tarama + #111–#116 düzeltme oturumu*
+*Son güncelleme: Ağustos 2026 — #208 Mezuniyet sertifikası, doğrulama sayfası ve salt-okunur mezun portfolyo erişimi*
+
+

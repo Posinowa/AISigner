@@ -14,8 +14,8 @@ vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 
 import { PUT, DELETE } from "./route";
 
-function authAs(id: string, role: "MENTOR" | "STUDENT" = "STUDENT") {
-  requireAuthMock.mockResolvedValue({ authorized: true, session: { user: { id, role } } });
+function authAs(id: string, role: "MENTOR" | "STUDENT" = "STUDENT", accountStatus = "APPROVED") {
+  requireAuthMock.mockResolvedValue({ authorized: true, session: { user: { id, role, accountStatus } } });
 }
 const params = (stepId = "step-1", commentId = "c-1") => Promise.resolve({ stepId, commentId });
 function req(body: unknown) {
@@ -26,10 +26,22 @@ function req(body: unknown) {
   });
 }
 
-describe("yorum düzenle/sil — yetki sınırları (#181)", () => {
+describe("yorum düzenle/sil — yetki sınırları (#181) & GRADUATED (#208)", () => {
   beforeEach(() => vi.clearAllMocks());
 
   // ---- PUT (düzenle) ----
+  it("PUT: GRADUATED öğrenci yorum düzenleyemez → 403 (#208)", async () => {
+    authAs("student-1", "STUDENT", "GRADUATED");
+    prismaMock.stepComment.findUnique.mockResolvedValue({ id: "c-1", stepId: "step-1", authorId: "student-1" });
+
+    const res = await PUT(req({ content: "yeni" }), { params: params() });
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toContain("Mezun öğrenciler");
+    expect(prismaMock.stepComment.update).not.toHaveBeenCalled();
+  });
+
   it("PUT: başkasının yorumu → 403, güncelleme yok", async () => {
     authAs("student-1");
     prismaMock.stepComment.findUnique.mockResolvedValue({ id: "c-1", stepId: "step-1", authorId: "baskasi" });
@@ -70,6 +82,16 @@ describe("yorum düzenle/sil — yetki sınırları (#181)", () => {
   });
 
   // ---- DELETE (sil) ----
+  it("DELETE: GRADUATED öğrenci yorum silemez → 403 (#208)", async () => {
+    authAs("student-1", "STUDENT", "GRADUATED");
+    const res = await DELETE(req({}), { params: params() });
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toContain("Mezun öğrenciler");
+    expect(prismaMock.stepComment.delete).not.toHaveBeenCalled();
+  });
+
   it("DELETE: yorum sahibi → siler", async () => {
     authAs("student-1");
     prismaMock.stepComment.findUnique.mockResolvedValue({ id: "c-1", stepId: "step-1", authorId: "student-1" });
