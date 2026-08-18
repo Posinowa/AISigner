@@ -8,28 +8,59 @@ const prisma = new PrismaClient();
 // ataması ve örnek proje şablonları oluşturan birleşik demo seed akışı. Tüm adımlar
 // upsert/varlık-kontrolü ile idempotent — tekrar çalıştırmak duplicate üretmez.
 async function main() {
+  // #216 review: Seed artık demo hesapların şifre/rol/accountStatus'unu EZİYOR.
+  // Bu yıkıcı davranış prod/staging'de kazara çalışırsa, zayıf ve bilinen bir
+  // parolayla ONAYLI ADMIN hesabı üretir (arka kapı). DEPLOYMENT.md uyarısı bir
+  // SÜREÇ kontrolüdür; burada KOD kontrolü şart.
+  if (process.env.NODE_ENV === "production") {
+    console.error(
+      "❌ Seed production ortamında çalıştırılamaz — demo hesapların şifresini/rolünü ezer.\n" +
+        "   Gerçek yönetici hesabı için: npm run create:admin (bkz. #206 / DEPLOYMENT.md)",
+    );
+    process.exit(1);
+  }
+
   const users: { email: string; name: string; role: "ADMIN" | "MENTOR" | "STUDENT" }[] = [
     { email: "admin@example.com", name: "Admin User", role: "ADMIN" },
     { email: "mentor@example.com", name: "Mentor User", role: "MENTOR" },
     { email: "student@example.com", name: "Student User", role: "STUDENT" },
   ];
 
-  const password = "geçici_şifre";
+  // #216: Demo şifresi `DEMO_PASSWORD` env'inden okunur; verilmezse yerleşik
+  // geliştirme varsayılanı kullanılır. (Seed YALNIZ yereldir — prod'da gerçek
+  // yönetici için `npm run create:admin` kullanılır, bkz. DEPLOYMENT.md.)
+  //
+  // ⚠️ Varsayılan DEĞİŞTİRİLMEZ: README, CONTRIBUTING ve scripts/reset-passwords.ts
+  // bu değeri belgeler. Değiştirilecekse hepsi AYNI commit'te güncellenmelidir.
+  const DEFAULT_DEMO_PASSWORD = "geçici_şifre";
+  const passwordFromEnv = Boolean(process.env.DEMO_PASSWORD);
+  const password = process.env.DEMO_PASSWORD || DEFAULT_DEMO_PASSWORD;
   const hashedPassword = await hash(password);
 
   for (const user of users) {
-    // Idempotent işlem: upsert kullanıyoruz
+    // Idempotent işlem: upsert kullanıyoruz (mevcutsa şifre ve APPROVED durumunu tazele)
     await prisma.user.upsert({
       where: { email: user.email }, // Benzersiz email kontrolü
-      update: {}, // Eğer varsa güncelleme yapma
+      update: {
+        password: hashedPassword,
+        role: user.role,
+        accountStatus: "APPROVED",
+      },
       create: {
         email: user.email,
         name: user.name,
         role: user.role, // schema.prisma'daki Role enum'una göre
         password: hashedPassword, // string hash
+        accountStatus: "APPROVED",
       },
     });
-    console.log(`✅ ${user.role} user created: ${user.email}`);
+    // Güvenlik: env'den GELEN şifre loglanmaz (terminal/CI çıktısına sızmasın);
+    // yalnız yerleşik varsayılan gösterilir.
+    console.log(
+      `✅ ${user.role} user ready: ${user.email} (şifre: ${
+        passwordFromEnv ? "DEMO_PASSWORD env'inden" : password
+      })`,
+    );
   }
 
   // #56: Student'ı mentor'a ata + demo için gerçekçi bir profil oluştur.
