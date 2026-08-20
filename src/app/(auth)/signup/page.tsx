@@ -25,7 +25,7 @@ export default function SignupPage() {
       subtitle={
         <>
           Zaten hesabınız var mı?{" "}
-          <Link href="/signin" className="font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300">
+          <Link href="/signin" className="font-semibold text-primary hover:text-primary/80">
             Giriş yapın
           </Link>
         </>

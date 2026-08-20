@@ -71,7 +71,7 @@ function SigninForm() {
       subtitle={
         <>
           Hesabınız yok mu?{" "}
-          <Link href="/signup" className="font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:underline">
+          <Link href="/signup" className="font-semibold text-primary hover:text-primary/80 hover:underline">
             Kayıt olun
           </Link>
         </>
@@ -108,7 +108,7 @@ function SigninForm() {
             <div className="mt-1.5 text-right">
               <Link
                 href="/forgot-password"
-                className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 hover:underline"
+                className="text-xs font-medium text-primary hover:text-primary/80 hover:underline"
               >
                 Şifremi Unuttum
               </Link>

@@ -38,12 +38,12 @@ export function AuthCard({
       </div>
       <div className={`w-full ${width === "lg" ? "max-w-lg" : "max-w-md"}`}>
         <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200/80 dark:border-slate-800 overflow-hidden">
-          <div className="h-1 bg-indigo-600" />
+          <div className="h-1 bg-primary" />
 
           <div className="p-8 sm:p-10">
             <div className="mb-8 text-center">
-              <div className="mx-auto mb-4 h-12 w-12 rounded-xl bg-indigo-600 flex items-center justify-center shadow-md shadow-indigo-600/20">
-                <Icon className="w-6 h-6 text-white" aria-hidden="true" />
+              <div className="mx-auto mb-4 h-12 w-12 rounded-xl bg-primary flex items-center justify-center shadow-md shadow-primary/20">
+                <Icon className="w-6 h-6 text-primary-foreground" aria-hidden="true" />
               </div>
               <h1
                 ref={titleRef}

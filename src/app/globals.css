@@ -20,7 +20,9 @@
   --color-popover: #ffffff;
   --color-popover-foreground: #090d16;
 
-  --color-primary: #4338ca;           /* Refined Indigo-700 / Indigo-600 */
+  /* #237: Marka rengi AISigner logosundan geliyor (lacivert). Acilis sayfasi
+     ile panel arasindaki renk dikisini kapatir. */
+  --color-primary: #23356c;           /* logo laciverti — beyaz yazi ile 11.68 */
   --color-primary-foreground: #ffffff;
 
   --color-secondary: #f1f5f9;         /* slate-100 */
@@ -29,15 +31,17 @@
   --color-muted: #f8fafc;             /* slate-50 */
   --color-muted-foreground: #64748b;  /* slate-500 */
 
-  --color-accent: #ecfdf5;            /* emerald-50 accent */
-  --color-accent-foreground: #047857; /* emerald-700 */
+  /* #237: Hover tonu emerald'den lacivert tintine cevrildi. Emerald "basari"
+     anlamini tasiyor; genel hover rengi olarak kullanilmasi yanilticiydi. */
+  --color-accent: #eef1f7;            /* lacivert tinti — uzerinde lacivert yazi 10.33 */
+  --color-accent-foreground: #23356c;
 
   --color-destructive: #dc2626;       /* red-600 */
   --color-destructive-foreground: #ffffff;
 
   --color-border: #e2e8f0;            /* slate-200 */
   --color-input: #e2e8f0;             /* slate-200 */
-  --color-ring: #6366f1;              /* indigo-500 */
+  --color-ring: #2d5890;              /* odak halkasi — lacivert x orta mavi */
 
   --radius: 0.75rem;
 }
@@ -54,8 +58,11 @@
   --color-popover: #0f172a;
   --color-popover-foreground: #f1f5f9;
 
-  --color-primary: #6366f1;           /* indigo-500 */
-  --color-primary-foreground: #ffffff;
+  /* #237: Lacivert koyu zeminde 1.66 kontrast veriyor (AA'yi gecmiyor), bu
+     yuzden koyu temada logonun ORTA MAVISI kullaniliyor: 5.73, gecer.
+     Yazi rengi beyaz DEGIL — beyaz bu ton uzerinde 3.39 ile kalir. */
+  --color-primary: #3e92cc;           /* logonun orta mavisi */
+  --color-primary-foreground: #090d16;
 
   --color-secondary: #1e293b;         /* slate-800 */
   --color-secondary-foreground: #f1f5f9;
@@ -63,12 +70,12 @@
   --color-muted: #1e293b;             /* slate-800 */
   --color-muted-foreground: #94a3b8;  /* slate-400 */
 
-  --color-accent: #064e3b;            /* emerald-900 */
-  --color-accent-foreground: #6ee7b7;
+  --color-accent: #16233d;            /* koyu lacivert tinti */
+  --color-accent-foreground: #cbd9ef;
 
   --color-border: #1e293b;            /* slate-800 */
   --color-input: #334155;             /* slate-700 */
-  --color-ring: #6366f1;
+  --color-ring: #3e92cc;
 }
 
 html {
