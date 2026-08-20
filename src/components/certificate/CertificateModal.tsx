@@ -66,12 +66,11 @@ export function CertificateModal({
 
     try {
       const iframe = document.createElement("iframe");
-      iframe.style.position = "fixed";
-      iframe.style.right = "0";
-      iframe.style.bottom = "0";
-      iframe.style.width = "0";
-      iframe.style.height = "0";
-      iframe.style.border = "none";
+      // #235: 0x0 iframe kullanma. Tarayicilarin bir kismi sifir boyutlu
+      // iframe'in icerigine layout uygulamaz ve print() bos sayfa uretir.
+      // Gercek A4 olcusu verip cerceveyi ekranin disina aliyoruz.
+      iframe.style.cssText =
+        "position:fixed;left:-10000px;top:0;width:210mm;height:297mm;border:0;";
       iframe.setAttribute("aria-hidden", "true");
       document.body.appendChild(iframe);
 
@@ -129,13 +128,46 @@ export function CertificateModal({
       `);
       doc.close();
 
-      iframe.contentWindow?.focus();
-      setTimeout(() => {
-        iframe.contentWindow?.print();
-        setTimeout(() => {
-          document.body.removeChild(iframe);
-        }, 1000);
-      }, 250);
+      const win = iframe.contentWindow;
+      if (!win) {
+        iframe.remove();
+        window.print();
+        return;
+      }
+
+      const temizle = () => iframe.remove();
+
+      const yazdir = async () => {
+        // #235: Temizligi EN BASTA kaydet. Asagidaki bekleme ne olursa olsun
+        // (fonts API takilsa, hata atsa) cerceve DOM'da unutulmaz.
+        // iframe 1sn sonra degil, yazdirma bitince kaldirilir — diyalog
+        // acikken DOM'dan cikarilirsa cikti bozulur.
+        win.addEventListener("afterprint", temizle, { once: true });
+        // afterprint her tarayicida tetiklenmiyor → guvenlik agi
+        setTimeout(temizle, 120_000);
+
+        // #235: Sabit 250ms gecikme yerine gercek hazir olma sinyali.
+        // Kopyalanan <link rel=stylesheet> ve yazi tipleri inmeden print()
+        // cagrilirsa cikti bicimsiz ya da bos olur. Bekleme SINIRLI: yazi
+        // tipleri hic gelmezse yazdirmayi sonsuza kadar engellemesin.
+        try {
+          await Promise.race([
+            doc.fonts?.ready ?? Promise.resolve(),
+            new Promise((r) => setTimeout(r, 2_000)),
+          ]);
+        } catch {
+          // fonts API yoksa/basarisizsa yazdirmaya yine de devam et
+        }
+
+        win.focus();
+        win.print();
+      };
+
+      if (doc.readyState === "complete") {
+        void yazdir();
+      } else {
+        win.addEventListener("load", () => void yazdir(), { once: true });
+      }
     } catch (e) {
       console.error("Print error:", e);
       window.print();
