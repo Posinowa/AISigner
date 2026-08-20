@@ -248,7 +248,7 @@ export default function OnboardingForm({
                 </span>
                 {index < allSteps.length - 1 && (
                   <div className={`absolute top-6 left-[50%] w-full h-[2px] -z-0 transition-all duration-300 ${
-                    index < step ? 'bg-blue-600' : 'bg-gray-200'
+                    index < step ? 'bg-primary' : 'bg-gray-200'
                   }`} />
                 )}
               </div>
@@ -334,7 +334,7 @@ export default function OnboardingForm({
                     id="ob-knownTech"
                     {...register("experience.knownTech")}
                     rows={4}
-                    className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-700 rounded-xl focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none resize-none transition-all"
+                    className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-700 rounded-xl focus:border-blue-600 focus:ring-1 focus:ring-ring outline-none resize-none transition-all"
                     placeholder="Bildiğiniz teknolojileri ve mevcut durumunuzu anlatın..."
                   />
                   {stepAttempted[1] && errors.experience?.knownTech && <p className="text-red-500 dark:text-red-400 text-xs">{errors.experience.knownTech.message}</p>}
@@ -374,7 +374,7 @@ export default function OnboardingForm({
                     id="ob-futureGoal"
                     {...register("vision.futureGoal")}
                     rows={4}
-                    className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-700 rounded-xl focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none resize-none transition-all"
+                    className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-700 rounded-xl focus:border-blue-600 focus:ring-1 focus:ring-ring outline-none resize-none transition-all"
                     placeholder="Hayalinizdeki projeleri ve hedeflerinizi detaylandırın..."
                   />
                   {stepAttempted[2] && errors.vision?.futureGoal && <p className="text-red-500 dark:text-red-400 text-xs">{errors.vision.futureGoal.message}</p>}
@@ -396,7 +396,7 @@ export default function OnboardingForm({
                     id="ob-learningStyle"
                     {...register("workingStyle.learningStyle")}
                     rows={4}
-                    className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-700 rounded-xl focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none resize-none transition-all"
+                    className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-700 rounded-xl focus:border-blue-600 focus:ring-1 focus:ring-ring outline-none resize-none transition-all"
                     placeholder="Nasıl bir çalışma tarzı sizi daha verimli yapar?"
                   />
                   {stepAttempted[3] && errors.workingStyle?.learningStyle && <p className="text-red-500 dark:text-red-400 text-xs">{errors.workingStyle.learningStyle.message}</p>}
@@ -464,7 +464,7 @@ export default function OnboardingForm({
                         maxLength={2000}
                         value={answers[q.id] ?? ""}
                         onChange={(e) => setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))}
-                        className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-700 rounded-xl focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none resize-none transition-all"
+                        className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-700 rounded-xl focus:border-blue-600 focus:ring-1 focus:ring-ring outline-none resize-none transition-all"
                         placeholder="Cevabınız..."
                       />
                     )}
@@ -491,7 +491,7 @@ export default function OnboardingForm({
                 <Button
                   type="button"
                   onClick={onNext}
-                  className="h-12 px-8 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-all shadow-md shadow-blue-200"
+                  className="h-12 px-8 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold transition-all shadow-md shadow-primary"
                 >
                   Sonraki Adım <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
@@ -499,7 +499,7 @@ export default function OnboardingForm({
                 <Button 
                   type="submit" 
                   disabled={isSubmitting}
-                  className="h-12 px-10 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold transition-all shadow-lg shadow-blue-200 disabled:opacity-70"
+                  className="h-12 px-10 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold transition-all shadow-lg shadow-primary disabled:opacity-70"
                 >
                   {isSubmitting ? (
                     <><Loader2 className="w-5 h-5 animate-spin mr-3" /> Kaydediliyor...</>

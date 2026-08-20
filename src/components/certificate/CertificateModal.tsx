@@ -371,7 +371,7 @@ export function CertificateModal({
                 <select
                   value={completionGrade}
                   onChange={(e) => setCompletionGrade(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3.5 py-2.5 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3.5 py-2.5 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="">Belirlenmedi (Seçilmedi)</option>
                   <option value="Üstün Başarı">🎖️ Üstün Başarı (High Honors)</option>
@@ -408,7 +408,7 @@ export function CertificateModal({
                 value={mentorNote}
                 onChange={(e) => setMentorNote(e.target.value)}
                 placeholder="Stajyerin teknik performansı, problem çözme yeteneği ve katkıları hakkında referans mektubu..."
-                className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-3 text-xs text-slate-800 dark:text-slate-200 leading-relaxed focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-3 text-xs text-slate-800 dark:text-slate-200 leading-relaxed focus:outline-none focus:ring-2 focus:ring-ring transition"
               />
 
               {/* Hızlı Şablon Butonları */}
@@ -440,7 +440,7 @@ export function CertificateModal({
                 type="button"
                 onClick={handleSaveDetails}
                 disabled={saving}
-                className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-md shadow-indigo-600/20 transition disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold shadow-md shadow-primary/20 transition disabled:opacity-50"
               >
                 {saving ? (
                   <Loader2 className="w-4 h-4 animate-spin" />

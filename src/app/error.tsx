@@ -34,7 +34,7 @@ export default function Error({
           </p>
           <button
             onClick={reset}
-            className="mt-6 w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-4 py-3 font-semibold text-white shadow-md shadow-blue-200 transition-all focus:outline-none focus:ring-3 focus:ring-blue-300"
+            className="mt-6 w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-4 py-3 font-semibold text-white shadow-md shadow-primary transition-all focus:outline-none focus:ring-3 focus:ring-ring"
           >
             Tekrar Dene
           </button>
