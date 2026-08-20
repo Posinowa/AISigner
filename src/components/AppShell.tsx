@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { GraduationCap } from "lucide-react";
 import LogoutButton from "@/components/LogoutButton";
 import { UnreadBadge } from "@/features/messaging/ui/UnreadBadge";
+import Image from "next/image";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 type Role = "ADMIN" | "MENTOR" | "STUDENT";
@@ -59,9 +59,18 @@ export function AppShell({ role }: { role: Role }) {
     <header className="sticky top-0 z-40 bg-white/90 dark:bg-slate-900/90 backdrop-blur border-b border-slate-200 dark:border-slate-700">
       <nav className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-3">
         <Link href={home} className="flex items-center gap-2 shrink-0">
-          <span className="w-8 h-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center shadow-sm">
-            <GraduationCap className="w-5 h-5" />
-          </span>
+          {/*
+            #237: Jenerik GraduationCap ikonu yerine AISigner markasi. Acilis
+            sayfasindan gelen kullanici panelde de ayni markayi goruyor.
+          */}
+          <Image
+            src="/brand/aisigner-mark.png"
+            alt=""
+            width={37}
+            height={32}
+            priority
+            className="h-8 w-auto"
+          />
           <span className="font-bold text-slate-900 dark:text-slate-100 hidden sm:inline">AISigner</span>
         </Link>
 
