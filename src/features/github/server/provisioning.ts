@@ -10,6 +10,7 @@ import {
   closeGitHubIssue,
   closeGitHubMilestone,
   ensureGitHubIssueOpen,
+  ensureGitHubMilestoneOpen,
 } from "./github-api";
 
 /** Telafi takip listesinden bir numarayı çıkarır (persist edilenler kapatılmaz). */
@@ -159,13 +160,32 @@ export async function provisionGitHubWorkspace(assignmentId: string): Promise<Pr
 
     // Her bir adım için (Milestone/Faz) detaylı Issue'ları AI ile üretip kaydedelim
     for (const step of assignment.roadmap.steps) {
-      const generatedIssues = await generateStepIssues({
-        stepId: step.id,
-        stepTitle: step.title,
-        stepDescription: step.description,
-        projectTitle: assignment.projectTemplate.title,
-        experienceLevel: assignment.studentProfile.experienceLevel,
-      });
+      // #218 review [P1]: Mevcut kayıtları generate'ten ÖNCE oku.
+      //
+      // `generateStepIssues` → `storeGeneratedIssues` içinde `stepIssue.deleteMany`
+      // çalışır. Bu adımda GitHub'a gönderilmiş (githubIssueUrl dolu) kayıtlar varsa
+      // yeniden üretmek onları SİLER; aşağıdaki "URL varsa atla" dalı hiç çalışmaz ve
+      // ikinci provision GitHub'da DUPLICATE issue açar, öğrencinin görev linkleri
+      // kaybolur. Bu yüzden provision edilmiş adımda AI'yı hiç çağırmıyoruz
+      // (aynı zamanda gereksiz AI maliyetini de önler).
+      const existingIssues = await prisma.stepIssue.findMany({ where: { stepId: step.id } });
+      const hasProvisionedIssues = existingIssues.some((i) => i.githubIssueUrl);
+
+      let generatedIssues: Awaited<ReturnType<typeof generateStepIssues>> = [];
+      if (hasProvisionedIssues) {
+        logger.info("Adımda GitHub'a gönderilmiş issue var — AI üretimi atlandı (idempotent)", {
+          stepId: step.id,
+          assignmentId,
+        });
+      } else {
+        generatedIssues = await generateStepIssues({
+          stepId: step.id,
+          stepTitle: step.title,
+          stepDescription: step.description,
+          projectTitle: assignment.projectTemplate.title,
+          experienceLevel: assignment.studentProfile.experienceLevel,
+        });
+      }
 
       let milestoneNumber: number | undefined;
       let stepIssueUrl = `${githubRepoUrl}/issues?q=is%3Aissue+milestone%3A%22${encodeURIComponent(step.title)}%22`;
@@ -179,7 +199,11 @@ export async function provisionGitHubWorkspace(assignmentId: string): Promise<Pr
         });
         milestoneNumber = milestoneResult.milestoneNumber;
         stepIssueUrl = milestoneResult.htmlUrl;
-        if (!milestoneResult.alreadyExisted) {
+        if (milestoneResult.alreadyExisted) {
+          // #218 review: Yeniden kullanılan milestone önceki telafide kapatılmış
+          // olabilir → öğrenci kapalı faza yönlenmesin diye aç.
+          await ensureGitHubMilestoneOpen({ owner, repo, milestoneNumber });
+        } else {
           createdThisRun.milestones.push(milestoneResult.milestoneNumber);
         }
       }
@@ -198,8 +222,11 @@ export async function provisionGitHubWorkspace(assignmentId: string): Promise<Pr
         removeFrom(createdThisRun.milestones, milestoneNumber);
       }
 
-      // Issue kayıtlarını güncelle
-      const stepIssues = await prisma.stepIssue.findMany({ where: { stepId: step.id } });
+      // Issue kayıtlarını güncelle. Generate ÇALIŞTIYSA satırlar yeniden yazıldığı
+      // için tazelenmeli; atlandıysa yukarıda okunan (URL'li) kayıtlar geçerlidir.
+      const stepIssues = hasProvisionedIssues
+        ? existingIssues
+        : await prisma.stepIssue.findMany({ where: { stepId: step.id } });
       for (const [index, dbIssue] of stepIssues.entries()) {
         // #179 review: İdempotent yeniden çalıştırma — bu issue GitHub'da zaten
         // açılıp URL'i kaydedilmişse tekrar AÇMA (duplicate önlemi). Ancak issue

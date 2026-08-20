@@ -7,6 +7,8 @@ const GITHUB_API_BASE = "https://api.github.com";
 const MAX_ATTEMPTS = 3;
 const BASE_BACKOFF_MS = 500;
 const MAX_BACKOFF_MS = 8000;
+/** #218 review: Tek bir GitHub isteğinin üst süre sınırı. */
+const REQUEST_TIMEOUT_MS = 15000;
 
 export function isGitHubConfigured(): boolean {
   return Boolean(process.env.GITHUB_TOKEN);
@@ -30,11 +32,33 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** 429, secondary rate-limit (403 + remaining=0) ve 5xx geçici kabul edilir. */
-function isRetryable(res: Response): boolean {
+/**
+ * 429, 5xx ve 403-rate-limit geçici kabul edilir.
+ *
+ * #218 review [P2]: GitHub **secondary rate limit**'te primary kota çoğu zaman
+ * TÜKENMEZ (`x-ratelimit-remaining > 0`). Sinyal `Retry-After` başlığı ve/veya
+ * gövdedeki "secondary rate limit" ifadesidir. Yalnız `remaining === "0"`e bakmak
+ * toplu issue açışındaki gerçek 403'leri tek denemede düşürüyordu.
+ */
+async function isRetryable(res: Response): Promise<boolean> {
   if (res.status === 429) return true;
   if (res.status >= 500) return true;
-  if (res.status === 403 && res.headers.get("x-ratelimit-remaining") === "0") return true;
+
+  if (res.status === 403) {
+    // Primary kota bitti
+    if (res.headers.get("x-ratelimit-remaining") === "0") return true;
+    // Secondary limit: sunucu ne zaman tekrar deneyeceğimizi söylüyorsa geçicidir
+    if (res.headers.get("retry-after") !== null) return true;
+    // Son çare: gövde açıkça secondary limit diyorsa. `clone()` — asıl yanıtın
+    // gövdesi çağıran için okunmamış kalmalı.
+    try {
+      const body = await res.clone().text();
+      if (/secondary rate limit|abuse detection/i.test(body)) return true;
+    } catch {
+      // gövde okunamadı → kalıcı hata varsay
+    }
+  }
+
   return false;
 }
 
@@ -68,10 +92,14 @@ async function githubFetch(url: string, init?: RequestInit): Promise<Response> {
   let lastRes: Response | undefined;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    const res = await fetch(url, init);
+    // #218 review: Asılı kalan istek provisioning'i süresiz bloke etmesin.
+    const res = await fetch(url, {
+      ...init,
+      signal: init?.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
     lastRes = res;
 
-    if (!isRetryable(res) || attempt === MAX_ATTEMPTS) {
+    if (!(await isRetryable(res)) || attempt === MAX_ATTEMPTS) {
       return res;
     }
 
@@ -314,6 +342,42 @@ export function parseIssueNumber(issueUrl: string): number | null {
   if (!match) return null;
   const n = Number(match[1]);
   return Number.isSafeInteger(n) && n > 0 ? n : null;
+}
+
+/**
+ * #218 review: Yeniden kullanılan (422 → alreadyExisted) bir milestone KAPALI olabilir
+ * — önceki telafi veya elle kapatma. Öğrenci kapalı bir faza yönlenmesin diye açar.
+ * Best-effort: hata fırlatmaz.
+ */
+export async function ensureGitHubMilestoneOpen(params: {
+  owner: string;
+  repo: string;
+  milestoneNumber: number;
+}): Promise<boolean> {
+  const { owner, repo, milestoneNumber } = params;
+  try {
+    const base = `${GITHUB_API_BASE}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/milestones/${milestoneNumber}`;
+    const res = await githubFetch(base, { headers: getHeaders() });
+    if (!res.ok) return false;
+
+    const data = (await res.json()) as { state?: string };
+    if (data.state !== "closed") return true;
+
+    const reopen = await githubFetch(base, {
+      method: "PATCH",
+      headers: getHeaders(),
+      body: JSON.stringify({ state: "open" }),
+    });
+    if (!reopen.ok) {
+      logger.warn("Kapalı milestone yeniden açılamadı", { status: reopen.status, milestoneNumber, repo });
+      return false;
+    }
+    logger.info("Kapalı milestone yeniden açıldı (idempotent re-run)", { milestoneNumber, repo });
+    return true;
+  } catch (err) {
+    logger.warn("Milestone durumu kontrol edilemedi", { milestoneNumber, repo, err });
+    return false;
+  }
 }
 
 /**

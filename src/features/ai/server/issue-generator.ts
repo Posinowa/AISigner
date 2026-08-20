@@ -63,16 +63,31 @@ JSON Formatı:
 }
 
 async function storeGeneratedIssues(stepId: string, issues: GeneratedIssueSpec[]) {
-  // Önceki issue'ları temizle
+  // #218 review [P1]: GitHub'a GÖNDERİLMİŞ (githubIssueUrl dolu) kayıtlar SİLİNMEZ.
+  //
+  // Eskiden koşulsuz `deleteMany` yapılıyordu; bu, provisioning'in idempotency
+  // sözleşmesini bozuyordu (URL'ler silinince re-run duplicate GitHub issue açıyor,
+  // öğrencinin mevcut görev linkleri kayboluyordu). Yalnızca henüz gönderilmemiş
+  // taslak satırlar tazelenir.
   await prisma.stepIssue.deleteMany({
-    where: { stepId },
+    where: { stepId, githubIssueUrl: null },
   });
+
+  // Korunan (gönderilmiş) kayıtların sırasını bozmamak için order'ı onların
+  // ardından devam ettir.
+  const preserved = await prisma.stepIssue.findMany({
+    where: { stepId },
+    select: { order: true },
+    orderBy: { order: "desc" },
+    take: 1,
+  });
+  const orderOffset = preserved[0]?.order ?? 0;
 
   // Yeni üretilenleri ekle
   await prisma.stepIssue.createMany({
     data: issues.map((issue, index) => ({
       stepId,
-      order: index + 1,
+      order: orderOffset + index + 1,
       title: issue.title,
       bodyMarkdown: issue.bodyMarkdown,
     })),

@@ -84,6 +84,49 @@ describe("github-api — rate-limit retry (#179 review)", () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
+  // #218 review [P2]: Secondary limit'te primary kota TÜKENMEZ (remaining > 0).
+  // Sinyal Retry-After ve/veya gövdedeki "secondary rate limit" ifadesidir.
+  it("secondary limit — 403 + Retry-After (remaining > 0) yeniden denenir", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        res(403, { message: "You have exceeded a secondary rate limit" }, {
+          "retry-after": "0",
+          "x-ratelimit-remaining": "4999", // primary kota DOLU
+        }),
+      )
+      .mockResolvedValueOnce(res(201, { number: 8, html_url: "https://gh/issues/8" }));
+
+    const result = await createGitHubIssue(issueParams);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.issueNumber).toBe(8);
+  });
+
+  it("secondary limit — Retry-After yoksa GÖVDEDEN anlaşılır ve yeniden denenir", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        res(403, { message: "You have exceeded a secondary rate limit. Please wait." }, {
+          "x-ratelimit-remaining": "4999",
+        }),
+      )
+      .mockResolvedValueOnce(res(201, { number: 9, html_url: "https://gh/issues/9" }));
+
+    const result = await createGitHubIssue(issueParams);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.issueNumber).toBe(9);
+  });
+
+  it("gerçek yetki hatası (403, rate-limit sinyali YOK) yeniden DENENMEZ", async () => {
+    fetchMock.mockResolvedValue(
+      res(403, { message: "Resource not accessible by integration" }, { "x-ratelimit-remaining": "4999" }),
+    );
+
+    await expect(createGitHubIssue(issueParams)).rejects.toThrow(/HTTP 403/);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("kalıcı hata (401) yeniden DENENMEZ — tek çağrı", async () => {
     fetchMock.mockResolvedValue(res(401, { message: "Bad credentials" }));
 

@@ -11,6 +11,7 @@ const {
   closeIssueMock,
   closeMilestoneMock,
   ensureIssueOpenMock,
+  ensureMilestoneOpenMock,
 } = vi.hoisted(() => ({
   requireAuthMock: vi.fn(),
   prismaMock: {
@@ -26,6 +27,7 @@ const {
   closeIssueMock: vi.fn(),
   closeMilestoneMock: vi.fn(),
   ensureIssueOpenMock: vi.fn(),
+  ensureMilestoneOpenMock: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/guard", () => ({
@@ -44,6 +46,7 @@ vi.mock("./github-api", () => ({
   closeGitHubIssue: (...a: unknown[]) => closeIssueMock(...a),
   closeGitHubMilestone: (...a: unknown[]) => closeMilestoneMock(...a),
   ensureGitHubIssueOpen: (...a: unknown[]) => ensureIssueOpenMock(...a),
+  ensureGitHubMilestoneOpen: (...a: unknown[]) => ensureMilestoneOpenMock(...a),
 }));
 
 import { provisionGitHubWorkspace, toAsciiSlug, shortId } from "./provisioning";
@@ -228,6 +231,57 @@ describe("provisionGitHubWorkspace (#178 & #179)", () => {
       expect(res.success).toBe(true);
       expect(createIssueMock).not.toHaveBeenCalled();
       expect(prismaMock.stepIssue.update).not.toHaveBeenCalled();
+    });
+
+    // #218 review [P1]: Önceki halde bu dal PRODUCTION'DA ÖLÜ KODDU.
+    // `generateStepIssues` → `storeGeneratedIssues` içinde `stepIssue.deleteMany`
+    // çalışıp kayıtlı `githubIssueUrl`'leri siliyordu; sonraki "URL varsa atla"
+    // kontrolü hiç true olmuyor, ikinci provision duplicate issue açıyordu.
+    // Test mock'u `deleteMany`'yi çalıştırmadığı için yeşil görünüyordu.
+    //
+    // Artık atlama kararı generate'ten ÖNCE veriliyor; bu testin kanıtı da odur:
+    // provision edilmiş adımda AI üretimi HİÇ ÇAĞRILMAZ → silme yolu hiç açılmaz.
+    it("provision edilmiş adımda generateStepIssues HİÇ çağrılmaz (silme yolu açılmaz)", async () => {
+      realGitHubFixture([
+        {
+          id: "iss-1",
+          title: "Task 1",
+          stepId: "s1",
+          githubIssueUrl: "https://github.com/Posinowa/aisigner-ali-proje/issues/5",
+        },
+      ]);
+
+      await provisionGitHubWorkspace("ap-1");
+
+      // AI çağrılmadı → storeGeneratedIssues/deleteMany hiç çalışmadı → URL'ler duruyor.
+      expect(genIssuesMock).not.toHaveBeenCalled();
+      // Duplicate GitHub issue açılmadı.
+      expect(createIssueMock).not.toHaveBeenCalled();
+    });
+
+    it("HENÜZ provision edilmemiş adımda AI üretimi çalışır (regresyon değil)", async () => {
+      realGitHubFixture([{ id: "iss-1", title: "Task 1", stepId: "s1", githubIssueUrl: null }]);
+
+      await provisionGitHubWorkspace("ap-1");
+
+      expect(genIssuesMock).toHaveBeenCalledOnce();
+      expect(createIssueMock).toHaveBeenCalledOnce();
+    });
+
+    it("yeniden kullanılan (alreadyExisted) milestone kapalıysa yeniden açılır", async () => {
+      realGitHubFixture([{ id: "iss-1", title: "Task 1", stepId: "s1", githubIssueUrl: null }]);
+      createMilestoneMock.mockResolvedValue({
+        milestoneNumber: 7,
+        htmlUrl: "https://github.com/Posinowa/aisigner-ali-proje/milestone/7",
+        alreadyExisted: true,
+      });
+      ensureMilestoneOpenMock.mockResolvedValue(true);
+
+      await provisionGitHubWorkspace("ap-1");
+
+      expect(ensureMilestoneOpenMock).toHaveBeenCalledWith(
+        expect.objectContaining({ milestoneNumber: 7, repo: "aisigner-ali-proje" }),
+      );
     });
 
     it("kayıtlı issue KAPALIYSA re-run onu yeniden açar (öğrenci kapalı göreve düşmez)", async () => {
