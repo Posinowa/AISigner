@@ -162,3 +162,77 @@ describe("CertificateModal — yazdırma (#235)", () => {
     vi.useRealTimers();
   });
 });
+
+describe("CertificateModal — indirme (#235)", () => {
+  /*
+    jsdom'da varsayılan olarak hiç stil sayfası yok; o yüzden test ortamına
+    hem bir <link> hem de kuralı olan bir <style> enjekte ediyoruz. Aksi
+    halde eski (hatalı) kod da boş çıktı üretir ve test YALANCI YEŞİL olur.
+  */
+  const ISARET = "sertifika-stil-isareti";
+
+  beforeEach(() => {
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = "/_next/static/css/app/layout.css";
+    document.head.appendChild(link);
+
+    const stil = document.createElement("style");
+    stil.textContent = `.${ISARET} { color: rgb(1, 2, 3); }`;
+    document.head.appendChild(stil);
+  });
+
+  afterEach(() => {
+    document.head.querySelectorAll("link[rel='stylesheet'], style").forEach((n) => n.remove());
+  });
+
+  /*
+    Buton adı TAM eşleşmeyle aranıyor: JS regex'inin `i` bayrağı Türkçe
+    "İ" (U+0130) harfini "i"ye katlamaz, bu yüzden /indir/i eşleşmez.
+  */
+  /** İndirme akışında üretilen HTML'i Blob'dan yakalar. */
+  async function indirilenHtml(): Promise<string> {
+    let yakalanan = "";
+    const gercekBlob = globalThis.Blob;
+    class YakalayanBlob extends gercekBlob {
+      constructor(parcalar: BlobPart[], secenekler?: BlobPropertyBag) {
+        yakalanan = String(parcalar[0] ?? "");
+        super(parcalar, secenekler);
+      }
+    }
+    vi.stubGlobal("Blob", YakalayanBlob);
+    vi.stubGlobal("URL", {
+      ...URL,
+      createObjectURL: () => "blob:test",
+      revokeObjectURL: () => {},
+    });
+
+    ac();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Sertifikayı İndir" }));
+      await Promise.resolve();
+    });
+    return yakalanan;
+  }
+
+  it("stil bağlantısı KOPYALANMAZ — dosya diskte açılınca çözülemez", async () => {
+    const html = await indirilenHtml();
+    // <link rel=stylesheet href="/_next/..."> indirilen dosyada file:/// olarak
+    // çözülür ve sertifika çıplak HTML görünür — hatanın kök nedeni buydu.
+    expect(html).not.toMatch(/<link[^>]*stylesheet/i);
+    expect(html).not.toContain("/_next/static/css");
+  });
+
+  it("stil KURALLARI dosyanın içine gömülür", async () => {
+    const html = await indirilenHtml();
+    expect(html).toMatch(/<style>/);
+    // sadece <style> etiketi değil, gerçek kural metni de içeride olmalı
+    expect(html).toContain(ISARET);
+  });
+
+  it("sertifika içeriği ve doğrulama numarası dosyada yer alır", async () => {
+    const html = await indirilenHtml();
+    expect(html).toContain("Test Stajyer");
+    expect(html).toContain("AIS-2026-0001");
+  });
+});

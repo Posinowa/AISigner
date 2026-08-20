@@ -27,6 +27,31 @@ type CertificateModalProps = {
   onSave?: (data: { mentorNote: string; completionGrade: string }) => Promise<void>;
 };
 
+/**
+ * #235: Sayfadaki tum stil kurallarini METIN olarak toplar.
+ *
+ * Neden `<link rel="stylesheet">` etiketini kopyalamiyoruz: indirilen dosya
+ * diske kaydedilip acildiginda `/_next/static/css/...` yolu `file:///_next/...`
+ * olarak cozulur, hicbir stil yuklenmez ve sertifika ciplak HTML olarak gorunur.
+ * Ayni sekilde yazdirma cercevesinde de ag beklemesi gerekmez.
+ *
+ * Ayni kaynakli stil sayfalarinin `cssRules` erisimi acik; farkli kaynakli
+ * olanlar (varsa) sessizce atlanir.
+ */
+function stilKurallariniTopla(): string {
+  let css = "";
+  for (const sayfa of Array.from(document.styleSheets)) {
+    try {
+      for (const kural of Array.from(sayfa.cssRules)) {
+        css += kural.cssText + "\n";
+      }
+    } catch {
+      // farkli kaynakli stil sayfasi — okunamaz, atla
+    }
+  }
+  return css;
+}
+
 const DEFAULT_NOTE_TEMPLATES = [
   "Staj programı boyunca gösterdiği üstün problem çözme yeteneği, disiplin ve teknik yetkinlik ile projelerini başarıyla tamamlamıştır. Kendisini tebrik eder, profesyonel kariyerinde başarılar dileriz.",
   "Modern yazılım mimarisi, yapay zeka entegrasyonu ve takım çalışmasında sergilediği teknik vizyon ile staj dönemini üstün başarıyla tamamlamıştır.",
@@ -81,10 +106,7 @@ export function CertificateModal({
       }
 
       // Ana sayfadaki tüm Tailwind ve font stillerini iframe'e kopyala
-      let stylesHtml = "";
-      document.querySelectorAll("style, link[rel='stylesheet']").forEach((node) => {
-        stylesHtml += node.outerHTML;
-      });
+      const stylesHtml = `<style>${stilKurallariniTopla()}</style>`;
 
       doc.open();
       doc.write(`
@@ -182,10 +204,7 @@ export function CertificateModal({
     }
 
     try {
-      let stylesHtml = "";
-      document.querySelectorAll("style, link[rel='stylesheet']").forEach((node) => {
-        stylesHtml += node.outerHTML;
-      });
+      const stylesHtml = `<style>${stilKurallariniTopla()}</style>`;
 
       const fullHtml = `<!DOCTYPE html>
 <html lang="tr">
