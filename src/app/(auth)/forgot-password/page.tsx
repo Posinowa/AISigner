@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { KeyRound, ShieldCheck, CheckCircle2 } from "lucide-react";
 import { AuthCard } from "@/features/auth/ui/AuthCard";
 import { FormAlert } from "@/features/auth/ui/FormAlert";
 import { StepIndicator } from "@/features/auth/ui/StepIndicator";
@@ -18,24 +17,20 @@ type Step = "email" | "questions" | "newPassword" | "success";
 const VERIFY_URL = "/api/auth/forgot-password/verify";
 
 /** Adım başına başlık/ikon — render içinde dağılmasın diye tek yerde. */
-const stepMeta: Record<Step, { icon: typeof KeyRound; title: string; subtitle: string }> = {
+const stepMeta: Record<Step, { title: string; subtitle: string }> = {
   email: {
-    icon: KeyRound,
     title: "Şifremi Unuttum",
     subtitle: "Kayıtlı e-posta adresini gir",
   },
   questions: {
-    icon: ShieldCheck,
     title: "Güvenlik Soruları",
     subtitle: "Kimliğini doğrulamak için soruları cevapla",
   },
   newPassword: {
-    icon: KeyRound,
     title: "Yeni Şifre Belirle",
     subtitle: "Yeni şifreni belirle",
   },
   success: {
-    icon: CheckCircle2,
     title: "Şifre Değiştirildi",
     subtitle: "Artık yeni şifrenle giriş yapabilirsin",
   },
@@ -187,7 +182,6 @@ export default function ForgotPasswordPage() {
 
   return (
     <AuthCard
-      icon={meta.icon}
       title={meta.title}
       subtitle={meta.subtitle}
       titleRef={titleRef}

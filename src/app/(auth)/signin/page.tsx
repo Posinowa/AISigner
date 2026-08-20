@@ -4,7 +4,6 @@
 import { Suspense, useState } from "react"
 import { validateUser } from "./actions"
 import { signIn } from "next-auth/react"
-import { LogIn } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { AuthCard } from "@/features/auth/ui/AuthCard"
@@ -66,7 +65,6 @@ function SigninForm() {
 
   return (
     <AuthCard
-      icon={LogIn}
       title={justRegistered ? "Hoş Geldiniz!" : "Tekrar Hoşgeldiniz"}
       subtitle={
         <>
