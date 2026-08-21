@@ -38,6 +38,9 @@ export function FormAlert({
       role="alert"
       className="rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-600"
     >
+      {/* #247: başlık daha önce yalnızca başarı dalında render ediliyordu;
+          hata kutusuna geçilen title sessizce kayboluyordu. */}
+      {title && <p className="font-semibold text-red-700">{title}</p>}
       {children}
     </div>
   );

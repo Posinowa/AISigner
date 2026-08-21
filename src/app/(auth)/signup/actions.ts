@@ -7,6 +7,7 @@ import { signupSchema } from "@/features/auth/models/user"
 import { redirect } from "next/navigation"
 import { headers } from "next/headers"
 import { createRateLimiter } from "@/lib/rate-limit"
+import { sendVerificationEmail } from "@/features/auth/server/email-verification"
 
 const signupLimiter = createRateLimiter("signup", {
   maxRequests: 5,
@@ -56,7 +57,7 @@ export async function signupAction(
     if (existing) return { error: { email: ["Bu email zaten kayıtlı"] } }
 
     const hashedPassword = await hash(password)
-    await prisma.user.create({
+    const yeniKullanici = await prisma.user.create({
       data: {
         name: parsed.data.name.trim(),
         lastName: parsed.data.lastName.trim(),
@@ -67,6 +68,15 @@ export async function signupAction(
         // Yeni stajyer hesabı admin onayına kadar PENDING — aktif değildir.
         accountStatus: "PENDING",
       },
+      select: { id: true, name: true },
+    })
+
+    // #247: Doğrulama e-postası. Gönderilemezse kayıt AKIŞI KIRILMAZ —
+    // hesap oluşmuş olur, kullanıcı doğrulamayı sonra yapabilir.
+    await sendVerificationEmail({
+      userId: yeniKullanici.id,
+      email: normalizedEmail,
+      name: yeniKullanici.name,
     })
   } catch (err) {
     // redirect() Next.js'te NEXT_REDIRECT throw eder — onu yakalayıp swallow etmemeliyiz

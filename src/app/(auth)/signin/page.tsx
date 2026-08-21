@@ -10,6 +10,7 @@ import { AuthCard } from "@/features/auth/ui/AuthCard"
 import { AuthField } from "@/features/auth/ui/AuthField"
 import { FormAlert } from "@/features/auth/ui/FormAlert"
 import { AuthSubmitButton } from "@/features/auth/ui/AuthSubmitButton"
+import { dogrulamaMesaji } from "@/features/auth/ui/dogrulama-mesaji"
 
 const initialState = { error: {} as Record<string, string[]> }
 
@@ -19,6 +20,8 @@ function SigninForm() {
   const [isPending, setIsPending] = useState(false)
   const searchParams = useSearchParams()
   const justRegistered = searchParams.get("registered") === "true"
+  // #247: e-postadaki doğrulama bağlantısı kullanıcıyı buraya döndürür.
+  const dogrulama = dogrulamaMesaji(searchParams.get("dogrulama"))
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -75,6 +78,12 @@ function SigninForm() {
         </>
       }
     >
+      {dogrulama && (
+        <FormAlert variant={dogrulama.variant} title={dogrulama.title}>
+          {dogrulama.body}
+        </FormAlert>
+      )}
+
       {justRegistered && (
         <FormAlert variant="success" title="Hesabınız başarıyla oluşturuldu!">
           Şimdi e-posta ve şifrenizle giriş yapabilirsiniz.
