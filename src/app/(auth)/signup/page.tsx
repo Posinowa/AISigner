@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { Suspense, useState } from "react"
 import { useActionState } from "react"
+import { useSearchParams } from "next/navigation"
 import { signupAction } from "./actions"
 import Link from "next/link"
 import { AuthCard } from "@/features/auth/ui/AuthCard"
@@ -9,16 +10,26 @@ import { AuthField } from "@/features/auth/ui/AuthField"
 import { FormAlert } from "@/features/auth/ui/FormAlert"
 import { AuthSubmitButton } from "@/features/auth/ui/AuthSubmitButton"
 import { PasswordRules } from "@/features/auth/ui/PasswordRules"
+import {
+  BASVURU_ALAN_ADI,
+  basvuruTipiCoz,
+} from "@/features/auth/models/basvuru-tipi"
 
 const initialState = { error: {} as Record<string, string[]> }
 
-export default function SignupPage() {
+// useSearchParams Suspense boundary gerektiriyor — iç bileşene taşındı
+function SignupForm() {
   const [state, formAction, isPending] = useActionState(signupAction, initialState)
   const [password, setPassword] = useState("")
+  // #250: Açılış sayfasındaki "Mentör olmak istiyorum" buraya ?rol=mentor ile gelir.
+  // Görünen metin buna göre değişiyor; asıl rol kararı SUNUCUDA veriliyor.
+  const searchParams = useSearchParams()
+  const basvuruTipi = basvuruTipiCoz(searchParams.get("rol"))
+  const mentorBasvurusu = basvuruTipi === "mentor"
 
   return (
     <AuthCard
-      title="Hesap Oluştur"
+      title={mentorBasvurusu ? "Mentör Başvurusu" : "Hesap Oluştur"}
       width="lg"
       subtitle={
         <>
@@ -39,6 +50,16 @@ export default function SignupPage() {
       }
     >
       <form action={formAction} className="space-y-5">
+        {/* Sunucu bu alana güvenmiyor; beyaz listeyle çözüyor (#250). */}
+        <input type="hidden" name={BASVURU_ALAN_ADI} value={basvuruTipi} />
+
+        {mentorBasvurusu && (
+          <FormAlert variant="success" title="Mentör olarak başvuruyorsunuz">
+            Başvurunuz ekibimize iletilecek. Onaylandığında mentör paneline
+            erişebilirsiniz.
+          </FormAlert>
+        )}
+
         {/* #153: Dar telefonlarda iki alan yan yana sıkışıyordu — sm'den itibaren iki sütun. */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <AuthField
@@ -103,10 +124,19 @@ export default function SignupPage() {
 
         <AuthSubmitButton
           pending={isPending}
-          label="Hesap Oluştur"
-          pendingLabel="Kayıt yapılıyor..."
+          label={mentorBasvurusu ? "Başvuruyu Gönder" : "Hesap Oluştur"}
+          pendingLabel={mentorBasvurusu ? "Başvuru gönderiliyor..." : "Kayıt yapılıyor..."}
         />
       </form>
     </AuthCard>
+  )
+}
+
+// Suspense boundary — useSearchParams için zorunlu (Next.js 15)
+export default function SignupPage() {
+  return (
+    <Suspense fallback={null}>
+      <SignupForm />
+    </Suspense>
   )
 }
