@@ -27,6 +27,31 @@ type CertificateModalProps = {
   onSave?: (data: { mentorNote: string; completionGrade: string }) => Promise<void>;
 };
 
+/**
+ * #235: Sayfadaki tum stil kurallarini METIN olarak toplar.
+ *
+ * Neden `<link rel="stylesheet">` etiketini kopyalamiyoruz: indirilen dosya
+ * diske kaydedilip acildiginda `/_next/static/css/...` yolu `file:///_next/...`
+ * olarak cozulur, hicbir stil yuklenmez ve sertifika ciplak HTML olarak gorunur.
+ * Ayni sekilde yazdirma cercevesinde de ag beklemesi gerekmez.
+ *
+ * Ayni kaynakli stil sayfalarinin `cssRules` erisimi acik; farkli kaynakli
+ * olanlar (varsa) sessizce atlanir.
+ */
+function stilKurallariniTopla(): string {
+  let css = "";
+  for (const sayfa of Array.from(document.styleSheets)) {
+    try {
+      for (const kural of Array.from(sayfa.cssRules)) {
+        css += kural.cssText + "\n";
+      }
+    } catch {
+      // farkli kaynakli stil sayfasi — okunamaz, atla
+    }
+  }
+  return css;
+}
+
 const DEFAULT_NOTE_TEMPLATES = [
   "Staj programı boyunca gösterdiği üstün problem çözme yeteneği, disiplin ve teknik yetkinlik ile projelerini başarıyla tamamlamıştır. Kendisini tebrik eder, profesyonel kariyerinde başarılar dileriz.",
   "Modern yazılım mimarisi, yapay zeka entegrasyonu ve takım çalışmasında sergilediği teknik vizyon ile staj dönemini üstün başarıyla tamamlamıştır.",
@@ -66,12 +91,11 @@ export function CertificateModal({
 
     try {
       const iframe = document.createElement("iframe");
-      iframe.style.position = "fixed";
-      iframe.style.right = "0";
-      iframe.style.bottom = "0";
-      iframe.style.width = "0";
-      iframe.style.height = "0";
-      iframe.style.border = "none";
+      // #235: 0x0 iframe kullanma. Tarayicilarin bir kismi sifir boyutlu
+      // iframe'in icerigine layout uygulamaz ve print() bos sayfa uretir.
+      // Gercek A4 olcusu verip cerceveyi ekranin disina aliyoruz.
+      iframe.style.cssText =
+        "position:fixed;left:-10000px;top:0;width:210mm;height:297mm;border:0;";
       iframe.setAttribute("aria-hidden", "true");
       document.body.appendChild(iframe);
 
@@ -82,10 +106,7 @@ export function CertificateModal({
       }
 
       // Ana sayfadaki tüm Tailwind ve font stillerini iframe'e kopyala
-      let stylesHtml = "";
-      document.querySelectorAll("style, link[rel='stylesheet']").forEach((node) => {
-        stylesHtml += node.outerHTML;
-      });
+      const stylesHtml = `<style>${stilKurallariniTopla()}</style>`;
 
       doc.open();
       doc.write(`
@@ -129,13 +150,46 @@ export function CertificateModal({
       `);
       doc.close();
 
-      iframe.contentWindow?.focus();
-      setTimeout(() => {
-        iframe.contentWindow?.print();
-        setTimeout(() => {
-          document.body.removeChild(iframe);
-        }, 1000);
-      }, 250);
+      const win = iframe.contentWindow;
+      if (!win) {
+        iframe.remove();
+        window.print();
+        return;
+      }
+
+      const temizle = () => iframe.remove();
+
+      const yazdir = async () => {
+        // #235: Temizligi EN BASTA kaydet. Asagidaki bekleme ne olursa olsun
+        // (fonts API takilsa, hata atsa) cerceve DOM'da unutulmaz.
+        // iframe 1sn sonra degil, yazdirma bitince kaldirilir — diyalog
+        // acikken DOM'dan cikarilirsa cikti bozulur.
+        win.addEventListener("afterprint", temizle, { once: true });
+        // afterprint her tarayicida tetiklenmiyor → guvenlik agi
+        setTimeout(temizle, 120_000);
+
+        // #235: Sabit 250ms gecikme yerine gercek hazir olma sinyali.
+        // Kopyalanan <link rel=stylesheet> ve yazi tipleri inmeden print()
+        // cagrilirsa cikti bicimsiz ya da bos olur. Bekleme SINIRLI: yazi
+        // tipleri hic gelmezse yazdirmayi sonsuza kadar engellemesin.
+        try {
+          await Promise.race([
+            doc.fonts?.ready ?? Promise.resolve(),
+            new Promise((r) => setTimeout(r, 2_000)),
+          ]);
+        } catch {
+          // fonts API yoksa/basarisizsa yazdirmaya yine de devam et
+        }
+
+        win.focus();
+        win.print();
+      };
+
+      if (doc.readyState === "complete") {
+        void yazdir();
+      } else {
+        win.addEventListener("load", () => void yazdir(), { once: true });
+      }
     } catch (e) {
       console.error("Print error:", e);
       window.print();
@@ -150,10 +204,7 @@ export function CertificateModal({
     }
 
     try {
-      let stylesHtml = "";
-      document.querySelectorAll("style, link[rel='stylesheet']").forEach((node) => {
-        stylesHtml += node.outerHTML;
-      });
+      const stylesHtml = `<style>${stilKurallariniTopla()}</style>`;
 
       const fullHtml = `<!DOCTYPE html>
 <html lang="tr">
