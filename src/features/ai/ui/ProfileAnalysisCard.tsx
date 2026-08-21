@@ -94,7 +94,7 @@ export function ProfileAnalysisCard({ analysis, loading, error }: Props) {
   return (
     <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-slate-950 dark:to-slate-950 rounded-xl shadow-sm p-6 space-y-4 border border-blue-100">
       <div className="flex items-center gap-2">
-        <div className="p-2 bg-blue-600 rounded-lg">
+        <div className="p-2 bg-primary rounded-lg">
           <Sparkles className="w-5 h-5 text-white" />
         </div>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-slate-100">Detaylı AI Profil Analizi</h2>

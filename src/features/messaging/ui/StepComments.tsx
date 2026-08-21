@@ -213,7 +213,7 @@ export function StepComments({ stepId, currentUserId, currentUserRole, isDraft, 
                             onChange={(e) => setEditContent(e.target.value)}
                             maxLength={1000}
                             rows={2}
-                            className="flex-1 text-xs px-2.5 py-1.5 rounded-md border border-blue-300 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
+                            className="flex-1 text-xs px-2.5 py-1.5 rounded-md border border-blue-300 focus:outline-none focus:ring-1 focus:ring-ring resize-none"
                           />
                           <div className="flex gap-1">
                             <button
@@ -284,12 +284,12 @@ export function StepComments({ stepId, currentUserId, currentUserRole, isDraft, 
                 placeholder="Yorumunuzu yazın..."
                 maxLength={1000}
                 rows={2}
-                className="flex-1 text-xs px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                className="flex-1 text-xs px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-ring resize-none"
               />
               <button
                 type="submit"
                 disabled={!newComment.trim() || sending}
-                className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                className="w-8 h-8 flex items-center justify-center bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg transition-colors disabled:opacity-50"
               >
                 {sending ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
