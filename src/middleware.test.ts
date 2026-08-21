@@ -118,3 +118,75 @@ describe("Middleware — onaysız stajyer (#143 sözleşmesi)", () => {
     expect(r.hedef).toBe("/account-status");
   });
 });
+
+/**
+ * #249 — onay kapısı ROLDEN BAĞIMSIZ olmalı.
+ *
+ * Kapının tamamı `userRole === "STUDENT"` içindeydi; onaylanmamış bir MENTOR
+ * hesabı mentör paneline girebiliyordu. Mentör başvuru akışı (#250) bunu
+ * ulaşılabilir bir açığa çevireceği için önce burası kapatılıyor.
+ */
+describe("Middleware — onaylanmamış mentör (#249)", () => {
+  const mentor = (accountStatus: string) =>
+    getTokenMock.mockResolvedValue({ role: "MENTOR", accountStatus });
+
+  it.each(["PENDING", "REJECTED"])(
+    "%s mentör mentör paneline giremez",
+    async (durum) => {
+      mentor(durum);
+      const r = await git("/mentor-dashboard");
+      expect(r.yonlendirdi, "onaylanmamış mentör engellenmeli").toBe(true);
+      expect(r.hedef).toBe("/account-status");
+    },
+  );
+
+  it.each(["APPROVED", "GRADUATED"])(
+    "%s mentör mentör paneline girebilir",
+    async (durum) => {
+      mentor(durum);
+      expect((await git("/mentor-dashboard")).hedef).not.toBe("/account-status");
+    },
+  );
+
+  it("onaylanmamış mentör durum ekranını görebilir — döngü oluşmaz", async () => {
+    mentor("PENDING");
+    expect((await git("/account-status")).hedef).not.toBe("/account-status");
+  });
+
+  it("onaylanmamış mentör stajyer profil rotalarından yararlanamaz", async () => {
+    // #143 istisnası stajyere özel; mentör oradan sızmamalı.
+    mentor("PENDING");
+    const r = await git("/student-onboarding");
+    expect(r.yonlendirdi).toBe(true);
+    expect(r.hedef).not.toBe("/student-onboarding");
+  });
+});
+
+describe("Middleware — admin kapıdan etkilenmez (#249)", () => {
+  it.each(["PENDING", "REJECTED"])(
+    "%s admin yönetim paneline erişmeyi sürdürür",
+    async (durum) => {
+      // Admin bilerek kapsam dışı: kendi hesabını kilitleyememeli.
+      getTokenMock.mockResolvedValue({ role: "ADMIN", accountStatus: durum });
+      expect((await git("/admin-dashboard")).hedef).not.toBe("/account-status");
+    },
+  );
+});
+
+describe("Middleware — stajyer davranışı korunuyor (#249 regresyon)", () => {
+  it("PENDING stajyer profilini tamamlayabilir (#143)", async () => {
+    getTokenMock.mockResolvedValue({ role: "STUDENT", accountStatus: "PENDING" });
+    expect((await git("/student-onboarding")).hedef).not.toBe("/account-status");
+    expect((await git("/profile-setup")).hedef).not.toBe("/account-status");
+  });
+
+  it("PENDING stajyer panele giremez", async () => {
+    getTokenMock.mockResolvedValue({ role: "STUDENT", accountStatus: "PENDING" });
+    expect((await git("/student-dashboard")).hedef).toBe("/account-status");
+  });
+
+  it("REJECTED stajyer profil rotalarına da giremez", async () => {
+    getTokenMock.mockResolvedValue({ role: "STUDENT", accountStatus: "REJECTED" });
+    expect((await git("/student-onboarding")).hedef).toBe("/account-status");
+  });
+});

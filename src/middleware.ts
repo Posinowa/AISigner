@@ -82,9 +82,15 @@ export async function middleware(request: NextRequest) {
   // değil, dolu profili (+ AI analizini) görerek onaylasın ve mentör atasın.
   // Bu yüzden profil tamamlama rotaları PENDING'e açıktır; yalnızca dashboard
   // kapalıdır. REJECTED ise hiçbirine erişemez.
+  //
+  // #249: Kapı ROLDEN BAĞIMSIZ. Önceden koşulun tamamı `userRole === "STUDENT"`
+  // içindeydi; onaylanmamış bir MENTOR hesabı mentör paneline girebiliyordu.
+  // ADMIN bilerek kapsam dışı — admin kendi hesabını kilitleyemesin.
   const accountStatus = token.accountStatus as string | undefined;
+  const onayGerektirenRol = userRole === "STUDENT" || userRole === "MENTOR";
+
   if (
-    userRole === "STUDENT" &&
+    onayGerektirenRol &&
     accountStatus &&
     accountStatus !== "APPROVED" &&
     accountStatus !== "GRADUATED"
@@ -93,9 +99,16 @@ export async function middleware(request: NextRequest) {
       pathname.startsWith("/student-onboarding") || pathname.startsWith("/profile-setup");
     const isStudentArea =
       pathname.startsWith("/student-dashboard") || isProfileCompletionRoute;
+    const isMentorArea = pathname.startsWith("/mentor-dashboard");
 
+    // Mentörde #143 istisnası YOK: profil tamamlama akışı stajyere özel.
+    // Onaylanmamış mentör mentör alanına hiç giremez.
     const blocked =
-      accountStatus === "REJECTED" ? isStudentArea : isStudentArea && !isProfileCompletionRoute;
+      userRole === "MENTOR"
+        ? isMentorArea
+        : accountStatus === "REJECTED"
+          ? isStudentArea
+          : isStudentArea && !isProfileCompletionRoute;
 
     if (blocked) {
       return NextResponse.redirect(new URL("/account-status", request.url));

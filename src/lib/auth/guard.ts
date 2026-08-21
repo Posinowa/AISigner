@@ -48,17 +48,26 @@ export async function requireAuth(
     }
   }
 
-  // Onaylanmamış stajyer hesabı (PENDING/REJECTED) hiçbir student işlemi yapamaz.
-  // Admin/mentor bu kontrolden etkilenmez (yalnızca STUDENT rolüne uygulanır).
+  // Onaylanmamış hesap (PENDING/REJECTED) hiçbir korumalı işlem yapamaz.
+  //
+  // #249: Kontrol önceden yalnızca STUDENT rolüne uygulanıyordu; onaylanmamış
+  // bir MENTOR hesabı mentör uçlarını çağırabiliyordu. ADMIN bilerek kapsam
+  // dışı — admin kendi hesabını kilitleyemesin.
   //
   // #143 istisnası: profil tamamlama uçları `allowUnapprovedStudent` ile PENDING'e
   // açılabilir — kullanıcı onaya düşmeden önce profilini doldurabilsin. REJECTED
   // bu istisnadan yararlanamaz.
+  // İstisna yalnızca stajyere ait: açılan uçlar profil tamamlama akışı.
   const isPendingButAllowed =
-    options?.allowUnapprovedStudent && session.user.accountStatus === "PENDING";
+    options?.allowUnapprovedStudent &&
+    session.user.role === "STUDENT" &&
+    session.user.accountStatus === "PENDING";
+
+  const onayGerektirenRol =
+    session.user.role === "STUDENT" || session.user.role === "MENTOR";
 
   if (
-    session.user.role === "STUDENT" &&
+    onayGerektirenRol &&
     session.user.accountStatus &&
     session.user.accountStatus !== "APPROVED" &&
     session.user.accountStatus !== "GRADUATED" &&
