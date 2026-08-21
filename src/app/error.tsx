@@ -20,15 +20,15 @@ export default function Error({
   }, [error]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 px-4">
-      <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-xl ring-1 ring-slate-200/60 overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 px-4">
+      <div className="w-full max-w-md bg-white rounded-3xl shadow-xl ring-1 ring-slate-200/60 overflow-hidden">
         <div className="h-1.5 bg-gradient-to-r from-red-500 via-rose-500 to-orange-500" />
         <div className="p-8 text-center">
-          <div className="mx-auto mb-4 h-14 w-14 rounded-2xl bg-red-50 dark:bg-red-950/40 flex items-center justify-center">
-            <AlertTriangle className="w-7 h-7 text-red-500 dark:text-red-400" />
+          <div className="mx-auto mb-4 h-14 w-14 rounded-2xl bg-red-50 flex items-center justify-center">
+            <AlertTriangle className="w-7 h-7 text-red-500" />
           </div>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">Bir şeyler ters gitti</h1>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+          <h1 className="text-xl font-bold text-slate-900">Bir şeyler ters gitti</h1>
+          <p className="mt-2 text-sm text-slate-500">
             Beklenmeyen bir hata oluştu. Tekrar deneyebilir veya birazdan yeniden
             ziyaret edebilirsiniz.
           </p>

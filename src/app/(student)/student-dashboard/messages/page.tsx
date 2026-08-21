@@ -13,12 +13,12 @@ export default async function StudentMessagesPage() {
   return (
     <div className="max-w-5xl mx-auto p-6">
       <div className="flex items-center mb-6">
-        <Link href="/student-dashboard" className="mr-4 text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-slate-100">
+        <Link href="/student-dashboard" className="mr-4 text-gray-600 hover:text-gray-900">
           <ArrowLeft className="w-6 h-6" />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">Mesajlar</h1>
-          <p className="text-gray-600 dark:text-slate-300 text-sm">Mentörünüzle iletişim kurun</p>
+          <h1 className="text-2xl font-bold text-gray-900">Mesajlar</h1>
+          <p className="text-gray-600 text-sm">Mentörünüzle iletişim kurun</p>
         </div>
       </div>
       <MessagingPanel currentUserId={session.user.id} />

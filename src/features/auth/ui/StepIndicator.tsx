@@ -25,7 +25,7 @@ export function StepIndicator({
             className={`h-1.5 rounded-full transition-all ${
               n <= current
                 ? "w-10 bg-primary"
-                : "w-6 bg-slate-200 dark:bg-slate-800"
+                : "w-6 bg-slate-200"
             }`}
           />
         ))}

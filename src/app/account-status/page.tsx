@@ -47,9 +47,9 @@ export default async function AccountStatusPage() {
   const needsProfile = !rejected && !isGraduated && !profile;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 px-4 py-12">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 px-4 py-12">
       <div className="w-full max-w-lg">
-        <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl ring-1 ring-slate-200/60 dark:ring-slate-800 overflow-hidden">
+        <div className="bg-white rounded-3xl shadow-2xl ring-1 ring-slate-200/60 overflow-hidden">
           <div
             className={`h-2 ${
               isGraduated
@@ -63,31 +63,31 @@ export default async function AccountStatusPage() {
             <div
               className={`mx-auto mb-5 h-20 w-20 rounded-3xl flex items-center justify-center shadow-inner ${
                 isGraduated
-                  ? "bg-gradient-to-br from-purple-50 to-emerald-50 dark:from-purple-950/50 dark:to-emerald-950/50 ring-4 ring-purple-100 dark:ring-purple-900/40"
+                  ? "bg-gradient-to-br from-purple-50 to-emerald-50 ring-4 ring-purple-100"
                   : rejected
-                    ? "bg-red-50 dark:bg-red-950/40"
-                    : "bg-amber-50 dark:bg-amber-950/40"
+                    ? "bg-red-50"
+                    : "bg-amber-50"
               }`}
             >
               {isGraduated ? (
-                <GraduationCap className="w-10 h-10 text-purple-600 dark:text-purple-400 animate-pulse" />
+                <GraduationCap className="w-10 h-10 text-purple-600 animate-pulse" />
               ) : rejected ? (
-                <XCircle className="w-8 h-8 text-red-600 dark:text-red-400" />
+                <XCircle className="w-8 h-8 text-red-600" />
               ) : needsProfile ? (
-                <UserPen className="w-8 h-8 text-amber-600 dark:text-amber-400" />
+                <UserPen className="w-8 h-8 text-amber-600" />
               ) : (
-                <Clock className="w-8 h-8 text-amber-600 dark:text-amber-400" />
+                <Clock className="w-8 h-8 text-amber-600" />
               )}
             </div>
 
             {isGraduated && (
-              <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-purple-100 dark:bg-purple-950/70 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 mb-3">
+              <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-purple-100 text-purple-700 border border-purple-200 mb-3">
                 <Sparkles className="w-3.5 h-3.5" />
                 Tebrikler • Staj Tamamlandı
               </span>
             )}
 
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
               {isGraduated
                 ? "Stajınız Başarıyla Tamamlandı!"
                 : rejected
@@ -97,10 +97,10 @@ export default async function AccountStatusPage() {
                     : "Hesabınız inceleniyor"}
             </h1>
 
-            <p className="mt-3.5 text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed font-normal">
+            <p className="mt-3.5 text-sm sm:text-base text-slate-600 leading-relaxed font-normal">
               {isGraduated ? (
                 <>
-                  <span className="font-semibold text-slate-900 dark:text-slate-100">
+                  <span className="font-semibold text-slate-900">
                     Posinowa bünyesinde yaptığınız staj başarıyla tamamlanmıştır.
                   </span>{" "}
                   Gelecek kariyerinizde ve profesyonel hayatınızda başarılarınızın devamını dileriz!
@@ -115,12 +115,12 @@ export default async function AccountStatusPage() {
             </p>
 
             {isGraduated && (
-              <div className="mt-6 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 text-left text-xs space-y-2">
-                <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 font-semibold">
+              <div className="mt-6 p-4 rounded-2xl bg-slate-50 border border-slate-200/80 text-left text-xs space-y-2">
+                <div className="flex items-center gap-2 text-emerald-700 font-semibold">
                   <Award className="w-4 h-4" />
                   <span>Staj Süreci & Yol Haritası Tamamlandı</span>
                 </div>
-                <p className="text-slate-500 dark:text-slate-400 leading-relaxed">
+                <p className="text-slate-500 leading-relaxed">
                   Staj süresince göstermiş olduğunuz özveri ve emekleriniz için teşekkür ederiz. Hesabınız mezun statüsünde arşivlenmiştir.
                 </p>
               </div>
@@ -139,8 +139,8 @@ export default async function AccountStatusPage() {
             )}
 
             {session.user.email && (
-              <p className="mt-5 text-xs text-slate-400 dark:text-slate-500">
-                Giriş yapılan hesap: <span className="font-medium text-slate-500 dark:text-slate-400">{session.user.email}</span>
+              <p className="mt-5 text-xs text-slate-400">
+                Giriş yapılan hesap: <span className="font-medium text-slate-500">{session.user.email}</span>
               </p>
             )}
 

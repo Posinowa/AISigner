@@ -101,16 +101,16 @@ export function SecurityQuestionsSetup({ onComplete }: Props) {
     return (
       <div className="flex items-center justify-center p-8">
         <Loader2 className="w-6 h-6 animate-spin text-amber-500" />
-        <span className="ml-2 text-gray-600 dark:text-slate-300">Yükleniyor...</span>
+        <span className="ml-2 text-gray-600">Yükleniyor...</span>
       </div>
     );
   }
 
   if (success || (isSetup && !Object.keys(answers).length)) {
     return (
-      <div className="bg-green-50 dark:bg-green-950/40 border border-green-200 rounded-xl p-6 text-center">
+      <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center">
         <CheckCircle2 className="w-8 h-8 text-green-600 mx-auto mb-2" />
-        <h3 className="font-semibold text-green-800 dark:text-green-300">Güvenlik Soruları Ayarlandı</h3>
+        <h3 className="font-semibold text-green-800">Güvenlik Soruları Ayarlandı</h3>
         <p className="text-sm text-green-600 mt-1">
           Şifrenizi unutursanız bu sorularla sıfırlayabilirsiniz.
         </p>
@@ -121,7 +121,7 @@ export function SecurityQuestionsSetup({ onComplete }: Props) {
             setSelectedQuestions([]);
             setAnswers({});
           }}
-          className="mt-3 text-sm text-green-700 dark:text-green-300 hover:text-green-900 underline"
+          className="mt-3 text-sm text-green-700 hover:text-green-900 underline"
         >
           Soruları Güncelle
         </button>
@@ -130,17 +130,17 @@ export function SecurityQuestionsSetup({ onComplete }: Props) {
   }
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl p-6 shadow-sm">
+    <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
       <div className="flex items-center gap-2 mb-4">
         <ShieldCheck className="w-5 h-5 text-amber-500" />
-        <h3 className="font-semibold text-gray-900 dark:text-slate-100">Güvenlik Soruları</h3>
+        <h3 className="font-semibold text-gray-900">Güvenlik Soruları</h3>
       </div>
-      <p className="text-sm text-gray-500 dark:text-slate-400 mb-4">
+      <p className="text-sm text-gray-500 mb-4">
         Şifrenizi unutmanız durumunda sıfırlayabilmeniz için 3 güvenlik sorusu seçin ve cevaplayın.
       </p>
 
       {error && (
-        <div className="mb-4 rounded-lg bg-red-50 dark:bg-red-950/40 px-4 py-2 text-sm text-red-600 dark:text-red-400">
+        <div className="mb-4 rounded-lg bg-red-50 px-4 py-2 text-sm text-red-600">
           {error}
         </div>
       )}
@@ -159,10 +159,10 @@ export function SecurityQuestionsSetup({ onComplete }: Props) {
                   onClick={() => canSelect && toggleQuestion(idx)}
                   className={`w-full text-left px-4 py-2.5 rounded-lg text-sm transition-all border ${
                     isSelected
-                      ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 text-amber-900 font-medium"
+                      ? "bg-amber-50 border-amber-300 text-amber-900 font-medium"
                       : canSelect
-                        ? "bg-gray-50 dark:bg-slate-950 border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-800"
-                        : "bg-gray-50 dark:bg-slate-950 border-gray-100 dark:border-slate-800 text-gray-400 dark:text-slate-500 cursor-not-allowed"
+                        ? "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
+                        : "bg-gray-50 border-gray-100 text-gray-400 cursor-not-allowed"
                   }`}
                 >
                   <span className="inline-flex items-center">
@@ -187,7 +187,7 @@ export function SecurityQuestionsSetup({ onComplete }: Props) {
                     onChange={(e) =>
                       setAnswers((prev) => ({ ...prev, [idx]: e.target.value }))
                     }
-                    className="mt-1 w-full px-4 py-2 border border-gray-200 dark:border-slate-700 rounded-lg text-sm text-gray-900 dark:text-slate-100 focus:border-amber-400 focus:ring-2 focus:ring-amber-100 outline-none"
+                    className="mt-1 w-full px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:border-amber-400 focus:ring-2 focus:ring-amber-100 outline-none"
                     placeholder="Cevabınızı yazın..."
                     required
                   />
@@ -197,7 +197,7 @@ export function SecurityQuestionsSetup({ onComplete }: Props) {
           })}
         </div>
 
-        <p className="text-xs text-gray-400 dark:text-slate-500">
+        <p className="text-xs text-gray-400">
           {selectedQuestions.length}/3 soru seçildi
         </p>
 

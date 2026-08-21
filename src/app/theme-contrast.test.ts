@@ -9,28 +9,20 @@ import { join } from "node:path";
  * kontrastı hesaplayarak korunuyor. Biri "biraz daha koyu olsun" diye değer
  * değiştirirse ve AA'nın altına düşerse burada yakalanır.
  *
- * Önemli kısıt: logo laciverti KOYU temada zemine karşı 1.66 kontrast veriyor.
- * Bu yüzden koyu temada primary olarak logonun orta mavisi kullanılıyor.
+ * #245 ile koyu tema kaldırıldı; bu testler tek (açık) tema için geçerli.
  */
 
 const css = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf-8");
 const kod = css.replace(/\/\*[\s\S]*?\*\//g, "");
 
-/**
- * Belirtilen blok içindeki bir tokenın değerini okur.
- *
- * DİKKAT: `.dark` kelimesi dosyada önce `@custom-variant dark (&:where(.dark …))`
- * satırında geçiyor. Blok başlangıcını `.dark {` deseniyle aramak şart; düz
- * `indexOf(".dark")` yanlışlıkla @theme bloğunu okutur.
- */
-function token(blok: "root" | "dark", ad: string): string {
-  const desen = blok === "root" ? /@theme\s*\{/ : /^\.dark\s*\{/m;
-  const eslesme = kod.match(desen);
-  if (!eslesme) throw new Error(`${blok} bloğu bulunamadı`);
+/** @theme bloğundaki bir tokenın değerini okur. */
+function token(ad: string): string {
+  const eslesme = kod.match(/@theme\s*\{/);
+  if (!eslesme) throw new Error("@theme bloğu bulunamadı");
   const bas = eslesme.index!;
   const govde = kod.slice(bas, kod.indexOf("}", bas));
   const m = govde.match(new RegExp(`--color-${ad}:\\s*(#[0-9a-fA-F]{6})`));
-  if (!m) throw new Error(`${blok} bloğunda --color-${ad} bulunamadı`);
+  if (!m) throw new Error(`@theme bloğunda --color-${ad} bulunamadı`);
   return m[1].toLowerCase();
 }
 
@@ -52,52 +44,28 @@ const AA = 4.5;
 
 describe("Marka paleti — açık tema (#237)", () => {
   it("primary üzerinde primary-foreground okunur", () => {
-    expect(oran(token("root", "primary"), token("root", "primary-foreground")))
+    expect(oran(token("primary"), token("primary-foreground")))
       .toBeGreaterThanOrEqual(AA);
   });
 
   it("primary, zemine karşı metin olarak okunur (bağlantı rengi)", () => {
-    expect(oran(token("root", "primary"), token("root", "background")))
+    expect(oran(token("primary"), token("background")))
       .toBeGreaterThanOrEqual(AA);
   });
 
   it("accent üzerinde accent-foreground okunur", () => {
-    expect(oran(token("root", "accent"), token("root", "accent-foreground")))
+    expect(oran(token("accent"), token("accent-foreground")))
       .toBeGreaterThanOrEqual(AA);
   });
 
   it("primary marka laciverti olarak kalır", () => {
-    expect(token("root", "primary")).toBe("#23356c");
-  });
-});
-
-describe("Marka paleti — koyu tema (#237)", () => {
-  it("primary üzerinde primary-foreground okunur", () => {
-    expect(oran(token("dark", "primary"), token("dark", "primary-foreground")))
-      .toBeGreaterThanOrEqual(AA);
-  });
-
-  it("primary, koyu zemine karşı metin olarak okunur", () => {
-    expect(oran(token("dark", "primary"), token("dark", "background")))
-      .toBeGreaterThanOrEqual(AA);
-  });
-
-  it("accent üzerinde accent-foreground okunur", () => {
-    expect(oran(token("dark", "accent"), token("dark", "accent-foreground")))
-      .toBeGreaterThanOrEqual(AA);
-  });
-
-  it("koyu temada lacivert primary olarak KULLANILMAZ (zeminde 1.66)", () => {
-    // Regresyon koruması: "tutarlılık olsun" diye koyu temayı da lacivert
-    // yapmak metni okunamaz hale getirir.
-    expect(token("dark", "primary")).not.toBe("#23356c");
-    expect(oran("#23356c", token("dark", "background"))).toBeLessThan(AA);
+    expect(token("primary")).toBe("#23356c");
   });
 });
 
 describe("Anlamsal renkler korunur (#237)", () => {
   it("destructive kırmızı ailesinde kalır", () => {
-    const d = token("root", "destructive");
+    const d = token("destructive");
     const h = d.replace("#", "");
     const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
     expect(r, "kırmızı bileşen baskın olmalı").toBeGreaterThan(g);
@@ -106,7 +74,7 @@ describe("Anlamsal renkler korunur (#237)", () => {
 
   it("destructive üzerinde yazı okunur", () => {
     expect(
-      oran(token("root", "destructive"), token("root", "destructive-foreground")),
+      oran(token("destructive"), token("destructive-foreground")),
     ).toBeGreaterThanOrEqual(AA);
   });
 });

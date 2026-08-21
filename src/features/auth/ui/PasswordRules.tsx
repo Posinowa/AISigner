@@ -29,7 +29,7 @@ export function PasswordRules({ password }: { password: string }) {
             <p
               key={rule.label}
               className={`flex items-center text-[11px] gap-1 ${
-                ok ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400 dark:text-slate-500"
+                ok ? "text-emerald-600" : "text-slate-400"
               }`}
             >
               <CheckCircle2

@@ -315,21 +315,21 @@ export function CertificateModal({
     >
       <div
         id="certificate-modal-container"
-        className="relative w-full max-w-4xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden my-8 print:my-0 print:border-none print:shadow-none print:w-full print:max-w-none print:static print:overflow-visible"
+        className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-8 print:my-0 print:border-none print:shadow-none print:w-full print:max-w-none print:static print:overflow-visible"
       >
         
         {/* Üst Eylem Araç Çubuğu (Yazdırmada gizlenir) */}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-950/70 print:hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-slate-100 bg-slate-50/90 print:hidden">
           
           <div className="flex items-center gap-3">
-            <span className="p-2 rounded-xl bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300">
+            <span className="p-2 rounded-xl bg-purple-100 text-purple-700">
               <Award className="w-5 h-5" />
             </span>
             <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+              <h3 className="text-sm font-bold text-slate-900">
                 Posinowa Staj Başarı Sertifikası
               </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="text-xs text-slate-500">
                 Seri No: <span className="font-mono font-semibold">{certificate.certificateNumber}</span>
               </p>
             </div>
@@ -338,14 +338,14 @@ export function CertificateModal({
           {/* Sekme ve Eylem Butonları */}
           <div className="flex items-center gap-2">
             {isAdmin && onSave && (
-              <div className="flex rounded-xl bg-slate-200/80 dark:bg-slate-800 p-1">
+              <div className="flex rounded-xl bg-slate-200/80 p-1">
                 <button
                   type="button"
                   onClick={() => setActiveTab("preview")}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
                     activeTab === "preview"
-                      ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm"
-                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                      ? "bg-white text-slate-900 shadow-sm"
+                      : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
                   <Eye className="w-3.5 h-3.5" />
@@ -356,11 +356,11 @@ export function CertificateModal({
                   onClick={() => setActiveTab("edit")}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
                     activeTab === "edit"
-                      ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm"
-                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                      ? "bg-white text-slate-900 shadow-sm"
+                      : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
-                  <Edit3 className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                  <Edit3 className="w-3.5 h-3.5 text-indigo-600" />
                   Belgeyi Düzenle
                 </button>
               </div>
@@ -370,10 +370,10 @@ export function CertificateModal({
             <button
               type="button"
               onClick={handleDownloadDocument}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-xs font-semibold shadow-sm transition"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold shadow-sm transition"
               title="Sertifikayı doğrudan bağımsız dosya olarak indir"
             >
-              <Download className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+              <Download className="w-4 h-4 text-indigo-600" />
               Sertifikayı İndir
             </button>
 
@@ -390,7 +390,7 @@ export function CertificateModal({
             <button
               type="button"
               onClick={onClose}
-              className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
               aria-label="Kapat"
             >
               <X className="w-5 h-5" />
@@ -400,14 +400,14 @@ export function CertificateModal({
 
         {/* ✏️ BELGEYİ DÜZENLE BÖLGESİ (Admin Ayrı Düzenleme Paneli) */}
         {isAdmin && onSave && activeTab === "edit" && (
-          <div className="p-6 sm:p-8 bg-slate-50/70 dark:bg-slate-950/40 border-b border-slate-200/80 dark:border-slate-800 print:hidden space-y-6">
+          <div className="p-6 sm:p-8 bg-slate-50/70 border-b border-slate-200/80 print:hidden space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <h4 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                  <Edit3 className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                <h4 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Edit3 className="w-4 h-4 text-indigo-600" />
                   Sertifika ve Mentör Görüşü Düzenleme
                 </h4>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                <p className="text-xs text-slate-500 mt-0.5">
                   Öğrencinin resmi belgesinde yer alacak başarı derecesi ve mentör referans notunu buradan özelleştirebilirsiniz.
                 </p>
               </div>
@@ -416,13 +416,13 @@ export function CertificateModal({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {/* Başarı Derecesi */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                <label className="block text-xs font-bold text-slate-700">
                   Başarı Derecesi
                 </label>
                 <select
                   value={completionGrade}
                   onChange={(e) => setCompletionGrade(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3.5 py-2.5 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="">Belirlenmedi (Seçilmedi)</option>
                   <option value="Üstün Başarı">🎖️ Üstün Başarı (High Honors)</option>
@@ -434,10 +434,10 @@ export function CertificateModal({
 
               {/* Öğrenci Bilgi Özeti */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                <label className="block text-xs font-bold text-slate-700">
                   Belge Sahibi Stajyer
                 </label>
-                <div className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-800/80 px-3.5 py-2.5 text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center justify-between">
+                <div className="w-full rounded-xl border border-slate-200 bg-slate-100/80 px-3.5 py-2.5 text-xs font-semibold text-slate-800 flex items-center justify-between">
                   <span>{certificate.studentName}</span>
                   <span className="text-slate-400 text-[11px]">{certificate.studentEmail}</span>
                 </div>
@@ -447,7 +447,7 @@ export function CertificateModal({
             {/* Mentör Referans ve Değerlendirme Notu */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                <label className="block text-xs font-bold text-slate-700">
                   Mentör / Yönetici Referans ve Bitirme Görüşü
                 </label>
                 <span className="text-[11px] text-slate-400">
@@ -459,7 +459,7 @@ export function CertificateModal({
                 value={mentorNote}
                 onChange={(e) => setMentorNote(e.target.value)}
                 placeholder="Stajyerin teknik performansı, problem çözme yeteneği ve katkıları hakkında referans mektubu..."
-                className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-3 text-xs text-slate-800 dark:text-slate-200 leading-relaxed focus:outline-none focus:ring-2 focus:ring-ring transition"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-800 leading-relaxed focus:outline-none focus:ring-2 focus:ring-ring transition"
               />
 
               {/* Hızlı Şablon Butonları */}
@@ -470,7 +470,7 @@ export function CertificateModal({
                     key={idx}
                     type="button"
                     onClick={() => setMentorNote(tmpl)}
-                    className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-200/60 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 hover:text-indigo-600 dark:hover:text-indigo-300 transition"
+                    className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-200/60 hover:bg-indigo-50 hover:text-indigo-600 transition"
                   >
                     Şablon {idx + 1}
                   </button>
@@ -479,11 +479,11 @@ export function CertificateModal({
             </div>
 
             {/* Kaydet ve Önizle Butonları */}
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
               <button
                 type="button"
                 onClick={() => setActiveTab("preview")}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 transition"
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-200 transition"
               >
                 Vazgeç / Önizlemeye Dön
               </button>
@@ -506,10 +506,10 @@ export function CertificateModal({
 
         {/* 📜 SERTİFİKA GÖVDESİ (A4 Baskı ve İndirme İçin Kusursuz Hizalanmış Şablon) */}
         {/* #204: id → yazdırmada yalnız bu alan basılır (bkz. globals.css @media print). */}
-        <div id="certificate-print-area" className="p-6 sm:p-12 print:p-6 bg-gradient-to-b from-slate-50 via-white to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 print:bg-white text-slate-800 dark:text-slate-100 print:text-black relative">
+        <div id="certificate-print-area" className="p-6 sm:p-12 print:p-6 bg-gradient-to-b from-slate-50 via-white to-slate-50 print:bg-white text-slate-800 print:text-black relative">
           
           {/* Çerçeve & Güvenlik Deseni */}
-          <div className="border-[6px] border-double border-indigo-900/30 dark:border-indigo-400/30 print:border-indigo-900 p-6 sm:p-10 rounded-2xl relative bg-white/80 dark:bg-slate-900/80 print:bg-white shadow-inner">
+          <div className="border-[6px] border-double border-indigo-900/30 print:border-indigo-900 p-6 sm:p-10 rounded-2xl relative bg-white/80 print:bg-white shadow-inner">
             
             {/* Köşe Süsleri */}
             <div className="absolute top-2 left-2 w-8 h-8 border-t-2 border-l-2 border-indigo-600/60" />
@@ -525,32 +525,32 @@ export function CertificateModal({
                 </div>
               </div>
 
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 font-extrabold text-[11px] uppercase tracking-widest">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 font-extrabold text-[11px] uppercase tracking-widest">
                 <Sparkles className="w-3.5 h-3.5" /> Posinowa Teknoloji & Yazılım Akademisi
               </div>
 
-              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100 print:text-black font-serif pt-1">
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 print:text-black font-serif pt-1">
                 STAJ BAŞARI SERTİFİKASI
               </h1>
-              <p className="text-[11px] uppercase tracking-widest text-slate-500 dark:text-slate-400 print:text-slate-600 font-semibold">
+              <p className="text-[11px] uppercase tracking-widest text-slate-500 print:text-slate-600 font-semibold">
                 Certificate of Internship Completion & Excellence
               </p>
             </div>
 
             {/* Sertifika Açıklama ve Öğrenci Adı */}
             <div className="text-center space-y-3 max-w-2xl mx-auto my-5">
-              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 print:text-slate-700 leading-relaxed">
+              <p className="text-xs sm:text-sm text-slate-600 print:text-slate-700 leading-relaxed">
                 Bu resmi belge, aşağıda adı geçen stajyerin Posinowa bünyesinde yürütülen yazılım geliştirme ve yapay zeka mühendisliği staj programını başarıyla tamamladığını onaylar:
               </p>
 
-              <div className="py-2 border-b-2 border-slate-300 dark:border-slate-700 inline-block px-8">
-                <h2 className="text-2xl sm:text-3xl font-extrabold text-indigo-950 dark:text-indigo-200 print:text-indigo-900 font-serif">
+              <div className="py-2 border-b-2 border-slate-300 inline-block px-8">
+                <h2 className="text-2xl sm:text-3xl font-extrabold text-indigo-950 print:text-indigo-900 font-serif">
                   {certificate.studentName}
                 </h2>
               </div>
 
               <div>
-                <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800 text-purple-800 dark:text-purple-300 font-bold text-xs">
+                <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-purple-50 border border-purple-200 text-purple-800 font-bold text-xs">
                   <Award className="w-3.5 h-3.5 text-purple-600" />
                   Başarı Derecesi: <span className="font-extrabold">{completionGrade || "Belirlenmedi"}</span>
                 </span>
@@ -559,8 +559,8 @@ export function CertificateModal({
 
             {/* Tamamlanan Projeler Listesi */}
             {certificate.completedProjects.length > 0 && (
-              <div className="my-5 p-3.5 rounded-xl bg-slate-50/90 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800 text-xs">
-                <p className="font-bold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1.5">
+              <div className="my-5 p-3.5 rounded-xl bg-slate-50/90 border border-slate-200/80 text-xs">
+                <p className="font-bold text-slate-700 mb-2 flex items-center gap-1.5">
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                   Staj Sürecinde Geliştirilen ve Tamamlanan Projeler:
                 </p>
@@ -568,10 +568,10 @@ export function CertificateModal({
                   {certificate.completedProjects.map((p) => (
                     <div
                       key={p.id}
-                      className="p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-800 font-medium flex items-center justify-between"
+                      className="p-2 rounded-lg bg-white border border-slate-200/70 font-medium flex items-center justify-between"
                     >
-                      <span className="truncate text-slate-800 dark:text-slate-200 text-xs">{p.title}</span>
-                      <span className="shrink-0 px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                      <span className="truncate text-slate-800 text-xs">{p.title}</span>
+                      <span className="shrink-0 px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700">
                         {p.difficulty}
                       </span>
                     </div>
@@ -582,15 +582,15 @@ export function CertificateModal({
 
             {/* Mentör / Yönetici Referans Notu (Kayma ve taşma önleyici simetrik yapı) */}
             {mentorNote && (
-              <div className="my-5 p-4 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/60 relative">
+              <div className="my-5 p-4 rounded-xl bg-indigo-50/60 border border-indigo-100 relative">
                 <div className="flex items-start gap-2.5">
-                  <Quote className="w-5 h-5 text-indigo-400 dark:text-indigo-600 shrink-0 mt-0.5" />
+                  <Quote className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" />
                   <div className="flex-1">
-                    <p className="text-xs italic text-slate-700 dark:text-slate-300 leading-relaxed font-serif">
+                    <p className="text-xs italic text-slate-700 leading-relaxed font-serif">
                       &ldquo;{mentorNote}&rdquo;
                     </p>
                     {certificate.mentorName && (
-                      <p className="text-[11px] font-bold text-indigo-900 dark:text-indigo-300 text-right mt-2">
+                      <p className="text-[11px] font-bold text-indigo-900 text-right mt-2">
                         — {certificate.mentorName} (Teknik Mentör)
                       </p>
                     )}
@@ -600,17 +600,17 @@ export function CertificateModal({
             )}
 
             {/* Alt İmzalar & Mühür (Simetrik 3 Sütunlu Grid) */}
-            <div className="grid grid-cols-3 gap-4 items-end pt-6 mt-4 border-t border-slate-200 dark:border-slate-800 text-center">
+            <div className="grid grid-cols-3 gap-4 items-end pt-6 mt-4 border-t border-slate-200 text-center">
               
               {/* Mentör İmzası */}
               <div className="space-y-1">
                 <div className="h-8 flex items-end justify-center">
-                  <span className="font-serif italic text-xs text-slate-700 dark:text-slate-300 font-bold">
+                  <span className="font-serif italic text-xs text-slate-700 font-bold">
                     {certificate.mentorName || "Teknik Mentör"}
                   </span>
                 </div>
                 <div className="w-28 border-t border-slate-400 mx-auto" />
-                <p className="text-[11px] font-bold text-slate-800 dark:text-slate-200">Teknik Mentör</p>
+                <p className="text-[11px] font-bold text-slate-800">Teknik Mentör</p>
                 <p className="text-[10px] text-slate-500">Posinowa Yazılım</p>
               </div>
 
@@ -628,20 +628,20 @@ export function CertificateModal({
               {/* Yönetici İmzası */}
               <div className="space-y-1">
                 <div className="h-8 flex items-end justify-center">
-                  <span className="font-serif italic text-xs text-slate-700 dark:text-slate-300 font-bold">
+                  <span className="font-serif italic text-xs text-slate-700 font-bold">
                     Posinowa Yönetim Kurulu
                   </span>
                 </div>
                 <div className="w-28 border-t border-slate-400 mx-auto" />
-                <p className="text-[11px] font-bold text-slate-800 dark:text-slate-200">Yönetici / Direktör</p>
+                <p className="text-[11px] font-bold text-slate-800">Yönetici / Direktör</p>
                 <p className="text-[10px] text-slate-500">Posinowa Akademi</p>
               </div>
             </div>
 
             {/* Doğrulama & Seri No Alt Çizgisi */}
-            <div className="mt-6 pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between text-[10px] text-slate-400">
-              <span>Sertifika No: <strong className="font-mono text-slate-600 dark:text-slate-300">{certificate.certificateNumber}</strong></span>
-              <span>Doğrulama: <strong className="text-indigo-600 dark:text-indigo-400">{certificate.verificationUrl}</strong></span>
+            <div className="mt-6 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between text-[10px] text-slate-400">
+              <span>Sertifika No: <strong className="font-mono text-slate-600">{certificate.certificateNumber}</strong></span>
+              <span>Doğrulama: <strong className="text-indigo-600">{certificate.verificationUrl}</strong></span>
             </div>
 
           </div>
