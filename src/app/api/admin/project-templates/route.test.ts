@@ -98,3 +98,66 @@ describe("POST /api/admin/project-templates — duplicate title (#112)", () => {
     expect(res.status).toBe(500);
   });
 });
+
+/**
+ * #253 — mentörler de şablon oluşturabiliyor; oluşturan kişi OTURUMDAN
+ * kaydediliyor, gövdeden değil.
+ */
+describe("project-templates POST — mentör oluşturma (#253)", () => {
+  function authMentor(id = "m1") {
+    requireAuthMock.mockResolvedValue({
+      authorized: true,
+      session: { user: { id, role: "MENTOR" } },
+    });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    prismaMock.projectTemplate.create.mockResolvedValue({ id: "tpl-1" });
+  });
+
+  it("mentör şablon oluşturabilir", async () => {
+    authMentor();
+    const res = await POST(postReq(validBody));
+    expect(res.status).toBe(201);
+  });
+
+  it("oluşturan kişi olarak mentörün kimliği yazılır", async () => {
+    authMentor("m1");
+    await POST(postReq(validBody));
+
+    const yazilan = prismaMock.projectTemplate.create.mock.calls[0][0].data;
+    expect(yazilan.createdById).toBe("m1");
+  });
+
+  it("sahip GÖVDEDEN belirlenemez — istemci başkasının adına oluşturamaz", async () => {
+    // İki savunma var: zod bilinmeyen alanları kırpıyor (parsed.data içinde
+    // createdById hiç oluşmuyor) VE sahip oturumdan alınıyor. Bu test asıl
+    // gerçekçi hatayı yakalıyor: doğrulanmamış HAM gövdeyi kullanmak.
+    authMentor("m1");
+    await POST(postReq({ ...validBody, createdById: "baskasi" }));
+
+    const yazilan = prismaMock.projectTemplate.create.mock.calls[0][0].data;
+    expect(yazilan.createdById).toBe("m1");
+  });
+
+  it("admin oluşturduğunda sahip admin olur", async () => {
+    authAdmin();
+    await POST(postReq(validBody));
+
+    const yazilan = prismaMock.projectTemplate.create.mock.calls[0][0].data;
+    expect(yazilan.createdById).toBe("admin-1");
+  });
+
+  it("öğrenci rolü şablon oluşturamaz", async () => {
+    // requireAuth zaten eleyecek; ikinci savunma katmanı da olsun.
+    requireAuthMock.mockResolvedValue({
+      authorized: true,
+      session: { user: { id: "s1", role: "STUDENT" } },
+    });
+
+    const res = await POST(postReq(validBody));
+    expect(res.status).toBe(403);
+    expect(prismaMock.projectTemplate.create).not.toHaveBeenCalled();
+  });
+});

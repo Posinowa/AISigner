@@ -7,9 +7,13 @@ export type CreateTemplateData = {
   difficulty: "EASY" | "MEDIUM" | "HARD";
   track: string[];
   githubRepoUrl?: string | null;
+  /** #253: Şablonu oluşturan kişi. Sahiplik kontrolü buna dayanıyor. */
+  createdById?: string | null;
 };
 
-export type UpdateTemplateData = Partial<CreateTemplateData>;
+// #253: Sahip güncellemeyle DEĞİŞTİRİLEMEZ — aksi halde mentör bir şablonun
+// sahipliğini kendine geçirebilirdi.
+export type UpdateTemplateData = Partial<Omit<CreateTemplateData, "createdById">>;
 
 // #112: Prisma unique ihlalini (P2002) route'un 409'a çevirebileceği
 // ayırt edilebilir bir hataya dönüştürür (unassignProject'teki code kalıbı).
@@ -45,6 +49,7 @@ export async function createTemplate(data: CreateTemplateData) {
         difficulty: data.difficulty,
         track: data.track,
         githubRepoUrl: data.githubRepoUrl ?? null,
+        createdById: data.createdById ?? null,
       },
     });
   } catch (error) {

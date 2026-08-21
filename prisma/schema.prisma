@@ -31,6 +31,8 @@ model User {
   stepFiles           StepFile[]
   securityAnswers     SecurityAnswer[]
   suggestions         Suggestion[]     @relation("Suggestion_authorIdToUser")
+  // #253: Bu kullanıcının oluşturduğu proje şablonları.
+  createdProjectTemplates ProjectTemplate[] @relation("ProjectTemplate_createdBy")
   reviewedSuggestions Suggestion[]     @relation("Suggestion_reviewedByIdToUser")
 }
 
@@ -93,10 +95,18 @@ model ProjectTemplate {
   difficulty    Difficulty
   // #49: Projenin GitHub repository URL'i (opsiyonel, public repo).
   githubRepoUrl String?
+  // #253: Şablonu oluşturan kişi. Mentör kendi şablonunu düzenleyebilsin,
+  // başkasınınkine dokunamasın diye. Nullable: mevcut şablonların sahibi yok
+  // (admin tarafından oluşturulmuş sayılırlar) — yalnızca EKLEME, yıkıcı değil.
+  // Kullanıcı silinirse şablon durur, sahipsizleşir (SetNull).
+  createdById   String?
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
+  createdBy        User?             @relation("ProjectTemplate_createdBy", fields: [createdById], references: [id], onDelete: SetNull)
   assignedProjects AssignedProject[]
+
+  @@index([createdById])
 }
 
 model AssignedProject {
