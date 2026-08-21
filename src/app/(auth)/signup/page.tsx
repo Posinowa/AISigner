@@ -3,7 +3,6 @@
 import { useState } from "react"
 import { useActionState } from "react"
 import { signupAction } from "./actions"
-import { UserPlus } from "lucide-react"
 import Link from "next/link"
 import { AuthCard } from "@/features/auth/ui/AuthCard"
 import { AuthField } from "@/features/auth/ui/AuthField"
@@ -19,13 +18,12 @@ export default function SignupPage() {
 
   return (
     <AuthCard
-      icon={UserPlus}
       title="Hesap Oluştur"
       width="lg"
       subtitle={
         <>
           Zaten hesabınız var mı?{" "}
-          <Link href="/signin" className="font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300">
+          <Link href="/signin" className="font-semibold text-primary hover:text-primary/80">
             Giriş yapın
           </Link>
         </>
