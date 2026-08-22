@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth/guard";
 import { getStudentAssignmentsProgress } from "@/features/admin/server/assignment-progress";
-import { provisionGitHubWorkspace } from "@/features/github/server/provisioning";
+import {
+  provisionGitHubWorkspace,
+  updateGitHubWorkspace,
+} from "@/features/github/server/provisioning";
 
 export async function GET() {
   const auth = await requireAuth("ADMIN");
@@ -25,7 +28,7 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { assignmentId } = body;
+    const { assignmentId, guncelle } = body;
 
     if (!assignmentId || typeof assignmentId !== "string") {
       return NextResponse.json(
@@ -34,7 +37,14 @@ export async function POST(req: Request) {
       );
     }
 
-    const result = await provisionGitHubWorkspace(assignmentId);
+    // #257: Aynı uç hem ilk kurulumu hem güncellemeyi yapıyor. Ayrım açıkça
+    // gövdeden geliyor; kurulu bir çalışma alanına kazayla "ilk kurulum"
+    // muamelesi yapılmasın.
+    const result =
+      guncelle === true
+        ? await updateGitHubWorkspace(assignmentId)
+        : await provisionGitHubWorkspace(assignmentId);
+
     return NextResponse.json(result);
   } catch (error) {
     console.error("POST /api/admin/assignments error:", error);

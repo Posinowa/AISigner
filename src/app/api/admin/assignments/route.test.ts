@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-const { requireAuthMock, progressMock, provisionMock } = vi.hoisted(() => ({
+const { requireAuthMock, progressMock, provisionMock, updateMock } = vi.hoisted(() => ({
   requireAuthMock: vi.fn(),
   progressMock: vi.fn(),
   provisionMock: vi.fn(),
+  updateMock: vi.fn(),
 }));
 vi.mock("@/lib/auth/guard", () => ({
   requireAuth: (...args: unknown[]) => requireAuthMock(...args),
@@ -13,6 +14,7 @@ vi.mock("@/features/admin/server/assignment-progress", () => ({
 }));
 vi.mock("@/features/github/server/provisioning", () => ({
   provisionGitHubWorkspace: (...a: unknown[]) => provisionMock(...a),
+  updateGitHubWorkspace: (...a: unknown[]) => updateMock(...a),
 }));
 
 import { GET, POST } from "./route";
@@ -70,4 +72,50 @@ describe("admin/assignments route (#178-3)", () => {
     expect(res.status).toBe(200);
     expect(provisionMock).toHaveBeenCalledWith("a1");
   });
+});
+
+/**
+ * #257 — aynı uç hem kurulum hem güncelleme yapıyor; ayrım gövdeden geliyor.
+ */
+describe("assignments POST — güncelleme ayrımı (#257)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    requireAuthMock.mockResolvedValue({
+      authorized: true,
+      session: { user: { id: "a", role: "ADMIN" } },
+    });
+    provisionMock.mockResolvedValue({ success: true });
+    updateMock.mockResolvedValue({ success: true });
+  });
+
+  const istek = (govde: unknown) =>
+    new Request("http://t", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(govde),
+    });
+
+  it("guncelle:true güncelleme akışını çağırır", async () => {
+    await POST(istek({ assignmentId: "ap-1", guncelle: true }));
+
+    expect(updateMock).toHaveBeenCalledWith("ap-1");
+    expect(provisionMock, "güncellemede ilk kurulum çağrılmamalı").not.toHaveBeenCalled();
+  });
+
+  it("guncelle yoksa ilk kurulum çağrılır", async () => {
+    await POST(istek({ assignmentId: "ap-1" }));
+
+    expect(provisionMock).toHaveBeenCalledWith("ap-1");
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it.each([false, "true", 1, null])(
+    "guncelle=%s kesin true değilse kurulum çağrılır",
+    async (deger) => {
+      // Gevşek doğruluk kontrolü kurulu bir alanı yanlışlıkla sıfırlayabilirdi.
+      await POST(istek({ assignmentId: "ap-1", guncelle: deger }));
+      expect(provisionMock).toHaveBeenCalled();
+      expect(updateMock).not.toHaveBeenCalled();
+    },
+  );
 });
