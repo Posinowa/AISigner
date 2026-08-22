@@ -8,7 +8,6 @@ import { authOptions } from "@/lib/auth/nextauth";
 import { Clock, Briefcase, Target, Github, GraduationCap, Sparkles, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { Progress } from "@/components/ui/progress";
-import { SecurityQuestionsSetup } from "@/features/auth/ui/SecurityQuestionsSetup";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { StudentCertificateTrigger } from "@/features/student/ui/StudentCertificateTrigger";
 
@@ -158,7 +157,6 @@ export default async function StudentDashboardPage() {
       </div>
 
       {/* Güvenlik Soruları Kurulumu */}
-      <SecurityQuestionsSetup />
 
       <ProfileSummaryCard
         level={summaryData.level}
