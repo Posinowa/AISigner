@@ -1,6 +1,7 @@
 import { getProfileSummary } from "@/features/student/server/profileSummary";
 import { ProfileSummaryCard } from "@/features/student/ui/ProfileSummaryCard";
 import { DogrulanmisRozet } from "@/features/auth/ui/DogrulanmisRozet";
+import { DogrulamaYenidenGonder } from "@/features/auth/ui/DogrulamaYenidenGonder";
 import { AvatarUpload } from "@/features/profile/ui/AvatarUpload";
 import { RoadmapSteps } from "@/features/student/ui/RoadmapSteps";
 import { prisma } from "@/lib/db";
@@ -153,6 +154,9 @@ export default async function StudentDashboardPage() {
           </h1>
           {/* #259: Kullanıcı hesabının doğrulanmış olduğunu kendi panelinde görsün. */}
           <DogrulanmisRozet emailVerified={session.user.emailVerified} />
+          {/* #261: Doğrulanmamış kullanıcı bağlantıyı yeniden isteyebilsin —
+              #259'da ibareyi görüp hiçbir şey yapamıyordu. */}
+          <DogrulamaYenidenGonder emailVerified={session.user.emailVerified} />
         </div>
 
         {/* #265: Profil fotoğrafı — başvuru değerlendirilirken admin görecek. */}

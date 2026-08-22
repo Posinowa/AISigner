@@ -5,6 +5,7 @@ import { Users, BookOpen, Clock, CheckCircle, AlertCircle, UserCircle2, ChevronR
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { DogrulanmisRozet } from "@/features/auth/ui/DogrulanmisRozet";
+import { DogrulamaYenidenGonder } from "@/features/auth/ui/DogrulamaYenidenGonder";
 import { experienceLevelLabel } from "@/lib/experience-level";
 
 type StudentWithProfile = {
@@ -133,6 +134,7 @@ export default function MentorDashboardPage() {
               {/* #259: Mentörler de kayıt olabildiği (#250) için doğrulama
                   durumunu kendi panellerinde görüyorlar. */}
               <DogrulanmisRozet emailVerified={session?.user?.emailVerified} />
+              <DogrulamaYenidenGonder emailVerified={session?.user?.emailVerified} />
             </div>
             <p className="text-slate-500 mt-1.5 text-sm">Size atanmış öğrencileri yönetin ve proje atayın</p>
           </div>
