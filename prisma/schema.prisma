@@ -17,6 +17,10 @@ model User {
   role          Role          @default(STUDENT)
   accountStatus AccountStatus @default(APPROVED)
   emailVerified DateTime?
+  // #265: Profil fotoğrafının DEPOLAMA ADI (URL değil). Dosya kendi
+  // rotamızdan servis ediliyor; böylece yetki kontrolü her istekte çalışıyor
+  // ve içerik tipini istemci değil sunucu belirliyor.
+  avatarFile   String?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
