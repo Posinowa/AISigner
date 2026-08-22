@@ -1,5 +1,6 @@
 import { getProfileSummary } from "@/features/student/server/profileSummary";
 import { ProfileSummaryCard } from "@/features/student/ui/ProfileSummaryCard";
+import { DogrulanmisRozet } from "@/features/auth/ui/DogrulanmisRozet";
 import { RoadmapSteps } from "@/features/student/ui/RoadmapSteps";
 import { prisma } from "@/lib/db";
 import { getServerSession } from "next-auth";
@@ -138,9 +139,13 @@ export default async function StudentDashboardPage() {
 
       {/* Sayfa başlığı — navigasyon/çıkış AppShell'de (#126-1) */}
       <div>
-        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
-          {isGraduated ? `Mezun Stajyer Portfolyosu: ${firstName}` : `Hoş geldin, ${firstName}`}
-        </h1>
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
+            {isGraduated ? `Mezun Stajyer Portfolyosu: ${firstName}` : `Hoş geldin, ${firstName}`}
+          </h1>
+          {/* #259: Kullanıcı hesabının doğrulanmış olduğunu kendi panelinde görsün. */}
+          <DogrulanmisRozet emailVerified={session.user.emailVerified} />
+        </div>
         <p className="text-slate-500 mt-2 text-sm">
           {isGraduated
             ? "Staj süreciniz boyunca geliştirdiğiniz projeler, tamamlanan adımlar ve çıktılar aşağıda arşivlenmiştir."

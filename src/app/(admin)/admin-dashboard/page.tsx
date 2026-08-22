@@ -29,6 +29,10 @@ import {
   type ProfileAnalysisData,
 } from "@/features/ai/ui/ProfileAnalysisCard";
 import { CertificateModal } from "@/components/certificate/CertificateModal";
+import {
+  DogrulanmisRozet,
+  dogrulandiMi,
+} from "@/features/auth/ui/DogrulanmisRozet";
 import type { CertificateData } from "@/features/certificate/server/certificate";
 
 type User = {
@@ -38,6 +42,8 @@ type User = {
   lastName: string | null;
   role: "ADMIN" | "MENTOR" | "STUDENT";
   accountStatus: "PENDING" | "APPROVED" | "REJECTED" | "GRADUATED";
+  // #259: Dolu ise e-postası doğrulanmış hesap.
+  emailVerified?: string | null;
   studentProfile?: {
     id: string;
     // #195: M:N — atanmış mentorlar (0..n).
@@ -62,6 +68,8 @@ type FilterCategory =
   // #250: Onay bekleyen mentör başvuruları. "MENTOR" kategorisinden ayrı
   // tutuluyor; aksi halde başvuru mevcut mentörlerin arasında kaybolurdu.
   | "MENTOR_BASVURU"
+  // #259: E-postasını henüz doğrulamamış hesaplar.
+  | "DOGRULANMAMIS"
   | "ADMIN";
 
 const roleConfig: Record<User["role"], { label: string; color: string }> = {
@@ -392,6 +400,7 @@ export default function AdminDashboard() {
       if (filterCategory === "MENTOR" && (u.role !== "MENTOR" || u.accountStatus === "PENDING")) return false;
       if (filterCategory === "MENTOR_BASVURU" && (u.role !== "MENTOR" || u.accountStatus !== "PENDING")) return false;
       if (filterCategory === "ADMIN" && u.role !== "ADMIN") return false;
+      if (filterCategory === "DOGRULANMAMIS" && dogrulandiMi(u.emailVerified)) return false;
 
       if (!q) return true;
       const fullName = `${u.name ?? ""} ${u.lastName ?? ""}`.toLowerCase();
@@ -422,6 +431,9 @@ export default function AdminDashboard() {
       (u) => u.role === "MENTOR" && u.accountStatus === "PENDING",
     ).length;
     const adminCount = users.filter((u) => u.role === "ADMIN").length;
+    const dogrulanmamisCount = users.filter(
+      (u) => !dogrulandiMi(u.emailVerified),
+    ).length;
     const studentsWithoutMentor = users.filter(
       // #195: M:N — onaylı ama hiç mentoru olmayan öğrenciler.
       (u) =>
@@ -441,6 +453,7 @@ export default function AdminDashboard() {
       mentorCount,
       mentorBasvuruCount,
       adminCount,
+      dogrulanmamisCount,
       studentsWithoutMentor,
     };
   }, [users]);
@@ -658,6 +671,10 @@ export default function AdminDashboard() {
                 id: "MENTOR_BASVURU" as FilterCategory,
                 label: `Mentör Başvuruları${stats.mentorBasvuruCount > 0 ? ` (${stats.mentorBasvuruCount})` : ""}`,
               },
+              {
+                id: "DOGRULANMAMIS" as FilterCategory,
+                label: `Doğrulanmamış${stats.dogrulanmamisCount > 0 ? ` (${stats.dogrulanmamisCount})` : ""}`,
+              },
               { id: "ADMIN" as FilterCategory, label: "Yöneticiler" },
             ].map(({ id, label }) => (
               <button
@@ -733,6 +750,12 @@ export default function AdminDashboard() {
                               <Award className="w-3 h-3" /> Mezun
                             </span>
                           )}
+                          {/* #259: Doğrulama durumu künyede; admin listeye
+                              bakarken hangi hesapların doğrulandığını görsün. */}
+                          <DogrulanmisRozet
+                            emailVerified={user.emailVerified}
+                            boyut="kucuk"
+                          />
                         </div>
                         <p className="text-xs text-slate-500 truncate">
                           {user.email}

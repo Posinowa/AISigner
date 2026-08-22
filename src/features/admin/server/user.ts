@@ -11,6 +11,9 @@ export type UserWithProfile = {
   lastName: string | null;
   role: "ADMIN" | "MENTOR" | "STUDENT";
   accountStatus: "PENDING" | "APPROVED" | "REJECTED" | "GRADUATED";
+  // #259: Doğrulama tarihi (#247 ile doluyor). Dolu = doğrulanmış hesap.
+  // Tarih hassas bilgi değil; admin zaten e-postayı görüyor.
+  emailVerified: Date | null;
   studentProfile?: {
     id: string;
     experienceLevel?: string | null;
@@ -33,6 +36,7 @@ export async function getAllUsers(): Promise<UserWithProfile[]> {
       lastName: true,
       role: true,
       accountStatus: true,
+      emailVerified: true,
       studentProfile: {
         select: {
           id: true,
