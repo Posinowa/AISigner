@@ -1,6 +1,7 @@
 import { getProfileSummary } from "@/features/student/server/profileSummary";
 import { ProfileSummaryCard } from "@/features/student/ui/ProfileSummaryCard";
 import { DogrulanmisRozet } from "@/features/auth/ui/DogrulanmisRozet";
+import { AvatarUpload } from "@/features/profile/ui/AvatarUpload";
 import { RoadmapSteps } from "@/features/student/ui/RoadmapSteps";
 import { prisma } from "@/lib/db";
 import { getServerSession } from "next-auth";
@@ -101,6 +102,14 @@ export default async function StudentDashboardPage() {
 
   const firstName = session.user.name?.split(" ")[0] ?? "Öğrenci";
 
+  // #265: Fotoğrafın varlığı — arayüz depolama adına ihtiyaç duymuyor,
+  // yalnızca fotoğraf olup olmadığını bilmesi yeterli.
+  const { avatarFile } =
+    (await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { avatarFile: true },
+    })) ?? {};
+
   return (
     <div className="max-w-5xl mx-auto mt-8 p-6 space-y-8">
       {/* 🎓 Mezun Stajyer Tebrik & Başarı Kartı */}
@@ -144,6 +153,16 @@ export default async function StudentDashboardPage() {
           </h1>
           {/* #259: Kullanıcı hesabının doğrulanmış olduğunu kendi panelinde görsün. */}
           <DogrulanmisRozet emailVerified={session.user.emailVerified} />
+        </div>
+
+        {/* #265: Profil fotoğrafı — başvuru değerlendirilirken admin görecek. */}
+        <div className="mt-5 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+          <AvatarUpload
+            userId={session.user.id}
+            basHarfler={firstName.slice(0, 2).toUpperCase()}
+            fotografVar={Boolean(avatarFile)}
+            ad={session.user.name}
+          />
         </div>
         <p className="text-slate-500 mt-2 text-sm">
           {isGraduated

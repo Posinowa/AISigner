@@ -33,6 +33,7 @@ import {
   DogrulanmisRozet,
   dogrulandiMi,
 } from "@/features/auth/ui/DogrulanmisRozet";
+import { Avatar } from "@/features/profile/ui/Avatar";
 import type { CertificateData } from "@/features/certificate/server/certificate";
 
 type User = {
@@ -44,6 +45,8 @@ type User = {
   accountStatus: "PENDING" | "APPROVED" | "REJECTED" | "GRADUATED";
   // #259: Dolu ise e-postası doğrulanmış hesap.
   emailVerified?: string | null;
+  // #265: Fotoğrafı var mı — gereksiz 404 isteği atmamak için.
+  avatarFile?: string | null;
   studentProfile?: {
     id: string;
     // #195: M:N — atanmış mentorlar (0..n).
@@ -727,8 +730,15 @@ export default function AdminDashboard() {
                   >
                     {/* Kullanıcı Künyesi */}
                     <div className="lg:col-span-4 flex items-center gap-3.5 min-w-0">
-                      <div
-                        className={`w-11 h-11 rounded-2xl text-white font-bold text-sm flex items-center justify-center shrink-0 shadow-sm ${
+                      {/* #265: Fotoğraf varsa gösterilir; yoksa eskisi gibi
+                          baş harfler. Renkler rol/durum bilgisini taşıdığı için
+                          fallback'te korunuyor. */}
+                      <Avatar
+                        userId={user.id}
+                        basHarfler={getInitials(user)}
+                        fotografVar={Boolean(user.avatarFile)}
+                        ad={getDisplayName(user)}
+                        arkaPlanSinifi={
                           user.accountStatus === "GRADUATED"
                             ? "bg-gradient-to-br from-purple-600 to-indigo-600 ring-2 ring-purple-200"
                             : user.role === "ADMIN"
@@ -736,10 +746,8 @@ export default function AdminDashboard() {
                               : user.role === "MENTOR"
                                 ? "bg-gradient-to-br from-blue-500 to-cyan-600"
                                 : "bg-gradient-to-br from-emerald-500 to-teal-600"
-                        }`}
-                      >
-                        {getInitials(user)}
-                      </div>
+                        }
+                      />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-bold text-slate-900 truncate">

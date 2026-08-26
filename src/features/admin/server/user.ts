@@ -14,6 +14,8 @@ export type UserWithProfile = {
   // #259: Doğrulama tarihi (#247 ile doluyor). Dolu = doğrulanmış hesap.
   // Tarih hassas bilgi değil; admin zaten e-postayı görüyor.
   emailVerified: Date | null;
+  // #265: Fotoğrafın depolama adı; arayüz yalnızca varlığına bakıyor.
+  avatarFile: string | null;
   studentProfile?: {
     id: string;
     experienceLevel?: string | null;
@@ -37,6 +39,7 @@ export async function getAllUsers(): Promise<UserWithProfile[]> {
       role: true,
       accountStatus: true,
       emailVerified: true,
+      avatarFile: true,
       studentProfile: {
         select: {
           id: true,
