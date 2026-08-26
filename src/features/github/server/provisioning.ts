@@ -60,9 +60,24 @@ function repoAdi(atama: Atama): string {
  *
  * Bu adım her iki yolda da (gerçek/simülasyon) çalışır — içerikler gerçektir
  * ve DB'de saklanır; yalnızca GitHub'a gönderilmeleri yapılandırmaya bağlıdır.
+ *
+ * #269: GitHub'a GÖNDERİLMİŞ adımda AI HİÇ çağrılmaz. Üç nedeni var:
+ * - `storeGeneratedIssues` kayıtları siliyor; gönderilmiş issue bağlantıları
+ *   kaybolurdu
+ * - AI her seferinde farklı başlık üretebiliyor; `issueHazirla` eşleştirmeyi
+ *   başlığa göre yaptığı için GitHub'da KOPYA issue açılırdı
+ * - gereksiz AI maliyeti ve gecikme
+ *
+ * Yani güncelleme, var olan adımlara dokunmadan yalnızca eksikleri tamamlıyor.
  */
 async function issueIcerikleriniUret(atama: Atama): Promise<void> {
   for (const step of atama.roadmap!.steps) {
+    const gonderilmisSayisi = await prisma.stepIssue.count({
+      where: { stepId: step.id, githubIssueUrl: { not: null } },
+    });
+
+    if (gonderilmisSayisi > 0) continue;
+
     await generateStepIssues({
       stepId: step.id,
       stepTitle: step.title,
