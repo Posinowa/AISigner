@@ -367,7 +367,7 @@ describe("güncelleme — mevcut repo adı korunur (#257)", () => {
 
     await provisionGitHubWorkspace("ap-1");
 
-    expect(repoMock.mock.calls[0][1].repoName).toBe("aisigner-ali-proje");
+    expect(repoMock.mock.calls[0][1].repoName).toBe("aisigner-ali-proje-ap-1");
   });
 
   it("BAŞKA hesabın reposu yeniden kullanılmaz", async () => {
@@ -381,7 +381,7 @@ describe("güncelleme — mevcut repo adı korunur (#257)", () => {
 
     await updateGitHubWorkspace("ap-1");
 
-    expect(repoMock.mock.calls[0][1].repoName).toBe("aisigner-ali-proje");
+    expect(repoMock.mock.calls[0][1].repoName).toBe("aisigner-ali-proje-ap-1");
   });
 
   it("bozuk url'den ad çıkarılmaya çalışılmaz", async () => {
@@ -391,7 +391,7 @@ describe("güncelleme — mevcut repo adı korunur (#257)", () => {
 
     await updateGitHubWorkspace("ap-1");
 
-    expect(repoMock.mock.calls[0][1].repoName).toBe("aisigner-ali-proje");
+    expect(repoMock.mock.calls[0][1].repoName).toBe("aisigner-ali-proje-ap-1");
   });
 
   it("hesap adı büyük/küçük harf farkı sorun olmaz", async () => {
@@ -470,5 +470,80 @@ describe("güncelleme — gönderilmiş adımda AI çağrılmaz (#269)", () => {
     await provisionGitHubWorkspace("ap-1");
 
     expect(genIssuesMock).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * #274 — repo adı atamaya özel olmalı.
+ *
+ * Adı aynı olan iki öğrenci aynı projeye atandığında aynı repo adını
+ * üretiyorlardı; repo işlemleri idempotent olduğu için ikincinin issue'ları
+ * BİRİNCİNİN reposuna açılırdı.
+ */
+describe("repo adı çakışması (#274)", () => {
+  beforeEach(() => {
+    admin();
+    tokenVar();
+  });
+
+  async function repoAdiniAl(atamaVerisi: Record<string, unknown>) {
+    vi.clearAllMocks();
+    prismaMock.stepIssue.count.mockResolvedValue(0);
+    prismaMock.stepIssue.findMany.mockResolvedValue([]);
+    prismaMock.assignedProject.update.mockResolvedValue({});
+    prismaMock.roadmapStep.update.mockResolvedValue({});
+    repoMock.mockResolvedValue({
+      ok: true,
+      olusturuldu: true,
+      veri: { name: "r", htmlUrl: "https://github.com/Posinowa/r" },
+    });
+    milestoneMock.mockResolvedValue({
+      ok: true,
+      olusturuldu: true,
+      veri: { number: 1, title: "Faz 1" },
+    });
+    prismaMock.assignedProject.findUnique.mockResolvedValue(atamaVerisi);
+
+    await provisionGitHubWorkspace(String(atamaVerisi.id));
+    return repoMock.mock.calls[0][1].repoName as string;
+  }
+
+  it("AYNI adlı iki öğrenci FARKLI repo adı alır", async () => {
+    const birinci = await repoAdiniAl(
+      atama({ id: "ap-aaaaaaaa", studentProfile: { user: { name: "Ali" }, experienceLevel: "BEGINNER" } }),
+    );
+    const ikinci = await repoAdiniAl(
+      atama({ id: "ap-bbbbbbbb", studentProfile: { user: { name: "Ali" }, experienceLevel: "BEGINNER" } }),
+    );
+
+    expect(birinci).not.toBe(ikinci);
+  });
+
+  it("adı OLMAYAN iki öğrenci de aynı repoyu paylaşmaz", async () => {
+    // "student" fallback'i en kötü durumdu: adsız herkes aynı repoda.
+    const birinci = await repoAdiniAl(
+      atama({ id: "ap-cccccccc", studentProfile: { user: { name: null }, experienceLevel: "BEGINNER" } }),
+    );
+    const ikinci = await repoAdiniAl(
+      atama({ id: "ap-dddddddd", studentProfile: { user: { name: null }, experienceLevel: "BEGINNER" } }),
+    );
+
+    expect(birinci).not.toBe(ikinci);
+  });
+
+  it("AYNI atama her zaman AYNI ada çözülür (idempotenslik)", async () => {
+    // Deterministik olmazsa her provision yeni repo açardı.
+    const veri = atama({ id: "ap-eeeeeeee" });
+
+    expect(await repoAdiniAl(veri)).toBe(await repoAdiniAl(veri));
+  });
+
+  it("ad hâlâ okunabilir — öğrenci ve proje adını taşır", async () => {
+    const ad = await repoAdiniAl(
+      atama({ id: "ap-ffffffff", studentProfile: { user: { name: "Ayse" }, experienceLevel: "BEGINNER" } }),
+    );
+
+    expect(ad).toContain("ayse");
+    expect(ad).toContain("proje");
   });
 });
