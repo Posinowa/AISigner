@@ -25,6 +25,18 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/logger", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
+// #218: Retry mantığı GERÇEK çalışsın ama testler uyumasın — yalnızca
+// bekleme işlevi devre dışı bırakılıyor. Tamamen mock'lansaydı repo.ts'in
+// çağrıları gerçekten sarıp sarmadığı test edilmemiş olurdu.
+vi.mock("./retry", async () => {
+  const gercek = await vi.importActual<typeof import("./retry")>("./retry");
+  return {
+    ...gercek,
+    yenidenDene: <T,>(islem: () => Promise<T>, s: { ad: string }) =>
+      gercek.yenidenDene(islem, { ...s, bekle: async () => {} }),
+  };
+});
+
 vi.mock("./client", async () => {
   const gercek = await vi.importActual<typeof import("./client")>("./client");
   return { ...gercek, getOctokit: () => octokitMock };
@@ -208,5 +220,63 @@ describe("issueHazirla — idempotent", () => {
 
     const r = await issueHazirla(config, { repoName: "r", title: "G", body: "b" });
     expect(r).toEqual({ ok: false, neden: "oran-siniri" });
+  });
+});
+
+/**
+ * #218 — çağrılar gerçekten yeniden deneniyor mu.
+ *
+ * `retry.test.ts` yeniden deneme mantığını tek başına kanıtlıyor; buradaki
+ * testler `repo.ts`'in o mantığı gerçekten KULLANDIĞINI kanıtlıyor. İkisi
+ * ayrı sorular: mantık doğru olabilir ama hiçbir yerden çağrılmıyorsa
+ * işe yaramaz.
+ */
+describe("GitHub çağrıları yeniden denenir (#218)", () => {
+  it("repo okuma geçici hatada tekrar denenir", async () => {
+    octokitMock.repos.get
+      .mockRejectedValueOnce(httpHata(503))
+      .mockResolvedValue({
+        data: { name: "r", html_url: "https://github.com/Posinowa/r" },
+      });
+
+    const r = await repoyuHazirla(config, { repoName: "r", description: "d" });
+
+    expect(r.ok).toBe(true);
+    expect(octokitMock.repos.get).toHaveBeenCalledTimes(2);
+  });
+
+  it("issue oluşturma oran sınırında tekrar denenir", async () => {
+    octokitMock.issues.listForRepo.mockResolvedValue({ data: [] });
+    octokitMock.issues.create
+      .mockRejectedValueOnce(httpHata(429))
+      .mockResolvedValue({
+        data: { number: 1, title: "G", html_url: "u1" },
+      });
+
+    const r = await issueHazirla(config, { repoName: "r", title: "G", body: "b" });
+
+    expect(r.ok).toBe(true);
+    expect(octokitMock.issues.create).toHaveBeenCalledTimes(2);
+  });
+
+  it("KALICI hatada tekrar denenmez", async () => {
+    // 404 tekrarlansa da aynı sonucu verir; boşuna gecikme olmamalı.
+    octokitMock.repos.get.mockRejectedValue(httpHata(404));
+    octokitMock.repos.createInOrg.mockResolvedValue({
+      data: { name: "r", html_url: "u" },
+    });
+
+    await repoyuHazirla(config, { repoName: "r", description: "d" });
+
+    expect(octokitMock.repos.get).toHaveBeenCalledTimes(1);
+  });
+
+  it("deneme hakkı bitince yapılandırılmış hata döner", async () => {
+    octokitMock.repos.get.mockRejectedValue(httpHata(503));
+
+    const r = await repoyuHazirla(config, { repoName: "r", description: "d" });
+
+    expect(r).toEqual({ ok: false, neden: "bilinmeyen" });
+    expect(octokitMock.repos.get).toHaveBeenCalledTimes(3);
   });
 });
