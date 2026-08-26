@@ -131,7 +131,7 @@ export default async function AccountStatusPage() {
               <div className="mt-6">
                 <Link
                   href="/profile-setup"
-                  className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-6 py-3 text-sm font-semibold text-white shadow-md shadow-blue-200 transition-all"
+                  className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-6 py-3 text-sm font-semibold text-white shadow-md shadow-primary transition-all"
                 >
                   Profilimi Tamamla
                 </Link>

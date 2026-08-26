@@ -137,7 +137,7 @@ export function ConfirmDialogProvider({ children }: { children: React.ReactNode 
                 className={`px-4 py-2 rounded-xl text-sm font-semibold text-white transition-colors ${
                   pending.options.danger
                     ? "bg-red-600 hover:bg-red-700"
-                    : "bg-blue-600 hover:bg-blue-700"
+                    : "bg-primary hover:bg-primary/90"
                 }`}
               >
                 {pending.options.confirmLabel ?? "Onayla"}

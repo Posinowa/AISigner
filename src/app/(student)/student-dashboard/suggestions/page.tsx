@@ -131,7 +131,7 @@ export default function StudentSuggestionsPage() {
               aria-pressed={type === t}
               className={`px-4 py-2 rounded-xl text-sm font-medium border transition-colors ${
                 type === t
-                  ? "bg-blue-600 text-white border-blue-600"
+                  ? "bg-primary text-primary-foreground border-primary"
                   : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
               }`}
             >
@@ -150,7 +150,7 @@ export default function StudentSuggestionsPage() {
             onChange={(e) => setTitle(e.target.value)}
             maxLength={MAX_TITLE}
             placeholder="Kısa ve net bir başlık"
-            className="w-full h-11 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"
+            className="w-full h-11 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-blue-500"
           />
         </div>
 
@@ -165,7 +165,7 @@ export default function StudentSuggestionsPage() {
             maxLength={MAX_CONTENT}
             rows={5}
             placeholder="Önerinizi veya talebinizi ayrıntılı anlatın (en az 10 karakter)."
-            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"
+            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-ring focus:border-blue-500"
           />
           <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5 text-right">
             {content.length}/{MAX_CONTENT}
@@ -175,7 +175,7 @@ export default function StudentSuggestionsPage() {
         <button
           type="submit"
           disabled={!canSubmit}
-          className="inline-flex items-center gap-2 h-11 px-6 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors"
+          className="inline-flex items-center gap-2 h-11 px-6 rounded-xl bg-primary hover:bg-primary/90 disabled:bg-slate-300 disabled:cursor-not-allowed text-primary-foreground text-sm font-medium transition-colors"
         >
           {submitting ? (
             <Loader2 className="w-4 h-4 animate-spin" />
@@ -204,7 +204,7 @@ export default function StudentSuggestionsPage() {
             <p className="text-slate-900 dark:text-slate-100 font-semibold">Kayıtlar yüklenemedi</p>
             <button
               onClick={load}
-              className="mt-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-5 py-2.5 transition-colors"
+              className="mt-4 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium px-5 py-2.5 transition-colors"
             >
               Tekrar Dene
             </button>

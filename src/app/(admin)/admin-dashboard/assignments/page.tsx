@@ -155,7 +155,7 @@ export default function AdminAssignmentsPage() {
           onClick={() => setFilterTab("ALL")}
           className={`px-4 py-2 rounded-xl text-xs font-semibold transition ${
             filterTab === "ALL"
-              ? "bg-indigo-600 text-white shadow-sm"
+              ? "bg-primary text-primary-foreground shadow-sm"
               : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800"
           }`}
         >
@@ -165,7 +165,7 @@ export default function AdminAssignmentsPage() {
           onClick={() => setFilterTab("NOT_PROVISIONED")}
           className={`px-4 py-2 rounded-xl text-xs font-semibold transition ${
             filterTab === "NOT_PROVISIONED"
-              ? "bg-indigo-600 text-white shadow-sm"
+              ? "bg-primary text-primary-foreground shadow-sm"
               : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800"
           }`}
         >
@@ -175,7 +175,7 @@ export default function AdminAssignmentsPage() {
           onClick={() => setFilterTab("PROVISIONED")}
           className={`px-4 py-2 rounded-xl text-xs font-semibold transition ${
             filterTab === "PROVISIONED"
-              ? "bg-indigo-600 text-white shadow-sm"
+              ? "bg-primary text-primary-foreground shadow-sm"
               : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800"
           }`}
         >
@@ -306,7 +306,7 @@ export default function AdminAssignmentsPage() {
                       </div>
                       <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-indigo-600 rounded-full transition-all duration-300"
+                          className="h-full bg-primary rounded-full transition-all duration-300"
                           style={{ width: `${item.progressPercentage}%` }}
                         />
                       </div>
@@ -350,7 +350,7 @@ export default function AdminAssignmentsPage() {
                       ) : item.roadmapStatus === "PUBLISHED" || item.totalSteps > 0 ? (
                         <button
                           onClick={() => setSelectedAssignment(item)}
-                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition shadow-sm"
+                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold transition shadow-sm"
                         >
                           <Sparkles className="w-3.5 h-3.5" />
                           GitHub Workspace Oluştur
@@ -442,7 +442,7 @@ export default function AdminAssignmentsPage() {
                 type="button"
                 onClick={handleConfirmProvision}
                 disabled={isProvisioning}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-md shadow-indigo-600/20 transition disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold shadow-md shadow-primary/20 transition disabled:opacity-50"
               >
                 {isProvisioning ? (
                   <>

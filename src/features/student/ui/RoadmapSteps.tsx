@@ -120,7 +120,7 @@ export function RoadmapSteps({ steps, isDraft, isGraduated = false, currentUserI
                   {/* Durum Badge */}
                   {isInProgress && (
                     <span className="flex items-center text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 px-2 py-1 rounded">
-                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse mr-1.5" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse mr-1.5" />
                       Şu Anki Odak
                     </span>
                   )}
@@ -198,7 +198,7 @@ export function RoadmapSteps({ steps, isDraft, isGraduated = false, currentUserI
                       <button
                         onClick={() => updateStepStatus(step.id, "IN_PROGRESS")}
                         disabled={isUpdating || isPending}
-                        className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50"
+                        className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary/90 rounded-lg transition-colors disabled:opacity-50"
                       >
                         {isUpdating ? (
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />

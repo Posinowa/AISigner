@@ -193,7 +193,7 @@ export default function ProjectsPage() {
         </div>
         <button
           onClick={() => setIsFormOpen(true)}
-          className="inline-flex items-center px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold rounded-xl text-sm shadow-md shadow-blue-200 transition-all"
+          className="inline-flex items-center px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold rounded-xl text-sm shadow-md shadow-primary transition-all"
         >
           <Plus className="w-4 h-4 mr-2" />
           Yeni Şablon
@@ -233,7 +233,7 @@ export default function ProjectsPage() {
                   type="text"
                   value={form.title}
                   onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent"
                   placeholder="Proje başlığı girin"
                   required
                 />
@@ -247,7 +247,7 @@ export default function ProjectsPage() {
                   value={form.description}
                   onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
                   rows={8}
-                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent font-mono text-sm"
                   placeholder="Proje açıklamasını markdown formatında yazın..."
                   required
                 />
@@ -264,7 +264,7 @@ export default function ProjectsPage() {
                   <select
                     value={form.difficulty}
                     onChange={e => setForm(f => ({ ...f, difficulty: e.target.value as "EASY" | "MEDIUM" | "HARD" }))}
-                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent"
                   >
                     <option value="EASY">Kolay</option>
                     <option value="MEDIUM">Orta</option>
@@ -280,7 +280,7 @@ export default function ProjectsPage() {
                     type="text"
                     value={form.track}
                     onChange={e => setForm(f => ({ ...f, track: e.target.value }))}
-                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent"
                     placeholder="React, Next.js, TypeScript..."
                   />
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
@@ -297,7 +297,7 @@ export default function ProjectsPage() {
                   type="text"
                   value={form.githubRepoUrl}
                   onChange={e => setForm(f => ({ ...f, githubRepoUrl: e.target.value }))}
-                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent"
                   placeholder="https://github.com/kullanici/repo"
                 />
               </div>
@@ -313,7 +313,7 @@ export default function ProjectsPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                  className="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg transition-colors disabled:opacity-50"
                 >
                   {loading ? "Kaydediliyor..." : editingId ? "Güncelle" : "Kaydet"}
                 </button>
@@ -339,7 +339,7 @@ export default function ProjectsPage() {
           <p className="text-slate-600 dark:text-slate-300 mb-4">Bağlantıda bir sorun oluştu. Lütfen tekrar deneyin.</p>
           <button
             onClick={loadTemplates}
-            className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+            className="inline-flex items-center px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-lg transition-colors"
           >
             Tekrar Dene
           </button>
@@ -354,7 +354,7 @@ export default function ProjectsPage() {
               <p className="text-slate-600 dark:text-slate-300 mb-4">İlk proje şablonunuzu ekleyerek başlayın</p>
               <button
                 onClick={() => setIsFormOpen(true)}
-                className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+                className="inline-flex items-center px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-lg transition-colors"
               >
                 <Plus className="w-5 h-5 mr-2" />
                 Yeni Şablon Ekle

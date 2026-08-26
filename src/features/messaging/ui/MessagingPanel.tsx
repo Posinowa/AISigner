@@ -319,7 +319,7 @@ export function MessagingPanel({ currentUserId }: Props) {
                       <div
                         className={`max-w-[75%] rounded-2xl px-4 py-2.5 ${
                           isOwn
-                            ? "bg-blue-600 text-white rounded-br-md"
+                            ? "bg-primary text-primary-foreground rounded-br-md"
                             : "bg-white dark:bg-slate-900 border text-gray-900 dark:text-slate-100 rounded-bl-md shadow-sm"
                         }`}
                       >
@@ -343,12 +343,12 @@ export function MessagingPanel({ currentUserId }: Props) {
                 onChange={(e) => setNewMessage(e.target.value)}
                 placeholder="Mesajınızı yazın..."
                 maxLength={2000}
-                className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-slate-800 border-0 rounded-full text-sm text-gray-900 dark:text-slate-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-slate-800 border-0 rounded-full text-sm text-gray-900 dark:text-slate-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-ring"
               />
               <button
                 type="submit"
                 disabled={!newMessage.trim() || sending}
-                className="w-10 h-10 flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-10 h-10 flex items-center justify-center bg-primary hover:bg-primary/90 text-primary-foreground rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {sending ? (
                   <Loader2 className="w-4 h-4 animate-spin" />

@@ -158,7 +158,7 @@ export default function AdminSuggestionsPage() {
           <p className="text-slate-900 dark:text-slate-100 font-semibold">Kayıtlar yüklenemedi</p>
           <button
             onClick={() => load(filter)}
-            className="mt-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-5 py-2.5 transition-colors"
+            className="mt-4 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium px-5 py-2.5 transition-colors"
           >
             Tekrar Dene
           </button>
@@ -237,7 +237,7 @@ export default function AdminSuggestionsPage() {
                     }
                     maxLength={2000}
                     rows={2}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-ring focus:border-blue-500"
                   />
                   <button
                     onClick={() => patch(item.id, { adminNote: draft })}

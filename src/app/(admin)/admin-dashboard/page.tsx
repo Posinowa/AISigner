@@ -474,7 +474,7 @@ export default function AdminDashboard() {
         </p>
         <button
           onClick={loadData}
-          className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-5 py-2.5 transition-colors"
+          className="rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium px-5 py-2.5 transition-colors"
         >
           Tekrar Dene
         </button>
@@ -497,7 +497,7 @@ export default function AdminDashboard() {
           </div>
           <a
             href="/admin-dashboard/assignments"
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-md shadow-indigo-600/20 transition self-start sm:self-auto"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs shadow-md shadow-primary/20 transition self-start sm:self-auto"
           >
             <Sparkles className="w-4 h-4" />
             Öğrenci İlerlemeleri & GitHub Yönetimi
@@ -555,7 +555,7 @@ export default function AdminDashboard() {
               onClick={() => setFilterCategory(filter)}
               className={`text-left rounded-2xl border p-4 shadow-sm transition-all ${
                 filterCategory === filter
-                  ? "bg-white dark:bg-slate-900 ring-2 ring-blue-500 border-blue-500 shadow-md"
+                  ? "bg-white dark:bg-slate-900 ring-2 ring-ring border-blue-500 shadow-md"
                   : "bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-700/80 hover:border-slate-300 dark:hover:border-slate-600"
               }`}
             >
@@ -611,7 +611,7 @@ export default function AdminDashboard() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="İsim veya e-posta ile ara..."
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-3 focus:ring-blue-100 dark:focus:ring-blue-950 outline-none transition"
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:bg-white dark:focus:bg-slate-800 focus:border-blue-500 focus:ring-3 focus:ring-ring dark:focus:ring-ring outline-none transition"
             />
           </div>
           <div className="flex gap-1.5 flex-wrap">
@@ -629,7 +629,7 @@ export default function AdminDashboard() {
                 onClick={() => setFilterCategory(id)}
                 className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
                   filterCategory === id
-                    ? "bg-slate-900 text-white dark:bg-blue-600 shadow-sm"
+                    ? "bg-slate-900 text-white dark:bg-primary shadow-sm"
                     : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
                 }`}
               >
@@ -730,7 +730,7 @@ export default function AdminDashboard() {
                           handleRoleChange(user, e.target.value as User["role"])
                         }
                         disabled={isUpdating}
-                        className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 transition"
+                        className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-ring focus:border-blue-500 disabled:opacity-50 transition"
                       >
                         <option value="ADMIN">👑 Yönetici</option>
                         <option value="MENTOR">🧑‍🏫 Mentor</option>
@@ -792,7 +792,7 @@ export default function AdminDashboard() {
                                   }
                                 }}
                                 disabled={isUpdating}
-                                className="flex-1 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
+                                className="flex-1 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-ring focus:border-blue-500 disabled:opacity-60"
                               >
                                 <option value="">+ Mentor ekle…</option>
                                 {mentors

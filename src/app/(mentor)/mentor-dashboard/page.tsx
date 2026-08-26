@@ -106,7 +106,7 @@ export default function MentorDashboardPage() {
         </p>
         <button
           onClick={loadStudents}
-          className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-5 py-2.5 transition-colors"
+          className="rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium px-5 py-2.5 transition-colors"
         >
           Tekrar Dene
         </button>
@@ -267,7 +267,7 @@ export default function MentorDashboardPage() {
                       {hasProfile && (
                         <Link
                           href={`/mentor-dashboard/${student.id}?tab=assign`}
-                          className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2.5 px-3.5 rounded-xl transition-colors flex items-center gap-1"
+                          className="bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium py-2.5 px-3.5 rounded-xl transition-colors flex items-center gap-1"
                         >
                           <BookOpen className="w-3.5 h-3.5" />
                           Ata
