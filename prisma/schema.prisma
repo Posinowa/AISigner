@@ -33,7 +33,6 @@ model User {
   receivedMessages    Message[]        @relation("Message_receiverIdToUser")
   stepComments        StepComment[]
   stepFiles           StepFile[]
-  securityAnswers     SecurityAnswer[]
   suggestions         Suggestion[]     @relation("Suggestion_authorIdToUser")
   // #253: Bu kullanıcının oluşturduğu proje şablonları.
   createdProjectTemplates ProjectTemplate[] @relation("ProjectTemplate_createdBy")
@@ -224,19 +223,6 @@ model StepFile {
 
   @@index([stepId])
   @@index([uploaderId])
-}
-
-model SecurityAnswer {
-  id         String   @id @default(cuid())
-  userId     String
-  questionId Int
-  answer     String
-  createdAt  DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, questionId])
-  @@index([userId])
 }
 
 // #45: Admin tarafından yönetilen anket soruları havuzu.
