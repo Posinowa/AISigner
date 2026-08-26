@@ -11,11 +11,11 @@ export default async function AdminMessagesPage() {
   if (!session?.user?.id) return <p>Oturum açmanız gerekiyor.</p>;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/30">
       <div className="max-w-5xl mx-auto p-6">
         <Link
           href="/admin-dashboard"
-          className="inline-flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors mb-4"
+          className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 transition-colors mb-4"
         >
           <ArrowLeft className="w-4 h-4" />
           Yönetici Paneline Dön
@@ -26,8 +26,8 @@ export default async function AdminMessagesPage() {
             <MessageSquare className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Mesajlar</h1>
-            <p className="text-slate-500 dark:text-slate-400 mt-0.5 text-sm">
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Mesajlar</h1>
+            <p className="text-slate-500 mt-0.5 text-sm">
               Tüm mentor ve öğrencilerle doğrudan iletişim
             </p>
           </div>

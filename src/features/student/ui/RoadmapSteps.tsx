@@ -64,7 +64,7 @@ export function RoadmapSteps({ steps, isDraft, isGraduated = false, currentUserI
   return (
     <div className="relative pl-4 md:pl-0">
       {/* Dikey Çizgi (Timeline) */}
-      <div className="absolute left-[1.35rem] top-2 bottom-2 w-px bg-slate-200 dark:bg-slate-800 hidden md:block" />
+      <div className="absolute left-[1.35rem] top-2 bottom-2 w-px bg-slate-200 hidden md:block" />
 
       <div className="space-y-6">
         {steps.map((step, index) => {
@@ -83,17 +83,17 @@ export function RoadmapSteps({ steps, isDraft, isGraduated = false, currentUserI
             <div key={step.id} className="relative flex items-start gap-4">
               {/* Status Icon / Timeline Node */}
               <div
-                className={`hidden md:flex relative z-10 items-center justify-center w-11 h-11 rounded-full bg-white dark:bg-slate-900 border-2 shrink-0 mt-1
-                  ${isCompleted ? "border-emerald-500" : isInProgress ? "border-blue-600" : isActionable ? "border-amber-400" : "border-slate-200 dark:border-slate-700"}`}
+                className={`hidden md:flex relative z-10 items-center justify-center w-11 h-11 rounded-full bg-white border-2 shrink-0 mt-1
+                  ${isCompleted ? "border-emerald-500" : isInProgress ? "border-blue-600" : isActionable ? "border-amber-400" : "border-slate-200"}`}
               >
                 {isCompleted ? (
                   <CheckCircle2 className="w-5 h-5 text-emerald-500" />
                 ) : isInProgress ? (
-                  <PlayCircle className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  <PlayCircle className="w-5 h-5 text-blue-600" />
                 ) : isActionable ? (
                   <div className="w-2.5 h-2.5 rounded-full bg-amber-400" />
                 ) : (
-                  <div className="w-2.5 h-2.5 rounded-full bg-slate-200 dark:bg-slate-800" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-slate-200" />
                 )}
               </div>
 
@@ -101,31 +101,31 @@ export function RoadmapSteps({ steps, isDraft, isGraduated = false, currentUserI
               <div
                 className={`flex-1 rounded-xl p-5 transition-all border
                   ${isCompleted
-                    ? "bg-white dark:bg-slate-900 border-slate-200/60 dark:border-slate-700/60"
+                    ? "bg-white border-slate-200/60"
                     : isInProgress
-                      ? "bg-white dark:bg-slate-900 border-blue-200 ring-1 ring-blue-100 shadow-sm"
+                      ? "bg-white border-blue-200 ring-1 ring-blue-100 shadow-sm"
                       : isActionable
-                        ? "bg-white dark:bg-slate-900 border-amber-200 shadow-sm"
-                        : "bg-slate-50/50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-700 opacity-60"
+                        ? "bg-white border-amber-200 shadow-sm"
+                        : "bg-slate-50/50 border-slate-200 opacity-60"
                   }`}
               >
                 <div className="flex items-center justify-between mb-1.5">
                   <span
                     className={`text-xs font-semibold tracking-wider uppercase
-                      ${isCompleted ? "text-emerald-600 dark:text-emerald-400" : isInProgress ? "text-blue-600 dark:text-blue-400" : isActionable ? "text-amber-600 dark:text-amber-400" : "text-slate-500 dark:text-slate-400"}`}
+                      ${isCompleted ? "text-emerald-600" : isInProgress ? "text-blue-600" : isActionable ? "text-amber-600" : "text-slate-500"}`}
                   >
                     Aşama {step.order}
                   </span>
 
                   {/* Durum Badge */}
                   {isInProgress && (
-                    <span className="flex items-center text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 px-2 py-1 rounded">
+                    <span className="flex items-center text-[10px] font-bold uppercase tracking-wider text-blue-700 bg-blue-50 px-2 py-1 rounded">
                       <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse mr-1.5" />
                       Şu Anki Odak
                     </span>
                   )}
                   {isCompleted && (
-                    <span className="flex items-center text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-1 rounded">
+                    <span className="flex items-center text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-1 rounded">
                       Tamamlandı
                     </span>
                   )}
@@ -133,21 +133,21 @@ export function RoadmapSteps({ steps, isDraft, isGraduated = false, currentUserI
 
                 <h5
                   className={`font-semibold text-base mb-2
-                    ${isCompleted ? "text-slate-500 dark:text-slate-400 line-through decoration-slate-300" : "text-slate-900 dark:text-slate-100"}`}
+                    ${isCompleted ? "text-slate-500 line-through decoration-slate-300" : "text-slate-900"}`}
                 >
                   {step.title}
                 </h5>
 
                 {/* Açıklama - kilitli olmayan adımlarda göster */}
                 {!isLocked && step.description && (
-                  <p className={`text-sm leading-relaxed ${isCompleted ? "text-slate-400 dark:text-slate-500" : "text-slate-600 dark:text-slate-300"}`}>
+                  <p className={`text-sm leading-relaxed ${isCompleted ? "text-slate-400 " : "text-slate-600 "}`}>
                     {step.description}
                   </p>
                 )}
 
                 {/* Tahmini süre */}
                 {!isLocked && step.estimatedHours && (
-                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">
+                  <p className="text-xs text-slate-400 mt-2">
                     Tahmini süre: ~{step.estimatedHours} saat
                   </p>
                 )}
@@ -158,7 +158,7 @@ export function RoadmapSteps({ steps, isDraft, isGraduated = false, currentUserI
                     href={step.githubIssueUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors mt-2"
+                    className="inline-flex items-center text-xs font-medium text-slate-600 hover:text-blue-600 transition-colors mt-2"
                   >
                     <Github className="w-3.5 h-3.5 mr-1.5" />
                     GitHub Issue&apos;yu Görüntüle
@@ -167,7 +167,7 @@ export function RoadmapSteps({ steps, isDraft, isGraduated = false, currentUserI
 
                 {/* Kilitli mesajı */}
                 {isLocked && (
-                  <div className="flex items-center text-sm text-slate-400 dark:text-slate-500 mt-2">
+                  <div className="flex items-center text-sm text-slate-400 mt-2">
                     <Lock className="w-3.5 h-3.5 mr-1.5" />
                     <span>Önceki aşamanın tamamlanması bekleniyor</span>
                   </div>
@@ -175,14 +175,14 @@ export function RoadmapSteps({ steps, isDraft, isGraduated = false, currentUserI
 
                 {/* Kaynaklar */}
                 {!isLocked && step.resources && step.resources.length > 0 && (
-                  <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-wrap gap-3">
+                  <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap gap-3">
                     {step.resources.map((link, i) => (
                       <a
                         key={i}
                         href={link}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                        className="inline-flex items-center text-xs font-medium text-slate-600 hover:text-blue-600 transition-colors"
                       >
                         <ExternalLink className="w-3.5 h-3.5 mr-1" />
                         Kaynak {i + 1}
@@ -193,7 +193,7 @@ export function RoadmapSteps({ steps, isDraft, isGraduated = false, currentUserI
 
                 {/* Aksiyon Butonları — Mezun olmayan ve yayınlanmış adımlarda aktif */}
                 {!isGraduated && !isDraft && !isLocked && !isCompleted && (
-                  <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                  <div className="mt-4 pt-4 border-t border-slate-100">
                     {isTodo && isActionable && (
                       <button
                         onClick={() => updateStepStatus(step.id, "IN_PROGRESS")}

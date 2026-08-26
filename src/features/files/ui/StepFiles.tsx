@@ -62,7 +62,7 @@ export function StepFiles({ stepId, currentUserId, currentUserRole, isDraft, rea
 
   function getFileIcon(mimeType: string) {
     if (mimeType.startsWith("image/")) return <ImageIcon className="w-4 h-4 text-pink-500" />;
-    if (mimeType === "application/pdf") return <FileText className="w-4 h-4 text-red-500 dark:text-red-400" />;
+    if (mimeType === "application/pdf") return <FileText className="w-4 h-4 text-red-500" />;
     if (mimeType.includes("zip")) return <FileArchive className="w-4 h-4 text-yellow-600" />;
     if (
       mimeType.includes("javascript") ||
@@ -72,7 +72,7 @@ export function StepFiles({ stepId, currentUserId, currentUserRole, isDraft, rea
       mimeType.includes("css")
     )
       return <FileCode className="w-4 h-4 text-blue-500" />;
-    return <FileText className="w-4 h-4 text-slate-500 dark:text-slate-400" />;
+    return <FileText className="w-4 h-4 text-slate-500" />;
   }
 
   function formatDate(dateStr: string) {
@@ -179,11 +179,11 @@ export function StepFiles({ stepId, currentUserId, currentUserRole, isDraft, rea
   }, [isOpen, files.length, loadFiles]);
 
   return (
-    <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+    <div className="mt-3 pt-3 border-t border-slate-100">
       {/* Toggle Butonu */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors group"
+        className="flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors group"
       >
         <Paperclip className="w-3.5 h-3.5 group-hover:text-amber-600 transition-colors" />
         <span>Dosyalar{files.length > 0 ? ` (${files.length})` : ""}</span>
@@ -194,15 +194,15 @@ export function StepFiles({ stepId, currentUserId, currentUserRole, isDraft, rea
         <div className="mt-3 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
           {/* Upload Alanı — taslak roadmap'te öğrenci yükleyemez (#52) */}
           {interactionLocked ? (
-            <p className="text-[11px] text-slate-400 dark:text-slate-500 text-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-lg p-4">
+            <p className="text-[11px] text-slate-400 text-center border-2 border-dashed border-slate-200 rounded-lg p-4">
               Bu yol haritası taslak aşamasında. Mentörünüz yayınladığında dosya yükleyebilirsiniz.
             </p>
           ) : (
             <div
               className={`relative border-2 border-dashed rounded-lg p-4 text-center transition-colors cursor-pointer
                 ${dragOver
-                  ? "border-blue-400 bg-blue-50 dark:bg-blue-950/40"
-                  : "border-slate-200 dark:border-slate-700 hover:border-slate-300 bg-slate-50/50 dark:bg-slate-950/50"
+                  ? "border-blue-400 bg-blue-50"
+                  : "border-slate-200 hover:border-slate-300 bg-slate-50/50"
                 }
                 ${uploading ? "pointer-events-none opacity-60" : ""}`}
               onDragOver={(e) => {
@@ -223,15 +223,15 @@ export function StepFiles({ stepId, currentUserId, currentUserRole, isDraft, rea
               {uploading ? (
                 <div className="flex items-center justify-center gap-2 py-1">
                   <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
-                  <span className="text-xs text-slate-500 dark:text-slate-400">Yükleniyor...</span>
+                  <span className="text-xs text-slate-500">Yükleniyor...</span>
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-1 py-1">
-                  <Upload className="w-5 h-5 text-slate-400 dark:text-slate-500" />
-                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                  <Upload className="w-5 h-5 text-slate-400" />
+                  <span className="text-xs text-slate-500">
                     Dosyayı sürükleyin veya tıklayıp seçin
                   </span>
-                  <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                  <span className="text-[10px] text-slate-400">
                     Maks. 10 MB &middot; Resim, PDF, Kod, ZIP
                   </span>
                 </div>
@@ -241,7 +241,7 @@ export function StepFiles({ stepId, currentUserId, currentUserRole, isDraft, rea
 
           {/* Hata Mesajı */}
           {error && (
-            <div className="flex items-center justify-between text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 rounded-lg px-3 py-2">
+            <div className="flex items-center justify-between text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">
               <span>{error}</span>
               <button onClick={() => setError(null)} aria-label="Hatayı kapat" className="ml-2 hover:text-red-800">
                 <X className="w-3.5 h-3.5" />
@@ -252,13 +252,13 @@ export function StepFiles({ stepId, currentUserId, currentUserRole, isDraft, rea
           {/* Yükleniyor */}
           {loading && (
             <div className="flex items-center justify-center py-4">
-              <Loader2 className="w-4 h-4 animate-spin text-slate-400 dark:text-slate-500" />
+              <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
             </div>
           )}
 
           {/* Dosya Listesi */}
           {!loading && files.length === 0 && (
-            <p className="text-xs text-slate-400 dark:text-slate-500 text-center py-2">
+            <p className="text-xs text-slate-400 text-center py-2">
               Henüz dosya yüklenmemiş.
             </p>
           )}
@@ -268,17 +268,17 @@ export function StepFiles({ stepId, currentUserId, currentUserRole, isDraft, rea
               {files.map((file) => (
                 <li
                   key={file.id}
-                  className="flex items-center gap-3 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-lg px-3 py-2.5 group hover:border-slate-200 transition-colors"
+                  className="flex items-center gap-3 bg-white border border-slate-100 rounded-lg px-3 py-2.5 group hover:border-slate-200 transition-colors"
                 >
                   {/* Dosya İkonu */}
                   <div className="shrink-0">{getFileIcon(file.mimeType)}</div>
 
                   {/* Dosya Bilgileri */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate" title={file.fileName}>
+                    <p className="text-sm font-medium text-slate-700 truncate" title={file.fileName}>
                       {file.fileName}
                     </p>
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                    <p className="text-[10px] text-slate-400">
                       {formatFileSize(file.fileSize)} &middot; {getFullName(file.uploader)} &middot;{" "}
                       {formatDate(file.createdAt)}
                     </p>
@@ -292,7 +292,7 @@ export function StepFiles({ stepId, currentUserId, currentUserRole, isDraft, rea
                         href={`/api/steps/${stepId}/files/${file.id}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded transition-colors"
+                        className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
                         aria-label={`${file.fileName} dosyasını önizle`}
                         title="Önizle"
                       >
@@ -302,7 +302,7 @@ export function StepFiles({ stepId, currentUserId, currentUserRole, isDraft, rea
                       <a
                         href={`/api/steps/${stepId}/files/${file.id}`}
                         download
-                        className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded transition-colors"
+                        className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
                         aria-label={`${file.fileName} dosyasını indir`}
                         title="İndir"
                       >
@@ -314,7 +314,7 @@ export function StepFiles({ stepId, currentUserId, currentUserRole, isDraft, rea
                     {canDelete(file) && (
                       <button
                         onClick={() => handleDelete(file.id)}
-                        className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded transition-colors"
+                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                         aria-label={`${file.fileName} dosyasını sil`}
                         title="Sil"
                       >

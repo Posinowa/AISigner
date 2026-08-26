@@ -29,9 +29,9 @@ export default function SignupPage() {
         </>
       }
       footer={
-        <p className="mt-6 text-center text-xs text-slate-500 dark:text-slate-400">
+        <p className="mt-6 text-center text-xs text-slate-500">
           Kayıt olarak{" "}
-          <Link href="/terms" className="underline hover:text-slate-700 dark:hover:text-slate-200">
+          <Link href="/terms" className="underline hover:text-slate-700">
             Kullanım Koşulları
           </Link>
           {"'nı kabul etmiş olursunuz."}

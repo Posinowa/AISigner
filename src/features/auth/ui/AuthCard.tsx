@@ -1,6 +1,5 @@
 import Image from "next/image";
 import type { ReactNode, Ref } from "react";
-import { ThemeToggle } from "@/components/ThemeToggle";
 
 /**
  * #153: Giriş/kayıt/şifre sıfırlama ekranlarının ortak kart kabuğu.
@@ -30,12 +29,9 @@ export function AuthCard({
   titleRef?: Ref<HTMLHeadingElement>;
 }) {
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950 px-4 py-12">
-      <div className="absolute top-4 right-4">
-        <ThemeToggle />
-      </div>
+    <div className="relative flex min-h-screen items-center justify-center bg-slate-50 px-4 py-12">
       <div className={`w-full ${width === "lg" ? "max-w-lg" : "max-w-md"}`}>
-        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200/80 dark:border-slate-800 overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-xl border border-slate-200/80 overflow-hidden">
           <div className="h-1 bg-primary" />
 
           <div className="p-8 sm:p-10">
@@ -56,11 +52,11 @@ export function AuthCard({
               <h1
                 ref={titleRef}
                 tabIndex={titleRef ? -1 : undefined}
-                className="text-2xl font-bold text-slate-900 dark:text-slate-100 outline-none"
+                className="text-2xl font-bold text-slate-900 outline-none"
               >
                 {title}
               </h1>
-              {subtitle && <p className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>}
+              {subtitle && <p className="mt-1.5 text-sm text-slate-500">{subtitle}</p>}
             </div>
 
             {children}
