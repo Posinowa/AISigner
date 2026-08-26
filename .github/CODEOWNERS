@@ -6,18 +6,18 @@
 # /src/app/api/ @org/backend-reviewers
 # /src/features/*/server/ @org/backend-reviewers
 # /src/app/ @org/frontend-reviewers
-# /.github/ @yusufyilmazf
+# /.github/ @yusufyilmazf @AlperEnesErsu
 
 # Frontend ağırlıklı dosyalar.
-/src/app/ @yusufyilmazf
-/src/features/*/ui/ @yusufyilmazf
-/components/ @yusufyilmazf
+/src/app/ @yusufyilmazf @AlperEnesErsu
+/src/features/*/ui/ @yusufyilmazf @AlperEnesErsu
+/components/ @yusufyilmazf @AlperEnesErsu
 
 # Backend ağırlıklı dosyalar.
-/src/app/api/ @yusufyilmazf
-/src/features/*/server/ @yusufyilmazf
-/src/lib/ @yusufyilmazf
-/prisma/ @yusufyilmazf
+/src/app/api/ @yusufyilmazf @AlperEnesErsu
+/src/features/*/server/ @yusufyilmazf @AlperEnesErsu
+/src/lib/ @yusufyilmazf @AlperEnesErsu
+/prisma/ @yusufyilmazf @AlperEnesErsu
 
 # GitHub workflow ve repo otomasyon değişiklikleri repo owner tarafından incelenmeli.
-/.github/ @yusufyilmazf
+/.github/ @yusufyilmazf @AlperEnesErsu
