@@ -7,7 +7,6 @@ import {
   ShieldCheck,
   Printer,
   X,
-  GraduationCap,
   CheckCircle2,
   Quote,
   Save,
@@ -18,6 +17,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import type { CertificateData } from "@/features/certificate/server/certificate";
+import { POSINOWA_LOGO_DATA_URI } from "@/features/certificate/ui/posinowa-logo";
 
 type CertificateModalProps = {
   certificate: CertificateData;
@@ -313,8 +313,13 @@ export function CertificateModal({
       id="certificate-modal-portal"
       className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-md flex items-start justify-center p-2 sm:p-6 print:p-0 print:bg-white print:static print:inset-auto"
     >
+      {/* #280: Modal ekran okuyucuya modal olarak duyurulmuyordu — role,
+          aria-modal ve başlık bağlantısı yoktu. */}
       <div
         id="certificate-modal-container"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="certificate-modal-title"
         className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-8 print:my-0 print:border-none print:shadow-none print:w-full print:max-w-none print:static print:overflow-visible"
       >
         
@@ -326,7 +331,7 @@ export function CertificateModal({
               <Award className="w-5 h-5" />
             </span>
             <div>
-              <h3 className="text-sm font-bold text-slate-900">
+              <h3 id="certificate-modal-title" className="text-sm font-bold text-slate-900">
                 Posinowa Staj Başarı Sertifikası
               </h3>
               <p className="text-xs text-slate-500">
@@ -509,23 +514,26 @@ export function CertificateModal({
         <div id="certificate-print-area" className="p-6 sm:p-12 print:p-6 bg-gradient-to-b from-slate-50 via-white to-slate-50 print:bg-white text-slate-800 print:text-black relative">
           
           {/* Çerçeve & Güvenlik Deseni */}
-          <div className="border-[6px] border-double border-indigo-900/30 print:border-indigo-900 p-6 sm:p-10 rounded-2xl relative bg-white/80 print:bg-white shadow-inner">
+          <div className="border-[6px] border-double border-primary/30 print:border-primary p-6 sm:p-10 rounded-2xl relative bg-white/80 print:bg-white shadow-inner">
             
             {/* Köşe Süsleri */}
-            <div className="absolute top-2 left-2 w-8 h-8 border-t-2 border-l-2 border-indigo-600/60" />
-            <div className="absolute top-2 right-2 w-8 h-8 border-t-2 border-r-2 border-indigo-600/60" />
-            <div className="absolute bottom-2 left-2 w-8 h-8 border-b-2 border-l-2 border-indigo-600/60" />
-            <div className="absolute bottom-2 right-2 w-8 h-8 border-b-2 border-r-2 border-indigo-600/60" />
+            <div className="absolute top-2 left-2 w-8 h-8 border-t-2 border-l-2 border-primary/60" />
+            <div className="absolute top-2 right-2 w-8 h-8 border-t-2 border-r-2 border-primary/60" />
+            <div className="absolute bottom-2 left-2 w-8 h-8 border-b-2 border-l-2 border-primary/60" />
+            <div className="absolute bottom-2 right-2 w-8 h-8 border-b-2 border-r-2 border-primary/60" />
 
             {/* Üst Logo & Başlık */}
             <div className="text-center space-y-2 mb-6">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-3xl bg-gradient-to-br from-indigo-600 via-purple-600 to-emerald-500 text-white shadow-xl mb-1 p-0.5">
-                <div className="w-full h-full bg-slate-900 rounded-[22px] flex items-center justify-center">
-                  <GraduationCap className="w-8 h-8 text-amber-400" />
-                </div>
-              </div>
+              {/* #280: Jenerik ikon yerine gerçek Posinowa logosu. Gömülü
+                  data URI — indirilen HTML dosyasında da görünsün. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={POSINOWA_LOGO_DATA_URI}
+                alt="Posinowa"
+                className="mx-auto mb-1 h-14 w-auto object-contain"
+              />
 
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 font-extrabold text-[11px] uppercase tracking-widest">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent border border-primary/20 text-primary font-extrabold text-[11px] uppercase tracking-widest">
                 <Sparkles className="w-3.5 h-3.5" /> Posinowa Teknoloji & Yazılım Akademisi
               </div>
 
@@ -544,7 +552,7 @@ export function CertificateModal({
               </p>
 
               <div className="py-2 border-b-2 border-slate-300 inline-block px-8">
-                <h2 className="text-2xl sm:text-3xl font-extrabold text-indigo-950 print:text-indigo-900 font-serif">
+                <h2 className="text-2xl sm:text-3xl font-extrabold text-primary print:text-primary font-serif">
                   {certificate.studentName}
                 </h2>
               </div>
@@ -571,7 +579,7 @@ export function CertificateModal({
                       className="p-2 rounded-lg bg-white border border-slate-200/70 font-medium flex items-center justify-between"
                     >
                       <span className="truncate text-slate-800 text-xs">{p.title}</span>
-                      <span className="shrink-0 px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700">
+                      <span className="shrink-0 px-2 py-0.5 rounded text-[10px] font-bold bg-accent text-accent-foreground">
                         {p.difficulty}
                       </span>
                     </div>
@@ -582,15 +590,15 @@ export function CertificateModal({
 
             {/* Mentör / Yönetici Referans Notu (Kayma ve taşma önleyici simetrik yapı) */}
             {mentorNote && (
-              <div className="my-5 p-4 rounded-xl bg-indigo-50/60 border border-indigo-100 relative">
+              <div className="my-5 p-4 rounded-xl bg-accent/60 border border-primary/15 relative">
                 <div className="flex items-start gap-2.5">
-                  <Quote className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" />
+                  <Quote className="w-5 h-5 text-primary/50 shrink-0 mt-0.5" />
                   <div className="flex-1">
                     <p className="text-xs italic text-slate-700 leading-relaxed font-serif">
                       &ldquo;{mentorNote}&rdquo;
                     </p>
                     {certificate.mentorName && (
-                      <p className="text-[11px] font-bold text-indigo-900 text-right mt-2">
+                      <p className="text-[11px] font-bold text-primary text-right mt-2">
                         — {certificate.mentorName} (Teknik Mentör)
                       </p>
                     )}
@@ -641,7 +649,18 @@ export function CertificateModal({
             {/* Doğrulama & Seri No Alt Çizgisi */}
             <div className="mt-6 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between text-[10px] text-slate-400">
               <span>Sertifika No: <strong className="font-mono text-slate-600">{certificate.certificateNumber}</strong></span>
-              <span>Doğrulama: <strong className="text-indigo-600">{certificate.verificationUrl}</strong></span>
+              <span>
+                Doğrulama:{" "}
+                {/* #280: Önceden düz metindi; ekranda tıklanamıyordu. */}
+                <a
+                  href={certificate.verificationUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-primary underline underline-offset-2"
+                >
+                  {certificate.verificationUrl}
+                </a>
+              </span>
             </div>
 
           </div>
