@@ -93,10 +93,6 @@ export function MapStage() {
       <div className="landing-rise [animation-delay:0.28s]">
         <TurkeyMap />
       </div>
-      <p className="mt-[11px] flex flex-wrap gap-x-[18px] gap-y-1.5 font-mono text-[11.5px] uppercase tracking-[0.1em] text-[var(--landing-muted)]">
-        <span>Kapsam hedefi: 81 il</span>
-        <span>Her ilde en az bir eşleşme</span>
-      </p>
     </div>
   );
 }
