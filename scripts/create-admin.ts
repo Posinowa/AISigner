@@ -5,11 +5,17 @@
  * Gerçek yönetici hesabını bu script ile oluştur. Kimlik bilgileri ORTAM
  * DEĞİŞKENİNDEN okunur — repoya hardcode EDİLMEZ, parola loglanmaz.
  *
- * Kullanım (dev makineden prod DB'ye, SSL ile):
+ * Kullanım — LOKAL (.env'deki DATABASE_URL kullanılır):
+ *   ADMIN_EMAIL="admin@posinowa.com" ADMIN_PASSWORD="<parola>" npm run create:admin
+ *
+ * Kullanım — dev makineden PROD DB'ye (SSL ile), .env'e dokunmadan:
  *   DATABASE_URL="postgresql://user:pass@host:5432/db?sslmode=require" \
  *   ADMIN_EMAIL="admin@posinowa.com" \
  *   ADMIN_PASSWORD="<güçlü-parola>" \
  *   npx tsx scripts/create-admin.ts
+ *
+ * Not: npm script'i `--env-file-if-exists=.env` kullanır; .env yoksa çökmez,
+ * ortamda tanımlı değişkenlerle devam eder.
  *
  * Idempotent: aynı e-posta ile tekrar çalıştırılırsa parolayı günceller
  * (ADMIN rolüne + APPROVED durumuna çeker). Şifre sıfırlama için de kullanılabilir.
