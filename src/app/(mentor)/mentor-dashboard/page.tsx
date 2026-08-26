@@ -3,6 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { Users, BookOpen, Clock, CheckCircle, AlertCircle, UserCircle2, ChevronRight, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
+import { DogrulanmisRozet } from "@/features/auth/ui/DogrulanmisRozet";
 import { experienceLevelLabel } from "@/lib/experience-level";
 
 type StudentWithProfile = {
@@ -43,6 +45,7 @@ const difficultyConfig = {
 };
 
 export default function MentorDashboardPage() {
+  const { data: session } = useSession();
   const [students, setStudents] = useState<StudentWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -125,7 +128,12 @@ export default function MentorDashboardPage() {
         {/* Sayfa başlığı — navigasyon/çıkış AppShell'de (#126-1) */}
         <div className="mb-8 pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Mentor Paneli</h1>
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Mentor Paneli</h1>
+              {/* #259: Mentörler de kayıt olabildiği (#250) için doğrulama
+                  durumunu kendi panellerinde görüyorlar. */}
+              <DogrulanmisRozet emailVerified={session?.user?.emailVerified} />
+            </div>
             <p className="text-slate-500 mt-1.5 text-sm">Size atanmış öğrencileri yönetin ve proje atayın</p>
           </div>
           {/* #253: Mentör artık kendi proje şablonunu oluşturabiliyor. */}

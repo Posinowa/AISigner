@@ -14,6 +14,8 @@ declare module "next-auth" {
       email?: string
       role?: string
       accountStatus?: string
+      // #259: Dolu ise e-postasi dogrulanmis hesap. ISO tarih string'i.
+      emailVerified?: string | null
     }
   }
 
@@ -22,6 +24,7 @@ declare module "next-auth" {
     sessionToken?: string
     role?: string
     accountStatus?: string
+    emailVerified?: string | null
   }
 
   interface User {

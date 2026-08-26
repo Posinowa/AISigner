@@ -128,15 +128,20 @@ callbacks: {
         try {
           const dbUser = await prisma.user.findUnique({
             where: { id: token.id as string },
-            select: { role: true, accountStatus: true },
+            // #259: Doğrulama durumu da tazeleniyor — kullanıcı e-postasını
+            // doğruladığında rozeti görmek için yeniden giriş yapmak zorunda
+            // kalmasın. Aynı sorgu, ek maliyet yok.
+            select: { role: true, accountStatus: true, emailVerified: true },
           })
           if (dbUser) {
             token.role = dbUser.role
             token.accountStatus = dbUser.accountStatus
+            token.emailVerified = dbUser.emailVerified?.toISOString() ?? null
           } else {
             // Kullanıcı silinmiş → yetkiyi kaldır
             token.role = undefined
             token.accountStatus = undefined
+            token.emailVerified = null
           }
         } catch {
           // DB geçici hatası → mevcut token değerlerini koru (oturumu bozma)
@@ -155,6 +160,7 @@ callbacks: {
         email: token.email?? "",
         role: typeof token.role === "string" ? token.role : undefined,
         accountStatus: typeof token.accountStatus === "string" ? token.accountStatus : undefined,
+        emailVerified: typeof token.emailVerified === "string" ? token.emailVerified : null,
       }
       return session
     },

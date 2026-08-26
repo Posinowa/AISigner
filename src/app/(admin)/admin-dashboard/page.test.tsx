@@ -198,3 +198,106 @@ describe("Admin dashboard — mentör başvuruları (#250)", () => {
     expect(screen.queryByTitle("Stajı Bitir & Mezun Et")).toBeNull();
   });
 });
+
+/**
+ * #259 — doğrulama durumu admin panelinde görünmeli.
+ *
+ * `emailVerified` #247 ile doluyor ama hiçbir yerde gösterilmiyordu; admin
+ * API'si alanı select'e bile almıyordu.
+ */
+describe("Admin dashboard — doğrulanmış hesap ibaresi (#259)", () => {
+  type DogrulamaliUser = {
+    id: string;
+    email: string;
+    name: string | null;
+    lastName: string | null;
+    role: "ADMIN" | "MENTOR" | "STUDENT";
+    accountStatus: "PENDING" | "APPROVED" | "REJECTED" | "GRADUATED";
+    emailVerified: string | null;
+    studentProfile?: null;
+  };
+
+  const ku = (
+    id: string,
+    emailVerified: string | null,
+    role: DogrulamaliUser["role"] = "STUDENT",
+  ): DogrulamaliUser => ({
+    id,
+    email: `${id}@ornek.com`,
+    name: id,
+    lastName: "Test",
+    role,
+    accountStatus: "APPROVED",
+    emailVerified,
+    studentProfile: null,
+  });
+
+  function stubla(users: DogrulamaliUser[]) {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((url: string) => {
+        const veri = String(url).includes("/api/admin/mentors") ? [] : users;
+        return Promise.resolve({ ok: true, status: 200, json: async () => veri });
+      }),
+    );
+  }
+
+  beforeEach(() => vi.unstubAllGlobals());
+
+  it("doğrulanmış hesapta olumlu ibare gösterilir", async () => {
+    stubla([ku("dogrulanmis", "2026-08-21T10:00:00.000Z")]);
+
+    renderPage();
+
+    expect(await screen.findByText("Doğrulanmış hesap")).toBeInTheDocument();
+  });
+
+  it("doğrulanmamış hesapta uyarı ibaresi gösterilir", async () => {
+    stubla([ku("dogrulanmamis", null)]);
+
+    renderPage();
+
+    expect(await screen.findByText("Doğrulanmamış")).toBeInTheDocument();
+  });
+
+  it("doğrulanmamış sayısı filtre sekmesinde görünür", async () => {
+    stubla([
+      ku("a", null),
+      ku("b", null),
+      ku("c", "2026-08-21T10:00:00.000Z"),
+    ]);
+
+    renderPage();
+
+    expect(
+      await screen.findByRole("button", { name: /Doğrulanmamış \(2\)/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("filtre yalnızca doğrulanmamışları gösterir", async () => {
+    stubla([
+      ku("Dogrulanmamis", null),
+      ku("Dogrulanmis", "2026-08-21T10:00:00.000Z"),
+    ]);
+
+    renderPage();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Doğrulanmamış/ }),
+    );
+
+    await vi.waitFor(() => {
+      expect(screen.queryByText(/Dogrulanmis Test/)).toBeNull();
+    });
+    expect(screen.getByText(/Dogrulanmamis Test/)).toBeInTheDocument();
+  });
+
+  it("hepsi doğrulanmışsa sekmede sayı gösterilmez", async () => {
+    stubla([ku("a", "2026-08-21T10:00:00.000Z")]);
+
+    renderPage();
+
+    const sekme = await screen.findByRole("button", { name: /Doğrulanmamış/ });
+    expect(sekme.textContent).toBe("Doğrulanmamış");
+  });
+});
