@@ -34,3 +34,30 @@ describe("FormAlert (#153)", () => {
     expect(screen.getByText("Hesabınız oluşturuldu!")).toBeInTheDocument();
   });
 });
+
+describe("FormAlert — hata kutusunda başlık (#247)", () => {
+  /**
+   * `title` propu tipte her iki varyant için de tanımlıydı ama yalnızca
+   * başarı dalında render ediliyordu. Doğrulama bağlantısının süresi
+   * dolduğunda kullanıcı "süresi doldu" başlığını hiç görmüyordu.
+   */
+  it("hata kutusunda başlık gösterilir", () => {
+    render(
+      <FormAlert variant="error" title="Bağlantının süresi doldu">
+        Yeni bir doğrulama e-postası isteyin.
+      </FormAlert>,
+    );
+
+    expect(screen.getByText("Bağlantının süresi doldu")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Yeni bir doğrulama e-postası isteyin.",
+    );
+  });
+
+  it("başlık verilmeyen hata kutusu değişmez — mevcut çağıranlar etkilenmez", () => {
+    const { container } = render(
+      <FormAlert variant="error">Sadece gövde</FormAlert>,
+    );
+    expect(container.querySelectorAll("p")).toHaveLength(0);
+  });
+});
