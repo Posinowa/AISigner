@@ -59,6 +59,9 @@ type FilterCategory =
   | "GRADUATED"
   | "REJECTED"
   | "MENTOR"
+  // #250: Onay bekleyen mentör başvuruları. "MENTOR" kategorisinden ayrı
+  // tutuluyor; aksi halde başvuru mevcut mentörlerin arasında kaybolurdu.
+  | "MENTOR_BASVURU"
   | "ADMIN";
 
 const roleConfig: Record<User["role"], { label: string; color: string }> = {
@@ -386,7 +389,8 @@ export default function AdminDashboard() {
       if (filterCategory === "APPROVED" && (u.role !== "STUDENT" || u.accountStatus !== "APPROVED")) return false;
       if (filterCategory === "GRADUATED" && (u.role !== "STUDENT" || u.accountStatus !== "GRADUATED")) return false;
       if (filterCategory === "REJECTED" && (u.role !== "STUDENT" || u.accountStatus !== "REJECTED")) return false;
-      if (filterCategory === "MENTOR" && u.role !== "MENTOR") return false;
+      if (filterCategory === "MENTOR" && (u.role !== "MENTOR" || u.accountStatus === "PENDING")) return false;
+      if (filterCategory === "MENTOR_BASVURU" && (u.role !== "MENTOR" || u.accountStatus !== "PENDING")) return false;
       if (filterCategory === "ADMIN" && u.role !== "ADMIN") return false;
 
       if (!q) return true;
@@ -410,7 +414,13 @@ export default function AdminDashboard() {
     const rejectedCount = users.filter(
       (u) => u.role === "STUDENT" && u.accountStatus === "REJECTED",
     ).length;
-    const mentorCount = users.filter((u) => u.role === "MENTOR").length;
+    // #250: Onay bekleyen başvuru henüz "mentör" değil — sayıdan ayrılıyor.
+    const mentorCount = users.filter(
+      (u) => u.role === "MENTOR" && u.accountStatus !== "PENDING",
+    ).length;
+    const mentorBasvuruCount = users.filter(
+      (u) => u.role === "MENTOR" && u.accountStatus === "PENDING",
+    ).length;
     const adminCount = users.filter((u) => u.role === "ADMIN").length;
     const studentsWithoutMentor = users.filter(
       // #195: M:N — onaylı ama hiç mentoru olmayan öğrenciler.
@@ -429,6 +439,7 @@ export default function AdminDashboard() {
       pendingCount,
       rejectedCount,
       mentorCount,
+      mentorBasvuruCount,
       adminCount,
       studentsWithoutMentor,
     };
@@ -503,6 +514,27 @@ export default function AdminDashboard() {
             Öğrenci İlerlemeleri & GitHub Yönetimi
           </a>
         </div>
+
+        {/* #250: Mentör başvurusu bekliyorsa admin bunu panele girer girmez
+            görmeli; başvuru listedeki satırlardan birine gömülü kalmasın. */}
+        {stats.mentorBasvuruCount > 0 && (
+          <button
+            onClick={() => setFilterCategory("MENTOR_BASVURU")}
+            className="mb-6 w-full flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3.5 text-left transition hover:border-amber-300"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+              <UserCog className="h-4.5 w-4.5" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold text-amber-900">
+                {stats.mentorBasvuruCount} mentör başvurusu onay bekliyor
+              </span>
+              <span className="block text-xs text-amber-700">
+                Başvuruları görmek için tıklayın.
+              </span>
+            </span>
+          </button>
+        )}
 
         {/* İstatistik Kartları */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5 mb-8">
@@ -622,6 +654,10 @@ export default function AdminDashboard() {
               { id: "GRADUATED" as FilterCategory, label: "Mezunlar 🎓" },
               { id: "REJECTED" as FilterCategory, label: "Reddedilenler" },
               { id: "MENTOR" as FilterCategory, label: "Mentörler" },
+              {
+                id: "MENTOR_BASVURU" as FilterCategory,
+                label: `Mentör Başvuruları${stats.mentorBasvuruCount > 0 ? ` (${stats.mentorBasvuruCount})` : ""}`,
+              },
               { id: "ADMIN" as FilterCategory, label: "Yöneticiler" },
             ].map(({ id, label }) => (
               <button
@@ -828,6 +864,51 @@ export default function AdminDashboard() {
                         <Loader2 className="animate-spin w-4 h-4 text-blue-600 my-1" />
                       ) : (
                         <>
+                          {/* #250: Mentör başvurusu. Onay butonları önceden
+                              yalnızca STUDENT satırlarında vardı; admin
+                              başvuruyu görebiliyor ama onaylayamıyordu.
+                              "Mezun Et" mentöre uygulanmaz.
+                              Reddet yalnızca bekleyen başvuruda: aktif bir
+                              mentörün yetkisini almak atanmış öğrencileri
+                              etkiler, o ayrı bir iş. */}
+                          {user.role === "MENTOR" &&
+                            (user.accountStatus === "PENDING" ||
+                              user.accountStatus === "REJECTED") && (
+                              <>
+                                <button
+                                  onClick={() =>
+                                    handleAccountStatus(
+                                      user,
+                                      "APPROVED",
+                                      `${getDisplayName(user)} adlı kişinin mentör başvurusunu onaylamak istediğinize emin misiniz?
+
+Onaylandığında mentör paneline erişebilecek.`,
+                                    )
+                                  }
+                                  title="Mentör Başvurusunu Onayla"
+                                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition-colors"
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5" /> Onayla
+                                </button>
+
+                                {user.accountStatus === "PENDING" && (
+                                  <button
+                                    onClick={() =>
+                                      handleAccountStatus(
+                                        user,
+                                        "REJECTED",
+                                        `${getDisplayName(user)} adlı kişinin mentör başvurusunu reddetmek istediğinize emin misiniz?`,
+                                      )
+                                    }
+                                    title="Mentör Başvurusunu Reddet"
+                                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-white border border-slate-200 hover:border-red-300 hover:text-red-600 text-slate-600 text-xs font-semibold shadow-sm transition-colors"
+                                  >
+                                    <XCircle className="w-3.5 h-3.5" /> Reddet
+                                  </button>
+                                )}
+                              </>
+                            )}
+
                           {user.role === "STUDENT" && (
                             <>
                               {/* Onay Bekleyen veya Reddedilen → Onayla */}

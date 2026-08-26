@@ -38,13 +38,19 @@ export default async function AccountStatusPage() {
 
   // #143: Onay artık profil tamamlandıktan SONRA anlam taşıyor. Profilini henüz
   // doldurmamış PENDING kullanıcıyı beklemeye değil, profil tamamlamaya yönlendir.
-  const profile = rejected || isGraduated
+  //
+  // #250: Mentör başvurusu da bu ekrana düşüyor (onay kapısı #249 ile mentörü
+  // de kapsıyor). Mentörün dolduracağı bir STAJYER profili yok — sorgu bile
+  // atılmıyor, "profilini tamamla" yönlendirmesi gösterilmiyor.
+  const mentorBasvurusu = session.user.role === "MENTOR";
+
+  const profile = rejected || isGraduated || mentorBasvurusu
     ? null
     : await prisma.studentProfile.findUnique({
         where: { userId: session.user.id },
         select: { id: true },
       });
-  const needsProfile = !rejected && !isGraduated && !profile;
+  const needsProfile = !rejected && !isGraduated && !mentorBasvurusu && !profile;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 px-4 py-12">
@@ -94,7 +100,9 @@ export default async function AccountStatusPage() {
                   ? "Başvurunuz reddedildi"
                   : needsProfile
                     ? "Profilinizi tamamlayın"
-                    : "Hesabınız inceleniyor"}
+                    : mentorBasvurusu
+                      ? "Mentör başvurunuz inceleniyor"
+                      : "Hesabınız inceleniyor"}
             </h1>
 
             <p className="mt-3.5 text-sm sm:text-base text-slate-600 leading-relaxed font-normal">
@@ -109,6 +117,8 @@ export default async function AccountStatusPage() {
                 "Hesabınız bir yönetici tarafından reddedildi. Bir hata olduğunu düşünüyorsanız lütfen ekiple iletişime geçin."
               ) : needsProfile ? (
                 "Değerlendirmeye alınabilmeniz için önce profilinizi doldurmanız gerekiyor. Profiliniz, size en uygun mentörün belirlenmesinde kullanılacak."
+              ) : mentorBasvurusu ? (
+                "Mentör başvurunuz ekibimize ulaştı ve inceleniyor. Onaylandığında mentör panelinize erişebileceksiniz. Teşekkürler!"
               ) : (
                 "Profiliniz alındı ve inceleniyor. Size uygun bir mentör atandıktan sonra panelinize erişebileceksiniz. Teşekkürler!"
               )}

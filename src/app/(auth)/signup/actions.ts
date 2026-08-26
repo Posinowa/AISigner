@@ -8,6 +8,11 @@ import { redirect } from "next/navigation"
 import { headers } from "next/headers"
 import { createRateLimiter } from "@/lib/rate-limit"
 import { sendVerificationEmail } from "@/features/auth/server/email-verification"
+import {
+  BASVURU_ALAN_ADI,
+  basvuruRolu,
+  basvuruTipiCoz,
+} from "@/features/auth/models/basvuru-tipi"
 
 const signupLimiter = createRateLimiter("signup", {
   maxRequests: 5,
@@ -56,6 +61,10 @@ export async function signupAction(
     const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } })
     if (existing) return { error: { email: ["Bu email zaten kayıtlı"] } }
 
+    // #250: Rol istemciden geliyor — beyaz listeyle çözülüyor, tanınmayan
+    // her değer stajyere düşüyor. ADMIN hiçbir girdiyle üretilemez.
+    const role = basvuruRolu(basvuruTipiCoz(formData.get(BASVURU_ALAN_ADI)))
+
     const hashedPassword = await hash(password)
     const yeniKullanici = await prisma.user.create({
       data: {
@@ -64,8 +73,9 @@ export async function signupAction(
         email: normalizedEmail,
         password: hashedPassword,
         phone: parsed.data.phone ?? null,
-        role: "STUDENT",
-        // Yeni stajyer hesabı admin onayına kadar PENDING — aktif değildir.
+        role,
+        // Yeni hesap admin onayına kadar PENDING — aktif değildir.
+        // #250: mentör başvurusu da aynı onaydan geçer.
         accountStatus: "PENDING",
       },
       select: { id: true, name: true },

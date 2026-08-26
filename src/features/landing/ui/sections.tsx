@@ -50,12 +50,15 @@ function BirincilCta({ children }: { children: React.ReactNode }) {
 
 function IkincilCta({ children }: { children: React.ReactNode }) {
   return (
-    <a
-      href="mailto:info@posinowa.com?subject=Ment%C3%B6r%20olmak%20istiyorum"
+    <Link
+      // #250: Önceden mailto: idi — başvuru sisteme hiç girmiyordu. Artık
+      // kayıt akışına gidiyor; başvuru MENTOR+PENDING olarak kaydediliyor ve
+      // admin panelinde görünüyor.
+      href="/signup?rol=mentor"
       className="inline-flex h-10 items-center justify-center rounded-md border border-[var(--landing-line)] px-[18px] text-[14.5px] font-semibold transition-colors hover:border-[var(--landing-muted)] active:translate-y-px"
     >
       {children}
-    </a>
+    </Link>
   );
 }
 
