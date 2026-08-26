@@ -123,9 +123,19 @@ export default function MentorDashboardPage() {
       <div className="max-w-6xl mx-auto p-6">
 
         {/* Sayfa başlığı — navigasyon/çıkış AppShell'de (#126-1) */}
-        <div className="mb-8 pt-2">
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Mentor Paneli</h1>
-          <p className="text-slate-500 mt-1.5 text-sm">Size atanmış öğrencileri yönetin ve proje atayın</p>
+        <div className="mb-8 pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Mentor Paneli</h1>
+            <p className="text-slate-500 mt-1.5 text-sm">Size atanmış öğrencileri yönetin ve proje atayın</p>
+          </div>
+          {/* #253: Mentör artık kendi proje şablonunu oluşturabiliyor. */}
+          <Link
+            href="/mentor-dashboard/projects"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs shadow-md shadow-primary/20 transition self-start sm:self-auto"
+          >
+            <BookOpen className="w-4 h-4" />
+            Proje Şablonları
+          </Link>
         </div>
 
         {/* Stats */}
