@@ -22,7 +22,7 @@ const {
   prismaMock: {
     assignedProject: { findUnique: vi.fn(), update: vi.fn() },
     roadmapStep: { update: vi.fn() },
-    stepIssue: { findMany: vi.fn(), update: vi.fn() },
+    stepIssue: { findMany: vi.fn(), update: vi.fn(), count: vi.fn() },
   },
   genIssuesMock: vi.fn(),
   configMock: vi.fn(),
@@ -86,6 +86,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   genIssuesMock.mockResolvedValue([]);
   prismaMock.stepIssue.findMany.mockResolvedValue([]);
+  prismaMock.stepIssue.count.mockResolvedValue(0);
   prismaMock.assignedProject.update.mockResolvedValue({});
   prismaMock.roadmapStep.update.mockResolvedValue({});
   prismaMock.assignedProject.findUnique.mockResolvedValue(atama());
@@ -404,5 +405,70 @@ describe("güncelleme — mevcut repo adı korunur (#257)", () => {
     await updateGitHubWorkspace("ap-1");
 
     expect(repoMock.mock.calls[0][1].repoName).toBe("korunacak-ad");
+  });
+});
+
+/**
+ * #269 — güncelleme, GÖNDERİLMİŞ adımlarda AI'ı hiç çağırmamalı.
+ *
+ * `storeGeneratedIssues` kayıtları siliyor; AI yeniden çağrılırsa kayıtlı
+ * `githubIssueUrl` bağlantıları kaybolur ve yeni üretilen başlıklar farklı
+ * olduğunda GitHub'da KOPYA issue açılır. Bu, #257'deki "idempotent
+ * güncelleme" iddiasını gerçek API yolunda çürütüyordu.
+ */
+describe("güncelleme — gönderilmiş adımda AI çağrılmaz (#269)", () => {
+  beforeEach(() => {
+    admin();
+    tokenVar();
+    prismaMock.assignedProject.findUnique.mockResolvedValue(
+      atama({
+        githubStatus: "PROVISIONED",
+        githubRepoUrl: "https://github.com/Posinowa/r",
+      }),
+    );
+    milestoneMock.mockResolvedValue({
+      ok: true,
+      olusturuldu: false,
+      veri: { number: 1, title: "Faz 1" },
+    });
+  });
+
+  it("adımda gönderilmiş issue varsa AI HİÇ çağrılmaz", async () => {
+    prismaMock.stepIssue.count.mockResolvedValue(3);
+
+    await updateGitHubWorkspace("ap-1");
+
+    expect(
+      genIssuesMock,
+      "gönderilmiş adımda AI çağrılırsa bağlantılar silinir",
+    ).not.toHaveBeenCalled();
+  });
+
+  it("gönderilmiş issue yoksa AI çalışır (regresyon değil)", async () => {
+    prismaMock.stepIssue.count.mockResolvedValue(0);
+
+    await updateGitHubWorkspace("ap-1");
+
+    expect(genIssuesMock).toHaveBeenCalled();
+  });
+
+  it("kontrol GÖNDERİLMİŞ kayıtlara bakar, hepsine değil", async () => {
+    prismaMock.stepIssue.count.mockResolvedValue(0);
+
+    await updateGitHubWorkspace("ap-1");
+
+    expect(prismaMock.stepIssue.count).toHaveBeenCalledWith({
+      where: { stepId: "s1", githubIssueUrl: { not: null } },
+    });
+  });
+
+  it("ilk kurulumda da aynı koruma geçerli", async () => {
+    // Yarıda kalmış bir kurulum tekrar denendiğinde de bağlantılar korunmalı.
+    prismaMock.assignedProject.findUnique.mockResolvedValue(atama());
+    prismaMock.stepIssue.count.mockResolvedValue(2);
+
+    await provisionGitHubWorkspace("ap-1");
+
+    expect(genIssuesMock).not.toHaveBeenCalled();
   });
 });

@@ -63,16 +63,27 @@ JSON Formatı:
 }
 
 async function storeGeneratedIssues(stepId: string, issues: GeneratedIssueSpec[]) {
-  // Önceki issue'ları temizle
+  // #269: GitHub'a GÖNDERİLMİŞ kayıtlar korunur.
+  //
+  // Önceden bu silme `where: { stepId }` idi ve adımdaki tüm kayıtları —
+  // `githubIssueUrl` dahil — siliyordu. Provisioning her çalıştığında AI'ı
+  // yeniden çağırdığı için: bağlantılar kayboluyor, yeni üretilen başlıklar
+  // farklı olduğunda GitHub'da KOPYA issue açılıyordu.
+  //
+  // Asıl koruma çağıran tarafta (provisioning artık gönderilmiş adımda AI'ı
+  // hiç çağırmıyor); burası savunma derinliği.
   await prisma.stepIssue.deleteMany({
-    where: { stepId },
+    where: { stepId, githubIssueUrl: null },
   });
 
-  // Yeni üretilenleri ekle
+  // Korunan kayıtların order'ı bozulmasın: yeni satırlar onların ardından
+  // numaralanır.
+  const korunanSayisi = await prisma.stepIssue.count({ where: { stepId } });
+
   await prisma.stepIssue.createMany({
     data: issues.map((issue, index) => ({
       stepId,
-      order: index + 1,
+      order: korunanSayisi + index + 1,
       title: issue.title,
       bodyMarkdown: issue.bodyMarkdown,
     })),
