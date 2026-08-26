@@ -47,11 +47,26 @@ function atamayiYukle(assignmentId: string) {
   });
 }
 
+/**
+ * #274: Repo adı ATAMAYA ÖZEL olmalı.
+ *
+ * Önceden yalnızca öğrenci adı + proje başlığından türetiliyordu. Adı aynı
+ * olan iki öğrenci aynı projeye atandığında aynı adı üretiyorlardı; repo
+ * işlemleri idempotent olduğu için ikinci öğrencinin issue'ları BİRİNCİNİN
+ * reposuna açılırdı. Adı olmayanlar ("student" fallback'i) ise hepsi aynı
+ * repoyu paylaşırdı.
+ *
+ * Sonek atama kimliğinden alınıyor: deterministik (aynı atama her zaman aynı
+ * ada çözülür, idempotenslik korunur) ve atamalar arasında benzersiz.
+ */
 function repoAdi(atama: Atama): string {
+  const kisaKimlik = atama.id.slice(-8).toLowerCase();
+
   return repoAdiUret([
     "aisigner",
     atama.studentProfile.user.name || "student",
     atama.projectTemplate.title,
+    kisaKimlik,
   ]);
 }
 
