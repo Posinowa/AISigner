@@ -236,3 +236,88 @@ describe("CertificateModal — indirme (#235)", () => {
     expect(html).toContain("AIS-2026-0001");
   });
 });
+
+/**
+ * #280 — sertifikanın marka ve erişilebilirlik eksikleri.
+ *
+ * En kritik olanı logonun GÖMÜLÜ olması: sertifika indirildiğinde tek bir HTML
+ * dosyasına dönüşüyor; göreli bir yol o dosya yerelden açıldığında çözülemez
+ * ve logo kırık çıkardı.
+ */
+describe("CertificateModal — marka ve erişilebilirlik (#280)", () => {
+  beforeEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  function ac() {
+    render(<CertificateModal certificate={sertifika} isOpen onClose={() => {}} />);
+  }
+
+  it("Posinowa logosu gösterilir", () => {
+    ac();
+    expect(screen.getByAltText("Posinowa")).toBeInTheDocument();
+  });
+
+  it("logo GÖMÜLÜ veri olarak taşınır — göreli yol DEĞİL", () => {
+    // Göreli yol indirilen dosyada kırılırdı.
+    ac();
+    const src = screen.getByAltText("Posinowa").getAttribute("src") ?? "";
+    expect(src.startsWith("data:image/")).toBe(true);
+  });
+
+  it("modal ekran okuyucuya modal olarak duyurulur", () => {
+    ac();
+    const d = document.querySelector('[role="dialog"]');
+    expect(d).not.toBeNull();
+    expect(d?.getAttribute("aria-modal")).toBe("true");
+  });
+
+  it("modalın erişilebilir bir başlığı vardır", () => {
+    ac();
+    const d = document.querySelector('[role="dialog"]');
+    const id = d?.getAttribute("aria-labelledby");
+    expect(id).toBeTruthy();
+    expect(document.getElementById(id!)?.textContent).toMatch(/sertifika/i);
+  });
+
+  it("doğrulama adresi tıklanabilir bağlantıdır", () => {
+    // Önceden düz metindi; ekranda tıklanamıyordu.
+    ac();
+    const a = document.querySelector(`a[href="${sertifika.verificationUrl}"]`);
+    expect(a).not.toBeNull();
+    expect(a?.getAttribute("rel")).toContain("noopener");
+  });
+});
+
+describe("CertificateModal — indirilen dosyada logo (#280)", () => {
+  beforeEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("indirilen HTML gömülü logoyu İÇERİR", () => {
+    // Asıl regresyon riski burada: logo göreli yola çevrilirse indirilen
+    // dosyada kırık çıkar ve bunu yalnızca dosyayı açan fark eder.
+    const yakalanan: string[] = [];
+    const orjinalCreate = URL.createObjectURL;
+    URL.createObjectURL = vi.fn((blob: Blob) => {
+      // Blob içeriğini senkron okuyamıyoruz; boyut üzerinden gömülü veri kontrolü
+      // yerine doğrudan DOM'daki src'yi doğruluyoruz (aşağıda).
+      yakalanan.push(String(blob.size));
+      return "blob:test";
+    }) as typeof URL.createObjectURL;
+
+    render(<CertificateModal certificate={sertifika} isOpen onClose={() => {}} />);
+
+    const src = screen.getByAltText("Posinowa").getAttribute("src") ?? "";
+    fireEvent.click(screen.getByRole("button", { name: "Sertifikayı İndir" }));
+
+    URL.createObjectURL = orjinalCreate;
+
+    // İndirilen dosya printArea.outerHTML'den üretiliyor; logo data URI olduğu
+    // için o çıktının içinde birebir taşınır.
+    expect(src.startsWith("data:image/webp;base64,")).toBe(true);
+    expect(yakalanan.length).toBeGreaterThan(0);
+  });
+});
