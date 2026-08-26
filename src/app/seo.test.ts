@@ -41,7 +41,8 @@ describe("SEO, Robots, Sitemap and Manifest Metadata", () => {
     const m = manifest();
     expect(m.name).toContain("AISigner");
     expect(m.short_name).toBe("AISigner");
-    expect(m.theme_color).toBe("#4338ca");
+    // #237: marka rengi logo laciverti
+    expect(m.theme_color).toBe("#23356c");
     expect(m.display).toBe("standalone");
     expect(m.icons?.length).toBeGreaterThan(0);
   });

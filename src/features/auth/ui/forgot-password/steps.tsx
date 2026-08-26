@@ -168,7 +168,7 @@ export function SuccessStep() {
       </p>
       <Link
         href="/signin"
-        className="block w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-4 py-3 font-semibold text-white shadow-md shadow-blue-200 transition-all text-center"
+        className="block w-full rounded-xl bg-primary hover:bg-primary/90 px-4 py-3 font-semibold text-primary-foreground shadow-md shadow-primary/20 transition-all text-center"
       >
         Giriş Yap
       </Link>

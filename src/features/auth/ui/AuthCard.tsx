@@ -1,4 +1,4 @@
-import type { LucideIcon } from "lucide-react";
+import Image from "next/image";
 import type { ReactNode, Ref } from "react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
@@ -10,7 +10,6 @@ import { ThemeToggle } from "@/components/ThemeToggle";
  * unutuluyordu (#126-1'de panel header'larında yaşadığımızın aynısı).
  */
 export function AuthCard({
-  icon: Icon,
   title,
   subtitle,
   width = "md",
@@ -18,7 +17,6 @@ export function AuthCard({
   footer,
   titleRef,
 }: {
-  icon: LucideIcon;
   title: string;
   subtitle?: ReactNode;
   /** Kayıt formu daha geniş (iki sütunlu ad/soyad) olduğu için ayarlanabilir. */
@@ -38,13 +36,23 @@ export function AuthCard({
       </div>
       <div className={`w-full ${width === "lg" ? "max-w-lg" : "max-w-md"}`}>
         <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200/80 dark:border-slate-800 overflow-hidden">
-          <div className="h-1 bg-indigo-600" />
+          <div className="h-1 bg-primary" />
 
           <div className="p-8 sm:p-10">
             <div className="mb-8 text-center">
-              <div className="mx-auto mb-4 h-12 w-12 rounded-xl bg-indigo-600 flex items-center justify-center shadow-md shadow-indigo-600/20">
-                <Icon className="w-6 h-6 text-white" aria-hidden="true" />
-              </div>
+              {/*
+                #237: Jenerik lucide ikonu yerine AISigner markasi. Acilis
+                sayfasindan gelen kullanici ayni markayi goruyor; sayfanin
+                hangisi oldugunu zaten baslik soyluyor.
+              */}
+              <Image
+                src="/brand/aisigner-mark.png"
+                alt="AISigner"
+                width={52}
+                height={45}
+                priority
+                className="mx-auto mb-4 h-11 w-auto"
+              />
               <h1
                 ref={titleRef}
                 tabIndex={titleRef ? -1 : undefined}
