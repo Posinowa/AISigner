@@ -9,6 +9,7 @@
     "start": "next start",
     "start:docker": "next start -H 0.0.0.0 -p ${PORT:-3000}",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "check:migrations": "node scripts/check-migrations.mjs",
