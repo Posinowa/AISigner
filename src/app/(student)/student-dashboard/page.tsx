@@ -1,5 +1,4 @@
-import { getProfileSummary } from "@/features/student/server/profileSummary";
-import { ProfileSummaryCard } from "@/features/student/ui/ProfileSummaryCard";
+import { ProfileSummarySection } from "@/features/student/ui/ProfileSummarySection";
 import { DogrulanmisRozet } from "@/features/auth/ui/DogrulanmisRozet";
 import { DogrulamaYenidenGonder } from "@/features/auth/ui/DogrulamaYenidenGonder";
 import { AvatarUpload } from "@/features/profile/ui/AvatarUpload";
@@ -93,13 +92,15 @@ export default async function StudentDashboardPage() {
     );
   }
 
-  const summaryData = await getProfileSummary({
+  // #282: AI özeti artık sayfayı BLOKLAMIYOR. Veri, akış sınırının içinde
+  // çekiliyor; sayfanın geri kalanı beklemeden render ediliyor.
+  const ozetGirdisi = {
     experienceLevel: profile.experienceLevel,
     interests: profile.interests,
     goals: profile.goals ?? "Henüz hedef belirtilmemiş",
     availability: profile.availability ?? undefined,
     userId: session.user.id, // Cache invalidation için userId gerekli
-  });
+  };
 
   const firstName = session.user.name?.split(" ")[0] ?? "Öğrenci";
 
@@ -181,12 +182,7 @@ export default async function StudentDashboardPage() {
 
       {/* Güvenlik Soruları Kurulumu */}
 
-      <ProfileSummaryCard
-        level={summaryData.level}
-        tracks={summaryData.tracks}
-        summary={summaryData.summary}
-        recommendations={summaryData.recommendations}
-      />
+      <ProfileSummarySection girdi={ozetGirdisi} />
 
       {/* Projeler ve Yol Haritası */}
       <div>

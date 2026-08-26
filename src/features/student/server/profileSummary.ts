@@ -4,6 +4,44 @@ import { unstable_cache } from "next/cache";
 import { analyzeStudentProfile } from "@/features/ai/server/profile-analysis";
 import { experienceLevelLabel } from "@/lib/experience-level";
 
+/**
+ * #282: AI çağrısı için üst sınır.
+ *
+ * Gemini istemcisinde timeout/AbortController yok; yavaşlarsa veya asılırsa
+ * sayfa süresiz bekliyordu. Mevcut yedek (mock özet) yalnızca hata
+ * FIRLATILDIĞINDA devreye giriyordu — asılma durumunda değil.
+ *
+ * Süre BİLEREK cömert. Kart artık akış sınırının içinde (#282), yani sayfa
+ * beklemiyor; zaman aşımının işi hızı zorlamak değil, sonsuz asılmayı
+ * önlemek. Ölçümde gerçek Gemini çağrısı ~10 sn sürüyor — daha kısa bir
+ * sınır kullanıcıyı sessizce mock özete düşürür ve özelliği bozardı.
+ */
+const AI_ZAMAN_ASIMI_MS = 25000;
+
+/** `islem` süreyi aşarsa `yedek` döner. İptal edilemeyen çağrıyı beklemez. */
+async function zamanAsimiyla<T>(
+  islem: Promise<T>,
+  yedek: () => T | Promise<T>,
+  ms: number = AI_ZAMAN_ASIMI_MS,
+): Promise<T> {
+  let zamanlayici: ReturnType<typeof setTimeout> | undefined;
+
+  const bekcı = new Promise<"zaman-asimi">((cozumle) => {
+    zamanlayici = setTimeout(() => cozumle("zaman-asimi"), ms);
+  });
+
+  try {
+    const sonuc = await Promise.race([islem, bekcı]);
+    if (sonuc === "zaman-asimi") {
+      console.warn(`AI profil analizi ${ms}ms icinde yanit vermedi; yedek ozete dusuldu.`);
+      return await yedek();
+    }
+    return sonuc as T;
+  } finally {
+    if (zamanlayici) clearTimeout(zamanlayici);
+  }
+}
+
 export type ProfileSummaryResponse = {
   level: string;
   tracks: string[];
@@ -46,12 +84,15 @@ export async function getProfileSummary(input: {
   const cached = unstable_cache(
     async () => {
       try {
-        const result = await analyzeStudentProfile({
-          experienceLevel: input.experienceLevel,
-          interests: input.interests,
-          goals: input.goals,
-          availability: input.availability,
-        });
+        const result = await zamanAsimiyla(
+          analyzeStudentProfile({
+            experienceLevel: input.experienceLevel,
+            interests: input.interests,
+            goals: input.goals,
+            availability: input.availability,
+          }),
+          () => getMockProfileSummary(input),
+        );
 
         return {
           level: result.level,
