@@ -19,6 +19,8 @@ const publicPaths = [
   "/signin",
   "/signup",
   "/forgot-password",
+  // #262: E-postadaki sifirlama baglantisi oturumsuz tiklanir.
+  "/reset-password",
   "/terms",
   "/privacy",
   "/verify-certificate",

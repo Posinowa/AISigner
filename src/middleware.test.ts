@@ -190,3 +190,30 @@ describe("Middleware — stajyer davranışı korunuyor (#249 regresyon)", () =>
     expect((await git("/student-onboarding")).hedef).toBe("/account-status");
   });
 });
+
+/**
+ * #262 — sıfırlama bağlantısı oturumsuz açılabilmeli.
+ *
+ * `/reset-password` public listede değilse, e-postadaki bağlantıya tıklayan
+ * (ve doğal olarak giriş yapmamış) kullanıcı signin'e sektirilir; şifresini
+ * hiçbir zaman sıfırlayamaz.
+ */
+describe("Middleware — şifre sıfırlama sayfası (#262)", () => {
+  it("oturumsuz kullanıcı /reset-password sayfasını açabilir", async () => {
+    getTokenMock.mockResolvedValue(null);
+
+    const r = await git("/reset-password");
+
+    expect(r.yonlendirdi, "sıfırlama bağlantısı oturum istememeli").toBe(false);
+  });
+
+  it("token parametresiyle de açılabilir", async () => {
+    getTokenMock.mockResolvedValue(null);
+    expect((await git("/reset-password?token=abc")).yonlendirdi).toBe(false);
+  });
+
+  it("/forgot-password oturumsuz açık kalmayı sürdürür", async () => {
+    getTokenMock.mockResolvedValue(null);
+    expect((await git("/forgot-password")).yonlendirdi).toBe(false);
+  });
+});
