@@ -60,8 +60,34 @@ Out Plane konsolunda servisin **Variables** bölümüne girilir.
 |---|---|---|
 | `NEXT_PUBLIC_APP_URL` | `https://aisigner.com` | **#204/SEO** — `robots.txt`, `sitemap.xml` ve canonical/OG URL'lerinin taban adresi. Gerçek domain'e ayarlanmazsa fallback kullanılır. ⚠️ **`NEXT_PUBLIC_` = build-time**: değeri **imaj build edilirken** mevcut olmalı (yalnız runtime env yetmez). Aşağıya bak. |
 | `GCS_BUCKET` | _(yok)_ | **#197** — Dosya yüklemelerinin kalıcılığı. Verilirse yüklemeler bu GCS bucket'ına yazılır (deploy'da silinmez, çok-instance ölçeklenir). Kimlik: mevcut `GCP_CREDENTIALS_JSON` (ADC). Verilmezse yerel disk. |
-| `GITHUB_ORG` | `Posinowa` | GitHub çalışma alanı URL'lerinde kullanılan org. |
+| `GITHUB_TOKEN` | _(yok)_ | **#218** — Verilirse GitHub'da **gerçek** repo/milestone/issue oluşturulur. Verilmezse sistem önizleme (simülasyon) modunda kalır: bağlantılar türetilir ama GitHub'da hiçbir şey yaratılmaz. Gerekli yetkiler aşağıda. |
+| `GITHUB_ORG` | `Posinowa` | GitHub çalışma alanı URL'lerinde kullanılan org. **Tanımlı ama boş bırakılırsa** entegrasyon bilerek devre dışı kalır — sessizce varsayılana düşmek yanlış hesapta repo açmaya yol açabilir. |
 | `PORT` | `3000` | Platform farklı bir port dayatıyorsa. |
+
+### GitHub token yetkileri (#218)
+
+Token **yalnızca sunucu tarafında** okunur ve hiçbir log'a yazılmaz.
+
+**Minimum yetki** — organizasyon altında repo açmak için:
+
+| Token tipi | Gerekli |
+|---|---|
+| Fine-grained PAT | Organizasyona erişim + `Repository: Administration (write)`, `Issues (write)`, `Contents (read)` |
+| Classic PAT | `repo` (özel repo açmak için tamamı) |
+
+Repolar **private** açılır ve `auto_init` ile başlatılır.
+
+**Önizleme → gerçek geçişi:** `GITHUB_TOKEN` tanımlanmadan önce oluşturulmuş çalışma
+alanlarının kayıtlı URL'leri simülasyondan gelmedir ve GitHub'da karşılığı yoktur. Token
+tanımlandıktan sonra ilgili atamada **Güncelle**'ye basmak repo adını kayıtlı URL'den
+alacağı için o eski adla gerçek repo açmaya çalışır. Temiz başlangıç isteniyorsa
+`AssignedProject.githubRepoUrl` alanını boşaltıp `githubStatus`'ü `NOT_PROVISIONED`
+yapın; sonraki kurulum adı yeniden türetir.
+
+**Doğrulama:** Admin panelinde *Öğrenci Proje İlerlemesi & GitHub Yönetimi* sayfası
+hangi modda olduğunuzu üstte gösterir (önizleme / gerçek).
+
+---
 
 > **`NEXT_PUBLIC_APP_URL` build-time notu:** Next.js `NEXT_PUBLIC_*` değişkenlerini **build sırasında**
 > bundle'a gömer. Out Plane GitHub-connect ile build ederken servis değişkenlerini build'e de

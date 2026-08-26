@@ -1,5 +1,6 @@
 import "server-only";
 import { getOctokit, hataNedeni, type GitHubConfig } from "./client";
+import { yenidenDene } from "./retry";
 import { logger } from "@/lib/logger";
 
 /**
@@ -53,7 +54,10 @@ export async function repoyuHazirla(
   const { repoName } = params;
 
   try {
-    const mevcut = await octokit.repos.get({ owner: config.owner, repo: repoName });
+    const mevcut = await yenidenDene(
+      () => octokit.repos.get({ owner: config.owner, repo: repoName }),
+      { ad: "repos.get" },
+    );
     return {
       ok: true,
       olusturuldu: false,
@@ -70,13 +74,17 @@ export async function repoyuHazirla(
 
   try {
     // Organizasyon altında açmak ayrı bir uç; kişisel hesapta bu 404 verir.
-    const yeni = await octokit.repos.createInOrg({
-      org: config.owner,
-      name: repoName,
-      description: params.description,
-      private: params.private ?? true,
-      auto_init: true,
-    });
+    const yeni = await yenidenDene(
+      () =>
+        octokit.repos.createInOrg({
+          org: config.owner,
+          name: repoName,
+          description: params.description,
+          private: params.private ?? true,
+          auto_init: true,
+        }),
+      { ad: "repos.createInOrg" },
+    );
     return {
       ok: true,
       olusturuldu: true,
@@ -98,12 +106,16 @@ export async function milestoneHazirla(
 
   try {
     // Kapalı olanlar da taranır: kapanmış bir fazın kopyası açılmasın.
-    const mevcutlar = await octokit.issues.listMilestones({
-      owner: config.owner,
-      repo: params.repoName,
-      state: "all",
-      per_page: 100,
-    });
+    const mevcutlar = await yenidenDene(
+      () =>
+        octokit.issues.listMilestones({
+          owner: config.owner,
+          repo: params.repoName,
+          state: "all",
+          per_page: 100,
+        }),
+      { ad: "issues.listMilestones" },
+    );
 
     const eslesen = mevcutlar.data.find((m) => m.title === params.title);
     if (eslesen) {
@@ -120,12 +132,16 @@ export async function milestoneHazirla(
   }
 
   try {
-    const yeni = await octokit.issues.createMilestone({
-      owner: config.owner,
-      repo: params.repoName,
-      title: params.title,
-      description: params.description,
-    });
+    const yeni = await yenidenDene(
+      () =>
+        octokit.issues.createMilestone({
+          owner: config.owner,
+          repo: params.repoName,
+          title: params.title,
+          description: params.description,
+        }),
+      { ad: "issues.createMilestone" },
+    );
     return {
       ok: true,
       olusturuldu: true,
@@ -156,12 +172,16 @@ export async function issueHazirla(
   const octokit = getOctokit(config);
 
   try {
-    const mevcutlar = await octokit.issues.listForRepo({
-      owner: config.owner,
-      repo: params.repoName,
-      state: "all",
-      per_page: 100,
-    });
+    const mevcutlar = await yenidenDene(
+      () =>
+        octokit.issues.listForRepo({
+          owner: config.owner,
+          repo: params.repoName,
+          state: "all",
+          per_page: 100,
+        }),
+      { ad: "issues.listForRepo" },
+    );
 
     const eslesen = mevcutlar.data.find((i) => i.title === params.title);
     if (eslesen) {
@@ -182,13 +202,17 @@ export async function issueHazirla(
   }
 
   try {
-    const yeni = await octokit.issues.create({
-      owner: config.owner,
-      repo: params.repoName,
-      title: params.title,
-      body: params.body,
-      milestone: params.milestoneNumber,
-    });
+    const yeni = await yenidenDene(
+      () =>
+        octokit.issues.create({
+          owner: config.owner,
+          repo: params.repoName,
+          title: params.title,
+          body: params.body,
+          milestone: params.milestoneNumber,
+        }),
+      { ad: "issues.create" },
+    );
     return {
       ok: true,
       olusturuldu: true,

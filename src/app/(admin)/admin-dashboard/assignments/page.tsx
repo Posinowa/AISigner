@@ -81,6 +81,17 @@ export default function AdminAssignmentsPage() {
   // milestone/issue oluşmuyor.
   const [guncellenenId, setGuncellenenId] = useState<string | null>(null);
 
+  // #218: Admin hangi modda olduğunu ÖNCEDEN bilmeli. Aksi halde
+  // "Oluşturuldu" mesajını görüp GitHub'da gerçek repo bekliyor, 404 buluyor.
+  const [gercekEntegrasyon, setGercekEntegrasyon] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    fetch("/api/admin/github-status")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setGercekEntegrasyon(d?.gercek ?? null))
+      .catch(() => setGercekEntegrasyon(null));
+  }, []);
+
   async function handleWorkspaceGuncelle(assignmentId: string) {
     setGuncellenenId(assignmentId);
     try {
@@ -95,7 +106,10 @@ export default function AdminAssignmentsPage() {
         throw new Error(data.error || "Çalışma alanı güncellenemedi");
       }
 
-      toast.success("Çalışma Alanı Güncellendi", { description: data.message });
+      toast.success(
+        data.simulated ? "Önizleme Güncellendi" : "Çalışma Alanı Güncellendi",
+        { description: data.message },
+      );
       await loadData();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Güncelleme başarısız oldu";
@@ -121,9 +135,13 @@ export default function AdminAssignmentsPage() {
         throw new Error(data.error || "GitHub çalışma alanı oluşturulamadı");
       }
 
-      toast.success("GitHub Çalışma Alanı Başarıyla Oluşturuldu!", {
-        description: data.message,
-      });
+      // #218: Simülasyonda "oluşturuldu" demek yanıltıcı olurdu.
+      toast.success(
+        data.simulated
+          ? "Çalışma Alanı Önizlemesi Hazırlandı"
+          : "GitHub Çalışma Alanı Başarıyla Oluşturuldu!",
+        { description: data.message },
+      );
       setSelectedAssignment(null);
       await loadData();
     } catch (err: unknown) {
@@ -166,6 +184,27 @@ export default function AdminAssignmentsPage() {
           <p className="text-sm text-slate-500 mt-1">
             Öğrencilerin projelerdeki canlı ilerleme durumunu takip edin, <span className="font-semibold text-indigo-600">Posinowa</span> organizasyonu altında repoları ve detaylı AI Issue&apos;larını oluşturun.
           </p>
+
+          {/* #218: Mod göstergesi. Simülasyonda üretilen repo/issue
+              bağlantıları GitHub'da 404 verir; admin bunu işlem YAPMADAN
+              önce bilmeli. */}
+          {gercekEntegrasyon === false && (
+            <p
+              role="status"
+              className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800"
+            >
+              Önizleme modu — GitHub&apos;da gerçek repo veya issue oluşturulmaz.
+              Etkinleştirmek için <code className="font-mono">GITHUB_TOKEN</code> tanımlayın.
+            </p>
+          )}
+          {gercekEntegrasyon === true && (
+            <p
+              role="status"
+              className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800"
+            >
+              Gerçek GitHub entegrasyonu etkin — işlemler kalıcıdır.
+            </p>
+          )}
         </div>
 
         <button
