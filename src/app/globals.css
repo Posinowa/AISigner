@@ -137,6 +137,102 @@ body {
   color-scheme: light;
 }
 
+/*
+  Açılış sayfası — harita ve hareket.
+  Proje CSS module kullanmadığı için (glass-panel, premium-card gibi) özel
+  sınıflar burada yaşıyor. Tokenlar yukarıdaki .landing bloğundan geliyor.
+*/
+
+/* --- iller --- */
+.landing-prov {
+  fill: var(--landing-map-off);
+  stroke: var(--landing-map-seam);
+  stroke-width: 0.7;
+  stroke-linejoin: round;
+  opacity: 0;
+  transition:
+    fill 0.55s var(--landing-ease-out),
+    opacity 0.5s ease;
+}
+.landing-prov[data-in="true"] { opacity: 1; }
+.landing-prov[data-lit="true"] { fill: var(--landing-wave); }
+.landing-prov[data-seed="true"] { fill: var(--landing-navy); }
+.landing-prov[data-hover="true"] { fill: var(--landing-teal); }
+
+/* --- şehir işaretleri --- */
+.landing-pin {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.landing-pin[data-on="true"] {
+  animation: landing-pin-in 0.45s cubic-bezier(0.2, 0.9, 0.25, 1) forwards;
+}
+@keyframes landing-pin-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: none; }
+}
+.landing-pin-core {
+  position: absolute;
+  left: -3.5px;
+  top: -3.5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 2px var(--landing-navy);
+}
+.landing-pin[data-on="true"] .landing-pin-core::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 1.5px solid var(--landing-teal);
+  animation: landing-ring 1.4s cubic-bezier(0.16, 0.8, 0.3, 1) 1 forwards;
+}
+@keyframes landing-ring {
+  from { transform: scale(0.5); opacity: 0.85; }
+  to { transform: scale(4); opacity: 0; }
+}
+
+/* --- açılış sırası --- */
+@keyframes landing-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes landing-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.landing-rise {
+  opacity: 0;
+  animation: landing-rise 0.5s var(--landing-ease-out) forwards;
+}
+
+/* --- kaydırınca beliren bölümler --- */
+.landing-reveal {
+  opacity: 0;
+  transform: translateY(12px);
+  transition:
+    opacity 0.5s var(--landing-ease-out),
+    transform 0.5s var(--landing-ease-out);
+}
+.landing-reveal[data-shown="true"] {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* daha az ve daha yumuşak — sıfır değil */
+  .landing-rise { animation: landing-fade 0.3s ease forwards; }
+  .landing-reveal { transform: none; transition: opacity 0.3s ease; }
+  .landing-prov { transition-duration: 0.001ms; }
+  .landing-pin[data-on="true"] { animation-duration: 0.001ms; }
+  .landing-pin[data-on="true"] .landing-pin-core::after { animation: none; }
+}
+
 /* Custom premium subtle card and glow utilities */
 .glass-panel {
   background: rgba(255, 255, 255, 0.85);
