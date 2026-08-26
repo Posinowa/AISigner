@@ -62,9 +62,9 @@ export const metadata: Metadata = {
     description:
       "Stajyer ve öğrencilerin AI destekli profil analizi, mentör eşleştirmesi ve kişiselleştirilmiş öğrenme yol haritası platformu.",
   },
-  icons: {
-    icon: "/favicon.ico",
-  },
+  // icons: Next.js `src/app/favicon.ico` dosyasını otomatik algılayıp link
+  // etiketini kendisi basar. Burada ayrıca tanımlamak ikinci ve sürümsüz bir
+  // <link> üretiyordu; kaldırıldı.
 };
 
 export default function RootLayout({
