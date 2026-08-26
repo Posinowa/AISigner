@@ -87,6 +87,49 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/*
+  ---------------------------------------------------------------------------
+  Açılış sayfası (landing) paleti.
+
+  Renkler AISigner logosundan örneklendi: lacivert #23356C (%30),
+  turkuaz #42B597 (%20), orta mavi #3E92CC (%11).
+
+  #landing-tek-tema: Bu tokenlar `.dark` altında BİLEREK yeniden tanımlanmaz.
+  Açılış sayfası tek temalıdır; `.landing` kendi zeminini ve metin rengini
+  açıkça boyar, böylece kullanıcının teması koyu olsa bile sayfa açık görünür.
+  Panellerdeki koyu tema bu karardan etkilenmez.
+
+  Kontrast (WCAG AA 4.5:1) doğrulanmıştır:
+    ink/paper 15.4 · muted/paper 5.3 · beyaz/navy 11.7 · navy/teal 4.6
+  DİKKAT: teal (2.5) ve mid (3.4) beyaz üstünde metin için YETERSİZDİR.
+  Bunlar dolgu rengidir; etiket, bağlantı veya küçük metinde kullanmayın.
+  ---------------------------------------------------------------------------
+*/
+.landing {
+  --landing-paper: #f8f9fc;
+  --landing-paper-2: #eef1f7;
+  --landing-ink: #141f3d;
+  --landing-muted: #5b6885;
+  --landing-line: #d8deea;
+  --landing-line-soft: #e4e8f0;
+
+  --landing-navy: #23356c;   /* ana marka rengi: buton, vurgu, seed iller */
+  --landing-wave: #2d5890;   /* navy x mid %38 — dalgayla boyanan iller */
+  --landing-mid: #3e92cc;    /* logonun orta mavisi */
+  --landing-teal: #42b597;   /* vurgu: hover, dalga ucu */
+
+  --landing-map-off: #dde2ec;
+  --landing-map-seam: #f8f9fc;
+  --landing-stage: #eff2f8;
+
+  --landing-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+
+  /* K1: koyu tema devredeyken bile açılış açık kalsın */
+  background: var(--landing-paper);
+  color: var(--landing-ink);
+  color-scheme: light;
+}
+
 /* Custom premium subtle card and glow utilities */
 .glass-panel {
   background: rgba(255, 255, 255, 0.85);
