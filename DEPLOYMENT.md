@@ -45,6 +45,26 @@ Out Plane konsolunda servisin **Variables** bölümüne girilir.
 |---|---|
 | `NEXTAUTH_SECRET` | Parola-sıfırlama token'larının imzalanmasında kullanılır. Verilmezse sabit bir decoy fallback devreye girer → token'lar tahmin edilebilir olur. **Ayrı, güçlü bir değer girin.** |
 
+### E-posta (SMTP) — doğrulama ve şifre sıfırlama için ZORUNLU
+
+| Değişken | Varsayılan | Açıklama |
+|---|---|---|
+| `SMTP_HOST` | _(yok)_ | SMTP sunucusu. **Üçü de (host/user/pass) verilmezse e-posta tamamen devre dışı kalır.** |
+| `SMTP_USER` | _(yok)_ | SMTP kullanıcı adı. |
+| `SMTP_PASS` | _(yok)_ | SMTP parolası. Asla loglanmaz. |
+| `SMTP_PORT` | `587` | 465 → örtük TLS, 587 → STARTTLS. |
+| `SMTP_SECURE` | port'a göre | `true`/`false` ile elle geçilebilir. |
+| `MAIL_FROM` | `SMTP_USER` | Gönderen adresi. Çoğu sunucu SMTP hesabından farklı bir adresi reddeder. |
+
+> **Sessiz başarısızlık uyarısı:** `sendMail` sözleşme gereği hata FIRLATMAZ — yapılandırma
+> eksikse yalnızca bir uyarı loglar ve `{ sent: false }` döner. Kayıt akışı e-posta yüzünden
+> kırılmasın diye böyle. Sonucu: SMTP verilmeden canlıya çıkılırsa **doğrulama e-postaları ve
+> şifre sıfırlama bağlantıları hiç gitmez**, kullanıcılar kalıcı olarak "Doğrulanmamış" kalır
+> ve parolasını unutan hesap kurtarılamaz. Hiçbir yerde hata görünmez.
+
+**Doğrulama:** Test hesabıyla kayıt olup doğrulama e-postasının ulaştığını, ardından
+"Şifremi Unuttum" akışının bağlantı gönderdiğini teyit edin.
+
 ### AI için (opsiyonel — verilmezse AI özellikleri mock'a düşer)
 
 | Değişken | Açıklama |
@@ -83,6 +103,12 @@ tanımlandıktan sonra ilgili atamada **Güncelle**'ye basmak repo adını kayı
 alacağı için o eski adla gerçek repo açmaya çalışır. Temiz başlangıç isteniyorsa
 `AssignedProject.githubRepoUrl` alanını boşaltıp `githubStatus`'ü `NOT_PROVISIONED`
 yapın; sonraki kurulum adı yeniden türetir.
+
+**Üretimde `GITHUB_TOKEN` ZORUNLUDUR (#179).** Token tanımlı değilken önizleme modu
+yalnızca geliştirmede çalışır; `NODE_ENV=production` altında çalışma alanı oluşturma
+**hata verir**. Sebebi: önizleme veritabanına sahte repo/issue URL'leri yazıp atamayı
+`PROVISIONED` damgalıyordu — admin "oluşturuldu" görüyor, öğrenci 404 veren bağlantıya
+tıklıyor ve kayıt sonradan gerçek kurulumdan ayırt edilemiyordu.
 
 **Doğrulama:** Admin panelinde *Öğrenci Proje İlerlemesi & GitHub Yönetimi* sayfası
 hangi modda olduğunuzu üstte gösterir (önizleme / gerçek).
@@ -141,6 +167,8 @@ npm run create:admin
 - [ ] İlk admin **güçlü, benzersiz parolayla** oluşturuldu.
 - [ ] Konteyner **root değil** (`node` kullanıcısı) — Dockerfile bunu sağlar.
 - [ ] `GCP_CREDENTIALS_JSON` yalnızca platform secret'ı olarak duruyor; logda içeriği görünmüyor.
+- [ ] **`GITHUB_TOKEN` tanımlı.** Üretimde eksikse proje atama hata verir (#179) — önizleme
+      modu yalnızca geliştirmede geçerlidir.
 
 ---
 
@@ -173,7 +201,12 @@ Canlı ortama ilk çıkış veya ana sürüm geçişlerinde şu adımlar sırayl
    - [ ] `npx prisma migrate deploy`'un `docker-entrypoint.sh` üzerinden hatasız tamamlandığı loglandı.
    - [ ] M:N mentör atama tablosu (`MentorAssignment`) kayıtlarının sağlıklı ilişkilendirildiği doğrulandı.
 
-3. **İlk Yönetici & Sistem Kontrolü:**
+3. **E-posta Gönderimi:**
+   - [ ] `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS` tanımlandı (eksikse e-posta SESSİZCE devre dışı kalır).
+   - [ ] Test kaydıyla doğrulama e-postasının ulaştığı görüldü.
+   - [ ] "Şifremi Unuttum" akışının bağlantı gönderdiği görüldü.
+
+4. **İlk Yönetici & Sistem Kontrolü:**
    - [ ] `ADMIN_EMAIL` ve `ADMIN_PASSWORD` ile `npm run create:admin` çalıştırılarak ilk yönetici açıldı.
    - [ ] `/api/health` uç noktası `200 OK` döndü.
    - [ ] Admin dashboard ve mentör/öğrenci akışları canlı ortamda duman testinden (smoke test) geçirildi.
