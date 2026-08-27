@@ -412,5 +412,34 @@ model MentorProfile {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user User @relation("MentorProfile_userIdToUser", fields: [userId], references: [id], onDelete: Cascade)
+  user     User            @relation("MentorProfile_userIdToUser", fields: [userId], references: [id], onDelete: Cascade)
+  analysis MentorAnalysis?
+}
+
+/// #288: Mentör profilinin AI değerlendirmesi.
+///
+/// `ProfileAnalysis` (stajyer) ile aynı desen, farklı sorular: stajyerde
+/// "ne öğrenmeli", mentörde "kime, neyi öğretebilir".
+///
+/// `level` stajyer analiziyle AYNI sözlüğü kullanır (Başlangıç | Orta | İleri)
+/// ki admin iki tarafı yan yana okuyabilsin.
+model MentorAnalysis {
+  id              String @id @default(cuid())
+  mentorProfileId String @unique
+
+  level               String
+  summary             String   @db.VarChar(2000)
+  /// Mentörün güçlü olduğu alanlar.
+  strengths           String[]
+  /// Öğretmeye en uygun olduğu teknik alanlar.
+  technicalTracks     String[]
+  /// Hangi stajyer profiline uygun — eşleştirmenin çekirdeği.
+  idealStudentProfile String   @db.VarChar(2000)
+  /// Admin'e eşleştirme ipuçları.
+  matchingNotes       String[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  mentorProfile MentorProfile @relation(fields: [mentorProfileId], references: [id], onDelete: Cascade)
 }

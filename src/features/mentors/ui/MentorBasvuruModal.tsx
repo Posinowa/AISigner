@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, X, Github, Linkedin } from "lucide-react";
+import { Loader2, X, Github, Linkedin, Sparkles } from "lucide-react";
 import { ilgiEtiketi, MENTOR_KIDEMLERI } from "@/features/student/models/secenekler";
 
 /**
@@ -26,6 +26,17 @@ type MentorBasvurusu = {
   linkedinUrl: string | null;
   city: string | null;
   updatedAt: string;
+  // #288: Analiz başvuruyla AYNI yanıtta geliyor; admin ikisini birlikte istiyor.
+  analysis: MentorAnalizi | null;
+};
+
+type MentorAnalizi = {
+  level: string;
+  summary: string;
+  strengths: string[];
+  technicalTracks: string[];
+  idealStudentProfile: string;
+  matchingNotes: string[];
 };
 
 const kidemEtiketi = (deger: string) =>
@@ -38,6 +49,70 @@ function Satir({ etiket, children }: { etiket: string; children: React.ReactNode
         {etiket}
       </dt>
       <dd className="min-w-0 flex-1 text-sm text-slate-800">{children}</dd>
+    </div>
+  );
+}
+
+/**
+ * #288: Eşleştirme değerlendirmesi.
+ *
+ * Cevapların ÜSTÜNDE duruyor: admin onay ekranında önce hızlı bir bakış
+ * istiyor, serbest metinleri okumak ikinci adım.
+ */
+function AnalizBolumu({ analiz }: { analiz: MentorAnalizi }) {
+  return (
+    <div className="mb-5 rounded-xl border border-indigo-100 bg-indigo-50/50 p-4">
+      <div className="flex items-center gap-2">
+        <Sparkles className="h-4 w-4 text-indigo-600" aria-hidden="true" />
+        <h3 className="text-sm font-bold text-indigo-900">AI eşleştirme değerlendirmesi</h3>
+        <span className="ml-auto rounded-md bg-white px-2 py-0.5 text-xs font-semibold text-indigo-700">
+          {analiz.level}
+        </span>
+      </div>
+
+      <p className="mt-3 text-sm leading-relaxed text-slate-700">{analiz.summary}</p>
+
+      {analiz.technicalTracks.length > 0 ? (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {analiz.technicalTracks.map((t) => (
+            <span key={t} className="rounded-md bg-white px-2 py-0.5 text-xs font-medium text-indigo-700">
+              {t}
+            </span>
+          ))}
+        </div>
+      ) : null}
+
+      <div className="mt-4 rounded-lg bg-white p-3">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+          Hangi stajyere uygun
+        </p>
+        <p className="mt-1 text-sm leading-relaxed text-slate-700">{analiz.idealStudentProfile}</p>
+      </div>
+
+      {analiz.strengths.length > 0 || analiz.matchingNotes.length > 0 ? (
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          {analiz.strengths.length > 0 ? (
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Güçlü yönler</p>
+              <ul className="mt-1 space-y-0.5 text-xs text-slate-600">
+                {analiz.strengths.map((g) => (
+                  <li key={g}>· {g}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {analiz.matchingNotes.length > 0 ? (
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Eşleştirme notları</p>
+              <ul className="mt-1 space-y-0.5 text-xs text-slate-600">
+                {analiz.matchingNotes.map((n) => (
+                  <li key={n}>· {n}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -130,6 +205,8 @@ export function MentorBasvuruModal({
               </p>
             </div>
           ) : (
+            <>
+              {basvuru.analysis ? <AnalizBolumu analiz={basvuru.analysis} /> : null}
             <dl>
               <Satir etiket="Ünvan">
                 {basvuru.title}
@@ -189,6 +266,7 @@ export function MentorBasvuruModal({
                 </Satir>
               ) : null}
             </dl>
+            </>
           )}
         </div>
       </div>

@@ -4,6 +4,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/nextauth";
 import { prisma } from "@/lib/db";
 import { mentorBasvuruSchema } from "../models/basvuru";
+import { generateAndPersistMentorAnalysis } from "@/features/ai/server/mentor-analysis-store";
+import { logger } from "@/lib/logger";
 
 /**
  * #287: Mentör başvurusunun cevaplarını kaydeder.
@@ -37,7 +39,7 @@ export async function saveMentorBasvuru(rawData: unknown) {
 
   // Başvuru tekrar açılıp güncellenebilir (onay beklerken düzeltme yapmak
   // yasak değil), bu yüzden upsert.
-  await prisma.mentorProfile.upsert({
+  const profil = await prisma.mentorProfile.upsert({
     where: { userId: session.user.id },
     update: {
       title: d.title,
@@ -69,4 +71,28 @@ export async function saveMentorBasvuru(rawData: unknown) {
       city: bosuAt(d.city),
     },
   });
+
+  // #288: Analiz burada üretiliyor, admin panelinde okunurken DEĞİL —
+  // onay ekranı bekletilmemeli ve aynı analiz her açılışta yeniden
+  // üretilip kota harcamamalı.
+  //
+  // Best-effort: analiz üretilemezse başvuru yine de kaydedilmiş olur.
+  // (analyzeMentorProfile zaten yedek döndürüyor; buradaki try/catch
+  // yalnızca DB persist hatasına karşı.)
+  try {
+    await generateAndPersistMentorAnalysis(profil.id, {
+      title: d.title,
+      company: bosuAt(d.company),
+      yearsExperience: d.yearsExperience,
+      seniority: d.seniority,
+      expertise: d.expertise,
+      capacity: d.capacity,
+      weeklyHours: d.weeklyHours,
+      motivation: d.motivation,
+      mentoringStyle: d.mentoringStyle,
+      city: bosuAt(d.city),
+    });
+  } catch (error) {
+    logger.error("Mentör başvurusu: analiz kaydedilemedi", error);
+  }
 }
