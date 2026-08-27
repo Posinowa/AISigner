@@ -11,6 +11,10 @@ import { requireAuth } from "@/lib/auth/guard";
  * panelinde onlarca mentör listeleniyor, hepsinin serbest metin cevaplarını
  * baştan yüklemenin anlamı yok.
  *
+ * #288: Yanıt AI analizini de taşıyor. Ayrı bir uç açılmadı: admin bu ikisini
+ * her zaman BİRLİKTE istiyor (cevapları oku, değerlendirmeyi gör) ve ikinci
+ * bir istek gereksiz gecikme olurdu.
+ *
  * Cevap vermemiş mentör bir HATA değil — 200 + `profile: null` döner ki
  * arayüz "henüz doldurmadı" diyebilsin. 404 dönseydi arayüz bunu gerçek bir
  * arızadan ayırt edemezdi.
@@ -57,6 +61,17 @@ export async function GET(
         linkedinUrl: true,
         city: true,
         updatedAt: true,
+        // #288: Analiz başvuruyla birlikte dönüyor.
+        analysis: {
+          select: {
+            level: true,
+            summary: true,
+            strengths: true,
+            technicalTracks: true,
+            idealStudentProfile: true,
+            matchingNotes: true,
+          },
+        },
       },
     });
 
