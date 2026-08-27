@@ -299,15 +299,20 @@ input[type="password"]::-ms-clear {
 
    Desen `dasharray: L L` yolu önce baştan doldurup sonra yine baştan sildiği
    için döngü görünür bir sıçrama olmadan kapanıyor. Sabit hızda sürekli
-   hareket olduğu için `linear`.
+   hareket olduğu için `linear`. Yol uzunluğu bileşenden `--pn-uzunluk` ile
+   geliyor; tek kaynak orada, burada kopyası tutulmuyor. Negatif uç AYRI bir
+   değişken: `calc()` ile hesaplatılınca tarayıcı ara değer üretmiyor ve
+   animasyon iki uç arasında sıçrıyor (ölçüldü).
 --------------------------------------------------------------------------- */
 @keyframes posinowa-ciz {
-  from { stroke-dashoffset: 2460; }
-  to   { stroke-dashoffset: -2460; }
+  from { stroke-dashoffset: var(--pn-uzunluk); }
+  to   { stroke-dashoffset: var(--pn-eksi); }
 }
 
 .posinowa-kalem {
-  animation: posinowa-ciz 2s linear infinite;
+  /* Dış hat, orta çizgiden yaklaşık iki kat uzun; aynı süre kalemi iki kat
+     hızlandırırdı. 2,6 sn tempoyu eskisiyle aynı yerde tutuyor. */
+  animation: posinowa-ciz 2.6s linear infinite;
 }
 
 /* Hareketi azalt: çizim kalkar, yerine hafif bir opaklık nefesi gelir.

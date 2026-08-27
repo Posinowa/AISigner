@@ -7,62 +7,51 @@ import { PosinowaYukleniyor } from "./PosinowaYukleniyor";
 /**
  * #285 — bekleme göstergesi sözleşmesi.
  *
- * En kritik iki nokta:
- * - aynı sayfada birden fazla örnek olabilir; maske kimlikleri ÇAKIŞMAMALI,
- *   yoksa ikinci örnek birincinin maskesini kullanır ve yarıklar kayar
+ * Gösterge logonun DIŞ HATTINI çiziyor; içi boş kalmalı. Kırılgan olan iki yer:
+ * - yol uzunluğu üç yerde tutarlı olmalı (dasharray, CSS değişkeni, keyframes),
+ *   yoksa çizim yarım kalır veya döngü sıçrar
  * - yanında zaten metin varsa gösterge ekran okuyucuya İKİ KEZ duyurulmamalı
  */
 
-describe("PosinowaYukleniyor — maske kimliği", () => {
-  it("iki örnek FARKLI maske kimliği kullanır", () => {
-    const { container } = render(
-      <>
-        <PosinowaYukleniyor />
-        <PosinowaYukleniyor />
-      </>,
-    );
-
-    const kimlikler = [...container.querySelectorAll("mask")].map((m) => m.id);
-
-    expect(kimlikler).toHaveLength(2);
-    expect(new Set(kimlikler).size, "kimlikler benzersiz olmalı").toBe(2);
-  });
-
-  it("grup kendi maskesine işaret eder", () => {
-    const { container } = render(<PosinowaYukleniyor />);
-
-    const maskeId = container.querySelector("mask")?.id;
-    const grup = container.querySelector("g");
-
-    expect(maskeId).toBeTruthy();
-    expect(grup?.getAttribute("mask")).toBe(`url(#${maskeId})`);
-  });
-});
-
-describe("PosinowaYukleniyor — erişilebilirlik", () => {
-  it("tek başına kullanıldığında durum olarak duyurulur", () => {
-    render(<PosinowaYukleniyor etiket="Yükleniyor" />);
-    expect(screen.getByRole("status", { name: "Yükleniyor" })).toBeInTheDocument();
-  });
-
-  it("dekoratif kullanımda ekran okuyucudan GİZLENİR", () => {
-    // Yanında zaten "Giriş yapılıyor..." metni var; iki kez duyurulmamalı.
-    const { container } = render(<PosinowaYukleniyor dekoratif />);
-    const svg = container.querySelector("svg");
-
-    expect(svg?.getAttribute("aria-hidden")).toBe("true");
-    expect(svg?.getAttribute("role")).toBeNull();
-    expect(screen.queryByRole("status")).toBeNull();
-  });
-});
+const svgAl = (c: HTMLElement) => c.querySelector("svg")!;
 
 describe("PosinowaYukleniyor — çizim", () => {
-  it("kalem yolu tam uzunlukta dash deseni taşır", () => {
-    // Desen yol uzunluğuyla eşleşmezse çizim yarım kalır veya sıçrar.
+  it("hat DOLDURULMAZ; yalnızca çizgi olarak çizilir", () => {
+    // Asıl kusur buydu: dolu/kalın çizim logoyu siyah bir damgaya çeviriyordu.
     const { container } = render(<PosinowaYukleniyor />);
+    const g = container.querySelector("g");
+
+    expect(g?.getAttribute("fill")).toBe("none");
+    expect(g?.getAttribute("stroke")).toBe("currentColor");
+  });
+
+  it("çizgi, şeklin kendi kalınlığından belirgin biçimde İNCE kalır", () => {
+    // Logonun en ince kolu 41 birim. Çizgi ona yaklaşırsa içi kapanır.
+    const { container } = render(<PosinowaYukleniyor />);
+    const kalinlik = Number(container.querySelector("g")?.getAttribute("stroke-width"));
+
+    expect(kalinlik).toBeLessThan(41 / 2);
+    expect(kalinlik).toBeGreaterThan(0);
+  });
+
+  it("dasharray ile CSS değişkeni AYNI uzunluğu söyler", () => {
+    // Keyframes dashoffset'i --pn-uzunluk'tan okuyor. İkisi ayrışırsa
+    // animasyon ya erken biter ya da ortada asılı kalır.
+    const { container } = render(<PosinowaYukleniyor />);
+    const svg = svgAl(container);
     const kalem = container.querySelector(".posinowa-kalem");
 
-    expect(kalem?.getAttribute("stroke-dasharray")).toBe("2460 2460");
+    const degisken = svg.style.getPropertyValue("--pn-uzunluk").trim();
+    expect(degisken).not.toBe("");
+    expect(kalem?.getAttribute("stroke-dasharray")).toBe(`${degisken} ${degisken}`);
+  });
+
+  it("logo İKİ ayrı kapalı halkadan oluşur — diyagonal boşluklar buradan gelir", () => {
+    const { container } = render(<PosinowaYukleniyor />);
+    const d = container.querySelector("path")?.getAttribute("d") ?? "";
+
+    expect((d.match(/Z/g) ?? []).length).toBe(2);
+    expect((d.match(/M /g) ?? []).length).toBe(2);
   });
 
   it("şekil bekleme boyunca okunur kalsın diye hayalet katman vardır", () => {
@@ -79,17 +68,45 @@ describe("PosinowaYukleniyor — çizim", () => {
 
     expect(hayalet.getAttribute("d")).toBe(kalem.getAttribute("d"));
   });
+});
 
-  it("renk currentColor'dan gelir — bağlamına uyum sağlar", () => {
+describe("PosinowaYukleniyor — kutu", () => {
+  it("viewBox logonun kutusundan GENİŞ; çizginin dış yarısı kırpılmaz", () => {
+    // Çizgi hattın üzerinde ortalanıyor. Pay olmasa 0 ve 511'e değen
+    // kenarlarda hattın yarısı kesilirdi.
     const { container } = render(<PosinowaYukleniyor />);
-    expect(container.querySelector("g")?.getAttribute("stroke")).toBe("currentColor");
+    const [x, y, g, h] = svgAl(container).getAttribute("viewBox")!.split(" ").map(Number);
+    const kalinlik = Number(container.querySelector("g")?.getAttribute("stroke-width"));
+
+    expect(x).toBeLessThanOrEqual(-kalinlik / 2);
+    expect(y).toBeLessThanOrEqual(-kalinlik / 2);
+    expect(g + x).toBeGreaterThanOrEqual(511 + kalinlik / 2);
+    expect(h + y).toBeGreaterThanOrEqual(482 + kalinlik / 2);
   });
 
-  it("boyut oranı korunur (511x482)", () => {
+  it("en-boy oranı korunur", () => {
     const { container } = render(<PosinowaYukleniyor boyut={100} />);
-    const svg = container.querySelector("svg");
+    const svg = svgAl(container);
+    const [, , g, h] = svg.getAttribute("viewBox")!.split(" ").map(Number);
 
-    expect(svg?.getAttribute("width")).toBe("100");
-    expect(svg?.getAttribute("height")).toBe("94"); // 100 * 482/511
+    expect(svg.getAttribute("width")).toBe("100");
+    expect(svg.getAttribute("height")).toBe(String(Math.round((100 * h) / g)));
+  });
+});
+
+describe("PosinowaYukleniyor — erişilebilirlik", () => {
+  it("tek başına kullanıldığında durum olarak duyurulur", () => {
+    render(<PosinowaYukleniyor etiket="Yükleniyor" />);
+    expect(screen.getByRole("status", { name: "Yükleniyor" })).toBeInTheDocument();
+  });
+
+  it("dekoratif kullanımda ekran okuyucudan GİZLENİR", () => {
+    // Yanında zaten "Giriş yapılıyor..." metni var; iki kez duyurulmamalı.
+    const { container } = render(<PosinowaYukleniyor dekoratif />);
+    const svg = svgAl(container);
+
+    expect(svg.getAttribute("aria-hidden")).toBe("true");
+    expect(svg.getAttribute("role")).toBeNull();
+    expect(screen.queryByRole("status")).toBeNull();
   });
 });

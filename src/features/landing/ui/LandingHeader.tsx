@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { CizimBaglantisi } from "@/features/brand/ui/CizimBaglantisi";
 import { useEffect, useState } from "react";
 
 const MENU = [
@@ -70,18 +71,20 @@ export function LandingHeader() {
         </nav>
 
         <div className="ml-auto flex items-center gap-2.5 lg:ml-0">
-          <Link
+          <CizimBaglantisi
             href="/signin"
+            mesaj="Giriş sayfası açılıyor..."
             className="inline-flex h-[34px] items-center justify-center rounded-md border border-[var(--landing-line)] px-2.5 text-[12.5px] font-semibold text-[var(--landing-ink)] transition-colors hover:border-[var(--landing-muted)] sm:px-[13px] sm:text-[13px]"
           >
             Giriş yap
-          </Link>
-          <Link
+          </CizimBaglantisi>
+          <CizimBaglantisi
             href="/signup"
+            mesaj="Kayıt sayfası açılıyor..."
             className="inline-flex h-[34px] items-center justify-center rounded-md bg-[var(--landing-navy)] px-2.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-[color-mix(in_srgb,var(--landing-navy)_86%,#000)] sm:px-[13px] sm:text-[13px]"
           >
             Kayıt ol
-          </Link>
+          </CizimBaglantisi>
         </div>
       </div>
     </header>
