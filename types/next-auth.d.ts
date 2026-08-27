@@ -16,6 +16,8 @@ declare module "next-auth" {
       accountStatus?: string
       // #259: Dolu ise e-postasi dogrulanmis hesap. ISO tarih string'i.
       emailVerified?: string | null
+      /** #290: Profil fotoğrafı VAR MI — dosya adı değil. */
+      fotografVar?: boolean
     }
   }
 
@@ -25,6 +27,8 @@ declare module "next-auth" {
     role?: string
     accountStatus?: string
     emailVerified?: string | null
+      /** #290: Profil fotoğrafı VAR MI — dosya adı değil. */
+      fotografVar?: boolean
   }
 
   interface User {

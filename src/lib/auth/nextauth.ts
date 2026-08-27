@@ -131,17 +131,22 @@ callbacks: {
             // #259: Doğrulama durumu da tazeleniyor — kullanıcı e-postasını
             // doğruladığında rozeti görmek için yeniden giriş yapmak zorunda
             // kalmasın. Aynı sorgu, ek maliyet yok.
-            select: { role: true, accountStatus: true, emailVerified: true },
+            select: { role: true, accountStatus: true, emailVerified: true, avatarFile: true },
           })
           if (dbUser) {
             token.role = dbUser.role
             token.accountStatus = dbUser.accountStatus
             token.emailVerified = dbUser.emailVerified?.toISOString() ?? null
+            // #290: Arayüz depolama adına ihtiyaç duymuyor, yalnızca fotoğrafın
+            // OLUP OLMADIĞINI bilmesi yeterli. Adı taşımak jetonu gereksiz
+            // büyütür ve dosya adını istemciye sızdırırdı.
+            token.fotografVar = Boolean(dbUser.avatarFile)
           } else {
             // Kullanıcı silinmiş → yetkiyi kaldır
             token.role = undefined
             token.accountStatus = undefined
             token.emailVerified = null
+            token.fotografVar = false
           }
         } catch {
           // DB geçici hatası → mevcut token değerlerini koru (oturumu bozma)
@@ -161,6 +166,7 @@ callbacks: {
         role: typeof token.role === "string" ? token.role : undefined,
         accountStatus: typeof token.accountStatus === "string" ? token.accountStatus : undefined,
         emailVerified: typeof token.emailVerified === "string" ? token.emailVerified : null,
+        fotografVar: token.fotografVar === true,
       }
       return session
     },
