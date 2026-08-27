@@ -137,3 +137,31 @@ export function dogumYiliEnGec(): number {
  */
 export const HAFTALIK_SAAT_EN_AZ = 1;
 export const HAFTALIK_SAAT_EN_COK = 60;
+
+/* -- Mentör tarafı (#287) ----------------------------------------------- */
+
+/**
+ * Mentörün kıdemi. Stajyerin `DENEYIM_SEVIYELERI` kovalarıyla KASITLI olarak
+ * ayrı: stajyerin ölçüsü "ne öğrenmek istiyor", mentörünki "ne öğretebilir".
+ */
+export const MENTOR_KIDEMLERI: Secenek[] = [
+  { deger: "junior", etiket: "Junior", aciklama: "1-2 yıl profesyonel deneyim." },
+  { deger: "mid", etiket: "Mid-level", aciklama: "3-5 yıl; kendi başına iş çıkarıyor." },
+  { deger: "senior", etiket: "Senior", aciklama: "6+ yıl; başkalarının kodunu yönlendiriyor." },
+  { deger: "lead", etiket: "Lead / Mimar", aciklama: "Takım ve teknik yön belirliyor." },
+];
+
+/**
+ * Mentörün uzmanlık alanları, stajyerin ilgi alanlarıyla AYNI sözlükten gelir.
+ * Eşleştirme ancak iki taraf aynı dili konuşursa çalışır — ayrı listeler
+ * tutulsaydı "Backend" ile "Sunucu Tarafı" eşleşmezdi.
+ */
+export const MENTOR_UZMANLIKLARI = ILGI_ALANLARI;
+
+/** Aynı anda kaç stajyer alabileceği. Atama ekranı bunu aşmamalı. */
+export const MENTOR_KAPASITE_EN_AZ = 1;
+export const MENTOR_KAPASITE_EN_COK = 10;
+
+/** Toplam profesyonel deneyim (yıl). */
+export const MENTOR_DENEYIM_EN_AZ = 0;
+export const MENTOR_DENEYIM_EN_COK = 50;

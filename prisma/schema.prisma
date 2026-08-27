@@ -37,6 +37,8 @@ model User {
   // #253: Bu kullanıcının oluşturduğu proje şablonları.
   createdProjectTemplates ProjectTemplate[]  @relation("ProjectTemplate_createdBy")
   reviewedSuggestions     Suggestion[]       @relation("Suggestion_reviewedByIdToUser")
+  // #287: Mentör başvurusunun cevapları (yalnızca MENTOR rolünde dolu).
+  mentorProfile           MentorProfile?     @relation("MentorProfile_userIdToUser")
 }
 
 model Session {
@@ -367,4 +369,48 @@ enum StepStatus {
   TODO
   IN_PROGRESS
   COMPLETED
+}
+
+/// #287: Mentör başvurusunun cevapları.
+///
+/// Önceden mentörün `User` satırı dışında hiçbir verisi yoktu; admin onay
+/// kararını yalnızca ad-soyada bakarak veriyordu. Eşleştirme de kör yapılıyordu.
+///
+/// StudentProfile ile kasıtlı olarak AYRI: stajyerin ölçüsü "ne öğrenmek
+/// istiyor", mentörünki "ne öğretebilir ve ne kadar vakti var".
+model MentorProfile {
+  id     String @id @default(cuid())
+  userId String @unique
+
+  /// Mevcut ünvan — "Senior Backend Developer".
+  title           String
+  company         String?
+  /// Toplam profesyonel yazılım deneyimi (yıl).
+  yearsExperience Int
+  /// Kıdem kovası: junior | mid | senior | lead. Serbest metin DEĞİL ki
+  /// eşleştirme ve analiz tek standartla çalışsın.
+  seniority       String
+  /// Öğretebileceği alanlar. StudentProfile.interests ile AYNI sözlükten
+  /// (models/secenekler) gelir — eşleştirme ancak iki taraf aynı dili
+  /// konuşursa çalışır.
+  expertise       String[]
+
+  /// Aynı anda kaç stajyer alabileceği.
+  capacity    Int @default(1)
+  /// Haftada ayırabileceği saat.
+  weeklyHours Int
+
+  /// Neden mentörlük yapmak istiyor.
+  motivation     String @db.VarChar(2000)
+  /// Nasıl bir mentörlük tarzı var — AI eşleştirmesinin en zengin girdisi.
+  mentoringStyle String @db.VarChar(2000)
+
+  githubUrl   String?
+  linkedinUrl String?
+  city        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation("MentorProfile_userIdToUser", fields: [userId], references: [id], onDelete: Cascade)
 }

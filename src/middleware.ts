@@ -9,6 +9,8 @@ const protectedRoutes: Record<string, string> = {
   "/student-dashboard": "STUDENT",
   "/student-onboarding": "STUDENT",
   "/profile-setup": "STUDENT",
+  // #287: Mentör başvurusunun soruları.
+  "/mentor-profile-setup": "MENTOR",
 };
 
 // Auth gerektirmeyen public sayfalar
@@ -102,12 +104,16 @@ export async function middleware(request: NextRequest) {
     const isStudentArea =
       pathname.startsWith("/student-dashboard") || isProfileCompletionRoute;
     const isMentorArea = pathname.startsWith("/mentor-dashboard");
+    // #287: Mentörün de profil tamamlama yolu var artık. Başvuru soruları
+    // tam da hesap PENDING iken doldurulur — onay bu adımdan SONRA gelir.
+    // Mentör alanının GERİ KALANI onaysız erişime hâlâ kapalı.
+    const isMentorProfileCompletionRoute = pathname.startsWith("/mentor-profile-setup");
 
-    // Mentörde #143 istisnası YOK: profil tamamlama akışı stajyere özel.
-    // Onaylanmamış mentör mentör alanına hiç giremez.
     const blocked =
       userRole === "MENTOR"
-        ? isMentorArea
+        ? accountStatus === "REJECTED"
+          ? isMentorArea || isMentorProfileCompletionRoute
+          : isMentorArea
         : accountStatus === "REJECTED"
           ? isStudentArea
           : isStudentArea && !isProfileCompletionRoute;
