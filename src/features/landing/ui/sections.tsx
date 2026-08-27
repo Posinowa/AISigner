@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { CizimBaglantisi } from "@/features/brand/ui/CizimBaglantisi";
 import { Reveal } from "./Reveal";
 import { TurkeyMap } from "./TurkeyMap";
 
@@ -39,26 +40,28 @@ function BolumBasligi({
 
 function BirincilCta({ children }: { children: React.ReactNode }) {
   return (
-    <Link
+    <CizimBaglantisi
       href="/signup"
+      mesaj="Kayıt sayfası açılıyor..."
       className="inline-flex h-10 items-center justify-center rounded-md bg-[var(--landing-navy)] px-[18px] text-[14.5px] font-semibold text-white transition-colors hover:bg-[color-mix(in_srgb,var(--landing-navy)_86%,#000)] active:translate-y-px"
     >
       {children}
-    </Link>
+    </CizimBaglantisi>
   );
 }
 
 function IkincilCta({ children }: { children: React.ReactNode }) {
   return (
-    <Link
+    <CizimBaglantisi
       // #250: Önceden mailto: idi — başvuru sisteme hiç girmiyordu. Artık
       // kayıt akışına gidiyor; başvuru MENTOR+PENDING olarak kaydediliyor ve
       // admin panelinde görünüyor.
       href="/signup?rol=mentor"
+      mesaj="Mentör başvurusu açılıyor..."
       className="inline-flex h-10 items-center justify-center rounded-md border border-[var(--landing-line)] px-[18px] text-[14.5px] font-semibold transition-colors hover:border-[var(--landing-muted)] active:translate-y-px"
     >
       {children}
-    </Link>
+    </CizimBaglantisi>
   );
 }
 
