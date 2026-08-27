@@ -7,6 +7,17 @@ export type ProfileAnalysisInput = {
   interests: string[];
   goals?: string;
   availability?: string;
+  /**
+   * #289: Genişletilen başvuru soruları. Hepsi OPSİYONEL — eski profillerde
+   * yoklar ve analiz onlarsız da çalışmaya devam etmeli.
+   */
+  gitLevel?: string;
+  weeklyHours?: number;
+  englishLevel?: string;
+  school?: string;
+  department?: string;
+  classYear?: string;
+  city?: string;
 };
 
 export type ProfileAnalysisResult = {
@@ -19,6 +30,22 @@ export type ProfileAnalysisResult = {
   recommendations: string[];
 };
 
+/** Ham değerleri isteme okunur biçimde koyar; model kod değeri görmesin. */
+const GIT_ETIKET: Record<string, string> = {
+  none: 'Hiç kullanmamış',
+  basic: 'commit/push yapabiliyor',
+  branching: 'branch açıp merge edebiliyor',
+  pr: 'PR açmış, review almış',
+};
+const INGILIZCE_ETIKET: Record<string, string> = {
+  none: 'Yok denecek kadar az',
+  reading: 'Dokümantasyon okuyabiliyor',
+  conversational: 'Konuşma seviyesinde',
+  fluent: 'Akıcı',
+};
+const gitEtiketi = (v?: string) => (v && GIT_ETIKET[v]) || 'Belirtilmemiş';
+const ingilizceEtiketi = (v?: string) => (v && INGILIZCE_ETIKET[v]) || 'Belirtilmemiş';
+
 export async function analyzeStudentProfile(
   input: ProfileAnalysisInput
 ): Promise<ProfileAnalysisResult> {
@@ -29,6 +56,10 @@ Deneyim Seviyesi: ${experienceLevelLabel(input.experienceLevel)}
 İlgi Alanları: ${input.interests.join(', ')}
 Hedefler: ${input.goals || 'Belirtilmemiş'}
 Çalışma Uygunluğu: ${input.availability || 'Belirtilmemiş'}
+Haftalık Ayrılabilen Saat: ${input.weeklyHours ? input.weeklyHours + ' saat' : 'Belirtilmemiş'}
+Git/GitHub Deneyimi: ${gitEtiketi(input.gitLevel)}
+İngilizce: ${ingilizceEtiketi(input.englishLevel)}
+Eğitim: ${[input.school, input.department, input.classYear].filter(Boolean).join(' · ') || 'Belirtilmemiş'}
 
 Lütfen aşağıdaki formatta SADECE JSON yanıtı ver (başka metin ekleme):
 {
@@ -47,6 +78,10 @@ Lütfen aşağıdaki formatta SADECE JSON yanıtı ver (başka metin ekleme):
 3. "summary" pozitif ve motive edici olsun
 4. "strengths" ve "developmentAreas" dizilerinde 2-4 madde olsun; developmentAreas yapıcı bir dille yazılsın
 5. "recommendedPath" somut ve uygulanabilir bir yol tarifi olsun
+5b. Git/GitHub deneyimi zayıfsa (hiç kullanmamış veya yalnızca commit/push) ilk
+    adımlar bunu ÖĞRETECEK şekilde planlansın — platformun tüm iş akışı repo,
+    issue ve PR üzerinden yürüyor
+5c. Haftalık saat belirtilmişse öneriler o bütçeye SIĞSIN
 6. "recommendations" pratik ve uygulanabilir olsun
 7. Sadece JSON döndür, başka metin ekleme`;
 
