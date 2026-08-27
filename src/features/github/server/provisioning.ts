@@ -271,6 +271,30 @@ async function senkronizeEt(
     await issueIcerikleriniUret(assignment);
 
     const config = readGitHubConfig();
+
+    /*
+     * #179: ÜRETİMDE simülasyona düşülmez.
+     *
+     * Simülasyon veritabanına SAHTE veri yazıyor: repo ve issue URL'leri
+     * `RoadmapStep.githubIssueUrl` ile `StepIssue.githubIssueUrl` alanlarına
+     * kaydediliyor, atama `PROVISIONED` damgası alıyor. Token'ı olmayan bir
+     * üretim ortamında bu sessizce oluyordu; admin "oluşturuldu" görüyor,
+     * öğrenci panelinde 404 veren bağlantılara tıklıyor ve kayıt sonradan
+     * gerçek kurulumdan AYIRT EDİLEMİYORDU.
+     *
+     * Bu yüzden üretimde eksik yapılandırma sessiz bir yedek değil, gürültülü
+     * bir hata. (`AUTH_SECRET` için `nextauth.ts`'te aynı yaklaşım var.)
+     *
+     * Geliştirmede simülasyon KORUNUYOR: token'ı olmayan ortamda uygulama
+     * çalışmayı sürdürmeli — `client.ts`'in sözleşmesi bu.
+     */
+    if (config === null && process.env.NODE_ENV === "production") {
+      throw new Error(
+        "GitHub entegrasyonu yapılandırılmamış: GITHUB_TOKEN tanımlı değil. " +
+          "Üretimde önizleme modu devre dışıdır; sahte repo bağlantıları kaydedilmez.",
+      );
+    }
+
     const simulated = config === null;
 
     const sonuc = simulated

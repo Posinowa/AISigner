@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 
 /**
  * #178 / #257 — çalışma alanı kurulumu ve güncellenmesi.
@@ -545,5 +545,58 @@ describe("repo adı çakışması (#274)", () => {
 
     expect(ad).toContain("ayse");
     expect(ad).toContain("proje");
+  });
+});
+
+describe("üretimde simülasyon YASAK (#179)", () => {
+  beforeEach(admin);
+  afterEach(() => vi.unstubAllEnvs());
+
+  const uretim = () => vi.stubEnv("NODE_ENV", "production");
+
+  it("token YOKKEN üretimde işlem başarısız olur", async () => {
+    // Simülasyon DB'ye sahte URL yazıp atamayı PROVISIONED damgalıyordu;
+    // admin "oluşturuldu" görüyor, öğrenci 404 veren bağlantıya tıklıyordu.
+    uretim();
+
+    await expect(provisionGitHubWorkspace("ap-1")).rejects.toThrow(/GITHUB_TOKEN/);
+  });
+
+  it("üretimde SAHTE veri veritabanına yazılmaz", async () => {
+    uretim();
+
+    await expect(provisionGitHubWorkspace("ap-1")).rejects.toThrow();
+
+    // Adım/issue URL'leri simülasyonda burada güncelleniyordu.
+    expect(prismaMock.roadmapStep.update).not.toHaveBeenCalled();
+  });
+
+  it("üretimde atama PROVISIONED damgası ALMAZ", async () => {
+    uretim();
+
+    await expect(provisionGitHubWorkspace("ap-1")).rejects.toThrow();
+
+    const provisionedYazildi = prismaMock.assignedProject.update.mock.calls.some(
+      ([arg]) =>
+        (arg as { data?: { githubStatus?: string } })?.data?.githubStatus === "PROVISIONED",
+    );
+    expect(provisionedYazildi, "üretimde sahte kurulum PROVISIONED sayılmamalı").toBe(false);
+  });
+
+  it("GELİŞTİRMEDE simülasyon korunur", async () => {
+    // Token'ı olmayan geliştirme ortamında uygulama çalışmayı sürdürmeli.
+    vi.stubEnv("NODE_ENV", "development");
+
+    const res = await provisionGitHubWorkspace("ap-1");
+    expect(res.simulated).toBe(true);
+    expect(res.success).toBe(true);
+  });
+
+  it("üretimde token VARSA normal çalışır", async () => {
+    uretim();
+    tokenVar();
+
+    const res = await provisionGitHubWorkspace("ap-1");
+    expect(res.simulated).toBe(false);
   });
 });
