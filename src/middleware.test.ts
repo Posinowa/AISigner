@@ -217,3 +217,43 @@ describe("Middleware — şifre sıfırlama sayfası (#262)", () => {
     expect((await git("/forgot-password")).yonlendirdi).toBe(false);
   });
 });
+
+describe("Middleware — mentörün profil tamamlama yolu (#287)", () => {
+  const kapi = async (accountStatus: string, yol: string) => {
+    getTokenMock.mockResolvedValue({ role: "MENTOR", accountStatus });
+    return git(yol);
+  };
+
+  it("ONAYSIZ mentör başvuru sorularına erişebilir", async () => {
+    // Sorular tam da hesap PENDING iken doldurulur; onay bu adımdan SONRA gelir.
+    expect((await kapi("PENDING", "/mentor-profile-setup")).yonlendirdi).toBe(false);
+  });
+
+  it("onaysız mentör mentör panelinin GERİ KALANINA giremez", async () => {
+    // Kapı gevşetilmiş olmamalı: yalnızca profil tamamlama yolu açıldı.
+    const sonuc = await kapi("PENDING", "/mentor-dashboard");
+
+    expect(sonuc.yonlendirdi).toBe(true);
+    expect(sonuc.hedef).toBe("/account-status");
+  });
+
+  it("REDDEDİLEN mentör başvuru sorularına da giremez", async () => {
+    // Reddedilmiş hesabın cevaplarını güncellemesinin bir anlamı yok.
+    const sonuc = await kapi("REJECTED", "/mentor-profile-setup");
+
+    expect(sonuc.yonlendirdi).toBe(true);
+    expect(sonuc.hedef).toBe("/account-status");
+  });
+
+  it("ONAYLI mentör başvuru sayfasını açabilir (cevaplarını güncelleyebilir)", async () => {
+    expect((await kapi("APPROVED", "/mentor-profile-setup")).yonlendirdi).toBe(false);
+  });
+
+  it("STAJYER mentör başvuru sayfasına giremez", async () => {
+    getTokenMock.mockResolvedValue({ role: "STUDENT", accountStatus: "APPROVED" });
+    const sonuc = await git("/mentor-profile-setup");
+
+    expect(sonuc.yonlendirdi).toBe(true);
+    expect(sonuc.hedef).toBe("/student-dashboard");
+  });
+});

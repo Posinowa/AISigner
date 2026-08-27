@@ -3,6 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { extractApiErrorMessage } from "@/lib/api-error-message";
+import { MentorBasvuruModal } from "@/features/mentors/ui/MentorBasvuruModal";
 import {
   Users,
   GraduationCap,
@@ -19,6 +20,7 @@ import {
   Trash2,
   Award,
   RefreshCw,
+  FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useModalA11y } from "@/components/ui/useModalA11y";
@@ -142,6 +144,10 @@ export default function AdminDashboard() {
   // Sertifika & Referans modal'ı
   const [certModalUser, setCertModalUser] = useState<User | null>(null);
   const [certModalData, setCertModalData] = useState<CertificateData | null>(null);
+
+  // #287: Admin, mentörün başvuru cevaplarını buradan okuyor. Önceden onay
+  // kararı yalnızca ad-soyada bakılarak veriliyordu.
+  const [basvuruMentoru, setBasvuruMentoru] = useState<User | null>(null);
 
   async function openAnalysisModal(user: User) {
     setAnalysisModalUser(user);
@@ -768,6 +774,19 @@ export default function AdminDashboard() {
                         <p className="text-xs text-slate-500 truncate">
                           {user.email}
                         </p>
+                        {/* #287: Mentörün başvuru cevapları — onay kararı
+                            artık ad-soyada bakılarak verilmiyor. */}
+                        {user.role === "MENTOR" && (
+                          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                            <button
+                              onClick={() => setBasvuruMentoru(user)}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-md border bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 transition-colors"
+                            >
+                              <FileText className="w-3 h-3" /> Başvuruyu Gör
+                            </button>
+                          </div>
+                        )}
+
                         {user.role === "STUDENT" && (
                           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                             <span
@@ -1046,6 +1065,13 @@ Onaylandığında mentör paneline erişebilecek.`,
       </div>
 
       {/* Admin — Detaylı AI Profil Analizi Modal'ı (lazy fetch) */}
+      {basvuruMentoru && (
+        <MentorBasvuruModal
+          mentorId={basvuruMentoru.id}
+          mentorAdi={[basvuruMentoru.name, basvuruMentoru.lastName].filter(Boolean).join(" ") || basvuruMentoru.email}
+          onClose={() => setBasvuruMentoru(null)}
+        />
+      )}
       {analysisModalUser && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div

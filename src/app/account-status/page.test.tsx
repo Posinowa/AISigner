@@ -9,9 +9,10 @@ import { render, screen } from "@testing-library/react";
  * tamamlayın" yönlendirmesi ona gösterilmemeli — o rota mentöre kapalı.
  */
 
-const { sessionMock, profileMock, redirectMock } = vi.hoisted(() => ({
+const { sessionMock, profileMock, mentorProfileMock, redirectMock } = vi.hoisted(() => ({
   sessionMock: vi.fn(),
   profileMock: vi.fn(),
+  mentorProfileMock: vi.fn(),
   redirectMock: vi.fn(() => {
     throw new Error("NEXT_REDIRECT");
   }),
@@ -21,7 +22,10 @@ vi.mock("next-auth", () => ({ getServerSession: sessionMock }));
 vi.mock("@/lib/auth/nextauth", () => ({ authOptions: {} }));
 vi.mock("next/navigation", () => ({ redirect: redirectMock }));
 vi.mock("@/lib/db", () => ({
-  prisma: { studentProfile: { findUnique: profileMock } },
+  prisma: {
+    studentProfile: { findUnique: profileMock },
+    mentorProfile: { findUnique: mentorProfileMock },
+  },
 }));
 vi.mock("@/components/LogoutButton", () => ({
   default: () => <button>Çıkış Yap</button>,
@@ -39,30 +43,50 @@ async function ekran(role: string, accountStatus: string) {
 beforeEach(() => {
   vi.clearAllMocks();
   profileMock.mockResolvedValue(null);
+  mentorProfileMock.mockResolvedValue(null);
 });
 
-describe("account-status — mentör başvurusu (#250)", () => {
+describe("account-status — mentör başvurusu (#250 / #287)", () => {
   it("bekleyen mentöre mentör metni gösterilir", async () => {
     await ekran("MENTOR", "PENDING");
     expect(screen.getByText("Mentör başvurunuz inceleniyor")).toBeInTheDocument();
   });
 
-  it("mentöre 'profilinizi tamamlayın' denmez", async () => {
+  it("SORULARI cevaplamamış mentör başvurusunu tamamlamaya yönlendirilir", async () => {
+    // #287: Mentörün de dolduracağı bir profil var artık; cevaplar gelmeden
+    // değerlendirme başlamıyor.
     await ekran("MENTOR", "PENDING");
-    expect(screen.queryByText("Profilinizi tamamlayın")).toBeNull();
+
+    expect(
+      document.querySelector('a[href="/mentor-profile-setup"]'),
+    ).not.toBeNull();
   });
 
-  it("mentöre stajyer profil bağlantısı verilmez", async () => {
+  it("cevaplarını vermiş mentöre tekrar SORULMAZ", async () => {
+    mentorProfileMock.mockResolvedValue({ id: "mp1" });
+    await ekran("MENTOR", "PENDING");
+
+    expect(document.querySelector('a[href="/mentor-profile-setup"]')).toBeNull();
+  });
+
+  it("REDDEDİLEN mentöre başvuru formu açılmaz", async () => {
+    // Reddedilmiş hesabın cevaplarını güncellemesinin bir anlamı yok.
+    await ekran("MENTOR", "REJECTED");
+
+    expect(document.querySelector('a[href="/mentor-profile-setup"]')).toBeNull();
+    expect(mentorProfileMock).not.toHaveBeenCalled();
+  });
+
+  it("mentöre STAJYER profil bağlantısı verilmez", async () => {
     // O rota mentöre kapalı; buton gösterilse kullanıcı geri sektirilirdi.
     await ekran("MENTOR", "PENDING");
     expect(document.querySelector('a[href="/profile-setup"]')).toBeNull();
   });
 
-  it("mentör için stajyer profili sorgusu hiç atılmaz", async () => {
+  it("mentör için STAJYER profili sorgusu hiç atılmaz", async () => {
     await ekran("MENTOR", "PENDING");
     expect(profileMock).not.toHaveBeenCalled();
-  });
-});
+  });});
 
 describe("account-status — stajyer davranışı korunuyor (#250 regresyon)", () => {
   it("profilsiz stajyere profil tamamlama gösterilir", async () => {

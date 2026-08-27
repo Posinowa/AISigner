@@ -52,6 +52,16 @@ export default async function AccountStatusPage() {
       });
   const needsProfile = !rejected && !isGraduated && !mentorBasvurusu && !profile;
 
+  // #287: Mentörün de dolduracağı bir profil VAR artık. Başvuru soruları
+  // olmadan admin onay kararını ad-soyada bakarak veriyordu.
+  const mentorProfile = mentorBasvurusu && !rejected
+    ? await prisma.mentorProfile.findUnique({
+        where: { userId: session.user.id },
+        select: { id: true },
+      })
+    : null;
+  const needsMentorProfile = mentorBasvurusu && !rejected && !mentorProfile;
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 px-4 py-12">
       <div className="w-full max-w-lg">
@@ -118,7 +128,9 @@ export default async function AccountStatusPage() {
               ) : needsProfile ? (
                 "Değerlendirmeye alınabilmeniz için önce profilinizi doldurmanız gerekiyor. Profiliniz, size en uygun mentörün belirlenmesinde kullanılacak."
               ) : mentorBasvurusu ? (
-                "Mentör başvurunuz ekibimize ulaştı ve inceleniyor. Onaylandığında mentör panelinize erişebileceksiniz. Teşekkürler!"
+                needsMentorProfile
+                  ? "Başvurunuzu tamamlamak için birkaç sorumuz var. Cevaplarınız gelmeden değerlendirme başlamıyor."
+                  : "Mentör başvurunuz ekibimize ulaştı ve inceleniyor. Onaylandığında mentör panelinize erişebileceksiniz. Teşekkürler!"
               ) : (
                 "Profiliniz alındı ve inceleniyor. Size uygun bir mentör atandıktan sonra panelinize erişebileceksiniz. Teşekkürler!"
               )}
@@ -133,6 +145,18 @@ export default async function AccountStatusPage() {
                 <p className="text-slate-500 leading-relaxed">
                   Staj süresince göstermiş olduğunuz özveri ve emekleriniz için teşekkür ederiz. Hesabınız mezun statüsünde arşivlenmiştir.
                 </p>
+              </div>
+            )}
+
+            {/* #287: Sorularını henüz cevaplamamış mentör için doğrudan aksiyon. */}
+            {needsMentorProfile && (
+              <div className="mt-6">
+                <Link
+                  href="/mentor-profile-setup"
+                  className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-6 py-3 text-sm font-semibold text-white shadow-md shadow-primary transition-all"
+                >
+                  Başvurumu Tamamla
+                </Link>
               </div>
             )}
 
