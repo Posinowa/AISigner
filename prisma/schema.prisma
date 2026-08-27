@@ -20,23 +20,23 @@ model User {
   // #265: Profil fotoğrafının DEPOLAMA ADI (URL değil). Dosya kendi
   // rotamızdan servis ediliyor; böylece yetki kontrolü her istekte çalışıyor
   // ve içerik tipini istemci değil sunucu belirliyor.
-  avatarFile   String?
+  avatarFile    String?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
   // Relations
-  sessions            Session[]
-  studentProfile      StudentProfile?    @relation("StudentProfile_userIdToUser")
+  sessions                Session[]
+  studentProfile          StudentProfile?    @relation("StudentProfile_userIdToUser")
   // #195: Mentor→öğrenci artık M:N (join tablosu). Bir mentörün öğrencileri buradan.
-  mentorAssignments   MentorAssignment[] @relation("MentorAssignment_mentorIdToUser")
-  sentMessages        Message[]          @relation("Message_senderIdToUser")
-  receivedMessages    Message[]        @relation("Message_receiverIdToUser")
-  stepComments        StepComment[]
-  stepFiles           StepFile[]
-  suggestions         Suggestion[]     @relation("Suggestion_authorIdToUser")
+  mentorAssignments       MentorAssignment[] @relation("MentorAssignment_mentorIdToUser")
+  sentMessages            Message[]          @relation("Message_senderIdToUser")
+  receivedMessages        Message[]          @relation("Message_receiverIdToUser")
+  stepComments            StepComment[]
+  stepFiles               StepFile[]
+  suggestions             Suggestion[]       @relation("Suggestion_authorIdToUser")
   // #253: Bu kullanıcının oluşturduğu proje şablonları.
-  createdProjectTemplates ProjectTemplate[] @relation("ProjectTemplate_createdBy")
-  reviewedSuggestions Suggestion[]     @relation("Suggestion_reviewedByIdToUser")
+  createdProjectTemplates ProjectTemplate[]  @relation("ProjectTemplate_createdBy")
+  reviewedSuggestions     Suggestion[]       @relation("Suggestion_reviewedByIdToUser")
 }
 
 model Session {
@@ -55,23 +55,45 @@ model StudentProfile {
   goals           String?
   availability    String?
   birthYear       Int?
+
+  // #289: Başvuru soruları genişletildi. Hepsi NULLABLE — mevcut profiller
+  // geçerli kalsın diye (expand/contract). Zorunluluk formda, şemada değil.
+
+  /// Platformun tüm iş akışı GitHub üzerinden; mentörün bunu bilmesi şart.
+  /// Değerler: none | basic | branching | pr
+  gitLevel          String?
+  /// Açılış sayfası "81 ilde eşleşme" hedefini anlatıyor; il sorulmadan
+  /// bu iddia ölçülemiyordu.
+  city              String?
+  /// Haftada kaç saat. `availability` kovaları ("yarı zamanlı") kişiden
+  /// kişiye değişiyordu; saat planlanabilir. availability KORUNUYOR —
+  /// eski kayıtlar hâlâ onunla dolu.
+  weeklyHours       Int?
+  /// Eğitim durumu — staj eşleştirmesinin en doğal ölçütü.
+  school            String?
+  department        String?
+  /// Sınıf: 1 | 2 | 3 | 4 | hazirlik | mezun | lise | diger
+  classYear         String?
+  /// Doküman okuma kabiliyeti yol haritasını doğrudan etkiliyor.
+  /// Değerler: none | reading | conversational | fluent
+  englishLevel      String?
   // #204: Staj başarı sertifikası alanları.
   // #208 review: Seri no belgeyi TEKİL tanımlar; public doğrulama `findFirst` ile
   // arar. Çakışma olursa yanlış belge "geçerli" sayılabilirdi → DB seviyesinde unique.
-  certificateNumber String?  @unique
+  certificateNumber String?   @unique
   mentorNote        String?   @db.VarChar(2000)
   completionGrade   String?
   issuedAt          DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   // Relations
-  user             User               @relation("StudentProfile_userIdToUser", fields: [userId], references: [id], onDelete: Cascade)
+  user              User               @relation("StudentProfile_userIdToUser", fields: [userId], references: [id], onDelete: Cascade)
   // #195: Tek mentorId yerine M:N. Bir öğrencinin mentorları buradan.
   mentorAssignments MentorAssignment[]
-  assignedProjects AssignedProject[]
-  surveyAnswers    SurveyAnswer[]
-  profileAnalysis  ProfileAnalysis?
+  assignedProjects  AssignedProject[]
+  surveyAnswers     SurveyAnswer[]
+  profileAnalysis   ProfileAnalysis?
 }
 
 // #195: Öğrenci↔Mentör M:N eşleştirmesi. Mentorlar eşit yetkili (birincil yok).
@@ -144,18 +166,18 @@ model Roadmap {
 }
 
 model RoadmapStep {
-  id             String      @id @default(cuid())
+  id             String     @id @default(cuid())
   roadmapId      String
   order          Int
   title          String
   description    String
   resources      String[]
   estimatedHours Int?
-  status         StepStatus  @default(TODO)
+  status         StepStatus @default(TODO)
   // #50: Bu adımın bağlı olduğu GitHub issue linki (opsiyonel).
   githubIssueUrl String?
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
 
   roadmap  Roadmap       @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
   comments StepComment[]
@@ -164,15 +186,15 @@ model RoadmapStep {
 }
 
 model StepIssue {
-  id             String      @id @default(cuid())
+  id             String   @id @default(cuid())
   stepId         String
-  order          Int         @default(1)
+  order          Int      @default(1)
   title          String
-  bodyMarkdown   String      @db.VarChar(4000)
+  bodyMarkdown   String   @db.VarChar(4000)
   githubIssueUrl String?
-  status         String      @default("OPEN")
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  status         String   @default("OPEN")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   step RoadmapStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
 

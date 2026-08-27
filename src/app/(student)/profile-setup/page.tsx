@@ -29,6 +29,15 @@ export default async function ProfileSetupPage() {
       interests: true,
       goals: true,
       availability: true,
+      // #289: Genişletilen sorular da prefill edilmeli — yoksa profilini
+      // tekrar açan stajyer bunları BOŞ görüp baştan doldurur.
+      city: true,
+      gitLevel: true,
+      weeklyHours: true,
+      school: true,
+      department: true,
+      classYear: true,
+      englishLevel: true,
     },
   });
 
@@ -62,6 +71,13 @@ export default async function ProfileSetupPage() {
         interests: studentProfile?.interests ?? undefined,
         goals: studentProfile?.goals ?? undefined,
         availability: studentProfile?.availability ?? undefined,
+        city: studentProfile?.city ?? undefined,
+        gitLevel: studentProfile?.gitLevel ?? undefined,
+        weeklyHours: studentProfile?.weeklyHours ?? undefined,
+        school: studentProfile?.school ?? undefined,
+        department: studentProfile?.department ?? undefined,
+        classYear: studentProfile?.classYear ?? undefined,
+        englishLevel: studentProfile?.englishLevel ?? undefined,
       }}
       surveyQuestions={surveyQuestions}
       surveyLoadFailed={surveyLoadFailed}

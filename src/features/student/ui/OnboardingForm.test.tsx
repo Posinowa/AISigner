@@ -31,3 +31,26 @@ describe("OnboardingForm — anket adımı render doğrulaması (#123 / #89-2)",
     expect(screen.getByText("Ek Sorular")).toBeInTheDocument();
   });
 });
+
+describe("OnboardingForm — genişletilen başvuru soruları (#289)", () => {
+  it("Eğitim adımı eklendi — 4 adım 5'e çıktı", () => {
+    render(<OnboardingForm surveyQuestions={[]} surveyLoadFailed={false} />);
+
+    for (const baslik of [
+      "Kişisel Bilgiler",
+      "Eğitim",
+      "Altyapı & Deneyim",
+      "Vizyon & Hedefler",
+      "Çalışma Tarzı",
+    ]) {
+      expect(screen.getAllByText(baslik).length).toBeGreaterThan(0);
+    }
+  });
+
+  it("ilk adımda İL sorulur", () => {
+    // Açılış sayfası "81 ilde eşleşme" diyor; il sorulmadan ölçülemiyordu.
+    render(<OnboardingForm surveyQuestions={[]} surveyLoadFailed={false} />);
+
+    expect(screen.getByLabelText("Yaşadığın il")).toBeInTheDocument();
+  });
+});

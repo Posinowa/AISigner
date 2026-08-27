@@ -2,7 +2,7 @@
 
 import { revalidateTag } from "next/cache"
 import { z } from "zod"
-import { personalSchema, experienceSchema, goalsSchema } from "../models/onboarding"
+import { personalSchema, educationSchema, experienceSchema, goalsSchema } from "../models/onboarding"
 import { prisma } from "@/lib/auth/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth/nextauth"
@@ -13,9 +13,10 @@ import { logger } from "@/lib/logger"
 // Tek birleşik şema
 const onboardingSchema = z.object({
   personal: personalSchema,
+  // #289: Eski istemciden gelen istek reddedilmesin diye opsiyonel.
+  education: educationSchema.optional(),
   experience: experienceSchema,
   goals: goalsSchema,
-  
 })
 
 export async function saveOnboarding(rawData: unknown) {
@@ -59,6 +60,15 @@ export async function saveOnboarding(rawData: unknown) {
         goals: data.goals.goal,
         availability: data.goals.availability,
         birthYear: data.personal.birthYear,
+        // #289: Yeni başvuru soruları. Gelmeyeni null yazmak yerine undefined
+        // bırakıyoruz ki mevcut değer SİLİNMESİN.
+        city: data.personal.city,
+        gitLevel: data.experience.gitLevel,
+        weeklyHours: data.goals.weeklyHours,
+        school: data.education?.school,
+        department: data.education?.department,
+        classYear: data.education?.classYear,
+        englishLevel: data.education?.englishLevel,
       },
       create: {
         userId: session.user.id,
@@ -67,6 +77,15 @@ export async function saveOnboarding(rawData: unknown) {
         goals: data.goals.goal,
         availability: data.goals.availability,
         birthYear: data.personal.birthYear,
+        // #289: Yeni başvuru soruları. Gelmeyeni null yazmak yerine undefined
+        // bırakıyoruz ki mevcut değer SİLİNMESİN.
+        city: data.personal.city,
+        gitLevel: data.experience.gitLevel,
+        weeklyHours: data.goals.weeklyHours,
+        school: data.education?.school,
+        department: data.education?.department,
+        classYear: data.education?.classYear,
+        englishLevel: data.education?.englishLevel,
       },
     }),
   ])
@@ -80,6 +99,15 @@ export async function saveOnboarding(rawData: unknown) {
       interests: data.experience.interest,
       goals: data.goals.goal,
       availability: data.goals.availability,
+      // #289: Yeni sorular analize de girsin — yoksa zenginleşen veri yalnızca
+      // DB'de durur, yol haritasına hiç yansımaz.
+      gitLevel: data.experience.gitLevel,
+      weeklyHours: data.goals.weeklyHours,
+      englishLevel: data.education?.englishLevel,
+      school: data.education?.school,
+      department: data.education?.department,
+      classYear: data.education?.classYear,
+      city: data.personal.city,
     })
   } catch (error) {
     logger.error("Onboarding: profil analizi kaydedilemedi", error)

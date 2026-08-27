@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { saveOnboarding } from "@/features/student/server/onboarding";
-import { CheckCircle, User, ArrowRight, ArrowLeft, Rocket, Terminal, BookOpen, Clock, ClipboardList, AlertCircle, Loader2 } from "lucide-react";
+import { CheckCircle, User, GraduationCap, ArrowRight, ArrowLeft, Rocket, Terminal, BookOpen, Clock, ClipboardList, AlertCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   buildSurveyAnswerPayload,
@@ -23,58 +23,74 @@ import {
 } from "@/features/student/models/onboardingInitial";
 
 import type { FieldPath } from "react-hook-form";
+import {
+  ILGI_ALANLARI,
+  DENEYIM_SEVIYELERI,
+  GIT_SEVIYELERI,
+  INGILIZCE_SEVIYELERI,
+  SINIFLAR,
+  DOGUM_YILI_EN_ERKEN,
+  dogumYiliEnGec,
+  HAFTALIK_SAAT_EN_AZ,
+  HAFTALIK_SAAT_EN_COK,
+} from "@/features/student/models/secenekler";
 
 // 🚀 SPRINT 4: Yapay Zekayı Besleyecek Gelişmiş Şema (Local Schema)
+// #289: Başvuru soruları genişletildi. Sınırlar `models/secenekler`ten geliyor —
+// doğum yılı önceden burada max(2015), sunucu şemasında ise mevcut yıl olarak
+// İKİ FARKLI yerde sınırlanıyordu.
 const enhancedSchema = z.object({
   personal: z.object({
     firstName: z.string().min(2, "Ad en az 2 karakter olmalıdır"),
     lastName: z.string().min(2, "Soyad en az 2 karakter olmalıdır"),
-    birthYear: z.number().min(1950).max(2015, "Geçerli bir yıl giriniz"),
+    birthYear: z
+      .number()
+      .min(DOGUM_YILI_EN_ERKEN, `${DOGUM_YILI_EN_ERKEN} yılından sonrasını girin`)
+      .max(dogumYiliEnGec(), "Geçerli bir doğum yılı giriniz"),
     phoneNumber: z.string().min(10, "Geçerli bir telefon numarası giriniz"),
+    city: z.string().min(2, "Yaşadığın ili yaz"),
+  }),
+  education: z.object({
+    school: z.string().min(2, "Okulunu yaz"),
+    department: z.string().min(2, "Bölümünü yaz"),
+    classYear: z.string().min(1, "Sınıfını seç"),
+    englishLevel: z.string().min(1, "İngilizce seviyeni seç"),
   }),
   experience: z.object({
     level: z.string().min(1, "Lütfen bir seviye seçin"),
-    knownTech: z.string().min(10, "Lütfen bildiklerinizi kısaca özetleyin"), // YENİ
+    gitLevel: z.string().min(1, "Git deneyimini seç"),
+    knownTech: z.string().min(10, "Lütfen bildiklerinizi kısaca özetleyin"),
   }),
   vision: z.object({
     interest: z.array(z.string()).min(1, "En az bir ilgi alanı seçmelisiniz"),
-    futureGoal: z.string().min(10, "Lütfen gelecekteki hedefinizi yazın"), // YENİ
+    futureGoal: z.string().min(10, "Lütfen gelecekteki hedefinizi yazın"),
   }),
   workingStyle: z.object({
-    learningStyle: z.string().min(10, "Lütfen nasıl öğrenmeyi sevdiğinizi yazın"), // YENİ
-    availability: z.string().min(1, "Lütfen uygunluğunuzu seçin"),
+    learningStyle: z.string().min(10, "Lütfen nasıl öğrenmeyi sevdiğinizi yazın"),
+    weeklyHours: z
+      .number({ message: "Haftalık saat giriniz" })
+      .min(HAFTALIK_SAAT_EN_AZ, `En az ${HAFTALIK_SAAT_EN_AZ} saat`)
+      .max(HAFTALIK_SAAT_EN_COK, `En fazla ${HAFTALIK_SAAT_EN_COK} saat`),
   }),
 });
 
 type EnhancedFormData = z.infer<typeof enhancedSchema>;
 
 // Form Adımları (4 Adıma çıkarıldı)
+// #289: Eğitim adımı eklendi — 4 adım 5'e çıktı.
 const steps = [
   { id: 0, title: "Kişisel Bilgiler", icon: User, description: "Sizi daha iyi tanıyalım" },
-  { id: 1, title: "Altyapı & Deneyim", icon: Terminal, description: "Mevcut bilgi birikiminiz nedir?" },
-  { id: 2, title: "Vizyon & Hedefler", icon: Rocket, description: "Gelecekte nerede olmak istiyorsunuz?" },
-  { id: 3, title: "Çalışma Tarzı", icon: BookOpen, description: "Sizin için en iyi öğrenme yöntemi nedir?" }
+  { id: 1, title: "Eğitim", icon: GraduationCap, description: "Nerede okuyorsunuz?" },
+  { id: 2, title: "Altyapı & Deneyim", icon: Terminal, description: "Mevcut bilgi birikiminiz nedir?" },
+  { id: 3, title: "Vizyon & Hedefler", icon: Rocket, description: "Gelecekte nerede olmak istiyorsunuz?" },
+  { id: 4, title: "Çalışma Tarzı", icon: BookOpen, description: "Sizin için en iyi öğrenme yöntemi nedir?" }
 ];
 
-const experienceLevels = [
-  { value: "beginner", label: "Sıfırdan Başlıyorum", description: "Yazılıma dair henüz temel bir bilgim yok." },
-  { value: "intermediate", label: "Temelim Var", description: "Değişkenler, döngüler ve temel algoritmaları biliyorum." },
-  { value: "advanced", label: "Projeler Geliştirdim", description: "Bir framework/dil ile kendi çapımda projeler yaptım." }
-];
 
-const availabilityOptions = [
-  { value: "full-time", label: "Tam Zamanlı", description: "Hafta içi her gün yoğun vakit ayırabilirim." },
-  { value: "part-time", label: "Yarı Zamanlı", description: "Okuldan/İşten arta kalan vakitlerde ilgilenebilirim." },
-  { value: "weekends", label: "Hafta Sonları", description: "Sadece hafta sonları odaklanabilirim." }
-];
 
-const interests = [
-  { id: "AI", label: "Yapay Zeka & Veri", emoji: "🤖" },
-  { id: "Web Development", label: "Web Geliştirme", emoji: "💻" },
-  { id: "Mobile", label: "Mobil Geliştirme", emoji: "📱" },
-  { id: "Game Dev", label: "Oyun Geliştirme", emoji: "🎮" },
-  { id: "Cybersecurity", label: "Siber Güvenlik", emoji: "🛡️" }
-];
+
+
+
 
 export default function OnboardingForm({
   initial,
@@ -130,11 +146,12 @@ export default function OnboardingForm({
     defaultValues: buildOnboardingDefaultValues(initial),
   });
 
-  const stepFields: FieldPath<EnhancedFormData>[][] = [
-    ["personal.firstName", "personal.lastName", "personal.birthYear", "personal.phoneNumber"],
-    ["experience.level", "experience.knownTech"],
+    const stepFields: FieldPath<EnhancedFormData>[][] = [
+    ["personal.firstName", "personal.lastName", "personal.birthYear", "personal.phoneNumber", "personal.city"],
+    ["education.school", "education.department", "education.classYear", "education.englishLevel"],
+    ["experience.level", "experience.gitLevel", "experience.knownTech"],
     ["vision.interest", "vision.futureGoal"],
-    ["workingStyle.learningStyle", "workingStyle.availability"],
+    ["workingStyle.learningStyle", "workingStyle.weeklyHours"],
   ];
 
   const onNext = async () => {
@@ -172,17 +189,21 @@ export default function OnboardingForm({
         learningStyle: data.workingStyle.learningStyle,
       });
 
-      // Eski backendin bozulmaması için veriyi onun beklediği formata çeviriyoruz
+      // #289: Yeni alanlar sunucuya AYRI gönderiliyor; serbest metinler
+      // eskisi gibi tek bir `goals` dizesine derleniyor (prefill round-trip'i
+      // bozulmasın diye derleme mantığı compileGoals'ta tek yerde).
       const backendPayload = {
         personal: data.personal,
+        education: data.education,
         experience: {
           level: data.experience.level,
+          gitLevel: data.experience.gitLevel,
           interest: data.vision.interest,
         },
         goals: {
-          availability: data.workingStyle.availability,
-          goal: compiledAIContext, // 🧠 AI bu metne bayılacak!
-        }
+          weeklyHours: data.workingStyle.weeklyHours,
+          goal: compiledAIContext,
+        },
       };
 
       await saveOnboarding(backendPayload);
@@ -298,29 +319,107 @@ export default function OnboardingForm({
                     <Input id="ob-phone" {...register("personal.phoneNumber")} className="h-12 bg-gray-50" placeholder="Örn: 0555 123 45 67" />
                     {stepAttempted[0] && errors.personal?.phoneNumber && <p className="text-red-500 text-xs">{errors.personal.phoneNumber.message}</p>}
                   </div>
+
+                  {/* #289: Açılış sayfası "81 ilde eşleşme" hedefini anlatıyor
+                      ama il hiç sorulmuyordu; iddia ölçülemiyordu. */}
+                  <div className="space-y-2">
+                    <label htmlFor="ob-city" className="block text-sm font-semibold text-gray-700">Yaşadığın il</label>
+                    <Input id="ob-city" {...register("personal.city")} className="h-12 bg-gray-50" placeholder="Örn: Samsun" />
+                    {stepAttempted[0] && errors.personal?.city && <p className="text-red-500 text-xs">{errors.personal.city.message}</p>}
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* ADIM 1: DENEYİM VE ALTYAPI */}
+            {/* ADIM 1: EĞİTİM (#289) */}
             {step === 1 && (
+              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label htmlFor="ob-school" className="block text-sm font-semibold text-gray-700">Okulun</label>
+                    <Input id="ob-school" {...register("education.school")} className="h-12 bg-gray-50" placeholder="Örn: Ondokuz Mayıs Üniversitesi" />
+                    {stepAttempted[1] && errors.education?.school && <p className="text-red-500 text-xs">{errors.education.school.message}</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <label htmlFor="ob-department" className="block text-sm font-semibold text-gray-700">Bölümün</label>
+                    <Input id="ob-department" {...register("education.department")} className="h-12 bg-gray-50" placeholder="Örn: Bilgisayar Mühendisliği" />
+                    {stepAttempted[1] && errors.education?.department && <p className="text-red-500 text-xs">{errors.education.department.message}</p>}
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <label htmlFor="ob-classYear" className="block text-sm font-semibold text-gray-700">Sınıfın</label>
+                  <select id="ob-classYear" {...register("education.classYear")} className="h-12 w-full rounded-md border border-gray-200 bg-gray-50 px-3 text-sm">
+                    <option value="">Seçiniz</option>
+                    {SINIFLAR.map((sn) => (
+                      <option key={sn.deger} value={sn.deger}>{sn.etiket}</option>
+                    ))}
+                  </select>
+                  {stepAttempted[1] && errors.education?.classYear && <p className="text-red-500 text-xs">{errors.education.classYear.message}</p>}
+                </div>
+
+                <div className="space-y-4">
+                  {/* #289: Doküman okuma kabiliyeti yol haritasının kaynak
+                      seçimini doğrudan etkiliyor. */}
+                  <label className="block text-sm font-semibold text-gray-700">İngilizce seviyen</label>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {INGILIZCE_SEVIYELERI.map((sv) => (
+                      <label key={sv.deger} className="relative">
+                        <input type="radio" value={sv.deger} {...register("education.englishLevel")} className="sr-only peer" />
+                        <div className="p-4 border-2 border-gray-100 rounded-xl cursor-pointer hover:border-blue-200 peer-checked:border-blue-600 peer-checked:bg-blue-50/50 transition-all">
+                          <span className="font-medium text-sm text-gray-800">{sv.etiket}</span>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                  {stepAttempted[1] && errors.education?.englishLevel && <p className="text-red-500 text-xs">{errors.education.englishLevel.message}</p>}
+                </div>
+              </div>
+            )}
+
+            {/* ADIM 2: DENEYİM VE ALTYAPI */}
+            {step === 2 && (
               <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="space-y-4">
                   <label className="block text-sm font-semibold text-gray-700">
                     Deneyim Seviyeniz
                   </label>
                   <div className="grid gap-4 md:grid-cols-3">
-                    {experienceLevels.map((level) => (
-                      <label key={level.value} className="relative">
-                        <input type="radio" value={level.value} {...register("experience.level")} className="sr-only peer" />
+                    {DENEYIM_SEVIYELERI.map((level) => (
+                      <label key={level.deger} className="relative">
+                        <input type="radio" value={level.deger} {...register("experience.level")} className="sr-only peer" />
                         <div className="p-5 h-full border-2 border-gray-100 rounded-xl cursor-pointer hover:border-blue-200 peer-checked:border-blue-600 peer-checked:bg-blue-50/50 transition-all text-center">
-                          <h3 className="font-bold text-gray-900 mb-2">{level.label}</h3>
-                          <p className="text-xs text-gray-500 leading-relaxed">{level.description}</p>
+                          <h3 className="font-bold text-gray-900 mb-2">{level.etiket}</h3>
+                          <p className="text-xs text-gray-500 leading-relaxed">{level.aciklama}</p>
                         </div>
                       </label>
                     ))}
                   </div>
-                  {stepAttempted[1] && errors.experience?.level && <p className="text-red-500 text-xs">{errors.experience.level.message}</p>}
+                  {stepAttempted[2] && errors.experience?.level && <p className="text-red-500 text-xs">{errors.experience.level.message}</p>}
+                </div>
+
+                <div className="space-y-4">
+                  {/* #289'un en büyük boşluğu: platformun tüm iş akışı repo + issue +
+                      PR üzerinden yürüyor ama bu hiç sorulmuyordu. Mentör, stajyerin
+                      PR açmayı bilip bilmediğini bilmeden yol haritası çiziyordu. */}
+                  <label className="block text-sm font-semibold text-gray-700">
+                    Git / GitHub deneyimin
+                  </label>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Projeler GitHub üzerinden yürüyor; bilmiyorsan ilk adımların bunu öğretecek şekilde planlanır.
+                  </p>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {GIT_SEVIYELERI.map((g) => (
+                      <label key={g.deger} className="relative">
+                        <input type="radio" value={g.deger} {...register("experience.gitLevel")} className="sr-only peer" />
+                        <div className="p-4 h-full border-2 border-gray-100 rounded-xl cursor-pointer hover:border-blue-200 peer-checked:border-blue-600 peer-checked:bg-blue-50/50 transition-all">
+                          <h3 className="font-semibold text-sm text-gray-900">{g.etiket}</h3>
+                          <p className="text-xs text-gray-500 mt-1">{g.aciklama}</p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                  {stepAttempted[2] && errors.experience?.gitLevel && <p className="text-red-500 text-xs">{errors.experience.gitLevel.message}</p>}
                 </div>
 
                 <div className="space-y-3">
@@ -337,30 +436,30 @@ export default function OnboardingForm({
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:border-blue-600 focus:ring-1 focus:ring-ring outline-none resize-none transition-all"
                     placeholder="Bildiğiniz teknolojileri ve mevcut durumunuzu anlatın..."
                   />
-                  {stepAttempted[1] && errors.experience?.knownTech && <p className="text-red-500 text-xs">{errors.experience.knownTech.message}</p>}
+                  {stepAttempted[2] && errors.experience?.knownTech && <p className="text-red-500 text-xs">{errors.experience.knownTech.message}</p>}
                 </div>
               </div>
             )}
 
-            {/* ADIM 2: İLGİ ALANLARI VE VİZYON */}
-            {step === 2 && (
+            {/* ADIM 3: İLGİ ALANLARI VE VİZYON */}
+            {step === 3 && (
               <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="space-y-4">
                   <label className="block text-sm font-semibold text-gray-700">
                     Hangi alanlara ilgi duyuyorsunuz? (Birden fazla seçilebilir)
                   </label>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {interests.map((interest) => (
-                      <label key={interest.id} className="relative">
-                        <input type="checkbox" value={interest.id} {...register("vision.interest")} className="sr-only peer" />
+                    {ILGI_ALANLARI.map((interest) => (
+                      <label key={interest.deger} className="relative">
+                        <input type="checkbox" value={interest.deger} {...register("vision.interest")} className="sr-only peer" />
                         <div className="p-3 border-2 border-gray-100 rounded-xl cursor-pointer hover:border-blue-200 peer-checked:border-blue-600 peer-checked:bg-blue-50/50 transition-all flex items-center gap-2">
                           <span className="text-xl">{interest.emoji}</span>
-                          <span className="font-medium text-sm text-gray-800">{interest.label}</span>
+                          <span className="font-medium text-sm text-gray-800">{interest.etiket}</span>
                         </div>
                       </label>
                     ))}
                   </div>
-                  {stepAttempted[2] && errors.vision?.interest && <p className="text-red-500 text-xs">{errors.vision.interest.message}</p>}
+                  {stepAttempted[3] && errors.vision?.interest && <p className="text-red-500 text-xs">{errors.vision.interest.message}</p>}
                 </div>
 
                 <div className="space-y-3">
@@ -377,13 +476,13 @@ export default function OnboardingForm({
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:border-blue-600 focus:ring-1 focus:ring-ring outline-none resize-none transition-all"
                     placeholder="Hayalinizdeki projeleri ve hedeflerinizi detaylandırın..."
                   />
-                  {stepAttempted[2] && errors.vision?.futureGoal && <p className="text-red-500 text-xs">{errors.vision.futureGoal.message}</p>}
+                  {stepAttempted[3] && errors.vision?.futureGoal && <p className="text-red-500 text-xs">{errors.vision.futureGoal.message}</p>}
                 </div>
               </div>
             )}
 
-            {/* ADIM 3: ÇALIŞMA TARZI VE ZAMAN */}
-            {step === 3 && (
+            {/* ADIM 4: ÇALIŞMA TARZI VE ZAMAN */}
+            {step === 4 && (
               <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="space-y-3">
                   <label htmlFor="ob-learningStyle" className="block text-sm font-semibold text-gray-700">
@@ -399,26 +498,32 @@ export default function OnboardingForm({
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:border-blue-600 focus:ring-1 focus:ring-ring outline-none resize-none transition-all"
                     placeholder="Nasıl bir çalışma tarzı sizi daha verimli yapar?"
                   />
-                  {stepAttempted[3] && errors.workingStyle?.learningStyle && <p className="text-red-500 text-xs">{errors.workingStyle.learningStyle.message}</p>}
+                  {stepAttempted[4] && errors.workingStyle?.learningStyle && <p className="text-red-500 text-xs">{errors.workingStyle.learningStyle.message}</p>}
                 </div>
 
-                <div className="space-y-4">
-                  <label className="block text-sm font-semibold text-gray-700">
-                    Projeler için ayırabileceğiniz vakit
+                <div className="space-y-3">
+                  {/* #289: "Tam zamanlı / yarı zamanlı" kişiden kişiye değişiyordu.
+                      Saat, mentörün yol haritasını planlayabileceği bir ölçü. */}
+                  <label htmlFor="ob-weeklyHours" className="block text-sm font-semibold text-gray-700">
+                    Haftada kaç saat ayırabilirsiniz?
                   </label>
-                  <div className="grid gap-4 md:grid-cols-3">
-                    {availabilityOptions.map((option) => (
-                      <label key={option.value} className="relative">
-                        <input type="radio" value={option.value} {...register("workingStyle.availability")} className="sr-only peer" />
-                        <div className="p-5 h-full border-2 border-gray-100 rounded-xl cursor-pointer hover:border-blue-200 peer-checked:border-blue-600 peer-checked:bg-blue-50/50 transition-all text-center">
-                          <Clock className={`w-6 h-6 mx-auto mb-2 ${option.value === "full-time" ? "text-red-500 " : option.value === "part-time" ? "text-yellow-500" : "text-green-500"}`} />
-                          <h3 className="font-bold text-gray-900 mb-1">{option.label}</h3>
-                          <p className="text-xs text-gray-500 leading-relaxed">{option.description}</p>
-                        </div>
-                      </label>
-                    ))}
+                  <p className="text-xs text-gray-500 mb-2">
+                    Dürüst bir sayı yazın — yol haritanız buna göre planlanacak.
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <Clock className="w-5 h-5 text-slate-400 shrink-0" />
+                    <Input
+                      id="ob-weeklyHours"
+                      type="number"
+                      min={HAFTALIK_SAAT_EN_AZ}
+                      max={HAFTALIK_SAAT_EN_COK}
+                      {...register("workingStyle.weeklyHours", { valueAsNumber: true })}
+                      className="h-12 bg-gray-50 max-w-[160px]"
+                      placeholder="Örn: 12"
+                    />
+                    <span className="text-sm text-gray-500">saat / hafta</span>
                   </div>
-                  {stepAttempted[3] && errors.workingStyle?.availability && <p className="text-red-500 text-xs">{errors.workingStyle.availability.message}</p>}
+                  {stepAttempted[4] && errors.workingStyle?.weeklyHours && <p className="text-red-500 text-xs">{errors.workingStyle.weeklyHours.message}</p>}
                 </div>
               </div>
             )}
