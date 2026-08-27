@@ -293,3 +293,32 @@ input[type="password"]::-ms-clear {
     text-shadow: none !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   #285: Posinowa logosunun çizilme animasyonu (bekleme göstergesi).
+
+   Desen `dasharray: L L` yolu önce baştan doldurup sonra yine baştan sildiği
+   için döngü görünür bir sıçrama olmadan kapanıyor. Sabit hızda sürekli
+   hareket olduğu için `linear`.
+--------------------------------------------------------------------------- */
+@keyframes posinowa-ciz {
+  from { stroke-dashoffset: 2460; }
+  to   { stroke-dashoffset: -2460; }
+}
+
+.posinowa-kalem {
+  animation: posinowa-ciz 2s linear infinite;
+}
+
+/* Hareketi azalt: çizim kalkar, yerine hafif bir opaklık nefesi gelir.
+   "Çalışıyor" bilgisi korunur, hareket kaldırılır. */
+@media (prefers-reduced-motion: reduce) {
+  @keyframes posinowa-nefes {
+    0%, 100% { opacity: 0.35; }
+    50%      { opacity: 1; }
+  }
+  .posinowa-kalem {
+    animation: posinowa-nefes 1.8s ease-in-out infinite;
+    stroke-dasharray: none;
+  }
+}

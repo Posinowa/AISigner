@@ -1,8 +1,12 @@
-import { Loader2 } from "lucide-react";
+import { PosinowaYukleniyor } from "@/features/brand/ui/PosinowaYukleniyor";
 
 /**
  * #153: Auth formlarının ortak gönder düğmesi.
  * Bekleme durumunda `aria-busy` ile ekran okuyucuya da bildirilir.
+ *
+ * #285: Bekleme göstergesi jenerik bir spinner değil, çizilen Posinowa
+ * logosu. Yanında zaten `pendingLabel` metni olduğu için gösterge
+ * dekoratif — ekran okuyucuya iki kez duyurulmasın.
  */
 export function AuthSubmitButton({
   pending,
@@ -22,7 +26,7 @@ export function AuthSubmitButton({
     >
       {pending ? (
         <>
-          <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+          <PosinowaYukleniyor boyut={18} dekoratif />
           {pendingLabel}
         </>
       ) : (

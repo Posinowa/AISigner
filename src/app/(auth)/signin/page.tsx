@@ -11,6 +11,7 @@ import { AuthField } from "@/features/auth/ui/AuthField"
 import { FormAlert } from "@/features/auth/ui/FormAlert"
 import { AuthSubmitButton } from "@/features/auth/ui/AuthSubmitButton"
 import { dogrulamaMesaji } from "@/features/auth/ui/dogrulama-mesaji"
+import { GecisPerdesi } from "@/features/brand/ui/GecisPerdesi"
 
 const initialState = { error: {} as Record<string, string[]> }
 
@@ -18,6 +19,8 @@ const initialState = { error: {} as Record<string, string[]> }
 function SigninForm() {
   const [state, setState] = useState(initialState)
   const [isPending, setIsPending] = useState(false)
+  // #285: Sert yönlendirme boyunca form ekranda kalıyordu; perde o boşluğu doldurur.
+  const [gecisteMi, setGecisteMi] = useState(false)
   const searchParams = useSearchParams()
   const justRegistered = searchParams.get("registered") === "true"
   // #247: e-postadaki doğrulama bağlantısı kullanıcıyı buraya döndürür.
@@ -53,6 +56,7 @@ function SigninForm() {
         // Yönlendirme kararı tek yerde — "/" route'unda (sunucu) — toplanıyor.
         // Hard navigation cookie'nin server'a temiz gitmesini garanti eder; böylece
         // client tarafında getSession retry hack'ine (yavaş ağda kırılgan) gerek kalmaz.
+        setGecisteMi(true)
         window.location.href = "/"
         return
       }
@@ -64,6 +68,10 @@ function SigninForm() {
     } finally {
       setIsPending(false)
     }
+  }
+
+  if (gecisteMi) {
+    return <GecisPerdesi />
   }
 
   return (
