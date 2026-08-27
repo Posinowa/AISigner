@@ -5,7 +5,9 @@ import { Users, BookOpen, Clock, CheckCircle, AlertCircle, UserCircle2, ChevronR
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { DogrulanmisRozet } from "@/features/auth/ui/DogrulanmisRozet";
-import { DogrulamaYenidenGonder } from "@/features/auth/ui/DogrulamaYenidenGonder";
+import { PanelKarsilama } from "@/features/dashboard/ui/PanelKarsilama";
+import { ProfilTamamlaSeridi } from "@/features/dashboard/ui/ProfilTamamlaSeridi";
+import { mentorDurumu } from "@/features/dashboard/models/mentorDurumu";
 import { experienceLevelLabel } from "@/lib/experience-level";
 
 type StudentWithProfile = {
@@ -122,39 +124,61 @@ export default function MentorDashboardPage() {
   const totalCompleted = students.reduce((acc, s) => acc + getCompletedProjects(s), 0);
   const missingProfile = students.filter(s => !s.studentProfile).length;
 
+  // #290: Mentör de isimle karşılanıyor ve sıradaki işi görüyor.
+  const mentorAdi = session?.user?.name?.split(" ")[0] ?? "Mentör";
+  const projesizOgrenci = students.filter((o) => getActiveProjects(o) === 0).length;
+  const { durum, siradaki } = mentorDurumu({
+    ogrenciSayisi: students.length,
+    profiliEksikSayisi: missingProfile,
+    projesizSayisi: projesizOgrenci,
+  });
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/30">
       <div className="max-w-6xl mx-auto p-6">
 
-        {/* Sayfa başlığı — navigasyon/çıkış AppShell'de (#126-1) */}
-        <div className="mb-8 pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Mentor Paneli</h1>
-              {/* #259: Mentörler de kayıt olabildiği (#250) için doğrulama
-                  durumunu kendi panellerinde görüyorlar. */}
-              <DogrulanmisRozet emailVerified={session?.user?.emailVerified} />
-              <DogrulamaYenidenGonder emailVerified={session?.user?.emailVerified} />
-            </div>
-            <p className="text-slate-500 mt-1.5 text-sm">Size atanmış öğrencileri yönetin ve proje atayın</p>
-          </div>
-          {/* #253: Mentör artık kendi proje şablonunu oluşturabiliyor. */}
-          <Link
-            href="/mentor-dashboard/projects"
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs shadow-md shadow-primary/20 transition self-start sm:self-auto"
-          >
-            <BookOpen className="w-4 h-4" />
-            Proje Şablonları
-          </Link>
+        {/* #290: Karşılama stajyerle AYNI dili konuşuyor — mentör de isimle
+            karşılanıyor. Önceden düz "Mentor Paneli" başlığı vardı. */}
+        <div className="space-y-4 mb-8 pt-2">
+          <PanelKarsilama
+            ad={mentorAdi}
+            basHarfler={mentorAdi.slice(0, 2).toUpperCase()}
+            userId={session?.user?.id ?? ""}
+            fotografVar={session?.user?.fotografVar === true}
+            durum={durum}
+            siradaki={siradaki}
+            rozet={
+              <DogrulanmisRozet
+                emailVerified={session?.user?.emailVerified}
+                dogrulanmamisiGoster={false}
+              />
+            }
+            sag={
+              <Link
+                href="/mentor-dashboard/projects"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs shadow-md shadow-primary/20 transition"
+              >
+                <BookOpen className="w-4 h-4" />
+                Proje Şablonları
+              </Link>
+            }
+          />
+
+          <ProfilTamamlaSeridi
+            emailVerified={session?.user?.emailVerified}
+            fotografVar={session?.user?.fotografVar === true}
+            fotografCapasi="/profile-setup"
+          />
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        {/* #290: "Profil Eksik" buradan çıkarıldı — o bir ölçü değil, üzerine
+    gidilmesi gereken bir görevdi; artık karşılamadaki "Sırada" alanında. */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
           {[
             { icon: Users, color: "text-blue-600 bg-blue-50", label: "Toplam Öğrenci", value: students.length },
             { icon: BookOpen, color: "text-indigo-600 bg-indigo-50", label: "Aktif Projeler", value: totalActive },
             { icon: CheckCircle, color: "text-emerald-600 bg-emerald-50", label: "Tamamlanan", value: totalCompleted },
-            { icon: AlertCircle, color: "text-amber-600 bg-amber-50", label: "Profil Eksik", value: missingProfile },
           ].map(({ icon: Icon, color, label, value }) => (
             <div key={label} className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm flex items-center gap-4">
               <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${color} shrink-0`}>
@@ -169,6 +193,8 @@ export default function MentorDashboardPage() {
         </div>
 
         {/* Student List */}
+        {/* #290: Karşılamadaki "Sırada" bağlantısının hedefi. */}
+        <div id="ogrenciler" className="scroll-mt-24">
         {students.length === 0 ? (
           <div className="bg-white rounded-2xl border border-slate-200 p-16 text-center shadow-sm">
             <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -300,6 +326,7 @@ export default function MentorDashboardPage() {
             })}
           </div>
         )}
+        </div>
       </div>
     </div>
   );

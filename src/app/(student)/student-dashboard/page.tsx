@@ -1,6 +1,5 @@
 import { ProfileSummarySection } from "@/features/student/ui/ProfileSummarySection";
 import { DogrulanmisRozet } from "@/features/auth/ui/DogrulanmisRozet";
-import { DogrulamaYenidenGonder } from "@/features/auth/ui/DogrulamaYenidenGonder";
 import { AvatarUpload } from "@/features/profile/ui/AvatarUpload";
 import { RoadmapSteps } from "@/features/student/ui/RoadmapSteps";
 import { prisma } from "@/lib/db";
@@ -11,6 +10,9 @@ import Link from "next/link";
 import { Progress } from "@/components/ui/progress";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { StudentCertificateTrigger } from "@/features/student/ui/StudentCertificateTrigger";
+import { PanelKarsilama } from "@/features/dashboard/ui/PanelKarsilama";
+import { ProfilTamamlaSeridi } from "@/features/dashboard/ui/ProfilTamamlaSeridi";
+import { stajyerDurumu, PROJELER_CAPASI } from "@/features/dashboard/models/stajyerDurumu";
 
 export const dynamic = "force-dynamic";
 
@@ -104,13 +106,23 @@ export default async function StudentDashboardPage() {
 
   const firstName = session.user.name?.split(" ")[0] ?? "Öğrenci";
 
-  // #265: Fotoğrafın varlığı — arayüz depolama adına ihtiyaç duymuyor,
-  // yalnızca fotoğraf olup olmadığını bilmesi yeterli.
-  const { avatarFile } =
-    (await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { avatarFile: true },
-    })) ?? {};
+  // #290: Karşılama artık "sırada ne var" sorusuna da cevap veriyor.
+  // Sıradaki adım = en yeni projenin tamamlanmamış İLK adımı.
+  const enYeniProje = profile.assignedProjects[0];
+  const bekleyenAdim = enYeniProje?.roadmap?.steps.find((a) => a.status !== "COMPLETED");
+  const { durum, siradaki } = stajyerDurumu({
+    mezun: isGraduated,
+    projeSayisi: profile.assignedProjects.length,
+    mentorSayisi: profile.mentorAssignments.length,
+    siradakiAdim: bekleyenAdim
+      ? { baslik: bekleyenAdim.title, projeAdi: enYeniProje.projectTemplate.title }
+      : null,
+  });
+
+  // #265/#290: Fotoğrafın varlığı — arayüz depolama adına ihtiyaç duymuyor.
+  // Bilgi oturumdan geliyor; JWT geri çağrısı her istekte kullanıcıyı zaten
+  // DB'den okuduğu için burada AYRI bir sorgu atmak gereksizdi.
+  const fotografVar = session.user.fotografVar === true;
 
   return (
     <div className="max-w-5xl mx-auto mt-8 p-6 space-y-8">
@@ -147,45 +159,38 @@ export default async function StudentDashboardPage() {
         </div>
       )}
 
-      {/* Sayfa başlığı — navigasyon/çıkış AppShell'de (#126-1) */}
-      <div>
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
-            {isGraduated ? `Mezun Stajyer Portfolyosu: ${firstName}` : `Hoş geldin, ${firstName}`}
-          </h1>
-          {/* #259: Kullanıcı hesabının doğrulanmış olduğunu kendi panelinde görsün. */}
-          <DogrulanmisRozet emailVerified={session.user.emailVerified} />
-          {/* #261: Doğrulanmamış kullanıcı bağlantıyı yeniden isteyebilsin —
-              #259'da ibareyi görüp hiçbir şey yapamıyordu. */}
-          <DogrulamaYenidenGonder emailVerified={session.user.emailVerified} />
-        </div>
-
-        {/* #265: Profil fotoğrafı — başvuru değerlendirilirken admin görecek. */}
-        <div className="mt-5 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
-          <AvatarUpload
-            userId={session.user.id}
-            basHarfler={firstName.slice(0, 2).toUpperCase()}
-            fotografVar={Boolean(avatarFile)}
-            ad={session.user.name}
+      {/* #290: Karşılama — kimsin, nerede duruyorsun, sırada ne var.
+          Fotoğraf yükleme ve e-posta doğrulama gibi idari işler buradan
+          çıkarıldı; artık yalnızca EKSİK olduklarında aşağıdaki şeritte. */}
+      <PanelKarsilama
+        ad={isGraduated ? `${firstName} · Mezun Stajyer` : firstName}
+        basHarfler={firstName.slice(0, 2).toUpperCase()}
+        userId={session.user.id}
+        fotografVar={fotografVar}
+        durum={durum}
+        siradaki={siradaki}
+        rozet={
+          /* #259: Yalnızca OLUMLU ibare karşılamada. Doğrulanmamış uyarısı
+             ismin yanında değil, profil şeridinde duruyor. */
+          <DogrulanmisRozet
+            emailVerified={session.user.emailVerified}
+            dogrulanmamisiGoster={false}
           />
-        </div>
-        <p className="text-slate-500 mt-2 text-sm">
-          {isGraduated
-            ? "Staj süreciniz boyunca geliştirdiğiniz projeler, tamamlanan adımlar ve çıktılar aşağıda arşivlenmiştir."
-            : profile.assignedProjects.length > 0
-              ? "Çalışma masan hazır. Odaklanman gereken güncel görevler aşağıda listelenmiştir."
-              : profile.mentorAssignments.length > 0
-                ? "Mentörün gelişim planını hazırlıyor. Lütfen beklemede kal."
-                : "Profilin inceleniyor. Yakında bir mentör ile eşleştirileceksin."}
-        </p>
-      </div>
+        }
+      />
+
+      <ProfilTamamlaSeridi
+        emailVerified={session.user.emailVerified}
+        fotografVar={fotografVar}
+      />
 
       {/* Güvenlik Soruları Kurulumu */}
 
       <ProfileSummarySection girdi={ozetGirdisi} />
 
       {/* Projeler ve Yol Haritası */}
-      <div>
+      {/* #290: Karşılamadaki "Sırada" bağlantısının hedefi. */}
+      <div id={PROJELER_CAPASI.slice(1)} className="scroll-mt-24">
         <h2 className="text-xl font-bold mb-6 flex items-center text-slate-900 border-b border-slate-200 pb-3">
           <Target className="w-5 h-5 mr-2 text-slate-700" />
           Aktif Projeler ve İş Akışı
@@ -293,6 +298,23 @@ export default async function StudentDashboardPage() {
           </div>
         )}
       </div>
+
+      {/* #290: Fotoğraf yönetimi karşılamadan buraya taşındı. Hero'da idari
+          bir araç durmuyor ama yetenek de kaybolmuyor — üstteki şerit
+          fotoğraf eksikken buraya bağ veriyor. */}
+      <section id="profil" className="scroll-mt-24">
+        <h2 className="mb-4 border-b border-slate-200 pb-3 text-xl font-bold text-slate-900">
+          Profil
+        </h2>
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+          <AvatarUpload
+            userId={session.user.id}
+            basHarfler={firstName.slice(0, 2).toUpperCase()}
+            fotografVar={fotografVar}
+            ad={session.user.name}
+          />
+        </div>
+      </section>
     </div>
   );
 }
