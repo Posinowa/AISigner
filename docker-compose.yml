@@ -1,4 +1,5 @@
-version: '3.9'
+# YALNIZCA YEREL GELİŞTİRME içindir. Üretim dağıtımı için DEPLOYMENT.md'ye bakın
+# (yönetilen Postgres + platform secret'ları). Bu dosyayı canlıda kullanmayın.
 
 services:
   db:
@@ -6,30 +7,48 @@ services:
     container_name: aisigner_db
     restart: always
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: aisigner
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      # Parola artık dosyaya GÖMÜLÜ DEĞİL. Yerelde varsayılan kalır; .env'de
+      # POSTGRES_PASSWORD verilirse o kullanılır. Böylece bu dosya yanlışlıkla
+      # bir sunucuda kullanılırsa parola değiştirilebilir olur.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-aisigner}
     ports:
-      - "5432:5432"
+      # SADECE 127.0.0.1'e bağlı. Öncesi "5432:5432" idi; bu, veritabanını
+      # makinenin TÜM arayüzlerine açıyordu — ortak/kurumsal ağda ya da güvenlik
+      # duvarı gevşekse Postgres varsayılan parolayla dışarıdan erişilebilir olur.
+      - "127.0.0.1:5432:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-aisigner}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   # Uygulama (tek instance). Yüklenen dosyalar kalıcı volume'da tutulur,
   # böylece container yeniden başlatılınca/yeniden deploy edilince silinmez.
   # ÖLÇEKLEME NOTU: Birden fazla instance çalıştırılacaksa rate-limit ve
-  # şifre-sıfırlama token'ları Redis'e, dosya depolama GCS/S3'e taşınmalı.
+  # metrik sayaçları Redis'e, dosya depolama GCS/S3'e taşınmalı.
   # Detaylar: DEPLOYMENT.md
   app:
     build: .
     container_name: aisigner_app
     restart: always
     depends_on:
-      - db
+      db:
+        # Öncesi sade "depends_on: [db]" idi: Compose yalnızca konteynerin
+        # BAŞLADIĞINI bekler, Postgres'in bağlantı kabul ettiğini değil. İlk
+        # açılışta entrypoint'teki `prisma migrate deploy` hazır olmayan DB'ye
+        # çarpıp konteyneri kapatabiliyordu (restart:always ile gizlenen bir
+        # yarış durumu). healthcheck bunu deterministik hale getiriyor.
+        condition: service_healthy
     env_file:
       - .env
     environment:
       # Compose ağı içinde DB host'u "db" servis adıdır (localhost değil)
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/aisigner?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-aisigner}?schema=public
     ports:
       - "3000:3000"
     volumes:

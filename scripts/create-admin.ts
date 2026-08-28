@@ -49,14 +49,18 @@ async function main() {
 
   const hashed = await hash(password);
 
+  // emailVerified doldurulur: bu hesabı açan kişi zaten DB kimlik bilgilerine
+  // sahip bir operatördür — adres sahipliği kanal dışında kanıtlanmıştır. Aksi
+  // halde ilk yönetici kalıcı olarak "Doğrulanmamış" görünürdü.
   const user = await prisma.user.upsert({
     where: { email },
-    update: { password: hashed, role: "ADMIN", accountStatus: "APPROVED" },
+    update: { password: hashed, role: "ADMIN", accountStatus: "APPROVED", emailVerified: new Date() },
     create: {
       email,
       password: hashed,
       role: "ADMIN",
       accountStatus: "APPROVED",
+      emailVerified: new Date(),
       name: "Yönetici",
     },
     select: { id: true, email: true, role: true },
