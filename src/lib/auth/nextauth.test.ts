@@ -71,3 +71,15 @@ describe("authOptions.callbacks.jwt — rol/durum tazeleme (#44/#68)", () => {
     expect(token.accountStatus).toBeUndefined();
   });
 });
+
+describe("authOptions.cookies — oturum çerezi adı sabitlenmemeli", () => {
+  // REGRESYON: Çerez adı "next-auth.session-token" olarak elle sabitlenmişti.
+  // middleware.ts oturumu getToken() ile okuyor ve getToken HTTPS'te
+  // "__Secure-next-auth.session-token" arıyor → prod'da hiçbir oturum
+  // görünmüyor, giriş yapan herkes /signin'e geri atılıyordu.
+  //
+  // Adı NextAuth'a bırakmak zorunlu: iki taraf da aynı kuralı kullansın.
+  it("sessionToken çerezinin adını sabitlemez", () => {
+    expect(authOptions.cookies?.sessionToken?.name).toBeUndefined();
+  });
+});

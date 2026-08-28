@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { createRateLimiter } from "@/lib/rate-limit";
+import { getClientIp } from "@/lib/client-ip";
 import { passwordSchema } from "@/features/auth/models/user";
 import {
   sendPasswordResetEmail,
@@ -31,21 +32,13 @@ const hesapLimiter = createRateLimiter("reset-password-account", {
   windowSeconds: 3600,
 });
 
-function istemciIp(h: Headers): string {
-  return (
-    h.get("x-real-ip") ||
-    h.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    "anonymous"
-  );
-}
-
 const AYNI_YANIT = {
   message:
     "Bu e-posta adresi kayıtlıysa şifre sıfırlama bağlantısı gönderildi. Gelen kutunuzu kontrol edin.",
 };
 
 export async function POST(req: Request) {
-  const ip = istemciIp(await headers());
+  const ip = getClientIp(await headers());
 
   const rl = ipLimiter.check(ip);
   if (!rl.allowed) {
