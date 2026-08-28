@@ -4,6 +4,7 @@ import Credentials from "next-auth/providers/credentials"
 import { prisma } from "@/lib/auth/prisma"
 import { hash, verify } from "@node-rs/argon2";
 import { createRateLimiter } from "@/lib/rate-limit";
+import { getClientIp } from "@/lib/client-ip";
 
 
 // AUTH_SECRET kontrolü - üretim ortamında eksikse hata fırlat
@@ -31,17 +32,6 @@ function getDummyHash(): Promise<string> {
     dummyHashPromise = hash("aisigner-dummy-password-for-constant-time-verify");
   }
   return dummyHashPromise;
-}
-
-function getClientIp(headers: Record<string, string | string[] | undefined> | undefined): string {
-  const h = headers ?? {};
-  const realIp = h["x-real-ip"];
-  const realIpStr = Array.isArray(realIp) ? realIp[0] : realIp;
-  if (realIpStr) return realIpStr.trim();
-  const fwd = h["x-forwarded-for"];
-  const fwdStr = Array.isArray(fwd) ? fwd[0] : fwd;
-  if (fwdStr) return fwdStr.split(",")[0]!.trim();
-  return "anonymous";
 }
 
 // NextAuth konfigürasyonu
@@ -95,20 +85,25 @@ export const authOptions : AuthOptions = {
       },
     }),
   ],
-   cookies: {
-    sessionToken: {
-      name: "next-auth.session-token",
-      options: {
-        httpOnly: true,  // JS tarafından erişilemez (XSS koruması)
-        sameSite: "lax"as const,  // CSRF koruması için SameSite=Lax
-        path: "/", // Her yerde geçerli
-        secure: process.env.NODE_ENV === "production", // Prod ortamında HTTPS şart
-      },
-    },
-  },
-  
- 
-callbacks: {
+  // ⚠️ ÇEREZ ADINI ELLE VERMEYİN (canlıyı kıran hata buradaydı).
+  //
+  // Burada `cookies.sessionToken.name` sabit "next-auth.session-token" idi.
+  // Ama `middleware.ts` oturumu `getToken()` ile okuyor ve NextAuth v4'ün
+  // `getToken` varsayılanı çerez adını NEXTAUTH_URL'e bakarak seçiyor:
+  //
+  //     secureCookie = NEXTAUTH_URL.startsWith("https://")
+  //     cookieName   = secureCookie ? "__Secure-next-auth.session-token"
+  //                                 : "next-auth.session-token"
+  //
+  // Sonuç: HTTPS'te uygulama çerezi "next-auth.session-token" adıyla yazıyor,
+  // middleware "__Secure-next-auth.session-token" arıyor, bulamıyor ve giriş
+  // yapmış HERKESİ /signin'e geri atıyordu. Lokalde (http) iki ad da aynı
+  // olduğu için hata hiç görünmüyordu.
+  //
+  // Blok kaldırıldı: NextAuth varsayılanı httpOnly + sameSite:"lax" + path:"/"
+  // + secure(https) zaten veriyor, ÜSTELİK doğru adı seçiyor ve prod'da
+  // "__Secure-" önekinin tarayıcı korumasını da kazandırıyor.
+  callbacks: {
     async jwt({ token, user }) {
       if (user) {
         // İlk giriş — bilgileri token'a yaz

@@ -7,6 +7,7 @@ import { signupSchema } from "@/features/auth/models/user"
 import { redirect } from "next/navigation"
 import { headers } from "next/headers"
 import { createRateLimiter } from "@/lib/rate-limit"
+import { getClientIp } from "@/lib/client-ip"
 import { sendVerificationEmail } from "@/features/auth/server/email-verification"
 import {
   BASVURU_ALAN_ADI,
@@ -28,11 +29,7 @@ export async function signupAction(
   formData: FormData
 ): Promise<SignupState> {
   // Rate limiting
-  const headersList = await headers();
-  const ip =
-    headersList.get("x-real-ip") ||
-    headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    "anonymous";
+  const ip = getClientIp(await headers());
   const rl = signupLimiter.check(ip);
   if (!rl.allowed) {
     return { error: { email: ["Çok fazla kayıt denemesi. Lütfen 5 dakika bekleyin."] } };

@@ -36,14 +36,18 @@ Out Plane konsolunda servisin **Variables** bölümüne girilir.
 | `AUTH_SECRET` | **JWT imzalama sırrı** (oturum + middleware). Yoksa uygulama prod'da açılmaz. **Yeni ve güçlü üretin.** | `openssl rand -base64 32` çıktısı |
 | `NEXTAUTH_URL` | Uygulamanın public URL'i (NextAuth callback'leri). | `https://aisigner.example.com` |
 
-> **Dikkat:** Bu proje NextAuth v4 ile **`AUTH_SECRET`** kullanır (`NEXTAUTH_SECRET` DEĞİL).
-> Bir platform şablonu `NEXTAUTH_SECRET` isterse, `AUTH_SECRET`'i mutlaka ayrıca girin.
+> **`NEXTAUTH_SECRET` GİRMEYİN.** Bu proje NextAuth v4'ü `AUTH_SECRET` ile
+> yapılandırır ve kodda `NEXTAUTH_SECRET` hiç okunmaz. Parola-sıfırlama ve
+> e-posta-doğrulama token'ları da (`lib/auth/reset-token.ts`,
+> `lib/auth/verification-token.ts`) `AUTH_SECRET` ile HMAC imzalanır.
+> Ayrı bir `NEXTAUTH_SECRET` girmek işe yaramaz; iki sırrı ayrı sanmak
+> rotasyon sırasında yanlışını değiştirmene yol açar.
 
 ### Güvenlik için önerilen
 
-| Değişken | Açıklama |
-|---|---|
-| `NEXTAUTH_SECRET` | Parola-sıfırlama token'larının imzalanmasında kullanılır. Verilmezse sabit bir decoy fallback devreye girer → token'lar tahmin edilebilir olur. **Ayrı, güçlü bir değer girin.** |
+| Değişken | Varsayılan | Açıklama |
+|---|---|---|
+| `TRUSTED_PROXY_HOPS` | `1` | Uygulamanın ÖNÜNDEKİ güvenilen ters vekil sayısı. Rate-limit'in istemci IP'sini `X-Forwarded-For` zincirinden **sağdan** kaçıncı girdiden okuyacağını belirler (`lib/client-ip.ts`). Tek PaaS yönlendiricisi → `1` (varsayılan, çoğu kurulum). Önde ayrıca CDN varsa (Cloudflare + platform LB) → `2`. **Fazla büyük vermeyin:** zincir kısa kalırsa istemcinin uydurduğu değere düşülür ve rate-limit atlatılabilir hale gelir. |
 
 ### E-posta (SMTP) — doğrulama ve şifre sıfırlama için ZORUNLU
 
@@ -160,7 +164,10 @@ npm run create:admin
 
 - [ ] **`gcp-credentials.json` repoda YOK.** `.gitignore` + `.dockerignore` korur; imaja da girmez.
 - [ ] **`.env` repoda YOK.** Tüm sırlar platformun Variables bölümünde.
-- [ ] **`NEXTAUTH_SECRET` yeni üretildi** (`openssl rand -base64 32`) — demo/örnek değer DEĞİL.
+- [ ] **`AUTH_SECRET` yeni üretildi** (`openssl rand -base64 32`) — demo/örnek değer DEĞİL.
+      (`NEXTAUTH_SECRET` diye ayrı bir değişken YOK; bkz. §2.)
+- [ ] **`TRUSTED_PROXY_HOPS` platformun vekil sayısıyla uyumlu.** Yanlışsa rate-limit
+      atlatılabilir — doğrulaması aşağıda (§7).
 - [ ] **`DATABASE_URL` içinde `sslmode=require`** var.
 - [ ] **Prod'da `npm run seed` çalıştırılmadı.** Seed; `admin@example.com` / `mentor@example.com`
       / `student@example.com` kullanıcılarını **sabit zayıf parola** ile açar — canlıda arka kapı olur.
@@ -180,9 +187,12 @@ npm run create:admin
     oluştur; servis hesabına `Storage Object Admin` yetkisi ver.
   - **`GCS_BUCKET` verme:** yerel disk `/app/uploads`. Volume bağlanmazsa **her deploy'da silinir**;
     kalıcılık için Out Plane Volume'ünü `/app/uploads`'a bağla (tek-instance).
-- **Tek-instance varsayımı**: `rate-limit.ts`, forgot-password token'ları ve `metrics.ts`
-  bellek-içi (process-local) tutulur. **Birden çok instance** çalıştıracaksanız bunlar
-  instance'lar arasında paylaşılmaz → Redis'e taşıyın. Tek instance ile sorun yok.
+- **Tek-instance varsayımı**: `rate-limit.ts` ve `metrics.ts` bellek-içi (process-local)
+  tutulur. **Birden çok instance** çalıştıracaksanız bunlar instance'lar arasında
+  paylaşılmaz → sayaçlar instance sayısıyla çarpılır (5 deneme limiti 3 instance'ta
+  fiilen 15 olur). Redis'e taşıyın. Tek instance ile sorun yok.
+  - Şifre-sıfırlama ve e-posta-doğrulama token'ları **artık bellekte DEĞİL**: durumsuz
+    HMAC (`AUTH_SECRET` ile imzalı), çok-instance'ta sorunsuz çalışır.
 
 ---
 
@@ -211,3 +221,24 @@ Canlı ortama ilk çıkış veya ana sürüm geçişlerinde şu adımlar sırayl
    - [ ] `/api/health` uç noktası `200 OK` döndü.
    - [ ] Admin dashboard ve mentör/öğrenci akışları canlı ortamda duman testinden (smoke test) geçirildi.
 
+---
+
+## 7. Ters vekil (proxy) doğrulaması — rate-limit'in gerçekten çalıştığını teyit et
+
+Rate-limit anahtarı istemci IP'sidir ve IP `X-Forwarded-For` zincirinden **sağdan**
+`TRUSTED_PROXY_HOPS` kadar sayılarak okunur (`lib/client-ip.ts`). Sayı yanlışsa limit ya
+herkesi tek kovaya toplar (meşru kullanıcılar birbirini kilitler) ya da istemcinin
+uydurduğu değere düşer (**limit tamamen atlatılır**).
+
+Deploy sonrası tek seferlik doğrulama:
+
+```bash
+for i in 1 2 3 4 5 6 7; do
+  curl -s -o /dev/null -w "%{http_code}
+"     -X POST https://<alan-adi>/api/auth/reset-password     -H "Content-Type: application/json"     -H "X-Forwarded-For: 9.9.9.$i"     -d '{"email":"yok@example.com"}'
+done
+```
+
+- [ ] Son istekler **429** dönüyor → doğru. Uydurma `X-Forwarded-For` limiti atlatamıyor.
+- [ ] Hepsi **200** dönüyor → `TRUSTED_PROXY_HOPS` yanlış. Platformun uygulamaya ulaştırdığı
+      ham `X-Forwarded-For` zincirini loglayıp kaç girdi geldiğini sayın ve değeri düzeltin.
