@@ -1,4 +1,3 @@
-import { ProfileSummarySection } from "@/features/student/ui/ProfileSummarySection";
 import { DogrulanmisRozet } from "@/features/auth/ui/DogrulanmisRozet";
 import { AvatarUpload } from "@/features/profile/ui/AvatarUpload";
 import { RoadmapSteps } from "@/features/student/ui/RoadmapSteps";
@@ -94,15 +93,6 @@ export default async function StudentDashboardPage() {
     );
   }
 
-  // #282: AI özeti artık sayfayı BLOKLAMIYOR. Veri, akış sınırının içinde
-  // çekiliyor; sayfanın geri kalanı beklemeden render ediliyor.
-  const ozetGirdisi = {
-    experienceLevel: profile.experienceLevel,
-    interests: profile.interests,
-    goals: profile.goals ?? "Henüz hedef belirtilmemiş",
-    availability: profile.availability ?? undefined,
-    userId: session.user.id, // Cache invalidation için userId gerekli
-  };
 
   const firstName = session.user.name?.split(" ")[0] ?? "Öğrenci";
 
@@ -186,7 +176,6 @@ export default async function StudentDashboardPage() {
 
       {/* Güvenlik Soruları Kurulumu */}
 
-      <ProfileSummarySection girdi={ozetGirdisi} />
 
       {/* Projeler ve Yol Haritası */}
       {/* #290: Karşılamadaki "Sırada" bağlantısının hedefi. */}
