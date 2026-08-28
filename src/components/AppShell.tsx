@@ -32,6 +32,7 @@ const navByRole: Record<Role, { home: string; links: NavLink[] }> = {
     links: [
       { href: "/student-dashboard", label: "Panel" },
       { href: "/student-dashboard/messages", label: "Mesajlar" },
+      { href: "/student-dashboard/ai-analiz", label: "AI Analizim" },
       { href: "/student-dashboard/suggestions", label: "Öneri & İstek" },
     ],
   },
