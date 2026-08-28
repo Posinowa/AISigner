@@ -97,6 +97,40 @@ export async function updateAccountStatus(
   userId: string,
   accountStatus: "PENDING" | "APPROVED" | "REJECTED" | "GRADUATED",
 ) {
+  // #247 sözleşmesinin KAPISI: e-posta doğrulaması burada anlam kazanıyor.
+  //
+  // Doğrulama akışı vardı ama hiçbir yerde kapı değildi — `emailVerified` yalnız
+  // bir rozet ve admin filtresiydi. Doğrulamayan kullanıcı her şeyi normal
+  // kullanabiliyordu, yani özellik fiilen dekoratifti.
+  //
+  // Kapı neden BURASI: hesabı asıl aktifleştiren adım admin onayıdır. Girişi
+  // engellemek yerine onayı engellemek üç şeyi birden koruyor:
+  //   - PENDING kullanıcı profilini doldurmaya devam edebilir (#143 sözleşmesi),
+  //   - SMTP sessizce çökerse (mail.ts bilerek hata fırlatmaz) kimse kilitli
+  //     kalmaz — admin panelde "doğrulanmamış" görür ve durumu fark eder,
+  //   - sahte/erişilemeyen adresle açılan hesap aktifleşemez.
+  //
+  // Yalnızca APPROVED kapılıdır: REJECTED ve PENDING'e dönüş her zaman serbest
+  // (aksi halde admin hatalı bir onayı geri alamazdı). GRADUATED zaten önce
+  // APPROVED olmayı gerektirir.
+  if (accountStatus === "APPROVED") {
+    const hedef = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { emailVerified: true },
+    });
+
+    if (!hedef) {
+      throw new AssignmentValidationError("Kullanıcı bulunamadı.");
+    }
+
+    if (!hedef.emailVerified) {
+      throw new AssignmentValidationError(
+        "Bu hesabın e-posta adresi henüz doğrulanmamış. Kullanıcı doğrulama " +
+          "bağlantısına tıklamadan hesap onaylanamaz.",
+      );
+    }
+  }
+
   const updated = await prisma.user.update({
     where: { id: userId },
     data: { accountStatus },

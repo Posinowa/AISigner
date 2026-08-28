@@ -45,6 +45,11 @@ async function main() {
         password: hashedPassword,
         role: user.role,
         accountStatus: "APPROVED",
+        // Demo hesapları APPROVED açılıyor; e-posta doğrulaması artık onayın
+        // ÖN KOŞULU olduğu için (features/admin/server/user.ts) doğrulanmış
+        // sayılmaları gerekiyor. Aksi halde yerelde bir demo hesabı PENDING'e
+        // alıp tekrar onaylamak imkânsız olurdu.
+        emailVerified: new Date(),
       },
       create: {
         email: user.email,
@@ -52,6 +57,7 @@ async function main() {
         role: user.role, // schema.prisma'daki Role enum'una göre
         password: hashedPassword, // string hash
         accountStatus: "APPROVED",
+        emailVerified: new Date(),
       },
     });
     // Güvenlik: env'den GELEN şifre loglanmaz (terminal/CI çıktısına sızmasın);

@@ -130,6 +130,9 @@ describe("updateAccountStatus — stajyer onay, mezuniyet ve red durumları", ()
   });
 
   it("#208: GRADUATED olmayan durumda sertifika resmileştirilmez", async () => {
+    // APPROVED artık e-posta doğrulaması gerektiriyor; bu test onay kapısını
+    // değil sertifika davranışını ölçtüğü için hesap doğrulanmış kabul edilir.
+    prismaMock.user.findUnique.mockResolvedValue({ emailVerified: new Date() });
     prismaMock.user.update.mockResolvedValue({
       id: "u-2",
       email: "s@test.com",
@@ -236,4 +239,62 @@ describe("deleteUser — güvenli hesap silme", () => {
     // Hata yutulur (best-effort) → çözümlenir.
     await expect(deleteUser("student-1", "admin-1")).resolves.toMatchObject({ id: "student-1" });
   });
+});
+
+describe("updateAccountStatus — e-posta doğrulaması onayın ön koşuludur", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const onayliKullanici = {
+    id: "u-9",
+    email: "yeni@test.com",
+    name: "Yeni",
+    lastName: "Stajyer",
+    role: "STUDENT",
+    accountStatus: "APPROVED",
+  };
+
+  it("e-postası doğrulanmamış hesap APPROVED YAPILAMAZ", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({ emailVerified: null });
+
+    await expect(updateAccountStatus("u-9", "APPROVED")).rejects.toBeInstanceOf(
+      AssignmentValidationError,
+    );
+    // Kritik: reddedilen çağrı DB'ye hiç yazmamalı.
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
+  });
+
+  it("e-postası doğrulanmış hesap APPROVED yapılabilir", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({ emailVerified: new Date() });
+    prismaMock.user.update.mockResolvedValue(onayliKullanici);
+
+    const sonuc = await updateAccountStatus("u-9", "APPROVED");
+
+    expect(sonuc.accountStatus).toBe("APPROVED");
+    expect(prismaMock.user.update).toHaveBeenCalledOnce();
+  });
+
+  it("var olmayan kullanıcıyı onaylamaya çalışmak anlamlı hata verir", async () => {
+    prismaMock.user.findUnique.mockResolvedValue(null);
+
+    await expect(updateAccountStatus("yok", "APPROVED")).rejects.toBeInstanceOf(
+      AssignmentValidationError,
+    );
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
+  });
+
+  // Kapı YALNIZCA APPROVED'a konuldu: admin hatalı bir onayı her zaman geri
+  // alabilmeli, yoksa doğrulanmamış bir hesap PENDING'e bile döndürülemezdi.
+  it.each(["PENDING", "REJECTED"] as const)(
+    "%s durumu doğrulama kontrolünden GEÇMEZ (geri alma her zaman mümkün)",
+    async (durum) => {
+      prismaMock.user.update.mockResolvedValue({ ...onayliKullanici, accountStatus: durum });
+
+      await updateAccountStatus("u-9", durum);
+
+      expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
+      expect(prismaMock.user.update).toHaveBeenCalledOnce();
+    },
+  );
 });
