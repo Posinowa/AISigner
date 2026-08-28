@@ -66,6 +66,7 @@
     "sharp": "^0.35.0",
     "postcss": "^8.4.31",
     "nodemailer": "^9.0.0",
-    "deepmerge-ts": "^8.0.2"
+    "deepmerge-ts": "^8.0.2",
+    "uuid": "^11.1.1"
   }
 }
