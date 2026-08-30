@@ -9,6 +9,8 @@ import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
  * - güncelleme başarısız olursa PROVISIONED durumu KAYBEDİLMEZ
  */
 
+const arkaPlanIsleri: Array<() => unknown> = [];
+
 const {
   requireAuthMock,
   prismaMock,
@@ -32,6 +34,14 @@ const {
 }));
 
 vi.mock("server-only", () => ({}));
+// `after()` gerçekte yanıt gönderildikten SONRA koşar. Testte geri çağrıyı
+// yakalayıp elle tetikliyoruz — hem "hemen koşmadığını" hem de "koştuğunda ne
+// yaptığını" ayrı ayrı doğrulayabilelim.
+vi.mock("next/server", () => ({
+  after: (cb: () => unknown) => {
+    arkaPlanIsleri.push(cb);
+  },
+}));
 vi.mock("@/lib/auth/guard", () => ({
   requireAuth: (...a: unknown[]) => requireAuthMock(...a),
 }));
@@ -53,7 +63,12 @@ vi.mock("./repo", () => ({
   issueHazirla: (...a: unknown[]) => issueMock(...a),
 }));
 
-import { provisionGitHubWorkspace, updateGitHubWorkspace } from "./provisioning";
+import {
+  provisionGitHubWorkspace,
+  updateGitHubWorkspace,
+  baslatGitHubWorkspaceKurulumu,
+  KurulumZatenSuruyorError,
+} from "./provisioning";
 
 function admin() {
   requireAuthMock.mockResolvedValue({
@@ -598,5 +613,113 @@ describe("üretimde simülasyon YASAK (#179)", () => {
 
     const res = await provisionGitHubWorkspace("ap-1");
     expect(res.simulated).toBe(false);
+  });
+});
+
+/**
+ * Kurulum artık HTTP isteğinde BEKLENMİYOR.
+ *
+ * Öncesi tüm zincir (adım başına AI + issue başına GitHub çağrısı) tek istekte
+ * seri koşuyordu ve platformun istek zaman aşımına çarpabiliyordu.
+ */
+describe("baslatGitHubWorkspaceKurulumu — arka plana alma", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    arkaPlanIsleri.length = 0;
+    admin();
+    configMock.mockReturnValue(null); // simülasyon yolu
+    prismaMock.assignedProject.update.mockResolvedValue({});
+  });
+
+  /** Başlatma katmanının gördüğü hafif atama kaydı. */
+  function atama(githubStatus = "NOT_PROVISIONED", adimVar = true) {
+    prismaMock.assignedProject.findUnique.mockResolvedValue({
+      id: "ap-1",
+      githubStatus,
+      roadmap: adimVar ? { steps: [{ id: "s1" }] } : { steps: [] },
+    });
+  }
+
+  it("hemen döner — asıl iş İSTEK İÇİNDE koşmaz", async () => {
+    atama();
+
+    const sonuc = await baslatGitHubWorkspaceKurulumu("ap-1", false);
+
+    expect(sonuc.started).toBe(true);
+    // Kritik: AI ve GitHub çağrıları henüz YAPILMAMIŞ olmalı.
+    expect(genIssuesMock).not.toHaveBeenCalled();
+    expect(arkaPlanIsleri).toHaveLength(1);
+  });
+
+  it("durumu hemen PROVISIONING yapar (panel 'kuruluyor' gösterebilsin)", async () => {
+    atama();
+
+    await baslatGitHubWorkspaceKurulumu("ap-1", false);
+
+    expect(prismaMock.assignedProject.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { githubStatus: "PROVISIONING" } }),
+    );
+  });
+
+  it("arka plan işi tetiklenince AI üretimi gerçekten çalışır", async () => {
+    atama();
+    // Arka planda `isiYurut` atamayı tam haliyle yeniden yükler.
+    prismaMock.assignedProject.findUnique.mockResolvedValue({
+      id: "ap-1",
+      githubStatus: "NOT_PROVISIONED",
+      githubRepoUrl: null,
+      studentProfile: { user: { name: "Ali" }, experienceLevel: "BEGINNER" },
+      projectTemplate: { title: "Proje" },
+      roadmap: { steps: [{ id: "s1", title: "Adım", description: "d", issues: [] }] },
+    });
+    prismaMock.stepIssue.count.mockResolvedValue(0);
+    prismaMock.stepIssue.findMany.mockResolvedValue([]);
+    prismaMock.roadmapStep.update.mockResolvedValue({});
+
+    await baslatGitHubWorkspaceKurulumu("ap-1", false);
+    await arkaPlanIsleri[0]!();
+
+    expect(genIssuesMock).toHaveBeenCalled();
+  });
+
+  it("kurulum SÜRERKEN ikinci başlatma reddedilir", async () => {
+    // Aynı repoya paralel yazma olurdu.
+    atama("PROVISIONING");
+
+    await expect(baslatGitHubWorkspaceKurulumu("ap-1", false)).rejects.toBeInstanceOf(
+      KurulumZatenSuruyorError,
+    );
+    expect(arkaPlanIsleri).toHaveLength(0);
+    expect(prismaMock.assignedProject.update).not.toHaveBeenCalled();
+  });
+
+  it("yetkisizse hiçbir şey başlatılmaz", async () => {
+    requireAuthMock.mockResolvedValue({ authorized: false });
+
+    await expect(baslatGitHubWorkspaceKurulumu("ap-1", false)).rejects.toThrow();
+    expect(prismaMock.assignedProject.findUnique).not.toHaveBeenCalled();
+    expect(arkaPlanIsleri).toHaveLength(0);
+  });
+
+  it("yol haritası yoksa İSTEK İÇİNDE reddedilir (arka planda sessizce ölmez)", async () => {
+    atama("NOT_PROVISIONED", false);
+
+    await expect(baslatGitHubWorkspaceKurulumu("ap-1", false)).rejects.toThrow(/Roadmap/);
+    expect(arkaPlanIsleri).toHaveLength(0);
+  });
+
+  it("arka plan işi patlarsa hata YUTULUR (yakalanmamış red üretmez)", async () => {
+    atama();
+    prismaMock.assignedProject.findUnique.mockResolvedValueOnce({
+      id: "ap-1",
+      githubStatus: "NOT_PROVISIONED",
+      roadmap: { steps: [{ id: "s1" }] },
+    });
+    // İkinci yükleme (arka planda) null → isiYurut fırlatır.
+    prismaMock.assignedProject.findUnique.mockResolvedValue(null);
+
+    await baslatGitHubWorkspaceKurulumu("ap-1", false);
+
+    await expect(arkaPlanIsleri[0]!()).resolves.toBeUndefined();
   });
 });

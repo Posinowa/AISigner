@@ -5,7 +5,8 @@ const { requireAuthMock, prismaMock } = vi.hoisted(() => ({
   prismaMock: {
     user: { findMany: vi.fn() },
     studentProfile: { findMany: vi.fn(), findUnique: vi.fn() },
-    message: { findFirst: vi.fn(), count: vi.fn() },
+    message: { groupBy: vi.fn() },
+    $queryRaw: vi.fn(),
   },
 }));
 vi.mock("@/lib/auth/guard", () => ({
@@ -27,8 +28,8 @@ const admin = { id: "admin-1", name: "Yönetici", lastName: null, role: "ADMIN" 
 describe("messages/conversations (#158)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    prismaMock.message.findFirst.mockResolvedValue(null);
-    prismaMock.message.count.mockResolvedValue(0);
+    prismaMock.$queryRaw.mockResolvedValue([]);
+    prismaMock.message.groupBy.mockResolvedValue([]);
     prismaMock.user.findMany.mockResolvedValue([]);
     prismaMock.studentProfile.findMany.mockResolvedValue([]);
     prismaMock.studentProfile.findUnique.mockResolvedValue(null);
@@ -104,9 +105,10 @@ describe("messages/conversations (#158)", () => {
       { user: { id: "eski", name: "Eski", lastName: null, role: "STUDENT" } },
       { user: { id: "yeni", name: "Yeni", lastName: null, role: "STUDENT" } },
     ]);
-    prismaMock.message.findFirst
-      .mockResolvedValueOnce({ id: "m1", content: "a", senderId: "eski", createdAt: new Date("2026-01-01"), isRead: true })
-      .mockResolvedValueOnce({ id: "m2", content: "b", senderId: "yeni", createdAt: new Date("2026-06-01"), isRead: true });
+    prismaMock.$queryRaw.mockResolvedValue([
+      { partnerId: "eski", id: "m1", content: "a", senderId: "eski", createdAt: new Date("2026-01-01"), isRead: true },
+      { partnerId: "yeni", id: "m2", content: "b", senderId: "yeni", createdAt: new Date("2026-06-01"), isRead: true },
+    ]);
 
     const json = await (await GET()).json();
 
@@ -119,9 +121,10 @@ describe("messages/conversations (#158)", () => {
       { user: { id: "bos", name: "Bos", lastName: null, role: "STUDENT" } },
       { user: { id: "dolu", name: "Dolu", lastName: null, role: "STUDENT" } },
     ]);
-    prismaMock.message.findFirst
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({ id: "m1", content: "a", senderId: "dolu", createdAt: new Date("2026-06-01"), isRead: false });
+    // "bos" için satır YOK — DISTINCT ON yalnız mesajı olan partnerleri döndürür.
+    prismaMock.$queryRaw.mockResolvedValue([
+      { partnerId: "dolu", id: "m1", content: "a", senderId: "dolu", createdAt: new Date("2026-06-01"), isRead: false },
+    ]);
 
     const json = await (await GET()).json();
 
@@ -134,12 +137,53 @@ describe("messages/conversations (#158)", () => {
     prismaMock.studentProfile.findMany.mockResolvedValue([
       { user: { id: "ogrenci-1", name: "Ali", lastName: null, role: "STUDENT" } },
     ]);
+    prismaMock.message.groupBy.mockResolvedValue([
+      { senderId: "ogrenci-1", _count: { _all: 3 } },
+    ]);
+
+    const json = await (await GET()).json();
+
+    expect(prismaMock.message.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        by: ["senderId"],
+        where: expect.objectContaining({ receiverId: "mentor-1", isRead: false }),
+      }),
+    );
+    expect(json.conversations[0].unreadCount).toBe(3);
+  });
+
+  // REGRESYON: bu uç partner başına 2 sorgu atıyordu. ADMIN için partner listesi
+  // TÜM kullanıcılar olduğundan 500 kullanıcı = 1000 eşzamanlı sorgu demekti ve
+  // Prisma bağlantı havuzunu tıkıyordu. Sorgu sayısı partner sayısından BAĞIMSIZ
+  // olmalı — aksi halde N+1 sessizce geri gelir.
+  it("sorgu sayısı partner sayısıyla BÜYÜMEZ", async () => {
+    authAs("admin-1", "ADMIN");
+    prismaMock.user.findMany.mockResolvedValue(
+      Array.from({ length: 50 }, (_, i) => ({
+        id: `u${i}`,
+        name: `K${i}`,
+        lastName: null,
+        role: "STUDENT",
+      })),
+    );
+
+    const json = await (await GET()).json();
+
+    expect(json.conversations).toHaveLength(50);
+    // 50 partner → yine tek $queryRaw + tek groupBy.
+    expect(prismaMock.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(prismaMock.message.groupBy).toHaveBeenCalledTimes(1);
+  });
+
+  it("hiç partner yoksa mesaj sorgusu HİÇ atılmaz", async () => {
+    authAs("ogrenci-1", "STUDENT");
+    prismaMock.studentProfile.findUnique.mockResolvedValue(null);
+    prismaMock.user.findMany.mockResolvedValue([]);
 
     await GET();
 
-    expect(prismaMock.message.count).toHaveBeenCalledWith({
-      where: { senderId: "ogrenci-1", receiverId: "mentor-1", isRead: false },
-    });
+    expect(prismaMock.$queryRaw).not.toHaveBeenCalled();
+    expect(prismaMock.message.groupBy).not.toHaveBeenCalled();
   });
 
   it("yetkisiz istekte DB'ye hiç gidilmez", async () => {

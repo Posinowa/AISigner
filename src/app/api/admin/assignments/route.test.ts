@@ -1,10 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-const { requireAuthMock, progressMock, provisionMock, updateMock } = vi.hoisted(() => ({
+const { requireAuthMock, progressMock, baslatMock } = vi.hoisted(() => ({
   requireAuthMock: vi.fn(),
   progressMock: vi.fn(),
-  provisionMock: vi.fn(),
-  updateMock: vi.fn(),
+  baslatMock: vi.fn(),
 }));
 vi.mock("@/lib/auth/guard", () => ({
   requireAuth: (...args: unknown[]) => requireAuthMock(...args),
@@ -13,9 +12,14 @@ vi.mock("@/features/admin/server/assignment-progress", () => ({
   getStudentAssignmentsProgress: (...a: unknown[]) => progressMock(...a),
 }));
 vi.mock("@/features/github/server/provisioning", () => ({
-  provisionGitHubWorkspace: (...a: unknown[]) => provisionMock(...a),
-  updateGitHubWorkspace: (...a: unknown[]) => updateMock(...a),
+  baslatGitHubWorkspaceKurulumu: (...a: unknown[]) => baslatMock(...a),
 }));
+
+/** Kurulum ikinci argümanla ayrılıyor: true = güncelleme, false = ilk kurulum. */
+const guncellemeOlarakCagrildi = () =>
+  baslatMock.mock.calls.some(([, guncelleme]) => guncelleme === true);
+const kurulumOlarakCagrildi = () =>
+  baslatMock.mock.calls.some(([, guncelleme]) => guncelleme === false);
 
 import { GET, POST } from "./route";
 
@@ -55,22 +59,27 @@ describe("admin/assignments route (#178-3)", () => {
     forbidden();
     const res = await POST(postReq({ assignmentId: "a1" }));
     expect(res.status).toBe(403);
-    expect(provisionMock).not.toHaveBeenCalled();
+    expect(baslatMock).not.toHaveBeenCalled();
   });
 
   it("POST geçersiz assignmentId → 400, provisioning çağrılmaz", async () => {
     admin();
     const res = await POST(postReq({ assignmentId: 123 }));
     expect(res.status).toBe(400);
-    expect(provisionMock).not.toHaveBeenCalled();
+    expect(baslatMock).not.toHaveBeenCalled();
   });
 
-  it("POST geçerli → provisioning çağrılır ve sonucu döner", async () => {
+  it("POST geçerli → kurulum BAŞLATILIR ve 202 döner", async () => {
     admin();
-    provisionMock.mockResolvedValue({ success: true, simulated: true });
+    baslatMock.mockResolvedValue({ started: true, simulated: true, guncelleme: false, message: "ok" });
+
     const res = await POST(postReq({ assignmentId: "a1" }));
-    expect(res.status).toBe(200);
-    expect(provisionMock).toHaveBeenCalledWith("a1");
+
+    // 202: iş kabul edildi ama BİTMEDİ. Uç artık kurulumu beklemiyor —
+    // beklemek platformun istek zaman aşımına çarpma riski taşıyordu.
+    expect(res.status).toBe(202);
+    expect(baslatMock).toHaveBeenCalledWith("a1", false);
+    expect((await res.json()).started).toBe(true);
   });
 });
 
@@ -84,8 +93,7 @@ describe("assignments POST — güncelleme ayrımı (#257)", () => {
       authorized: true,
       session: { user: { id: "a", role: "ADMIN" } },
     });
-    provisionMock.mockResolvedValue({ success: true });
-    updateMock.mockResolvedValue({ success: true });
+    baslatMock.mockResolvedValue({ started: true, simulated: true, guncelleme: false, message: "ok" });
   });
 
   const istek = (govde: unknown) =>
@@ -98,15 +106,15 @@ describe("assignments POST — güncelleme ayrımı (#257)", () => {
   it("guncelle:true güncelleme akışını çağırır", async () => {
     await POST(istek({ assignmentId: "ap-1", guncelle: true }));
 
-    expect(updateMock).toHaveBeenCalledWith("ap-1");
-    expect(provisionMock, "güncellemede ilk kurulum çağrılmamalı").not.toHaveBeenCalled();
+    expect(baslatMock).toHaveBeenCalledWith("ap-1", true);
+    expect(kurulumOlarakCagrildi(), "güncellemede ilk kurulum çağrılmamalı").toBe(false);
   });
 
   it("guncelle yoksa ilk kurulum çağrılır", async () => {
     await POST(istek({ assignmentId: "ap-1" }));
 
-    expect(provisionMock).toHaveBeenCalledWith("ap-1");
-    expect(updateMock).not.toHaveBeenCalled();
+    expect(baslatMock).toHaveBeenCalledWith("ap-1", false);
+    expect(guncellemeOlarakCagrildi()).toBe(false);
   });
 
   it.each([false, "true", 1, null])(
@@ -114,8 +122,8 @@ describe("assignments POST — güncelleme ayrımı (#257)", () => {
     async (deger) => {
       // Gevşek doğruluk kontrolü kurulu bir alanı yanlışlıkla sıfırlayabilirdi.
       await POST(istek({ assignmentId: "ap-1", guncelle: deger }));
-      expect(provisionMock).toHaveBeenCalled();
-      expect(updateMock).not.toHaveBeenCalled();
+      expect(kurulumOlarakCagrildi()).toBe(true);
+      expect(guncellemeOlarakCagrildi()).toBe(false);
     },
   );
 });

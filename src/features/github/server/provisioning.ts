@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth/guard";
 import { generateStepIssues } from "@/features/ai/server/issue-generator";
@@ -17,6 +18,28 @@ import { repoAdiUret, repoyuHazirla, milestoneHazirla, issueHazirla } from "./re
  * Tüm GitHub işlemleri idempotent olduğu için (#255) güncelleme, var olanları
  * atlayıp eksikleri tamamlamak demektir — repo kopya issue'larla dolmaz.
  */
+
+/**
+ * Kurulum zaten sürerken ikinci kez başlatılmaya çalışıldı.
+ *
+ * Ayrı bir tip: çağıran route bunu 500 (sunucu hatası) değil **409 Conflict**
+ * olarak yanıtlamalı — istek geçerli, yalnızca şu an uygun bir durum değil.
+ */
+export class KurulumZatenSuruyorError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "KurulumZatenSuruyorError";
+  }
+}
+
+/** Arka plana alınan kurulumun BAŞLATMA yanıtı (işin kendisi değil). */
+export type KurulumBaslatmaSonucu = {
+  started: true;
+  /** #178-1: true ise GitHub'da fiziksel bir şey oluşturulmayacak. */
+  simulated: boolean;
+  guncelleme: boolean;
+  message: string;
+};
 
 export type ProvisioningResult = {
   success: boolean;
@@ -86,21 +109,30 @@ function repoAdi(atama: Atama): string {
  * Yani güncelleme, var olan adımlara dokunmadan yalnızca eksikleri tamamlıyor.
  */
 async function issueIcerikleriniUret(atama: Atama): Promise<void> {
-  for (const step of atama.roadmap!.steps) {
-    const gonderilmisSayisi = await prisma.stepIssue.count({
-      where: { stepId: step.id, githubIssueUrl: { not: null } },
-    });
+  // PERFORMANS: adımlar PARALEL işleniyor.
+  //
+  // Öncesi seriydi ve her adım bir Gemini çağrısı olduğu için toplam süre adım
+  // sayısıyla doğrusal büyüyordu (5 adımlık bir yol haritası tek başına
+  // ~25 saniye). Adımlar birbirinden bağımsız: `generateStepIssues` yalnız
+  // KENDİ adımının StepIssue kayıtlarını siliyor/yazıyor, bu yüzden paralel
+  // çalışmaları çakışma üretmiyor.
+  await Promise.all(
+    atama.roadmap!.steps.map(async (step) => {
+      const gonderilmisSayisi = await prisma.stepIssue.count({
+        where: { stepId: step.id, githubIssueUrl: { not: null } },
+      });
 
-    if (gonderilmisSayisi > 0) continue;
+      if (gonderilmisSayisi > 0) return;
 
-    await generateStepIssues({
-      stepId: step.id,
-      stepTitle: step.title,
-      stepDescription: step.description,
-      projectTitle: atama.projectTemplate.title,
-      experienceLevel: atama.studentProfile.experienceLevel,
-    });
-  }
+      await generateStepIssues({
+        stepId: step.id,
+        stepTitle: step.title,
+        stepDescription: step.description,
+        projectTitle: atama.projectTemplate.title,
+        experienceLevel: atama.studentProfile.experienceLevel,
+      });
+    }),
+  );
 }
 
 /** #178-1 davranışı: URL'ler yalnızca türetilir, GitHub'a gidilmez. */
@@ -235,19 +267,41 @@ function mesajUret(p: {
   return `GitHub çalışma alanı oluşturuldu: ${p.createdMilestonesCount} faz ve ${p.createdIssuesCount} issue.`;
 }
 
-async function senkronizeEt(
-  assignmentId: string,
-  guncelleme: boolean,
-): Promise<ProvisioningResult> {
-  // Güvenlik: requireAuth hata FIRLATMAZ, { authorized } döndürür. Dönüş değeri
-  // kontrol edilmezse bu kontrol işlevsizdir. Çağıran route zaten ADMIN
-  // kontrolü yapsa da, bu fonksiyon başka bir yerden çağrılırsa korumasız
-  // kalmasın diye burada da açıkça reddediyoruz.
+/**
+ * Yetkilendirme kapısı.
+ *
+ * requireAuth hata FIRLATMAZ, `{ authorized }` döndürür — dönüş değeri kontrol
+ * edilmezse bu kontrol işlevsizdir. Çağıran route zaten ADMIN kontrolü yapsa da,
+ * bu modül başka bir yerden çağrılırsa korumasız kalmasın diye burada da
+ * açıkça reddediyoruz.
+ */
+async function yoneticiOlduguDogrula(): Promise<void> {
   const auth = await requireAuth(["ADMIN"]);
   if (!auth.authorized) {
     throw new Error("Bu işlem için yönetici yetkisi gerekiyor");
   }
+}
 
+async function senkronizeEt(
+  assignmentId: string,
+  guncelleme: boolean,
+): Promise<ProvisioningResult> {
+  await yoneticiOlduguDogrula();
+  return isiYurut(assignmentId, guncelleme);
+}
+
+/**
+ * Asıl iş. YETKİ KONTROLÜ YAPMAZ — çağıranlar (`senkronizeEt` ve
+ * `baslatGitHubWorkspaceKurulumu`) yetkilendirmeyi kendileri yapar.
+ *
+ * Neden ayrıldı: arka planda `after()` içinde koşarken istek bağlamına (çerez/
+ * başlık) güvenmek istemiyoruz. Yetki, isteği yanıtlamadan ÖNCE doğrulanıyor;
+ * arka plan işi yalnızca o kapıdan geçmiş çağrılarla başlatılabiliyor.
+ */
+async function isiYurut(
+  assignmentId: string,
+  guncelleme: boolean,
+): Promise<ProvisioningResult> {
   const assignment = await atamayiYukle(assignmentId);
   if (!assignment) {
     throw new Error("Proje ataması bulunamadı");
@@ -368,4 +422,98 @@ export async function updateGitHubWorkspace(
   assignmentId: string,
 ): Promise<ProvisioningResult> {
   return senkronizeEt(assignmentId, true);
+}
+
+/**
+ * PERFORMANS + DAYANIKLILIK: kurulumu HTTP isteğinden çıkarır.
+ *
+ * Sorun neydi: `POST /api/admin/assignments` tüm zinciri bekliyordu — adım
+ * başına bir Gemini çağrısı, ardından repo + adım başına milestone + issue
+ * başına bir GitHub çağrısı, hepsi seri. Sıradan bir yol haritasında bu 30
+ * saniyeyi aşabiliyor; GitHub'ın yeniden deneme beklemeleri (30 sn'ye kadar)
+ * eklendiğinde platformun istek zaman aşımına çarpıyor. İstek koparsa admin
+ * hata görüyor ama iş sunucuda yarıda kalıyordu.
+ *
+ * Şimdi: doğrulama ve yetkilendirme İSTEK İÇİNDE yapılır (admin yanlış bir
+ * şey denediyse anında öğrenir), durum `PROVISIONING`'e çekilir, yanıt hemen
+ * döner ve asıl iş `after()` ile arka planda koşar.
+ *
+ * ⚠️ Süreç yeniden başlarsa (deploy) arka plan işi yarıda kalır ve atama
+ * `PROVISIONING`'de asılı kalır. Bilinçli takas: kurtarma otomatik değil,
+ * admin panelinden "Tekrar Dene" ile yapılır — ek bir kolon/migration
+ * gerektirmiyor ve admin zaten o ekranda.
+ */
+export async function baslatGitHubWorkspaceKurulumu(
+  assignmentId: string,
+  guncelleme: boolean,
+): Promise<KurulumBaslatmaSonucu> {
+  await yoneticiOlduguDogrula();
+
+  const atama = await prisma.assignedProject.findUnique({
+    where: { id: assignmentId },
+    select: {
+      id: true,
+      githubStatus: true,
+      roadmap: { select: { steps: { select: { id: true }, take: 1 } } },
+    },
+  });
+
+  if (!atama) {
+    throw new Error("Proje ataması bulunamadı");
+  }
+
+  if (!atama.roadmap || atama.roadmap.steps.length === 0) {
+    throw new Error("Bu projeye ait onaylanmış bir Roadmap ve adım bulunmuyor");
+  }
+
+  // Çift tetikleme koruması: iş zaten koşuyorken ikinci bir kurulum başlatmak
+  // aynı repoya paralel yazma demek olurdu.
+  if (atama.githubStatus === "PROVISIONING") {
+    throw new KurulumZatenSuruyorError(
+      "Bu çalışma alanı için bir kurulum zaten sürüyor. Tamamlanmasını bekleyin.",
+    );
+  }
+
+  // Yapılandırma kontrolü İSTEK İÇİNDE: eksik token'ı arka planda sessiz bir
+  // hataya çevirmek yerine admin'e anında söylüyoruz (#179 ile aynı gerekçe).
+  const config = readGitHubConfig();
+  if (config === null && process.env.NODE_ENV === "production") {
+    throw new Error(
+      "GitHub entegrasyonu yapılandırılmamış: GITHUB_TOKEN tanımlı değil. " +
+        "Üretimde önizleme modu devre dışıdır; sahte repo bağlantıları kaydedilmez.",
+    );
+  }
+  const simulated = config === null;
+
+  // Durumu hemen çeviriyoruz ki admin paneli yanıtla birlikte "kuruluyor"
+  // gösterebilsin; `isiYurut` da ayrıca yazıyor, tekrar yazması zararsız.
+  await prisma.assignedProject.update({
+    where: { id: assignmentId },
+    data: { githubStatus: "PROVISIONING" },
+  });
+
+  after(async () => {
+    try {
+      await isiYurut(assignmentId, guncelleme);
+    } catch (error) {
+      // `isiYurut` durumu zaten ERROR'a yazıp hatayı yeniden fırlatıyor.
+      // Arka planda yakalanmayan bir reddi süreç seviyesine taşımayalım.
+      logger.error("Arka plan GitHub kurulumu başarısız", {
+        assignmentId,
+        guncelleme,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  return {
+    started: true,
+    simulated,
+    guncelleme,
+    message: guncelleme
+      ? "Çalışma alanı güncellemesi başlatıldı. İşlem arka planda sürüyor."
+      : simulated
+        ? "Çalışma alanı önizlemesi hazırlanıyor. İşlem arka planda sürüyor."
+        : "GitHub çalışma alanı kurulumu başlatıldı. İşlem arka planda sürüyor.",
+  };
 }
