@@ -87,6 +87,7 @@ Out Plane konsolunda servisin **Variables** bölümüne girilir.
 | `GITHUB_TOKEN` | _(yok)_ | **#218** — Verilirse GitHub'da **gerçek** repo/milestone/issue oluşturulur. Verilmezse sistem önizleme (simülasyon) modunda kalır: bağlantılar türetilir ama GitHub'da hiçbir şey yaratılmaz. Gerekli yetkiler aşağıda. |
 | `GITHUB_ORG` | `Posinowa` | GitHub çalışma alanı URL'lerinde kullanılan org. **Tanımlı ama boş bırakılırsa** entegrasyon bilerek devre dışı kalır — sessizce varsayılana düşmek yanlış hesapta repo açmaya yol açabilir. |
 | `PORT` | `3000` | Platform farklı bir port dayatıyorsa. |
+| `ERROR_ALERT_EMAIL` | _(yok)_ | **#316** — Üretimdeki yakalanmamış sunucu hatalarının bildirileceği operatör adresi. **Tanımsızsa özellik kapalıdır.** SMTP'ye bağımlıdır: `sendMail` hata fırlatmadığı için SMTP eksikse bildirim de sessizce gitmez (gönderim sonucu loglanır). Aynı hata en fazla 15 dk'da bir bildirilir; aradaki tekrarlar sayılıp bir sonraki iletide raporlanır — susturma olmadan bir hata seli SMTP hesabınızı kısıtlatabilir. |
 | `GIT_COMMIT_SHA` | _(yok)_ | **#10** — `/api/health`'in `version` alanı. Deploy sonrası "yeni sürüm gerçekten yayında mı?" kontrolünü (§8.5) anlamlı kılan tek şey. Platform commit SHA'sını başka bir adla veriyorsa (`RAILWAY_GIT_COMMIT_SHA`, `SOURCE_COMMIT`) route onları da okur. Hiçbiri yoksa imaj build'inde `--build-arg APP_VERSION=<sha>` geçilebilir; o da yoksa `version` **"bilinmiyor"** döner. |
 
 ### GitHub token yetkileri (#218)
@@ -331,3 +332,31 @@ curl -s https://<alan-adi>/api/health
       çalışma-anı değişkenini girin ya da imajı `--build-arg APP_VERSION=<sha>` ile kurun.
       Damga olmadan bu kontrol hiçbir şey doğrulamaz.
 - [ ] `uptimeSeconds` küçük (yeniden başlatıldığını doğrular)
+
+---
+
+## 9. 🔔 Hata bildirimi (#316)
+
+Loglar üretimde yapısal JSON (§bkz. `lib/logger.ts`) — yani *aranabilir*. Ama **log
+yazmak ile haberdar olmak aynı şey değil**: birinin bakması gerekir. Bu yüzden
+yakalanmamış sunucu hataları ayrıca e-posta ile bildirilir
+(`src/instrumentation.ts` → `lib/error-alerts.ts`).
+
+**Açmak için:** `ERROR_ALERT_EMAIL` girin (SMTP zaten yapılandırılmış olmalı).
+Tanımsızsa özellik kapalıdır ve uygulama hiçbir şekilde etkilenmez.
+
+**Doğrulama:** aşağıdaki uç kasıtlı olarak yoktur, bu yüzden 404 döner ve bildirim
+üretmez. Gerçek doğrulama için deploy sonrası bir hata oluştuğunda kutunuzu kontrol
+edin; ya da geçici olarak `ERROR_ALERT_EMAIL`'i kendi adresinize alıp bilinen bir
+hatayı tetikleyin.
+
+- [ ] `ERROR_ALERT_EMAIL` tanımlı ve okunan bir kutuya gidiyor
+- [ ] SMTP çalışıyor (§2'deki test kaydı akışı ile teyit edilmiş olmalı)
+
+> ⚠️ **Susturma tek instance içindir.** Sayaçlar bellekte (`rate-limit.ts` ve
+> `metrics.ts` ile aynı kısıt). Çok instance çalıştırılırsa her instance kendi
+> susturmasını uygular; bildirim sayısı instance sayısıyla çarpılır.
+
+> ⚠️ **Bildirim e-postası yığın izi taşır.** Yığın izi ve hata mesajı kullanıcı
+> verisi içerebilir. Adresin operatöre ait, erişimi sınırlı bir kutu olduğundan
+> emin olun. Sorgu dizesi bilerek bildirime konmaz (PII sıklıkla oradadır).

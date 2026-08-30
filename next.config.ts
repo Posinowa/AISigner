@@ -16,6 +16,16 @@ const nextConfig: NextConfig = {
   serverExternalPackages: [
     "@google-cloud/vertexai",
     "google-auth-library",
+    // #316: nodemailer `net`/`tls`/`os`/`stream` gibi Node çekirdek modüllerini
+    // kullanıyor. `instrumentation.ts` üzerinden bildirim zincirine girdiği için
+    // Next onu Node dışı derlemelere de sokmaya çalışıyor ve bu, DEV modunda
+    // istemci paketini komple kırıyor (layout.css / main-app.js 404, MIME
+    // text/plain). Buraya eklemek paketlemeyi tamamen devre dışı bırakıp
+    // çalışma anında native require kullandırıyor.
+    //
+    // NOT: `npm run build` bu sorunu YAKALAMIYOR — üretim derlemesi geçiyor,
+    // kırılan yalnız dev. Bu yüzden sayfa yüklemeden "çalışıyor" demeyin.
+    "nodemailer",
   ],
   async headers() {
     return [
