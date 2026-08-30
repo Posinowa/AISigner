@@ -81,6 +81,25 @@ export default function AdminAssignmentsPage() {
   // milestone/issue oluşmuyor.
   const [guncellenenId, setGuncellenenId] = useState<string | null>(null);
 
+  // Kurulum artık arka planda koşuyor (uç 202 dönüyor). İlerlemeyi
+  // `githubStatus` üzerinden izliyoruz: PROVISIONING olan bir atama varsa
+  // listeyi düzenli tazele, hepsi bitince yoklamayı durdur.
+  //
+  // Sayfa yenilendiğinde de çalışır: sürmekte olan bir kurulum varsa yoklama
+  // kendiliğinden başlar.
+  const kuruluyorVar = assignments.some((a) => a.githubStatus === "PROVISIONING");
+
+  useEffect(() => {
+    if (!kuruluyorVar) return;
+
+    const zamanlayici = setInterval(() => {
+      // Sekme arka plandayken boşuna istek atma.
+      if (document.visibilityState === "visible") loadData();
+    }, 4000);
+
+    return () => clearInterval(zamanlayici);
+  }, [kuruluyorVar]);
+
   // #218: Admin hangi modda olduğunu ÖNCEDEN bilmeli. Aksi halde
   // "Oluşturuldu" mesajını görüp GitHub'da gerçek repo bekliyor, 404 buluyor.
   const [gercekEntegrasyon, setGercekEntegrasyon] = useState<boolean | null>(null);
@@ -106,8 +125,9 @@ export default function AdminAssignmentsPage() {
         throw new Error(data.error || "Çalışma alanı güncellenemedi");
       }
 
+      // 202: iş kabul edildi, henüz bitmedi. "Güncellendi" demek yanıltıcı olur.
       toast.success(
-        data.simulated ? "Önizleme Güncellendi" : "Çalışma Alanı Güncellendi",
+        data.simulated ? "Önizleme Güncellemesi Başlatıldı" : "Güncelleme Başlatıldı",
         { description: data.message },
       );
       await loadData();
@@ -136,10 +156,13 @@ export default function AdminAssignmentsPage() {
       }
 
       // #218: Simülasyonda "oluşturuldu" demek yanıltıcı olurdu.
+      // Ayrıca iş artık ARKA PLANDA koşuyor: yanıt geldiğinde henüz bitmiş
+      // değil, bu yüzden geçmiş zaman kullanmıyoruz. Sonuç `githubStatus`
+      // üzerinden izleniyor.
       toast.success(
         data.simulated
-          ? "Çalışma Alanı Önizlemesi Hazırlandı"
-          : "GitHub Çalışma Alanı Başarıyla Oluşturuldu!",
+          ? "Çalışma Alanı Önizlemesi Hazırlanıyor"
+          : "GitHub Çalışma Alanı Kurulumu Başlatıldı",
         { description: data.message },
       );
       setSelectedAssignment(null);
@@ -404,7 +427,15 @@ export default function AdminAssignmentsPage() {
 
                     {/* GitHub Aksiyon */}
                     <td className="py-4 px-6 text-right">
-                      {item.githubStatus === "PROVISIONED" && item.githubRepoUrl ? (
+                      {item.githubStatus === "PROVISIONING" ? (
+                        // İş arka planda koşuyor. Buton YOK: ikinci bir kurulum
+                        // tetiklemek aynı repoya paralel yazma demek olurdu
+                        // (uç da bunu 400 ile reddediyor).
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-200/60 text-xs font-semibold">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          Kuruluyor...
+                        </span>
+                      ) : item.githubStatus === "PROVISIONED" && item.githubRepoUrl ? (
                         <div className="inline-flex items-center gap-2">
                           <button
                             onClick={() => handleWorkspaceGuncelle(item.assignmentId)}
@@ -429,12 +460,34 @@ export default function AdminAssignmentsPage() {
                           </a>
                         </div>
                       ) : item.roadmapStatus === "PUBLISHED" || item.totalSteps > 0 ? (
+                        // ERROR: arka plan işi başarısız oldu YA DA süreç
+                        // yeniden başladığı için yarıda kaldı. Kurtarma
+                        // bilinçli olarak elle: admin burada tekrar dener.
+                        // (Kurulum idempotent — tekrar denemek kopya üretmez.)
                         <button
                           onClick={() => setSelectedAssignment(item)}
-                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold transition shadow-sm"
+                          className={
+                            item.githubStatus === "ERROR"
+                              ? "inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 text-xs font-semibold transition"
+                              : "inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold transition shadow-sm"
+                          }
+                          title={
+                            item.githubStatus === "ERROR"
+                              ? "Önceki kurulum tamamlanamadı. Tekrar denemek kopya oluşturmaz."
+                              : undefined
+                          }
                         >
-                          <Sparkles className="w-3.5 h-3.5" />
-                          GitHub Workspace Oluştur
+                          {item.githubStatus === "ERROR" ? (
+                            <>
+                              <AlertCircle className="w-3.5 h-3.5" />
+                              Kurulum Başarısız — Tekrar Dene
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="w-3.5 h-3.5" />
+                              GitHub Workspace Oluştur
+                            </>
+                          )}
                         </button>
                       ) : (
                         <span className="text-xs text-slate-400 italic">

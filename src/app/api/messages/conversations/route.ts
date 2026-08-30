@@ -68,42 +68,85 @@ export async function GET() {
       conversationPartners = [...conversationPartners, ...admins];
     }
 
-    // Her partner için son mesaj ve okunmamış sayısı
-    const conversations = await Promise.all(
-      conversationPartners.map(async (partner) => {
-        const [lastMessage, unreadCount] = await Promise.all([
-          prisma.message.findFirst({
-            where: {
-              OR: [
-                { senderId: userId, receiverId: partner.id },
-                { senderId: partner.id, receiverId: userId },
-              ],
-            },
-            orderBy: { createdAt: "desc" },
-            select: {
-              id: true,
-              content: true,
-              senderId: true,
-              createdAt: true,
-              isRead: true,
-            },
-          }),
-          prisma.message.count({
-            where: {
-              senderId: partner.id,
-              receiverId: userId,
-              isRead: false,
-            },
-          }),
-        ]);
+    /*
+     * PERFORMANS (N+1 giderildi):
+     *
+     * Öncesi her konuşma partneri için AYRI iki sorgu atıyordu (son mesaj +
+     * okunmamış sayısı), hepsi `Promise.all` ile aynı anda. ADMIN için partner
+     * listesi TÜM kullanıcılar olduğundan 500 kullanıcı = 1000 eşzamanlı sorgu
+     * demekti. Prisma'nın bağlantı havuzu küçüktür (varsayılan ~cpu×2+1), yani
+     * bu sorgular havuzu tıkayıp yalnız bu ucu değil, o an gelen HER isteği
+     * yavaşlatıyordu.
+     *
+     * Artık partner sayısından BAĞIMSIZ olarak iki sorgu:
+     *   1) partner başına son mesaj  → Postgres `DISTINCT ON`
+     *   2) partner başına okunmamış  → tek `groupBy`
+     */
+    const partnerIdleri = conversationPartners.map((p) => p.id);
 
-        return {
-          partner,
-          lastMessage,
-          unreadCount,
-        };
-      })
+    type SonMesajSatiri = {
+      partnerId: string;
+      id: string;
+      content: string;
+      senderId: string;
+      createdAt: Date;
+      isRead: boolean;
+    };
+
+    // DISTINCT ON: her partner için yalnızca en yeni satırı döndürür. Prisma'nın
+    // sorgu kurucusunda karşılığı yok, bu yüzden ham SQL. Parametreler
+    // $queryRaw ile bağlanıyor (SQL enjeksiyonu yok) — şablon literali
+    // interpolasyonu Prisma tarafından parametreye çevriliyor.
+    const sonMesajlar =
+      partnerIdleri.length === 0
+        ? []
+        : await prisma.$queryRaw<SonMesajSatiri[]>`
+            SELECT DISTINCT ON ("partnerId")
+                   "partnerId", "id", "content", "senderId", "createdAt", "isRead"
+            FROM (
+              SELECT CASE WHEN "senderId" = ${userId} THEN "receiverId" ELSE "senderId" END AS "partnerId",
+                     "id", "content", "senderId", "createdAt", "isRead"
+              FROM "Message"
+              WHERE "senderId" = ${userId} OR "receiverId" = ${userId}
+            ) AS konusmalar
+            WHERE "partnerId" = ANY(${partnerIdleri})
+            ORDER BY "partnerId", "createdAt" DESC
+          `;
+
+    // Okunmamışlar: gönderene göre tek gruplama. @@index([receiverId, isRead])
+    // bu sorguyu doğrudan karşılıyor.
+    const okunmamisGruplari =
+      partnerIdleri.length === 0
+        ? []
+        : await prisma.message.groupBy({
+            by: ["senderId"],
+            where: { receiverId: userId, isRead: false, senderId: { in: partnerIdleri } },
+            _count: { _all: true },
+          });
+
+    const sonMesajHaritasi = new Map(sonMesajlar.map((m) => [m.partnerId, m]));
+    const okunmamisHaritasi = new Map(
+      okunmamisGruplari.map((g) => [g.senderId, g._count._all]),
     );
+
+    // Hiç mesajlaşılmamış partnerler de listede kalmalı (lastMessage: null) —
+    // admin/mentör yeni bir konuşma başlatabilsin.
+    const conversations = conversationPartners.map((partner) => {
+      const satir = sonMesajHaritasi.get(partner.id);
+      return {
+        partner,
+        lastMessage: satir
+          ? {
+              id: satir.id,
+              content: satir.content,
+              senderId: satir.senderId,
+              createdAt: satir.createdAt,
+              isRead: satir.isRead,
+            }
+          : null,
+        unreadCount: okunmamisHaritasi.get(partner.id) ?? 0,
+      };
+    });
 
     // Son mesaja göre sırala (en son mesajı olan en üstte)
     conversations.sort((a, b) => {
