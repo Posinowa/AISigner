@@ -38,10 +38,13 @@ Kaynak dosyaları baştan taramak yerine önce burayı okuyun.
 src/
 ├── app/
 │   ├── (admin)/admin-dashboard/          — kullanıcı/rol/mentor/onay yönetimi + projects
-│   ├── (auth)/signin|signup|forgot-password|signout/
+│   ├── (auth)/signin|signup|forgot-password|reset-password|signout/
 │   ├── (mentor)/mentor-dashboard/        — öğrenci detay + roadmap yönetimi
+│   ├── (mentor)/mentor-profile-setup/    — mentör başvuru soruları (#287, PENDING iken)
 │   ├── (student)/student-dashboard|profile-setup|student-onboarding/
 │   ├── account-status/                   — PENDING/REJECTED stajyer ekranı (#39)
+│   ├── terms|privacy/                    — public hukuki metinler (#171)
+│   ├── verify-certificate/[no]/          — public sertifika doğrulama (#208)
 │   └── api/  — admin/(users|approval|project-templates|survey-questions|students/analysis),
 │              auth/, mentor/, student/(ai-chat|steps|survey-answers), steps/, messages/
 ├── features/
@@ -60,7 +63,12 @@ src/
     ├── validations/api.ts                — tüm Zod şemaları (github URL'leri dahil)
     ├── rate-limit.ts (peek/check/reset) · logger.ts · metrics.ts · experience-level.ts
     ├── file-signature.ts                 — upload magic-byte doğrulaması (#113)
-    └── api-error-message.ts              — string/fieldErrors → tek mesaj (#114)
+    ├── api-error-message.ts              — string/fieldErrors → tek mesaj (#114)
+    ├── client-ip.ts                      — rate-limit için GÜVENİLİR istemci IP (#308)
+    ├── security-headers.ts               — CSP + güvenlik başlıkları (#310)
+    ├── mail.ts                           — SMTP gönderici; yapılandırma yoksa ÇÖKMEZ (#241)
+    ├── auth/verification-token.ts        — e-posta doğrulama, durumsuz HMAC (#247)
+    └── auth/reset-token.ts               — şifre sıfırlama, durumsuz HMAC (#262)
 ```
 
 ## Veritabanı Modelleri (özet)
@@ -76,7 +84,9 @@ src/
 | `SurveyQuestion` / `SurveyAnswer` | admin anket havuzu + stajyer cevapları (#45/#46) |
 | `ProfileAnalysis` | AI profil analizinin kalıcı hali, profile 1-1 (#47) |
 | `Suggestion` | Stajyer→admin öneri/istek; type + status + adminNote (#147) |
-| `Message` / `StepComment` / `StepFile` / `SecurityAnswer` | mesajlaşma, yorum, dosya, güvenlik soruları |
+| `MentorProfile` / `MentorAnalysis` | mentör başvuru profili + AI eşleştirme analizi (#287/#288) |
+| `StepIssue` | adım ↔ GitHub issue eşlemesi (#218) |
+| `Message` / `StepComment` / `StepFile` | mesajlaşma, yorum, dosya (`SecurityAnswer` #264'te düşürüldü) |
 
 ## Kritik Mimari Notlar
 
@@ -85,6 +95,25 @@ src/
 2. JWT callback **her istekte** rol + accountStatus'u DB'den tazeler → admin değişikliği aktif oturuma hemen yansır (#44).
 3. `requireAuth`: rol kontrolü + APPROVED olmayan STUDENT'a 403.
 4. Middleware: onaysız stajyeri `/account-status`'a yönlendirir; `/forgot-password` public.
+
+#### ⚠️ Oturum çerezi adını ELLE VERMEYİN (#308 — canlıyı kırdı)
+`authOptions.cookies.sessionToken.name` sabitlenmişti; `middleware.ts` ise oturumu
+`getToken()` ile okuyor ve NextAuth v4 çerez adını `NEXTAUTH_URL`'e bakarak seçiyor
+(https ⇒ `__Secure-` önekli). Sonuç: **HTTPS'te giriş yapan herkes /signin'e geri
+atılıyordu**, lokalde (http) hiç görünmüyordu. Adı NextAuth'a bırakın — regresyon
+testi `nextauth.test.ts`'te.
+
+#### ⚠️ E-posta doğrulaması ONAYIN ön koşuludur (#310)
+`emailVerified` artık dekoratif değil: `updateAccountStatus` bir hesabı **APPROVED**
+yapmadan önce doğrulanmış olmasını şart koşar. Kapı bilerek **yalnız APPROVED'da** —
+`PENDING`/`REJECTED`'a dönüş serbest (admin hatalı onayı geri alabilmeli). Girişe
+kapı KONMADI: SMTP sessizce çökebildiği için (`mail.ts` hata fırlatmaz) herkesi
+kilitleme riski var. `create:admin` ve `seed` doğrulanmış hesap üretir.
+
+#### ⚠️ Rate-limit IP'si sağdan okunur (#308)
+`X-Forwarded-For`'un **en solu istemcinin uydurduğudur** (vekil ekleme yapar, silme
+değil). `lib/client-ip.ts` sağdan `TRUSTED_PROXY_HOPS` kadar sayar. Bu dosyayı
+atlayıp doğrudan başlık okumayın — limitler atlatılabilir hale gelir.
 
 #### ⚠️ PENDING profil-tamamlama sözleşmesi (#143 — bozmayın)
 Stajyer **PENDING iken profilini tamamlar**; onay bu adımdan *sonra* gelir. Bu yüzden
@@ -151,6 +180,8 @@ npm run dev / build / lint / test
 npm run seed          # idempotent demo verisi (kullanıcılar + şablonlar)
 npm run test:ai       # Vertex AI bağlantı testi (.env gerekli)
 npm run check:migrations   # yıkıcı migration guard (#198, CI'da zorunlu)
+npm run create:admin       # ilk yöneticiyi env'den güvenle oluşturur (#206)
+npm run typecheck          # tsc --noEmit (CI'da zorunlu, #160)
 npx prisma migrate dev --name <ad>   # yeni şema değişikliği (db push kullanmayın)
 docker compose up -d  # db (+app) — uploads kalıcı volume'da
 ```
@@ -168,6 +199,23 @@ docker compose up -d  # db (+app) — uploads kalıcı volume'da
 
 ---
 
-*Son güncelleme: Ağustos 2026 — #208 Mezuniyet sertifikası, doğrulama sayfası ve salt-okunur mezun portfolyo erişimi*
+## Dağıtım (özet — detay `DEPLOYMENT.md`)
+
+- Docker imajı **standalone** çıktı kullanır; runner'da `npm install` YOK. Prisma CLI
+  migration için imaja ayrıca kopyalanır, entrypoint `node server.js` ile başlar (#10).
+- `AUTH_SECRET` tek sırdır — **`NEXTAUTH_SECRET` diye bir değişken YOKTUR**. Oturum,
+  e-posta doğrulama ve şifre sıfırlama token'larının üçü de bununla imzalanır;
+  rotasyonu tüm oturumları ve bekleyen bağlantıları geçersiz kılar.
+- `TRUSTED_PROXY_HOPS` platformun vekil sayısıyla uyuşmalı, yoksa rate-limit atlatılır.
+- Üretim CSP'sinde `'unsafe-eval'` yoktur (`lib/security-headers.ts`); `'unsafe-inline'`
+  Next hydration için bilerek durur — kaldırmak nonce + zorunlu dinamik render demek.
+- Yedekleme/rollback prosedürü: `DEPLOYMENT.md §8`. Yıkıcı migration rollback'i imkânsız
+  kılar → expand/contract (`docs/MIGRATIONS.md`).
+
+---
+
+*Son güncelleme: Ağustos 2026 — #308/#310 canlıya çıkış hazırlığı: oturum çerezi
+bloker'ı, güvenilir istemci IP'si, e-posta doğrulamasının onaya bağlanması, üretim
+CSP'si, standalone Docker imajı ve yedekleme/rollback prosedürü*
 
 

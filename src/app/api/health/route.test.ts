@@ -1,30 +1,55 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-const { prismaMock } = vi.hoisted(() => ({
-  prismaMock: { $queryRaw: vi.fn() },
+const { queryRawMock, loggerErrorMock } = vi.hoisted(() => ({
+  queryRawMock: vi.fn(),
+  loggerErrorMock: vi.fn(),
 }));
-vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
+vi.mock("@/lib/db", () => ({ prisma: { $queryRaw: queryRawMock } }));
+vi.mock("@/lib/logger", () => ({ logger: { error: loggerErrorMock } }));
 
-import { GET } from "./route";
+import { GET, dynamic, revalidate } from "./route";
 
-describe("health route (#189)", () => {
+describe("GET /api/health", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("DB erişilebilirse → 200 status:ok", async () => {
-    prismaMock.$queryRaw.mockResolvedValue([{ "?column?": 1 }]);
+  it("DB erişilebilirken 200 + sürüm/uptime döner", async () => {
+    queryRawMock.mockResolvedValue([{ "?column?": 1 }]);
+
     const res = await GET();
-    const json = await res.json();
+    const govde = await res.json();
+
     expect(res.status).toBe(200);
-    expect(json.status).toBe("ok");
+    expect(govde.status).toBe("ok");
+    expect(govde.db).toBe("connected");
+    // Deploy sonrası "yeni sürüm gerçekten yayında mı?" sorusunu yanıtlayan alanlar.
+    expect(govde).toHaveProperty("version");
+    expect(typeof govde.uptimeSeconds).toBe("number");
   });
 
-  it("DB hatasında → 500 status:error", async () => {
-    prismaMock.$queryRaw.mockRejectedValue(new Error("connection refused"));
+  it("DB düştüğünde 500 döner", async () => {
+    queryRawMock.mockRejectedValue(new Error("connect ECONNREFUSED 10.0.0.5:5432"));
+
     const res = await GET();
-    const json = await res.json();
+
     expect(res.status).toBe(500);
-    expect(json.status).toBe("error");
-    // ham hata mesajı sızmamalı
-    expect(JSON.stringify(json)).not.toContain("connection refused");
+    expect((await res.json()).db).toBe("disconnected");
+  });
+
+  it("DB hatasının DETAYINI yanıta SIZDIRMAZ (yalnız loglar)", async () => {
+    // Bağlantı hataları host/port, bazen kimlik bilgisi taşır. Sağlık ucu
+    // genelde kimlik doğrulamasızdır — gövdeye konmamalı.
+    queryRawMock.mockRejectedValue(new Error("connect ECONNREFUSED 10.0.0.5:5432"));
+
+    const res = await GET();
+    const ham = JSON.stringify(await res.json());
+
+    expect(ham).not.toContain("ECONNREFUSED");
+    expect(ham).not.toContain("10.0.0.5");
+    expect(loggerErrorMock).toHaveBeenCalledOnce();
+  });
+
+  it("önbelleklenmez — önbellekli 'ok', DB düştüğünde yalan söylerdi", () => {
+    expect(dynamic).toBe("force-dynamic");
+    expect(revalidate).toBe(0);
   });
 });

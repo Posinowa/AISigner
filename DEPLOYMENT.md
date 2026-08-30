@@ -12,7 +12,7 @@ benzeri bir PaaS üzerinde **güvenli** biçimde canlıya almak içindir.
 | Bileşen | Değer |
 |---|---|
 | Runtime | Node 20 (Docker imajı: `node:20-bookworm-slim`) |
-| Uygulama | Next.js 15 standalone, port **3000** |
+| Uygulama | Next.js 15 **standalone** çıktısı (`node server.js`), port **3000**. İmaj ~970 MB; runner'da `npm install` yoktur. Migration için Prisma CLI ayrı bir katmanda `/app/.migrator` altında taşınır. |
 | Veritabanı | PostgreSQL 14–18, **SSL zorunlu** |
 | AI (opsiyonel) | Google Vertex AI / Gemini — kimlik JSON'u env'den |
 | Dosya yükleme | Yerel disk `/app/uploads` (kalıcılık için Volume gerekir) |
@@ -87,6 +87,7 @@ Out Plane konsolunda servisin **Variables** bölümüne girilir.
 | `GITHUB_TOKEN` | _(yok)_ | **#218** — Verilirse GitHub'da **gerçek** repo/milestone/issue oluşturulur. Verilmezse sistem önizleme (simülasyon) modunda kalır: bağlantılar türetilir ama GitHub'da hiçbir şey yaratılmaz. Gerekli yetkiler aşağıda. |
 | `GITHUB_ORG` | `Posinowa` | GitHub çalışma alanı URL'lerinde kullanılan org. **Tanımlı ama boş bırakılırsa** entegrasyon bilerek devre dışı kalır — sessizce varsayılana düşmek yanlış hesapta repo açmaya yol açabilir. |
 | `PORT` | `3000` | Platform farklı bir port dayatıyorsa. |
+| `GIT_COMMIT_SHA` | _(yok)_ | **#10** — `/api/health`'in `version` alanı. Deploy sonrası "yeni sürüm gerçekten yayında mı?" kontrolünü (§8.5) anlamlı kılan tek şey. Platform commit SHA'sını başka bir adla veriyorsa (`RAILWAY_GIT_COMMIT_SHA`, `SOURCE_COMMIT`) route onları da okur. Hiçbiri yoksa imaj build'inde `--build-arg APP_VERSION=<sha>` geçilebilir; o da yoksa `version` **"bilinmiyor"** döner. |
 
 ### GitHub token yetkileri (#218)
 
@@ -242,3 +243,91 @@ done
 - [ ] Son istekler **429** dönüyor → doğru. Uydurma `X-Forwarded-For` limiti atlatamıyor.
 - [ ] Hepsi **200** dönüyor → `TRUSTED_PROXY_HOPS` yanlış. Platformun uygulamaya ulaştırdığı
       ham `X-Forwarded-For` zincirini loglayıp kaç girdi geldiğini sayın ve değeri düzeltin.
+
+---
+
+## 8. 💾 Yedekleme ve geri dönüş (backup & rollback)
+
+> Bu bölüm daha önce hiç yoktu. Yedeği olmayan bir sistemde ilk ciddi hata,
+> kurtarılamayan bir veri kaybıdır — ve bunu fark ettiğiniz an yedek almak için
+> çok geçtir. **Canlıya çıkmadan önce en az bir kez geri yükleme provası yapın.**
+
+### 8.1 Neyin yedeği alınmalı
+
+| Veri | Nerede | Kaybedilirse |
+|---|---|---|
+| **PostgreSQL** | Yönetilen DB | Her şey: kullanıcılar, yol haritaları, sertifikalar. Kurtarılamaz. |
+| **Yüklenen dosyalar** | `GCS_BUCKET` ya da `/app/uploads` | Öğrenci teslimleri. DB'deki `StepFile` satırları öksüz kalır. |
+| **Sırlar** (`AUTH_SECRET` vb.) | Platform Variables | `AUTH_SECRET` kaybolursa tüm oturumlar + bekleyen sıfırlama/doğrulama bağlantıları geçersiz olur (parolalar etkilenmez). |
+
+> ⚠️ `AUTH_SECRET`'i yedekleyin ve **rotasyonun bedelini bilin**: değiştirdiğiniz an
+> herkes sistemden atılır ve gönderilmiş tüm şifre-sıfırlama / e-posta-doğrulama
+> bağlantıları ölür (ikisi de bu sır ile HMAC imzalanıyor).
+
+### 8.2 Yedek alma
+
+Out Plane'in yönetilen Postgres'i otomatik yedek sunuyorsa **onu açın** ve saklama
+süresini not edin. Ek olarak, elle bir anlık görüntü (özellikle **her deploy öncesi**):
+
+```bash
+pg_dump --format=custom --no-owner --no-privileges \
+  "postgresql://user:pass@host:5432/aisigner?sslmode=require" \
+  > aisigner-$(date +%Y%m%d-%H%M).dump
+```
+
+Dosyalar için `GCS_BUCKET` kullanıyorsanız bucket'ta **Object Versioning**'i açın;
+yerel diskteyseniz volume anlık görüntüsü alın.
+
+### 8.3 Geri yükleme provası (canlıya çıkmadan ÖNCE, bir kez)
+
+Yedeğin var olması yetmez — geri yüklenebildiği **kanıtlanmalıdır**.
+
+```bash
+createdb aisigner_restore_test
+pg_restore --no-owner --no-privileges -d aisigner_restore_test aisigner-YYYYMMDD-HHMM.dump
+psql -d aisigner_restore_test -c 'SELECT count(*) FROM "User";'
+```
+
+- [ ] `pg_restore` hatasız tamamlandı
+- [ ] Satır sayıları canlıyla tutarlı
+- [ ] Test veritabanı sonrasında silindi
+
+### 8.4 Sürüm geri alma (rollback)
+
+**Uygulama kodu** — platformdan bir önceki imaja/deploy'a dön. Kod geri alma
+genelde güvenlidir; **tehlike şemadadır**.
+
+**Şema** — `prisma migrate deploy` ileri yönlüdür, otomatik geri alma **yoktur**.
+Bu yüzden `docs/MIGRATIONS.md`'deki **expand/contract** kuralı yalnız bir stil
+tercihi değil, rollback'i mümkün kılan şeydir:
+
+- **Yalnızca eklemeli (additive) migration** → eski kod yeni şemayla çalışmaya
+  devam eder, kodu geri almak **yeterlidir**. Güvenli durum.
+- **Yıkıcı migration** (kolon/tablo silme, rename, NOT NULL) → eski kod yeni
+  şemada **çalışmaz**. Kodu geri almak yetmez; yedekten dönmek gerekir ve
+  **migration'dan sonraki tüm veri kaybedilir**.
+
+> Bu nedenle: yıkıcı bir migration'ı **asla** aynı deploy'da göndermeyin.
+> CI'daki `check:migrations` guard'ı (#198) bunu zaten engelliyor — `-- migration-safety-ack:`
+> ile geçmeden önce yedeğinizin tazeliğini teyit edin.
+
+**Sıralama (yıkıcı olmayan deploy için):**
+
+1. Deploy öncesi `pg_dump` al.
+2. Deploy et, `/api/health`'in **200** ve `version` alanının yeni commit'i
+   gösterdiğini teyit et.
+3. Sorun varsa platformdan önceki imaja dön; şema eklemeli olduğu için müdahale gerekmez.
+4. Şema geri alınmak zorundaysa: uygulamayı durdur → yedekten geri yükle → eski imajı başlat.
+
+### 8.5 Deploy sonrası hızlı doğrulama
+
+```bash
+curl -s https://<alan-adi>/api/health
+```
+
+- [ ] `status: "ok"`, `db: "connected"`
+- [ ] `version` **beklenen commit** — eski değer görünüyorsa yeni sürüm yayına çıkmamıştır.
+      `"bilinmiyor"` görüyorsanız sürüm damgası hiç ayarlanmamış demektir: `GIT_COMMIT_SHA`
+      çalışma-anı değişkenini girin ya da imajı `--build-arg APP_VERSION=<sha>` ile kurun.
+      Damga olmadan bu kontrol hiçbir şey doğrulamaz.
+- [ ] `uptimeSeconds` küçük (yeniden başlatıldığını doğrular)

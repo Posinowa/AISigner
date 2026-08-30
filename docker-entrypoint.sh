@@ -19,10 +19,17 @@ fi
 
 # --- Şema göçleri ---
 # Prod'da güvenli: yalnızca uygulanmamış migration'ları uygular (db push/seed DEĞİL).
+# `npx` DEĞİL doğrudan yerel binary: npx, paket bulunmazsa sessizce ağdan
+# indirmeye çalışır. Prisma CLI imaja bilerek kopyalandığı (Dockerfile) için
+# doğrudan çağırmak hem hızlı hem de ağı kapalı ortamda deterministik.
 echo "→ Prisma migrate deploy çalışıyor..."
-npx prisma migrate deploy
+node ./.migrator/node_modules/prisma/build/index.js migrate deploy --schema=./prisma/schema.prisma
 
 # --- Sunucu ---
-# exec: sinyaller (SIGTERM) doğrudan Node sürecine iletilsin (temiz kapanış).
+# standalone çıktısının kendi sunucusu (server.js). Öncesi `npm run start:docker`
+# idi; standalone imajda npm script'leri ve `next` binary'si bulunmaz.
+# PORT/HOSTNAME env'lerini server.js kendisi okur.
+# exec: sinyaller (SIGTERM) doğrudan Node sürecine iletilsin (temiz kapanış) —
+# araya npm girmemesi, platformun kapatma sinyalinin kaybolmamasını da sağlar.
 echo "→ Uygulama başlatılıyor..."
-exec npm run start:docker
+exec node server.js
