@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
+import { sinirla, ALAN_SINIRI } from "@/lib/ai/truncate";
 import {
   analyzeMentorProfile,
   type MentorAnalysisInput,
@@ -30,19 +31,19 @@ export async function generateAndPersistMentorAnalysis(
     where: { mentorProfileId },
     update: {
       level: sonuc.level,
-      summary: sonuc.summary,
+      summary: sinirla(sonuc.summary ?? "", ALAN_SINIRI.analizMetni),
       strengths: sonuc.strengths,
       technicalTracks: sonuc.technicalTracks,
-      idealStudentProfile: sonuc.idealStudentProfile,
+      idealStudentProfile: sinirla(sonuc.idealStudentProfile ?? "", ALAN_SINIRI.analizMetni),
       matchingNotes: sonuc.matchingNotes,
     },
     create: {
       mentorProfileId,
       level: sonuc.level,
-      summary: sonuc.summary,
+      summary: sinirla(sonuc.summary ?? "", ALAN_SINIRI.analizMetni),
       strengths: sonuc.strengths,
       technicalTracks: sonuc.technicalTracks,
-      idealStudentProfile: sonuc.idealStudentProfile,
+      idealStudentProfile: sinirla(sonuc.idealStudentProfile ?? "", ALAN_SINIRI.analizMetni),
       matchingNotes: sonuc.matchingNotes,
     },
   });

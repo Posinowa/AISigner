@@ -22,7 +22,7 @@ const {
 } = vi.hoisted(() => ({
   requireAuthMock: vi.fn(),
   prismaMock: {
-    assignedProject: { findUnique: vi.fn(), update: vi.fn() },
+    assignedProject: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
     roadmapStep: { update: vi.fn() },
     stepIssue: { findMany: vi.fn(), update: vi.fn(), count: vi.fn() },
   },
@@ -629,6 +629,8 @@ describe("baslatGitHubWorkspaceKurulumu — arka plana alma", () => {
     admin();
     configMock.mockReturnValue(null); // simülasyon yolu
     prismaMock.assignedProject.update.mockResolvedValue({});
+    // Varsayılan: atomik kilit alınabiliyor (bir satır güncellendi).
+    prismaMock.assignedProject.updateMany.mockResolvedValue({ count: 1 });
   });
 
   /** Başlatma katmanının gördüğü hafif atama kaydı. */
@@ -656,7 +658,8 @@ describe("baslatGitHubWorkspaceKurulumu — arka plana alma", () => {
 
     await baslatGitHubWorkspaceKurulumu("ap-1", false);
 
-    expect(prismaMock.assignedProject.update).toHaveBeenCalledWith(
+    // #318: geçiş artık atomik `updateMany` ile yapılıyor (eskiden `update`).
+    expect(prismaMock.assignedProject.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ data: { githubStatus: "PROVISIONING" } }),
     );
   });
@@ -683,14 +686,53 @@ describe("baslatGitHubWorkspaceKurulumu — arka plana alma", () => {
   });
 
   it("kurulum SÜRERKEN ikinci başlatma reddedilir", async () => {
-    // Aynı repoya paralel yazma olurdu.
-    atama("PROVISIONING");
+    // Atomik kilit satırı güncelleyemedi → iş zaten sürüyor.
+    atama();
+    prismaMock.assignedProject.updateMany.mockResolvedValue({ count: 0 });
 
     await expect(baslatGitHubWorkspaceKurulumu("ap-1", false)).rejects.toBeInstanceOf(
       KurulumZatenSuruyorError,
     );
     expect(arkaPlanIsleri).toHaveLength(0);
-    expect(prismaMock.assignedProject.update).not.toHaveBeenCalled();
+  });
+
+  // #318 REGRESYON: koruma önceden findUnique ile OKUYUP ayrı bir update ile
+  // YAZIYORDU. İki eşzamanlı istek arada kalır, ikisi de geçerdi. #313'te
+  // ardışık isteklerle test edildiği için bu boşluk görünmemişti.
+  it("durum geçişi ATOMİK — koşul veritabanına bırakılır", async () => {
+    atama();
+
+    await baslatGitHubWorkspaceKurulumu("ap-1", false);
+
+    // Koşul updateMany'nin WHERE'inde olmalı; ayrı bir okuma+yazma değil.
+    expect(prismaMock.assignedProject.updateMany).toHaveBeenCalledWith({
+      where: { id: "ap-1", githubStatus: { not: "PROVISIONING" } },
+      data: { githubStatus: "PROVISIONING" },
+    });
+  });
+
+  it("EŞZAMANLI iki başlatmadan yalnız biri geçer", async () => {
+    atama();
+    // DB'yi taklit et: ilk updateMany kilidi alır, ikincisi satır bulamaz.
+    let kilitAlindi = false;
+    prismaMock.assignedProject.updateMany.mockImplementation(async () => {
+      if (kilitAlindi) return { count: 0 };
+      kilitAlindi = true;
+      return { count: 1 };
+    });
+
+    const sonuclar = await Promise.allSettled([
+      baslatGitHubWorkspaceKurulumu("ap-1", false),
+      baslatGitHubWorkspaceKurulumu("ap-1", false),
+    ]);
+
+    const basarili = sonuclar.filter((r) => r.status === "fulfilled");
+    const reddedilen = sonuclar.filter((r) => r.status === "rejected");
+
+    expect(basarili).toHaveLength(1);
+    expect(reddedilen).toHaveLength(1);
+    // Kritik: yalnız BİR arka plan işi kuyruğa girmeli.
+    expect(arkaPlanIsleri).toHaveLength(1);
   });
 
   it("yetkisizse hiçbir şey başlatılmaz", async () => {

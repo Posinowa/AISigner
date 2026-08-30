@@ -453,7 +453,9 @@ export async function baslatGitHubWorkspaceKurulumu(
     where: { id: assignmentId },
     select: {
       id: true,
-      githubStatus: true,
+      // githubStatus artık BURADAN okunmuyor: çift tetikleme koruması aşağıda
+      // atomik `updateMany` ile yapılıyor. Buradan okumak, karar ile yazma
+      // arasında yarış penceresi bırakırdı.
       roadmap: { select: { steps: { select: { id: true }, take: 1 } } },
     },
   });
@@ -466,15 +468,10 @@ export async function baslatGitHubWorkspaceKurulumu(
     throw new Error("Bu projeye ait onaylanmış bir Roadmap ve adım bulunmuyor");
   }
 
-  // Çift tetikleme koruması: iş zaten koşuyorken ikinci bir kurulum başlatmak
-  // aynı repoya paralel yazma demek olurdu.
-  if (atama.githubStatus === "PROVISIONING") {
-    throw new KurulumZatenSuruyorError(
-      "Bu çalışma alanı için bir kurulum zaten sürüyor. Tamamlanmasını bekleyin.",
-    );
-  }
-
-  // Yapılandırma kontrolü İSTEK İÇİNDE: eksik token'ı arka planda sessiz bir
+  // Yapılandırma kontrolü kilitten ÖNCE: burada fırlatırsak kaydı
+  // `PROVISIONING`'de asılı bırakmamış oluruz.
+  //
+  // Kontrolün İSTEK İÇİNDE olması bilinçli: eksik token'ı arka planda sessiz bir
   // hataya çevirmek yerine admin'e anında söylüyoruz (#179 ile aynı gerekçe).
   const config = readGitHubConfig();
   if (config === null && process.env.NODE_ENV === "production") {
@@ -485,12 +482,31 @@ export async function baslatGitHubWorkspaceKurulumu(
   }
   const simulated = config === null;
 
-  // Durumu hemen çeviriyoruz ki admin paneli yanıtla birlikte "kuruluyor"
-  // gösterebilsin; `isiYurut` da ayrıca yazıyor, tekrar yazması zararsız.
-  await prisma.assignedProject.update({
-    where: { id: assignmentId },
+  /*
+   * #318: ÇİFT TETİKLEME KORUMASI ATOMİK OLMALI.
+   *
+   * Öncesi klasik bir "check-then-act" idi: durum `findUnique` ile okunuyor,
+   * ayrı bir `update` ile yazılıyordu. İki EŞZAMANLI istek arada kalır — ikisi
+   * de `NOT_PROVISIONED` okur, ikisi de kontrolden geçer, iki arka plan işi
+   * başlar ve GitHub'a mükerrer repo/issue istekleri gider.
+   *
+   * (#313'te 409 koruması eklenmişti ama ARDIŞIK isteklerle test edildiği için
+   * bu boşluk görünmemişti.)
+   *
+   * Çözüm: okuma ve yazma tek bir atomik ifadede. `updateMany` koşulu
+   * veritabanı seviyesinde değerlendirir; yalnızca BİR istek satırı
+   * güncelleyebilir, diğerinin `count`'u 0 döner.
+   */
+  const kilit = await prisma.assignedProject.updateMany({
+    where: { id: assignmentId, githubStatus: { not: "PROVISIONING" } },
     data: { githubStatus: "PROVISIONING" },
   });
+
+  if (kilit.count === 0) {
+    throw new KurulumZatenSuruyorError(
+      "Bu çalışma alanı için bir kurulum zaten sürüyor. Tamamlanmasını bekleyin.",
+    );
+  }
 
   after(async () => {
     try {

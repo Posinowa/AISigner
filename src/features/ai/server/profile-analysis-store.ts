@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { sinirla, ALAN_SINIRI } from "@/lib/ai/truncate";
 import { logger } from "@/lib/logger";
 import {
   analyzeStudentProfile,
@@ -30,21 +31,21 @@ export async function generateAndPersistProfileAnalysis(
     where: { studentProfileId },
     update: {
       level: result.level,
-      summary: result.summary,
+      summary: sinirla(result.summary ?? "", ALAN_SINIRI.analizMetni),
       strengths: result.strengths,
       developmentAreas: result.developmentAreas,
       technicalTracks: result.tracks,
-      recommendedPath: result.recommendedPath,
+      recommendedPath: sinirla(result.recommendedPath ?? "", ALAN_SINIRI.analizMetni),
       recommendations: result.recommendations,
     },
     create: {
       studentProfileId,
       level: result.level,
-      summary: result.summary,
+      summary: sinirla(result.summary ?? "", ALAN_SINIRI.analizMetni),
       strengths: result.strengths,
       developmentAreas: result.developmentAreas,
       technicalTracks: result.tracks,
-      recommendedPath: result.recommendedPath,
+      recommendedPath: sinirla(result.recommendedPath ?? "", ALAN_SINIRI.analizMetni),
       recommendations: result.recommendations,
     },
   });
