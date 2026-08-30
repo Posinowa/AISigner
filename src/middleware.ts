@@ -30,6 +30,16 @@ const publicPaths = [
   "/api/health",
 ];
 
+/**
+ * Middleware'in atlayacağı statik varlık uzantıları (#318).
+ *
+ * Bilerek DAR tutuldu: liste dışında kalan bir yol middleware'den geçer, yani
+ * en kötü ihtimalle gereksiz bir kontrol çalışır. Tersi — geniş bir kural —
+ * yetki kapısının atlanması demekti.
+ */
+const STATIK_UZANTI =
+  /\.(?:ico|png|jpg|jpeg|gif|svg|webp|avif|css|js|map|txt|xml|json|webmanifest|woff|woff2|ttf|otf|eot|mp4|webm|pdf)$/i;
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -50,11 +60,28 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Statik dosyalar ve Next.js internal path'leri atla
+  // Statik dosyalar ve Next.js internal path'leri atla.
+  //
+  // #318: Koşul önceden `pathname.includes(".")` idi — yani yolunda NOKTA olan
+  // her istek middleware'i atlıyordu.
+  //
+  // Sayfa erişimi açısından felaket değildi: `(admin)`/`(mentor)`/`(student)`
+  // layout'ları `getServerSession` + rol kontrolü yapıp redirect ediyor, API
+  // uçları `requireAuth` kullanıyor. Yani `/admin-dashboard.json` ile panele
+  // girilemiyordu.
+  //
+  // AMA layout'lar rolü kontrol ediyor, `accountStatus`'ü ETMİYOR. O kapı
+  // yalnız burada (#249). Noktalı bir dinamik yol — ör.
+  // `/mentor-dashboard/abc.def` — onaysız bir MENTOR'ün mentör alanına
+  // girmesine izin veriyordu.
+  //
+  // Artık yalnızca bilinen statik uzantılar atlanıyor. Yeni bir varlık tipi
+  // eklenirse listeye de eklenmeli; sessizce yetki atlatmaktansa fazladan
+  // middleware çalıştırmak tercih edilir.
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
-    pathname.includes(".")
+    STATIK_UZANTI.test(pathname)
   ) {
     return NextResponse.next();
   }

@@ -1,4 +1,5 @@
 import { getModel } from "@/lib/ai/gemini-client";
+import { sinirla, ALAN_SINIRI } from "@/lib/ai/truncate";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 
@@ -84,8 +85,11 @@ async function storeGeneratedIssues(stepId: string, issues: GeneratedIssueSpec[]
     data: issues.map((issue, index) => ({
       stepId,
       order: korunanSayisi + index + 1,
-      title: issue.title,
-      bodyMarkdown: issue.bodyMarkdown,
+      // #318: Şema sınırına göre kırp. Model 4000 karakteri aşan bir gövde
+      // ürettiğinde Postgres "right truncated" fırlatıyor; çağrı try/catch
+      // içinde olduğu için bu SESSİZCE mock içeriğe düşmeye yol açıyordu.
+      title: sinirla(issue.title ?? "", ALAN_SINIRI.issueTitle),
+      bodyMarkdown: sinirla(issue.bodyMarkdown ?? "", ALAN_SINIRI.issueBody),
     })),
   });
 }

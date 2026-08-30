@@ -3,6 +3,7 @@ import { cache } from "react";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { createRateLimiter } from "@/lib/rate-limit";
+import { getClientIp } from "@/lib/client-ip";
 import {
   ShieldCheck,
   Award,
@@ -25,17 +26,6 @@ const verifyLimiter = createRateLimiter("verify-certificate", {
   maxRequests: 20,
   windowSeconds: 60,
 });
-
-// Not: `x-real-ip` proxy tarafından set edilir; `x-forwarded-for`'un ilk hop'u
-// proxy arkasında değilsek istemci tarafından uydurulabilir. Bu limit tek başına
-// bir kimlik kontrolü değil, enumeration'ı pahalılaştıran savunma-derinliği katmanıdır.
-function getClientIp(h: Headers): string {
-  const realIp = h.get("x-real-ip")?.trim();
-  if (realIp) return realIp;
-  const fwd = h.get("x-forwarded-for");
-  if (fwd) return fwd.split(",")[0]!.trim();
-  return "anonymous";
-}
 
 /**
  * #208 review: Rate-limit kontrolü DOĞRULAMA SORGUSUNUN İÇİNDE.
