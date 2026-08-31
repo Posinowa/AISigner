@@ -5,12 +5,18 @@ const { requireAuthMock, prismaMock } = vi.hoisted(() => ({
   prismaMock: {
     roadmapStep: { findUnique: vi.fn(), update: vi.fn(), findMany: vi.fn() },
     assignedProject: { update: vi.fn() },
+    // #324: durum degisikligi + gecmis kaydi tek transaction'da.
+    stepStatusHistory: { create: vi.fn() },
+    $transaction: vi.fn(),
   },
 }));
 vi.mock("@/lib/auth/guard", () => ({
   requireAuth: (...a: unknown[]) => requireAuthMock(...a),
 }));
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
+// #324: Durum degisikligi artik gecmis kaydiyla birlikte yapiliyor.
+// `server-only` bu depoda test ortaminda mock'lanir (yerlesik desen).
+vi.mock("server-only", () => ({}));
 
 import { PATCH } from "./route";
 
@@ -64,6 +70,8 @@ describe("student steps PATCH — IDOR + kurallar (#184)", () => {
     prismaMock.roadmapStep.update.mockResolvedValue({ id: "s-1", status: "IN_PROGRESS" });
     prismaMock.roadmapStep.findMany.mockResolvedValue([]);
     prismaMock.assignedProject.update.mockResolvedValue({});
+    // #324: transaction, [guncellenmis adim, gecmis kaydi] doner.
+    prismaMock.$transaction.mockResolvedValue([{ id: "s-1", status: "IN_PROGRESS" }, {}]);
   });
 
   it("STUDENT değil (guard) → 403, DB'ye gidilmez", async () => {
@@ -127,6 +135,27 @@ describe("student steps PATCH — IDOR + kurallar (#184)", () => {
       where: { id: "s-1" },
       data: { status: "IN_PROGRESS" },
     });
+  });
+
+  // #324 REGRESYON: durum degisikligi GECMISE de yazilmali. Dogrudan
+  // `prisma.roadmapStep.update` cagirmak gecmisi sessizce atlar ve analitik
+  // verisi kalici olarak eksilir — bugun kaydedilmeyen gecis geri gelmez.
+  it("durum degisikligi GECMISE kaydedilir (kim, nereden, nereye)", async () => {
+    student("student-1");
+    prismaMock.roadmapStep.findUnique.mockResolvedValue(stepGraph({ ownerUserId: "student-1" }));
+
+    await PATCH(req({ status: "IN_PROGRESS" }), { params: params() });
+
+    expect(prismaMock.stepStatusHistory.create).toHaveBeenCalledWith({
+      data: {
+        stepId: "s-1",
+        fromStatus: "TODO",
+        toStatus: "IN_PROGRESS",
+        changedById: "student-1",
+      },
+    });
+    // Ikisi tek transaction'da: biri yazilip digeri yazilmamali.
+    expect(prismaMock.$transaction).toHaveBeenCalledOnce();
   });
 
   it("TODO adımı doğrudan COMPLETED yapmak → 400", async () => {

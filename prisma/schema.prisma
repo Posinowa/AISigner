@@ -26,19 +26,20 @@ model User {
 
   // Relations
   sessions                Session[]
-  studentProfile          StudentProfile?    @relation("StudentProfile_userIdToUser")
+  studentProfile          StudentProfile?     @relation("StudentProfile_userIdToUser")
   // #195: Mentor→öğrenci artık M:N (join tablosu). Bir mentörün öğrencileri buradan.
-  mentorAssignments       MentorAssignment[] @relation("MentorAssignment_mentorIdToUser")
-  sentMessages            Message[]          @relation("Message_senderIdToUser")
-  receivedMessages        Message[]          @relation("Message_receiverIdToUser")
+  mentorAssignments       MentorAssignment[]  @relation("MentorAssignment_mentorIdToUser")
+  sentMessages            Message[]           @relation("Message_senderIdToUser")
+  receivedMessages        Message[]           @relation("Message_receiverIdToUser")
   stepComments            StepComment[]
   stepFiles               StepFile[]
-  suggestions             Suggestion[]       @relation("Suggestion_authorIdToUser")
+  suggestions             Suggestion[]        @relation("Suggestion_authorIdToUser")
   // #253: Bu kullanıcının oluşturduğu proje şablonları.
-  createdProjectTemplates ProjectTemplate[]  @relation("ProjectTemplate_createdBy")
-  reviewedSuggestions     Suggestion[]       @relation("Suggestion_reviewedByIdToUser")
+  createdProjectTemplates ProjectTemplate[]   @relation("ProjectTemplate_createdBy")
+  reviewedSuggestions     Suggestion[]        @relation("Suggestion_reviewedByIdToUser")
   // #287: Mentör başvurusunun cevapları (yalnızca MENTOR rolünde dolu).
-  mentorProfile           MentorProfile?     @relation("MentorProfile_userIdToUser")
+  mentorProfile           MentorProfile?      @relation("MentorProfile_userIdToUser")
+  stepStatusChanges       StepStatusHistory[]
 }
 
 model Session {
@@ -181,10 +182,40 @@ model RoadmapStep {
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 
-  roadmap  Roadmap       @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
+  roadmap  Roadmap             @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
   comments StepComment[]
   files    StepFile[]
   issues   StepIssue[]
+  history  StepStatusHistory[]
+}
+
+/// #324: Adım durum geçişlerinin kaydı.
+///
+/// NEDEN: `RoadmapStep` yalnızca ANLIK durumu ve `updatedAt`'i tutuyor. Bir
+/// adımın ne zaman başladığı, ne zaman bittiği ve arada ne kadar beklediği
+/// hiçbir yerde yazılı değil. Planlanan analitik panel (darboğaz analizi,
+/// "hangi adımda takılıyorlar", drop-off erken uyarısı) bu veri olmadan
+/// hesaplanamaz.
+///
+/// ZAMANA DUYARLI: Bugün kaydedilmeyen geçiş sonsuza kadar kayıp. Panel çok
+/// sonra yapılsa bile kayıt şimdi başlarsa o gün geçmiş veriyle açılır.
+model StepStatusHistory {
+  id          String   @id @default(cuid())
+  stepId      String
+  /// İlk kayıtta null olabilir (durum bilinmeyen bir noktadan geliyorsa).
+  fromStatus  String?
+  toStatus    String
+  /// Değişikliği yapan kullanıcı. Hesap silinirse kayıt KALIR (SetNull):
+  /// analitik geçmişi tek bir kullanıcı silindi diye bozulmamalı.
+  changedById String?
+  createdAt   DateTime @default(now())
+
+  step      RoadmapStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  changedBy User?       @relation(fields: [changedById], references: [id], onDelete: SetNull)
+
+  /// Analitik sorguları adım bazında ve zaman sıralı okuyacak.
+  @@index([stepId, createdAt])
+  @@index([toStatus, createdAt])
 }
 
 model StepIssue {

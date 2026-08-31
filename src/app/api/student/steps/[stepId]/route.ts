@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth/guard";
 import { updateStepStatusSchema } from "@/lib/validations/api";
+import { adimDurumunuDegistir } from "@/features/roadmap/server/step-status";
 
 /**
  * PATCH /api/student/steps/[stepId]
@@ -107,10 +108,15 @@ export async function PATCH(
       );
     }
 
-    // Durumu güncelle
-    const updated = await prisma.roadmapStep.update({
-      where: { id: stepId },
-      data: { status: newStatus },
+    // Durumu güncelle + geçişi GEÇMİŞE yaz (#324).
+    //
+    // Doğrudan `prisma.roadmapStep.update` ÇAĞIRMAYIN: geçmişi sessizce atlar
+    // ve analitik verisi kalıcı olarak eksilir. İkisi tek transaction'da.
+    const updated = await adimDurumunuDegistir({
+      stepId,
+      yeniDurum: newStatus,
+      oncekiDurum: step.status,
+      degistirenId: auth.session.user.id ?? null,
     });
 
     // Tüm adımlar tamamlandıysa proje durumunu da güncelle
