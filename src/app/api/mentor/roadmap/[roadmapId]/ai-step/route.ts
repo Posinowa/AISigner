@@ -86,7 +86,7 @@ JSON Formatı (Sadece geçerli bir JSON objesi döndür, başka hiçbir metin ek
 `;
 
       const response = await model.generateContent(promptText);
-      const text = response.response.candidates?.[0]?.content?.parts?.[0]?.text;
+      const text = response.text;
       if (text) {
         const cleaned = text.replace(/```json/gi, "").replace(/```/g, "").trim();
         const parsed = JSON.parse(cleaned);

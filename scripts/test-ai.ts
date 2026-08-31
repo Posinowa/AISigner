@@ -14,7 +14,7 @@ async function main() {
   // 1) Düz metin (chat) yolu — getTextModel
   const textModel = getTextModel();
   const r1 = await textModel.generateContent("Tek kısa cümleyle kendini Türkçe tanıt.");
-  const text = r1.response.candidates?.[0]?.content?.parts?.[0]?.text;
+  const text = r1.text;
   console.log("\n✅ [1/2] Düz metin (chat) yanıt verdi:");
   console.log("   " + (text ?? "(boş yanıt)"));
 
@@ -23,7 +23,7 @@ async function main() {
   const r2 = await jsonModel.generateContent(
     'Sadece şu JSON\'u döndür: {"durum":"ok","mesaj":"<tek kelime selam>"}'
   );
-  const raw = r2.response.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+  const raw = r2.text;
   const parsed = JSON.parse(raw.replace(/```json|```/g, "").trim());
   console.log("\n✅ [2/2] JSON modu geçerli JSON döndürdü:");
   console.log("   ", parsed);

@@ -31,7 +31,8 @@ const girdi = {
 };
 
 const yanit = (metin: string) => ({
-  response: { candidates: [{ content: { parts: [{ text: metin }] } }] },
+  // #335: istemci artik normalize `{ text }` donduruyor (SDK sekli disari sizmiyor).
+  text: metin,
 });
 
 const tamJson = JSON.stringify({
