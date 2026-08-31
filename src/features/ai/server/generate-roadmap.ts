@@ -1,7 +1,20 @@
 import { getModel } from "@/lib/ai/gemini-client";
+import { cozVeDogrula } from "@/lib/ai/response";
+import { z } from "zod";
 import { logger } from "@/lib/logger";
 import { experienceLevelLabel } from "@/lib/experience-level";
 import { StudentProfile, ProjectTemplate } from "@prisma/client";
+
+/** #320: Model çıktısının şekli doğrulanır (öncesi `as` ile varsayılıyordu). */
+const roadmapSemasi = z.array(
+  z.object({
+    order: z.number(),
+    title: z.string().min(1),
+    description: z.string(),
+    estimatedHours: z.number(),
+    resources: z.array(z.string()),
+  }),
+).min(1);
 
 export interface RoadmapStepData {
   order: number;
@@ -60,20 +73,7 @@ export async function generateRoadmap(
     };
 
     const result = await model.generateContent(request);
-    let text = result.response.candidates?.[0]?.content?.parts?.[0]?.text || "";
-
-    logger.debug("Roadmap ham yanıtı", text);
-
-    text = text.replace(/```json/gi, "").replace(/```/g, "").trim();
-
-    const startIndex = text.indexOf('[');
-    const endIndex = text.lastIndexOf(']');
-
-    if (startIndex !== -1 && endIndex !== -1) {
-      text = text.substring(startIndex, endIndex + 1);
-    }
-
-    const roadmapSteps: RoadmapStepData[] = JSON.parse(text);
+    const roadmapSteps = cozVeDogrula(result, roadmapSemasi, "generate-roadmap");
 
     return roadmapSteps.sort((a, b) => a.order - b.order);
 

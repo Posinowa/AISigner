@@ -114,7 +114,7 @@ Lütfen aşağıdaki formatta SADECE JSON yanıtı ver (başka metin ekleme):
       contents: [{ role: "user" as const, parts: [{ text: prompt }] }],
     });
 
-    let text = result.response.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    let text = result.text;
     logger.debug("Mentör analizi ham yanıtı", text);
 
     // Yük taşıyan temizlik AŞAĞIDAKİ parantez arası kesme; fence soymayı

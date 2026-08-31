@@ -44,7 +44,7 @@ JSON Formatı:
 `;
 
     const response = await model.generateContent(prompt);
-    const text = response.response.candidates?.[0]?.content?.parts?.[0]?.text;
+    const text = response.text;
 
     if (!text) {
       throw new Error("AI yanıtı boş geldi");

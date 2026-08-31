@@ -168,8 +168,7 @@ export async function POST(req: Request) {
     });
 
     const result = await chat.sendMessage(message.trim());
-    const response = result.response;
-    const text = response.candidates?.[0]?.content?.parts?.[0]?.text || "Bunu tam çözemedim. Sorunu biraz daha somutlaştırır mısın — hangi adımda, tam olarak nerede takıldın?";
+    const text = result.text || "Bunu tam çözemedim. Sorunu biraz daha somutlaştırır mısın — hangi adımda, tam olarak nerede takıldın?";
 
     return NextResponse.json({ reply: text });
   } catch (error) {

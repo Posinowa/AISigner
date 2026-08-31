@@ -14,7 +14,9 @@ const nextConfig: NextConfig = {
   output: "standalone",
 
   serverExternalPackages: [
-    "@google-cloud/vertexai",
+    // #335: @google-cloud/vertexai kaldirilma tarihini gectigi icin
+    // @google/genai'ye tasindi.
+    "@google/genai",
     "google-auth-library",
     // #316: nodemailer `net`/`tls`/`os`/`stream` gibi Node çekirdek modüllerini
     // kullanıyor. `instrumentation.ts` üzerinden bildirim zincirine girdiği için

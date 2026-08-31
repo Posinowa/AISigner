@@ -75,7 +75,7 @@ describe("POST /api/student/ai-chat — fallback + telemetry (#51/#70/#71)", () 
     // 2) Başarılı çağrı → fallback artmaz, attempt artar
     authAsStudent();
     const { model } = fakeModel(() => ({
-      response: { candidates: [{ content: { parts: [{ text: "İşte yönlendirme..." }] } }] },
+      text: "İşte yönlendirme...",
     }));
     getTextModelMock.mockReturnValue(model);
     const res = await POST(makeRequest("soru 2"));
@@ -89,7 +89,7 @@ describe("POST /api/student/ai-chat — fallback + telemetry (#51/#70/#71)", () 
   it("guidance-only sistem promptu modele gerçekten gönderilir (regresyon koruması)", async () => {
     authAsStudent();
     const { model, startChat } = fakeModel(() => ({
-      response: { candidates: [{ content: { parts: [{ text: "ok" }] } }] },
+      text: "ok",
     }));
     getTextModelMock.mockReturnValue(model);
 

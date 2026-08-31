@@ -14,7 +14,7 @@ const input = {
 function modelReturning(json: unknown) {
   return {
     generateContent: vi.fn().mockResolvedValue({
-      response: { candidates: [{ content: { parts: [{ text: JSON.stringify(json) }] } }] },
+      text: JSON.stringify(json),
     }),
   };
 }
@@ -59,7 +59,14 @@ describe("analyzeStudentProfile — genişletilmiş sonuç (#47)", () => {
     expect(res.recommendedPath).toBe("önce X sonra Y");
   });
 
-  it("model yeni alanları üretmezse güvenli varsayılanlar atanır", async () => {
+  // #320 SÖZLEŞME DEĞİŞİKLİĞİ: eksik alanlar artık boş varsayılanlarla
+  // DOLDURULMUYOR; şema tutmadığı için yedek analize düşülüyor.
+  //
+  // Neden daha iyi: öncesi kullanıcıya yarı boş bir analizi GERÇEK gibi
+  // gösteriyordu (boş güçlü yönler, boş önerilen yol). Yedek analiz ise
+  // öğrencinin kendi girdisinden anlamlı içerik üretiyor ve düşüş artık
+  // sayaç + uyarı logu ile görünür.
+  it("model eksik alan döndürürse YEDEK analize düşülür (yarı boş sonuç gösterilmez)", async () => {
     getModelMock.mockReturnValue(
       modelReturning({
         level: "Orta",
@@ -72,9 +79,9 @@ describe("analyzeStudentProfile — genişletilmiş sonuç (#47)", () => {
 
     const res = await analyzeStudentProfile(input);
 
-    expect(res.strengths).toEqual([]);
-    expect(res.developmentAreas).toEqual([]);
-    expect(res.recommendedPath).toBe("");
-    expect(res.level).toBe("Orta");
+    // Yedek analiz DOLU gelir — boş dizi/boş metin değil.
+    expect(res.strengths.length).toBeGreaterThan(0);
+    expect(res.developmentAreas.length).toBeGreaterThan(0);
+    expect(res.recommendedPath.length).toBeGreaterThan(0);
   });
 });

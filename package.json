@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "@google-cloud/storage": "^7.21.0",
-    "@google-cloud/vertexai": "^1.10.0",
+    "@google/genai": "^2.19.0",
     "@hookform/resolvers": "^5.2.1",
     "@node-rs/argon2": "^2.0.2",
     "@octokit/rest": "^22.0.1",

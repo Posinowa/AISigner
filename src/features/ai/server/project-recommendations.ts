@@ -1,4 +1,6 @@
 import { getModel } from "@/lib/ai/gemini-client";
+import { cozVeDogrula } from "@/lib/ai/response";
+import { z } from "zod";
 import { logger } from "@/lib/logger";
 import { experienceLevelLabel } from "@/lib/experience-level";
 import { ilgiEtiketi } from "@/features/student/models/secenekler";
@@ -17,6 +19,18 @@ import { StudentProfile, ProjectTemplate } from "@prisma/client";
  * - Her arıza `throw` ile 500'e dönüyordu. Projedeki diğer AI özelliklerinin
  *   hepsinde yedek var; burası tek istisnaydı.
  */
+
+/**
+ * #320: Yalnız KABA sekil dogrulanir - `projectId` gecerliligi asagida ayrica
+ * eleniyor (model var olmayan id uydurabiliyor, o kontrol korunuyor).
+ */
+const oneriSemasi = z.array(
+  z.object({
+    projectId: z.unknown(),
+    matchScore: z.unknown(),
+    reason: z.unknown(),
+  }).loose(),
+);
 
 export interface RankedProject {
   projectId: string;
@@ -142,16 +156,7 @@ Yanıtın SADECE şu formatta bir JSON dizisi olsun:
       contents: [{ role: "user" as const, parts: [{ text: prompt }] }],
     });
 
-    let text = result.response.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    logger.debug("Proje önerisi ham yanıtı", text);
-
-    text = text.replace(/```json/gi, "").replace(/```/g, "").trim();
-    const bas = text.indexOf("[");
-    const son = text.lastIndexOf("]");
-    if (bas === -1 || son === -1) throw new Error("AI yanıtı JSON dizisi içermiyor");
-
-    const cozulen = JSON.parse(text.substring(bas, son + 1));
-    if (!Array.isArray(cozulen)) throw new Error("AI yanıtı dizi değil");
+    const cozulen = cozVeDogrula(result, oneriSemasi, "project-recommendations");
 
     // Uydurma id'ler BURADA eleniyor. Eskiden geçip gidiyor, arayüzde eşleşme
     // bulunamayınca öneri sessizce kayboluyordu.
