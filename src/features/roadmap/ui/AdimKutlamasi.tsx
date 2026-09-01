@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PartyPopper } from "lucide-react";
 import { useCanliAkis } from "@/features/messaging/ui/useCanliAkis";
@@ -25,13 +25,34 @@ export function AdimKutlamasi() {
   const router = useRouter();
   const [baslik, setBaslik] = useState<string | null>(null);
 
+  /**
+   * Açık kapanma zamanlayıcısı (#358).
+   *
+   * Önceden her olay yeni bir `setTimeout` kuruyor ve hiçbiri iptal
+   * edilmiyordu. İki adım arka arkaya tamamlandığında ilk zamanlayıcı
+   * İKİNCİ kutlamayı erken kapatıyor, `router.refresh()` de iki kez
+   * koşuyordu. Unmount'ta da iptal edilmediği için gezindikten sonra
+   * başıboş bir yenileme ateşleniyordu.
+   */
+  const zamanlayiciRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (zamanlayiciRef.current) clearTimeout(zamanlayiciRef.current);
+    };
+  }, []);
+
   useCanliAkis(
     useCallback(
       (olay) => {
         if (olay.tip !== "adim-tamamlandi") return;
 
+        // Önceki kutlama sürüyorsa süresini sıfırdan başlat.
+        if (zamanlayiciRef.current) clearTimeout(zamanlayiciRef.current);
+
         setBaslik(olay.baslik);
-        window.setTimeout(() => {
+        zamanlayiciRef.current = setTimeout(() => {
+          zamanlayiciRef.current = null;
           setBaslik(null);
           // Liste, ilerleme çubuğu ve rozetler tazelensin.
           router.refresh();

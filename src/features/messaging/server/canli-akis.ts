@@ -186,7 +186,21 @@ export async function tikAt(): Promise<void> {
     // kapattığında webhook adımı COMPLETED yapıyor ve öğrenci bunu sayfayı
     // yenilemeden görüyor.
     const tamamlananlar = await prisma.stepStatusHistory.findMany({
-      where: { toStatus: "COMPLETED", createdAt: { gt: pencereBasi } },
+      // #358: Kullanıcı filtresi SORGUDA. Önceden platformdaki TÜM tamamlanma
+      // kayıtları çekilip JS tarafında eleniyordu; `take` sınırı yüzünden bağlı
+      // bir öğrencinin tamamlaması ilgisiz kayıtların arkasında kalıp
+      // KAÇIRILABİLİRDİ — kutlama hiç görünmezdi.
+      where: {
+        toStatus: "COMPLETED",
+        createdAt: { gt: pencereBasi },
+        step: {
+          roadmap: {
+            assignedProject: {
+              studentProfile: { userId: { in: kullanicilar } },
+            },
+          },
+        },
+      },
       select: {
         stepId: true,
         step: {

@@ -168,6 +168,11 @@ Olaylar: `mesaj`, `okunmamis`, `adim-tamamlandi`.
   `gorulen` kümesiyle elenir. Tik hata verirse **imleç ilerlemez**.
 - Kimse bağlı değilken döngü durur — boş pod sorgu atmaz.
 - `: kalp` yorumu 25 sn'de bir: vekiller sessiz bağlantıyı ~60 sn'de keser.
+- **Bağlantı SEKME başına TEK** (#358). `useCanliAkis` modül düzeyinde tek `EventSource`'u
+  referans sayacıyla paylaşır; kapatma gecikmeli (sayfa geçişindeki unmount/mount çifti
+  bağlantıyı yeniden kurmasın). Öncesinde her bileşen kendi bağlantısını kuruyordu ve
+  öğrenci mesajlar sayfası **3 kalıcı bağlantı** açıyordu.
+  ⚠️ Paylaşımlı durum modül düzeyinde: testlerde `canliAkisiSifirlaForTests()` çağrılmalı.
 - **"Yazıyor..." bu PR'a ALINMADI** → #354 (paylaşımlı geçici durum gerektiriyor).
 
 ### Akıllı Eşleştirme (#328)
