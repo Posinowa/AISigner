@@ -157,8 +157,19 @@ export async function milestoneHazirla(
 /**
  * Aynı başlıklı issue varsa onu döndürür, yoksa oluşturur.
  *
- * Kopya kontrolü başlık üzerinden: güncelleme akışı aynı adımları tekrar
- * gönderdiğinde repo aynı issue'larla dolmasın.
+ * ⚠️ BAŞLIK TARAMASI BİR GARANTİ DEĞİL, YEDEKTİR (#345).
+ *
+ * Kopya kontrolü `issues.listForRepo` sonucunda başlık eşleştirmeye dayanıyor.
+ * GitHub'ın liste uçları ANINDA TUTARLI DEĞİL: yeni açılmış bir issue listede
+ * gecikmeli görünüyor. Canlı testte art arda iki çağrı KOPYA issue açtı —
+ * üçüncü çağrıda (liste yetiştiğinde) doğru davrandı.
+ *
+ * Bu yüzden idempotensin OTORİTER kaynağı burası değil, veritabanıdır:
+ * `provisioning.ts` `StepIssue.githubIssueUrl` dolu olan kaydı GitHub'a hiç
+ * göndermiyor. Buradaki tarama yalnızca "issue açıldı ama URL kaydedilemeden
+ * süreç öldü" gibi dar bir boşluğu kapatan yedek katmandır.
+ *
+ * Aynı uyarı `milestoneHazirla` için de geçerli.
  */
 export async function issueHazirla(
   config: GitHubConfig,

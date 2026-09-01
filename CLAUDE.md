@@ -227,6 +227,19 @@ Mentör **talep eder** (`POST /api/mentor/workspace-request`), admin **karara ba
 - Rozet (`BekleyenTalepRozeti`) özelliğin ön koşulu: fark edilmeyen kuyruk darboğazı yalnızca
   yer değiştirir.
 
+#### ⚠️ GitHub'ın liste uçları ANINDA TUTARLI DEĞİL (#345)
+`issueHazirla`/`milestoneHazirla` kopya kontrolünü `listForRepo` başlık taramasıyla
+yapıyor ve **bu bir garanti değil**: yeni açılmış kayıt listede gecikmeli görünüyor.
+Canlı testte art arda iki çağrı KOPYA issue açtı; üçüncüde (liste yetişince) düzeldi.
+
+İdempotensin otoriter kaynağı **veritabanı**: `provisioning.ts`, `StepIssue.githubIssueUrl`
+dolu olan kaydı GitHub'a **hiç göndermiyor**; `RoadmapStep.githubIssueUrl` varsa milestone
+numarasını URL'den okuyup yeniden oluşturmuyor. Başlık taraması yalnızca "issue açıldı ama
+URL kaydedilemeden süreç öldü" boşluğunu kapatan yedek katman.
+
+Aynı ders #327'de `PullRequestReview` tablosuyla, #349'da `pendingKey` ile uygulandı:
+**taramaya değil kısıta/kayda güven.**
+
 ### AI Kod İncelemesi (#327)
 PR açıldığında (`opened` / `ready_for_review`) webhook Gemini'den ön inceleme alıp PR'a
 **tek bir yorum** yazar. Akış: `pr-inceleme.ts` → `pr-diff.ts` (filtre+bütçe) →
