@@ -153,6 +153,24 @@ Arayüz **asenkron**: `check`/`peek`/`reset` Promise döner. DB'ye ulaşılamazs
 **fail-open** (istek geçer + loglanır); kesintide tüm girişleri kilitlememek için
 bilinçli karar.
 
+### Analitik Panel (#331)
+`features/analytics/server/analiz.ts` (üç ham SQL) → `panel.ts` (önbellek) →
+`/api/admin/analytics` (platform) · `/api/mentor/analytics` (kapsam OTURUMDAN daraltılır).
+
+- **⚠️ DROP-OFF RİSKİ AI İLE ÜRETİLMİYOR.** Skor yok, SİNYAL var: "14 gündür sessiz",
+  "3 adım takılı", "yanıtlanmamış mesajı var". Gerekçe bir açıklama metni değil, verinin
+  kendisi. "%73 risk" bir insan hakkında uydurma kesinlik olurdu (#328'deki yüzde kararı).
+- **Darboğaz PROJE + ADIM SIRASI ile gruplanır**, başlıkla değil: yol haritaları öğrenciye
+  özel üretildiği için başlıklar tutmuyor. Gösterilen başlık gruptan bir ÖRNEK (arayüzde yazılı).
+- **Ortanca da dönüyor**; sıralama ona göre — tek bir yarım bırakılmış adım ortalamayı uçurur.
+- **Üçü de TEK sorgu, toplama veritabanında.** Satırları çekip JS'te gruplamak öğrenci
+  sayısıyla havuzu tıkardı (#313 dersi). `unstable_cache` 5 dk — panel, izlediği sistemi
+  yavaşlatan şey olmamalı. Önbellek anahtarı KAPSAMI içerir, yoksa mentöre admin verisi gider.
+- Mentör yanıt süresi bir performans ölçümü: **mentörleri karşılaştıran sıralama YOK**,
+  mentör kendi sayısını görür.
+- ⚠️ Ham SQL gerçek Postgres'e karşı, ekilmiş bilinen değerlerle doğrulandı; birim testler
+  yalnız sorgu SONRASI dönüşümleri kapsıyor (mock Prisma SQL'i kanıtlamaz).
+
 ### Gerçek Zamanlı Mesajlaşma (#329)
 `GET /api/messages/stream` (SSE) + `features/messaging/server/canli-akis.ts`.
 Olaylar: `mesaj`, `okunmamis`, `adim-tamamlandi`.

@@ -19,6 +19,8 @@ const navByRole: Record<Role, { home: string; links: NavLink[] }> = {
       { href: "/admin-dashboard/projects", label: "Projeler" },
       // #349: Mentör taleplerinin kuyruğu. Rozet olmadan kuyruk fark edilmez.
       { href: "/admin-dashboard/workspace-requests", label: "Çalışma Alanı Talepleri" },
+      // #331: Darboğaz, yanıt süresi, gözden geçirilecek öğrenciler.
+      { href: "/admin-dashboard/analytics", label: "Analitik" },
       { href: "/admin-dashboard/messages", label: "Mesajlar" },
       { href: "/admin-dashboard/suggestions", label: "Öneri & İstek" },
     ],
@@ -27,6 +29,8 @@ const navByRole: Record<Role, { home: string; links: NavLink[] }> = {
     home: "/mentor-dashboard",
     links: [
       { href: "/mentor-dashboard", label: "Panel" },
+      // #331: Mentöre YALNIZCA kendi öğrencileri ve kendi yanıt süresi.
+      { href: "/mentor-dashboard/analytics", label: "Analitik" },
       { href: "/mentor-dashboard/messages", label: "Mesajlar" },
     ],
   },
