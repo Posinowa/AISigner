@@ -299,3 +299,32 @@ export const decideWorkspaceRequestSchema = z.object({
 export const matchMentorsSchema = z.object({
   studentId: z.string().min(1, "Öğrenci ID'si gerekli"),
 });
+
+// #332 Faz 2: Takım yönetimi.
+const takimRolEnum = z.enum(["frontend", "backend", "fullstack", "qa", "design"]);
+
+export const createTeamSchema = z.object({
+  name: z
+    .string()
+    .min(2, "Takım adı en az 2 karakter olmalı")
+    .max(60, "Takım adı en fazla 60 karakter olabilir")
+    .transform((v) => v.trim()),
+});
+
+export const addTeamMemberSchema = z.object({
+  studentUserId: z.string().min(1, "Öğrenci gerekli"),
+  role: takimRolEnum,
+});
+
+export const setTeamMentorsSchema = z.object({
+  mentorIds: z.array(z.string().min(1)).max(10, "En fazla 10 mentör"),
+});
+
+export const assignTeamProjectSchema = z.object({
+  projectTemplateId: z.string().min(1, "Proje şablonu gerekli"),
+});
+
+// #332: Adımı üstlenme/bırakma. null = bırak.
+export const claimStepSchema = z.object({
+  assigneeId: z.string().min(1).nullable(),
+});
