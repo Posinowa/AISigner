@@ -279,3 +279,18 @@ export const updateCertificateSchema = z.object({
   completionGrade: completionGradeEnum.optional().nullable(),
 });
 
+
+// #349: Çalışma alanı talebi (mentör açar, admin karara bağlar).
+export const createWorkspaceRequestSchema = z.object({
+  assignedProjectId: z.string().min(1, "Atama ID'si gerekli"),
+  // Gerekçe opsiyonel; uzunluk sınırı şemadaki VarChar(500) ile aynı.
+  mentorNote: z.string().max(500, "Not en fazla 500 karakter olabilir").optional(),
+});
+
+export const decideWorkspaceRequestSchema = z.object({
+  onay: z.boolean(),
+  // Reddin gerekçesi ZORUNLU ama bu kural sunucu katmanında: burada
+  // `onay: false` ile boş not ayrımı yapmak şemayı `superRefine` ile
+  // karmaşıklaştırırdı ve kural iki yerde tekrarlanırdı.
+  adminNote: z.string().max(500, "Not en fazla 500 karakter olabilir").optional(),
+});

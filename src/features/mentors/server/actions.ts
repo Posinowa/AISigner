@@ -107,7 +107,21 @@ export async function getStudentDetail(studentId: string, mentorId: string) {
                       }
                     }
                   }
-                }
+                },
+                // #349: Çalışma alanı talebinin SON durumu. Yalnız sonuncusu
+                // gerekiyor — mentör ekranı "talep ettim mi, ne oldu" sorusunu
+                // cevaplıyor, geçmiş dökümü değil.
+                workspaceRequests: {
+                  orderBy: { createdAt: "desc" },
+                  take: 1,
+                  select: {
+                    id: true,
+                    status: true,
+                    adminNote: true,
+                    createdAt: true,
+                    decidedAt: true,
+                  },
+                },
               },
               orderBy: {
                 createdAt: "desc",

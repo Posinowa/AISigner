@@ -10,6 +10,10 @@ import { ProfileAnalysisCard, type ProfileAnalysisData } from "@/features/ai/ui/
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { useModalA11y } from "@/components/ui/useModalA11y";
 import { stripMarkdown } from "@/lib/markdown-preview";
+import {
+  CalismaAlaniBolumu,
+  type CalismaAlaniTalebi,
+} from "@/features/workspace-requests/ui/CalismaAlaniBolumu";
 
 type ProjectTemplate = {
   id: string;
@@ -59,6 +63,10 @@ type StudentDetail = {
       projectTemplate: ProjectTemplate;
       createdAt: string;
       roadmap?: Roadmap | null; // 🚀 SPRINT 3: Roadmap eklendi
+      // #349: Çalışma alanının durumu ve mentörün son talebi.
+      githubStatus: string;
+      githubRepoUrl: string | null;
+      workspaceRequests?: CalismaAlaniTalebi[];
     }[];
     // #48: Detaylı AI profil analizi (yoksa null — henüz üretilmemiş).
     profileAnalysis: ProfileAnalysisData | null;
@@ -573,6 +581,15 @@ export default function StudentDetailPage() {
                           )}
                         </div>
 
+                        {/* #349: Çalışma alanı — mentör TALEP eder, admin onaylar. */}
+                        <CalismaAlaniBolumu
+                          assignedProjectId={project.id}
+                          githubStatus={project.githubStatus}
+                          githubRepoUrl={project.githubRepoUrl}
+                          talep={project.workspaceRequests?.[0] ?? null}
+                          yolHaritasiHazir={(project.roadmap?.steps?.length ?? 0) > 0}
+                          onDegisti={loadStudentDetail}
+                        />
                       </div>
                     );
                   })}
