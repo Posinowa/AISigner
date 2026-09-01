@@ -87,6 +87,7 @@ src/
 | `Suggestion` | Stajyer→admin öneri/istek; type + status + adminNote (#147) |
 | `MentorProfile` / `MentorAnalysis` | mentör başvuru profili + AI eşleştirme analizi (#287/#288) |
 | `StepIssue` | adım ↔ GitHub issue eşlemesi (#218) |
+| `WorkspaceRequest` | mentörün çalışma alanı talebi, admin onayı (#349); `pendingKey @unique` bekleyen tekilliği |
 | `ProcessedWebhook` / `PullRequestReview` | webhook teslimat kimliği (#326) / PR'a inceleme yazıldığının otoriter kaydı (#327) |
 | `Message` / `StepComment` / `StepFile` | mesajlaşma, yorum, dosya (`SecurityAnswer` #264'te düşürüldü) |
 
@@ -151,6 +152,23 @@ tek atomik SQL ifadesiyle yapılıyor — çok instance güvenli, Redis gerekmiy
 Arayüz **asenkron**: `check`/`peek`/`reset` Promise döner. DB'ye ulaşılamazsa
 **fail-open** (istek geçer + loglanır); kesintide tüm girişleri kilitlememek için
 bilinçli karar.
+
+### Çalışma Alanı Talebi (#349)
+Kurulumu tetikleyen uç ADMIN'e kapalı, ama öğrencinin ne zaman hazır olduğunu bilen MENTÖR.
+Mentör **talep eder** (`POST /api/mentor/workspace-request`), admin **karara bağlar**
+(`POST /api/admin/workspace-requests/[id]`). Yetki mentöre AÇILMADI: repo açmak geri alınamaz.
+
+- **Bekleyen tekilliği `pendingKey`** ile: PENDING iken `assignedProjectId`, karar verilince
+  NULL (Postgres çoklu NULL'a izin verir). Kısmi benzersiz indeks Prisma'da ifade edilemediği
+  için bu desen seçildi — kısıt **veritabanında**, "önce sorgula sonra oluştur" değil.
+- **Onay `baslatGitHubWorkspaceKurulumu`'dan geçer** — oradaki atomik `PROVISIONING` kilidi
+  (#318) atlanmaz.
+- **Kurulum sonucu talepte TUTULMAZ.** İş `after()` ile arka planda koşuyor; tek doğru kaynak
+  `AssignedProject.githubStatus`. Kopyalansaydı iki kayıt ayrışırdı. Kurulum *başlatılamazsa*
+  karar geri alınır, talep PENDING'e döner.
+- `ERROR` durumundaki atama **yeniden talep edilebilir** — bir kere patlayan atama kilitlenmemeli.
+- Rozet (`BekleyenTalepRozeti`) özelliğin ön koşulu: fark edilmeyen kuyruk darboğazı yalnızca
+  yer değiştirir.
 
 ### AI Kod İncelemesi (#327)
 PR açıldığında (`opened` / `ready_for_review`) webhook Gemini'den ön inceleme alıp PR'a

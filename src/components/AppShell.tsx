@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import LogoutButton from "@/components/LogoutButton";
 import { UnreadBadge } from "@/features/messaging/ui/UnreadBadge";
+import { BekleyenTalepRozeti } from "@/features/workspace-requests/ui/BekleyenTalepRozeti";
 import Image from "next/image";
 
 type Role = "ADMIN" | "MENTOR" | "STUDENT";
@@ -16,6 +17,8 @@ const navByRole: Record<Role, { home: string; links: NavLink[] }> = {
     links: [
       { href: "/admin-dashboard", label: "Panel" },
       { href: "/admin-dashboard/projects", label: "Projeler" },
+      // #349: Mentör taleplerinin kuyruğu. Rozet olmadan kuyruk fark edilmez.
+      { href: "/admin-dashboard/workspace-requests", label: "Çalışma Alanı Talepleri" },
       { href: "/admin-dashboard/messages", label: "Mesajlar" },
       { href: "/admin-dashboard/suggestions", label: "Öneri & İstek" },
     ],
@@ -78,6 +81,7 @@ export function AppShell({ role }: { role: Role }) {
           {links.map((l) => {
             const active = isActive(l.href);
             const isMessages = l.href.endsWith("/messages");
+            const isTalepler = l.href.endsWith("/workspace-requests");
             return (
               <Link
                 key={l.href}
@@ -91,6 +95,7 @@ export function AppShell({ role }: { role: Role }) {
               >
                 {isMessages && <UnreadBadge className="text-current" />}
                 {l.label}
+                {isTalepler && <BekleyenTalepRozeti />}
               </Link>
             );
           })}
