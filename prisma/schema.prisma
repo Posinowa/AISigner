@@ -515,6 +515,27 @@ model RateLimit {
 ///
 /// Ayrıca güvenlik katmanı: geçerli imzalı bir istek yakalanıp tekrar
 /// gönderilse bile ikinci kez işlenmez.
+/// #327: Bir PR'a AI incelemesi yazıldığının OTORİTER kaydı.
+///
+/// NEDEN GEREKLİ — canlı testte bulundu: İdempotens önce yalnızca PR'daki
+/// yorumları okuyup kendi işaretimizi aramaya dayanıyordu. GitHub'ın liste
+/// uçları ANINDA TUTARLI DEĞİL: aynı depoda yeni açılan bir issue'nun
+/// `issues.listForRepo` sonucunda görünmesi gecikebiliyor (aynı hata
+/// `issueHazirla`'da KOPYA issue açtırdı). Aynı gecikme `listComments` için de
+/// geçerli; birbirine yakın iki teslimat (`opened` + `ready_for_review`) public
+/// bir PR'a İKİ yorum bıraktırabilirdi.
+///
+/// Yorum yazılmadan HEMEN ÖNCE ekleniyor ve benzersizlik ihlali "zaten yazıldı"
+/// demek — `ProcessedWebhook` ile aynı desen.
+model PullRequestReview {
+  id        String   @id @default(cuid())
+  repoUrl   String
+  prNumber  Int
+  createdAt DateTime @default(now())
+
+  @@unique([repoUrl, prNumber])
+}
+
 model ProcessedWebhook {
   /// GitHub'ın `X-GitHub-Delivery` başlığındaki benzersiz teslimat kimliği.
   deliveryId String   @id

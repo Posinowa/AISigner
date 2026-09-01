@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import crypto from "crypto";
 
-const { prismaMock, isleMock, limiterCheckMock, loggerMock } = vi.hoisted(() => ({
+const { prismaMock, isleMock, incelemeMock, limiterCheckMock, loggerMock } = vi.hoisted(() => ({
   prismaMock: { processedWebhook: { create: vi.fn() } },
   isleMock: vi.fn(),
+  incelemeMock: vi.fn(),
   limiterCheckMock: vi.fn(),
   loggerMock: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
@@ -14,6 +15,9 @@ vi.mock("@/lib/rate-limit", () => ({
 }));
 vi.mock("@/features/github/server/webhook-isle", () => ({
   issueKapandiginiIsle: (...a: unknown[]) => isleMock(...a),
+}));
+vi.mock("@/features/github/server/pr-inceleme", () => ({
+  prAcildiginiIncele: (...a: unknown[]) => incelemeMock(...a),
 }));
 vi.mock("next/headers", () => ({ headers: () => Promise.resolve(basliklar) }));
 
@@ -42,6 +46,54 @@ beforeEach(() => {
   limiterCheckMock.mockResolvedValue({ allowed: true, remaining: 59, retryAfterSeconds: 0 });
   prismaMock.processedWebhook.create.mockResolvedValue({});
   isleMock.mockResolvedValue({ islendi: true, aciklama: "adım COMPLETED yapıldı" });
+  incelemeMock.mockResolvedValue({ islendi: true, aciklama: "inceleme yazıldı (1 bulgu)" });
+});
+
+/** #327 — PR açılma olayları AI incelemesine yönlendirilmeli. */
+describe("AI kod incelemesi yönlendirmesi (#327)", () => {
+  const prOlayi = (action: string) => ({ action, pull_request: { number: 7 } });
+
+  it("PR 'opened' olayını incelemeye yönlendirir", async () => {
+    const res = await POST(istek(prOlayi("opened"), { "x-github-event": "pull_request" }));
+
+    expect(res.status).toBe(200);
+    expect(incelemeMock).toHaveBeenCalledOnce();
+    // Kapanma işleyicisi ÇAĞRILMAMALI: iki akış birbirine karışmasın.
+    expect(isleMock).not.toHaveBeenCalled();
+  });
+
+  it("taslaktan çıkan PR ('ready_for_review') da incelenir", async () => {
+    // Taslak açılışta atlanıyor; hazır işaretlendiğinde tek şansı bu olay.
+    await POST(istek(prOlayi("ready_for_review"), { "x-github-event": "pull_request" }));
+
+    expect(incelemeMock).toHaveBeenCalledOnce();
+  });
+
+  it("issue 'opened' olayını incelemeye YÖNLENDİRMEZ", async () => {
+    await POST(istek({ action: "opened", issue: {} }, { "x-github-event": "issues" }));
+
+    expect(incelemeMock).not.toHaveBeenCalled();
+  });
+
+  it("MERGE olayı incelemeye değil kapanma işleyicisine gider", async () => {
+    await POST(
+      istek(
+        { action: "closed", pull_request: { merged: true, html_url: "https://github.com/o/r/pull/2" } },
+        { "x-github-event": "pull_request" },
+      ),
+    );
+
+    expect(incelemeMock).not.toHaveBeenCalled();
+    expect(isleMock).toHaveBeenCalledOnce();
+  });
+
+  it("inceleme fırlatırsa 500 DEĞİL 200 döner", async () => {
+    incelemeMock.mockRejectedValue(new Error("beklenmeyen"));
+
+    const res = await POST(istek(prOlayi("opened"), { "x-github-event": "pull_request" }));
+
+    expect(res.status).toBe(200);
+  });
 });
 
 describe("imza koruması", () => {

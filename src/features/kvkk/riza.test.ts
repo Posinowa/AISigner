@@ -11,6 +11,7 @@ vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 
 import {
   aiRizasiVar,
+  guncelRizaVar,
   profilSahibininRizasiVar,
   aiRizasiniAyarla,
   RIZA_METIN_SURUMU,
@@ -76,5 +77,48 @@ describe("aiRizasiniAyarla", () => {
       where: { id: "u1" },
       data: { aiConsentAt: null, aiConsentVersion: null },
     });
+  });
+});
+
+/**
+ * #327 — Kod incelemesi rızanın KAPSAMINI genişletti (artık kod da gidiyor).
+ * Eski metne rıza vermiş kullanıcı yeni kapsamı onaylamış sayılamaz.
+ */
+describe("guncelRizaVar", () => {
+  it("yürürlükteki sürüme rıza varsa true", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      aiConsentAt: new Date(),
+      aiConsentVersion: RIZA_METIN_SURUMU,
+    });
+
+    expect(await guncelRizaVar("u1")).toBe(true);
+  });
+
+  it("ESKİ sürüme rıza varsa false — genişleyen kapsamı kapsamaz", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      aiConsentAt: new Date(),
+      aiConsentVersion: "2026-08-v1",
+    });
+
+    expect(await guncelRizaVar("u1")).toBe(false);
+  });
+
+  it("hiç rıza yoksa false", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      aiConsentAt: null,
+      aiConsentVersion: null,
+    });
+
+    expect(await guncelRizaVar("u1")).toBe(false);
+  });
+
+  it("eski rızalı kullanıcı MEVCUT AI özelliklerini kaybetmez", async () => {
+    // Kasıtlı ayrım: yalnızca kod incelemesi kapanır, sohbet/analiz sürer.
+    prismaMock.user.findUnique.mockResolvedValue({
+      aiConsentAt: new Date(),
+      aiConsentVersion: "2026-08-v1",
+    });
+
+    expect(await aiRizasiVar("u1")).toBe(true);
   });
 });

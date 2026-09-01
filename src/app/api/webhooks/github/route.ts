@@ -9,6 +9,7 @@ import {
   webhookSirriVarMi,
 } from "@/features/github/server/webhook-imza";
 import { issueKapandiginiIsle } from "@/features/github/server/webhook-isle";
+import { prAcildiginiIncele } from "@/features/github/server/pr-inceleme";
 
 /**
  * GitHub webhook alıcısı (#326).
@@ -97,6 +98,21 @@ export async function POST(req: Request) {
 
   try {
     const govde = JSON.parse(hamGovde) as { action?: string };
+
+    // PR açıldı → AI ön incelemesi (#327).
+    //
+    // "ready_for_review" de dahil: taslak olarak açılan PR'ın `opened` olayı
+    // incelenmeden geçiliyor, hazır işaretlendiğinde buraya düşüyor. İki olayın
+    // da geldiği durumda kopya yorum YAZILMAZ — `prAcildiginiIncele` PR'daki
+    // yorumlarda kendi işaretini arıyor (`ProcessedWebhook` yalnız aynı
+    // TESLİMATI eler, iki farklı olayı değil).
+    if (
+      olay === "pull_request" &&
+      (govde.action === "opened" || govde.action === "ready_for_review")
+    ) {
+      const sonuc = await prAcildiginiIncele(govde);
+      return NextResponse.json({ ok: true, ...sonuc });
+    }
 
     // issue "closed", PR "closed" + merged.
     const kapandi =

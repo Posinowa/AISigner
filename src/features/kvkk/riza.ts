@@ -35,17 +35,45 @@ import { prisma } from "@/lib/db";
  * Metin değiştiğinde BU DEĞER DE ARTIRILMALI — aksi halde eski sürüme verilmiş
  * rıza, kullanıcının hiç görmediği yeni bir metni kapsıyormuş gibi görünür.
  */
-export const RIZA_METIN_SURUMU = "2026-08-v1";
+export const RIZA_METIN_SURUMU = "2026-09-v1";
 
 export { AI_RIZA_ALANI, RIZA_OZETI } from "./riza-alani";
 
-/** Kullanıcının AI işlemeye rızası var mı? false ise veri Vertex'e GİTMEMELİ. */
+/**
+ * Kullanıcının AI işlemeye rızası var mı? false ise veri Vertex'e GİTMEMELİ.
+ *
+ * SÜRÜM KONTROLÜ YOK — bilinçli. Metin her güncellendiğinde mevcut tüm
+ * kullanıcıların AI özellikleri kapansaydı, tek bir yazım düzeltmesi bile
+ * platformu geniş çapta işlevsiz bırakırdı. Metnin KAPSAMI genişlediğinde
+ * (yeni veri türü / yeni amaç) `guncelRizaVar` kullanılır.
+ */
 export async function aiRizasiVar(userId: string): Promise<boolean> {
   const k = await prisma.user.findUnique({
     where: { id: userId },
     select: { aiConsentAt: true },
   });
   return Boolean(k?.aiConsentAt);
+}
+
+/**
+ * Kullanıcı YÜRÜRLÜKTEKİ metne rıza vermiş mi?
+ *
+ * NEDEN AYRI (#327): Kod incelemesi rızanın kapsamını genişletti — artık
+ * stajyerin KODU da yurt dışına gidiyor. "Profil ve mesajlarım aktarılsın"
+ * diyen bir kullanıcı koduna rıza vermiş sayılamaz; açık rızanın "belirli ve
+ * bilgilendirilmiş" olma şartı bunu engelliyor.
+ *
+ * Bu yüzden yalnızca KAPSAMI GENİŞLEYEN özellikler bunu kullanır. Mevcut
+ * özellikler `aiRizasiVar` ile çalışmaya devam eder, yani eski rızası olan
+ * kullanıcı sohbetini ve analizini kaybetmez; sadece kod incelemesi almaz.
+ * Yeniden rıza vermek için `/api/profile/ai-riza` açık.
+ */
+export async function guncelRizaVar(userId: string): Promise<boolean> {
+  const k = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { aiConsentAt: true, aiConsentVersion: true },
+  });
+  return Boolean(k?.aiConsentAt) && k?.aiConsentVersion === RIZA_METIN_SURUMU;
 }
 
 /**
