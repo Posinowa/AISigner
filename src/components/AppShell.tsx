@@ -21,6 +21,8 @@ const navByRole: Record<Role, { home: string; links: NavLink[] }> = {
       { href: "/admin-dashboard/workspace-requests", label: "Çalışma Alanı Talepleri" },
       // #331: Darboğaz, yanıt süresi, gözden geçirilecek öğrenciler.
       { href: "/admin-dashboard/analytics", label: "Analitik" },
+      // #332: Takım/Scrum projeleri.
+      { href: "/admin-dashboard/teams", label: "Takımlar" },
       { href: "/admin-dashboard/messages", label: "Mesajlar" },
       { href: "/admin-dashboard/suggestions", label: "Öneri & İstek" },
     ],

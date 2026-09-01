@@ -153,6 +153,27 @@ Arayüz **asenkron**: `check`/`peek`/`reset` Promise döner. DB'ye ulaşılamazs
 **fail-open** (istek geçer + loglanır); kesintide tüm girişleri kilitlememek için
 bilinçli karar.
 
+### Takım / Scrum Projeleri (#332)
+2–4 kişilik takım ortak bir pano ve ortak bir repo paylaşır. **Sahiplik takımda, kredi kişide.**
+
+- `AssignedProject` takıma ait (**tek kayıt → tek roadmap → tek repo**); `studentProfileId`
+  nullable, `teamId` dolu. **Sahip TAM BİRİ olmalı** — kısıt ham CHECK olarak VERİTABANINDA
+  (`assigned_project_sahip_tek`), Prisma ifade edemiyor.
+- **Sertifika BİREYSEL kalıyor.** Katkı `RoadmapStep.assigneeId` (kim üstlendi) +
+  `StepStatusHistory.changedById` (kim tamamladı, #324) üzerinden ölçülür.
+- **`sahiplik.ts` tek doğru kaynak.** "Bu atama kimin" sorusunu 15 dosya soruyordu; hepsi
+  `ATAMA_SAHIPLIK_SELECT` + saf yardımcılardan geçiyor. Fonksiyonlar veri ÇEKMİYOR.
+- **Ayrılmış üye sahip DEĞİL** ama satırı SİLİNMİYOR (`leftAt`) — katkı geçmişi sertifikanın
+  dayanağı. Ayrılınca üstlendiği adımlar panoya geri düşer.
+- **Mentör TAKIMA atanır**; etkin mentörler = kendi mentörleri (#195) + takımınkiler.
+- **Adım kilitlenmez:** başkasının üstlendiği adım devralınabilir (havuzdan iş çekme).
+  Adım yalnızca ATAMANIN ÖĞRENCİLERİNE atanabilir — yoksa mentör panoya kendini yazardı.
+- Takımda AI girdileri: seviye **EN DÜŞÜK** (pano ortak, en yeni üye de takip etmeli),
+  PR incelemesinde **HERKESİN** rızası aranır (kimin hangi satırı yazdığı bilinmiyor),
+  günlük tavan **takım başına**.
+- ⚠️ **Takım için AI yol haritası/adım üretimi YOK** — açık 400. Sentetik profil uydurmak
+  üretilen içeriğin kime göre ayarlandığını belirsizleştirirdi.
+
 ### Analitik Panel (#331)
 `features/analytics/server/analiz.ts` (üç ham SQL) → `panel.ts` (önbellek) →
 `/api/admin/analytics` (platform) · `/api/mentor/analytics` (kapsam OTURUMDAN daraltılır).
