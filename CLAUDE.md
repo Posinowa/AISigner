@@ -153,6 +153,23 @@ Arayüz **asenkron**: `check`/`peek`/`reset` Promise döner. DB'ye ulaşılamazs
 **fail-open** (istek geçer + loglanır); kesintide tüm girişleri kilitlememek için
 bilinçli karar.
 
+### Akıllı Eşleştirme (#328)
+`POST /api/admin/match-mentors` — öğrencinin `ProfileAnalysis`'i ile mentörlerin
+`MentorAnalysis.idealStudentProfile`'ını (#288) tek bir Gemini çağrısında sıralar.
+**pgvector YOK** (Aşama 1): anlamsal malzeme zaten üretiliyordu, eksik olan sıralamaydı.
+
+- **ÖNERİ ATAMA YAPMAZ.** Uç yalnız sıralama döner; atama admin'in ayrı tıkı
+  (`setStudentMentors`). Otomatik atamak, insanın gözden geçirdiği kararı modele devretmekti.
+- **⚠️ YÜZDE SKOR ÜRETİLMİYOR.** "%88 uyum" arkasında ölçülmüş bir şey yokken kesinlik
+  hissi verir ve admin'i gerekçeyi okumadan güvenmeye iter. Bant (`guclu`/`olasi`/`zayif`)
+  + zorunlu gerekçe; okunacak şey gerekçe.
+- **Eleme SESSİZ DEĞİL.** Analizi/rızası olmayan mentörler sıralamaya girmez; sayıları
+  yanıtta döner — "en uygun 3", adaylar elenmişken yanıltıcı olur.
+- **Uydurma mentör kimliği elenir.** Prompt'taki "uydurma" talimatı garanti değil;
+  dönen kimlik aday kümesinde yoksa atılır ve sayaç artar.
+- **Mentör rızası da aranıyor** — `basvuru.ts` analizi rıza kontrolü yapmadan üretiyor
+  (mevcut boşluk); burada aynı boşluk tekrarlanmadı.
+
 ### Çalışma Alanı Talebi (#349)
 Kurulumu tetikleyen uç ADMIN'e kapalı, ama öğrencinin ne zaman hazır olduğunu bilen MENTÖR.
 Mentör **talep eder** (`POST /api/mentor/workspace-request`), admin **karara bağlar**

@@ -38,6 +38,7 @@ import {
 import { Avatar } from "@/features/profile/ui/Avatar";
 import type { CertificateData } from "@/features/certificate/server/certificate";
 import { ROL_ROZETI, DURUM_ROZETI } from "@/lib/ui/rol-renkleri";
+import { MentorOnerisiPaneli } from "@/features/matching/ui/MentorOnerisiPaneli";
 
 type User = {
   id: string;
@@ -886,6 +887,20 @@ export default function AdminDashboard() {
                               </select>
                               {isUpdating && <Loader2 className="animate-spin w-3.5 h-3.5 text-blue-600" />}
                             </div>
+
+                            {/* #328: AI mentör önerisi. Panel ATAMA YAPMAZ —
+                                "Ata" düğmesi mevcut atama akışını çağırır. */}
+                            <MentorOnerisiPaneli
+                              studentId={user.id}
+                              ogrenciAdi={getDisplayName(user)}
+                              atamaSuruyor={isUpdating}
+                              onAta={(mentorId) =>
+                                handleSetMentors(user.id, [
+                                  ...user.studentProfile!.mentors.map((x) => x.id),
+                                  mentorId,
+                                ])
+                              }
+                            />
                           </div>
                         ) : (
                           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 rounded-xl">

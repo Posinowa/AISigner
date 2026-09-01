@@ -294,3 +294,8 @@ export const decideWorkspaceRequestSchema = z.object({
   // karmaşıklaştırırdı ve kural iki yerde tekrarlanırdı.
   adminNote: z.string().max(500, "Not en fazla 500 karakter olabilir").optional(),
 });
+
+// #328: Mentör önerisi — yalnız öğrenci kimliği; sıralama sunucuda kurulur.
+export const matchMentorsSchema = z.object({
+  studentId: z.string().min(1, "Öğrenci ID'si gerekli"),
+});
