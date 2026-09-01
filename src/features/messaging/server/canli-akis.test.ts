@@ -155,6 +155,22 @@ describe("olay dağıtımı", () => {
     ]);
   });
 
+  it("adım sorgusu bağlı kullanıcılara göre SORGUDA filtrelenir", async () => {
+    // #358: Önceden tüm platformun tamamlanma kayıtları çekilip JS tarafında
+    // eleniyordu; `take` sınırı yüzünden bağlı bir öğrencinin tamamlaması
+    // ilgisiz kayıtların arkasında kalıp KAÇIRILABİLİRDİ.
+    abone("ogrenci-1");
+    abone("ogrenci-2");
+
+    await tikAt();
+
+    const where = prismaMock.stepStatusHistory.findMany.mock.calls[0][0].where;
+    expect(where.step.roadmap.assignedProject.studentProfile.userId.in).toEqual([
+      "ogrenci-1",
+      "ogrenci-2",
+    ]);
+  });
+
   it("tamamlanan adımı adımın SAHİBİNE yollar", async () => {
     const sahip = abone("ogrenci-1");
     const baskasi = abone("ogrenci-2");

@@ -53,6 +53,7 @@ class SahteEventSource {
 }
 
 import { UnreadBadge } from "./UnreadBadge";
+import { canliAkisiSifirlaForTests } from "./useCanliAkis";
 
 const fetchMock = vi.fn();
 
@@ -63,9 +64,14 @@ beforeEach(() => {
   vi.stubGlobal("fetch", fetchMock);
   vi.stubGlobal("EventSource", SahteEventSource);
   SahteEventSource.sonuncu = null;
+  // #358: Bağlantı artık modül düzeyinde PAYLAŞILIYOR. Sıfırlanmazsa bir
+  // sonraki test, kapanması beklemede olan aynı bağlantıyı devralır ve yeni
+  // bir örnek hiç oluşmaz.
+  canliAkisiSifirlaForTests();
 });
 
 afterEach(() => {
+  canliAkisiSifirlaForTests();
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
