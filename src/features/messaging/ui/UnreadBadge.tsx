@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { MessageCircle } from "lucide-react";
 import { useCanliAkis } from "./useCanliAkis";
 
@@ -15,11 +15,22 @@ type Props = {
 export function UnreadBadge({ className = "" }: Props) {
   const [count, setCount] = useState(0);
 
+  /**
+   * Akıştan bir değer geldi mi?
+   *
+   * ⚠️ YARIŞ KORUMASI: açılıştaki ilk `fetch` uçuştayken akış daha taze bir
+   * sayı gönderebiliyor. Koruma olmadan geciken yanıt üzerine yazıyor ve rozet
+   * eski değere geri dönüyordu — testte yakalandı.
+   */
+  const akistanGeldi = useRef(false);
+
   // #329: Sayacı canlı akış besliyor. Akış her tikte "değiştiyse" yolluyor,
   // yani okundu işaretlemesi de anında yansıyor.
   const { bagli } = useCanliAkis(
     useCallback((olay) => {
-      if (olay.tip === "okunmamis") setCount(olay.sayi);
+      if (olay.tip !== "okunmamis") return;
+      akistanGeldi.current = true;
+      setCount(olay.sayi);
     }, []),
   );
 
@@ -29,7 +40,8 @@ export function UnreadBadge({ className = "" }: Props) {
       const res = await fetch("/api/messages/unread-count");
       if (res.ok) {
         const data = await res.json();
-        setCount(data.unreadCount);
+        // Akış zaten konuştuysa yanıt bayattır.
+        if (!akistanGeldi.current) setCount(data.unreadCount);
       }
     } catch {
       // Sessiz fail
@@ -45,6 +57,9 @@ export function UnreadBadge({ className = "" }: Props) {
   // Kaldırılsaydı, SSE'yi kesen bir vekilin arkasında rozet ölü kalırdı.
   useEffect(() => {
     if (bagli) return;
+
+    // Akış koptu: yoklama yeniden tek doğru kaynak olur.
+    akistanGeldi.current = false;
 
     const interval = setInterval(fetchCount, 15000);
     const onVisible = () => {

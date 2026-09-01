@@ -153,6 +153,23 @@ Arayüz **asenkron**: `check`/`peek`/`reset` Promise döner. DB'ye ulaşılamazs
 **fail-open** (istek geçer + loglanır); kesintide tüm girişleri kilitlememek için
 bilinçli karar.
 
+### Gerçek Zamanlı Mesajlaşma (#329)
+`GET /api/messages/stream` (SSE) + `features/messaging/server/canli-akis.ts`.
+Olaylar: `mesaj`, `okunmamis`, `adim-tamamlandi`.
+
+- **⚠️ "GERÇEK PUSH" DEĞİL — SUNUCU TARAFI TARAMA.** Süreç-yerel yayın listesi çok
+  instance'ta SESSİZCE bozulurdu (A pod'una yazılan mesaj B'ye ulaşmaz; #322 zaten çok
+  instance diyor). LISTEN/NOTIFY `pg` bağımlılığı + havuz dışı bağlantı + yine de yakalama
+  sorgusu isterdi. Seçilen: her pod TİK BAŞINA TEK sorgu — **kullanıcı sayısından bağımsız**.
+- Yük: ~800 istek/dk (50 kullanıcı) → pod başına ~30 sorgu/dk. Yoklama istemciden sunucuya taşındı.
+- **Yoklama KALDIRILMADI, koşullu.** `useCanliAkis` `bagli` döner; istemci yalnız kopukken
+  yoklar. SSE'yi kesen bir vekilin arkasında mesajlaşma ölmemeli.
+- **İmleç çakışma payıyla geriye çekilir** (kayıp önleme), kopyalar bağlantı başına
+  `gorulen` kümesiyle elenir. Tik hata verirse **imleç ilerlemez**.
+- Kimse bağlı değilken döngü durur — boş pod sorgu atmaz.
+- `: kalp` yorumu 25 sn'de bir: vekiller sessiz bağlantıyı ~60 sn'de keser.
+- **"Yazıyor..." bu PR'a ALINMADI** → #354 (paylaşımlı geçici durum gerektiriyor).
+
 ### Akıllı Eşleştirme (#328)
 `POST /api/admin/match-mentors` — öğrencinin `ProfileAnalysis`'i ile mentörlerin
 `MentorAnalysis.idealStudentProfile`'ını (#288) tek bir Gemini çağrısında sıralar.
