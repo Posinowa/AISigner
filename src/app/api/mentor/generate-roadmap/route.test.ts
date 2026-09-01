@@ -19,6 +19,11 @@ vi.mock("@/features/ai/server/generate-roadmap", () => ({
 vi.mock("@/lib/rate-limit", () => ({
   createRateLimiter: () => ({ check: () => ({ allowed: true }) }),
 }));
+// #321: KVKK rizasi — varsayilan olarak VAR; ayri bir test yoklugunu olcuyor.
+const { rizaMock } = vi.hoisted(() => ({ rizaMock: vi.fn() }));
+vi.mock("@/features/kvkk/riza", () => ({
+  profilSahibininRizasiVar: (...a: unknown[]) => rizaMock(...a),
+}));
 
 import { POST } from "./route";
 
@@ -49,6 +54,21 @@ describe("generate-roadmap overwrite koruması (#178-4)", () => {
     vi.clearAllMocks();
     generateRoadmapMock.mockResolvedValue([]);
     prismaMock.roadmap.create.mockResolvedValue({ id: "r-new", steps: [] });
+    rizaMock.mockResolvedValue(true);
+  });
+
+  // #321 KVKK: islemi MENTOR tetikliyor ama veri OGRENCIYE ait. Ogrencinin
+  // rizasi yoksa profil verisi Vertex AI'ya (ABD) gonderilmemeli.
+  it("öğrencinin KVKK rızası yoksa 403 döner ve AI ÇAĞRILMAZ", async () => {
+    mentor();
+    prismaMock.assignedProject.findUnique.mockResolvedValue(assignedProject(null));
+    rizaMock.mockResolvedValue(false);
+
+    const res = await POST(req({ assignedProjectId: "ap-1" }));
+
+    expect(res.status).toBe(403);
+    expect((await res.json()).rizaGerekli).toBe(true);
+    expect(generateRoadmapMock).not.toHaveBeenCalled();
   });
 
   it("MENTOR değil → guard yanıtı döner (403)", async () => {

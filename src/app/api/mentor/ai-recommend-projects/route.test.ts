@@ -20,6 +20,10 @@ vi.mock("@/features/ai/server/project-recommendations", () => ({
 vi.mock("@/lib/rate-limit", () => ({
   createRateLimiter: () => ({ check: () => ({ allowed: true }) }),
 }));
+// #321: KVKK rizasi — varsayilan olarak VAR; ayri bir test yoklugunu olcuyor.
+vi.mock("@/features/kvkk/riza", () => ({
+  profilSahibininRizasiVar: () => Promise.resolve(true),
+}));
 
 import { POST } from "./route";
 

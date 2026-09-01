@@ -22,6 +22,8 @@ vi.mock("next/cache", () => ({
 vi.mock("@/features/ai/server/profile-analysis", () => ({
   analyzeStudentProfile: analizMock,
 }));
+// #321: KVKK rizasi — bu dosya AI ozet davranisini olcuyor, riza VAR kabul.
+vi.mock("@/features/kvkk/riza", () => ({ aiRizasiVar: () => Promise.resolve(true) }));
 
 import { getProfileSummary } from "./profileSummary";
 
