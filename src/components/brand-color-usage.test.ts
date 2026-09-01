@@ -34,6 +34,16 @@ function ihlaller(desen: RegExp): string[] {
   return bulunan;
 }
 
+/**
+ * Tailwind mor yardimci siniflari.
+ *
+ * `\b` KULLANILMIYOR: #338 sirasinda kacis hatasi yuzunden desen icine
+ * gercek bir backspace karakteri kacmis ve test hicbir seyi yakalamadan
+ * yesil kalmisti. Sahte guvence, korumasizliktan daha kotudur.
+ */
+const MOR_DESENI =
+  /(?:bg|text|border|ring|from|to|via|shadow|fill|stroke|outline|accent|divide|placeholder)-purple-[0-9]/g;
+
 describe("Marka rengi kullanımı (#239)", () => {
   it("bg-primary üzerinde sabit text-white kullanılmaz", () => {
     /*
@@ -42,6 +52,20 @@ describe("Marka rengi kullanımı (#239)", () => {
       gelmeli: text-primary-foreground.
     */
     expect(ihlaller(/bg-primary[^"'`]*\btext-white\b/g)).toEqual([]);
+  });
+
+  it("mor (purple-*) KULLANILMAZ — marka paletinde yok", () => {
+    /*
+      #338: Mor hiçbir tasarım tokeninde geçmiyor (`globals.css` `@theme`
+      yalnız logo laciverti #23356c ve logonun orta mavisi #3e92cc tanımlar).
+      Buna rağmen bileşenlere sabit kodlanarak 119 kullanıma kadar yayılmıştı
+      ve ANLAMI da tutarsızdı: mor admin panelinde ADMIN'i, mesajlaşmada
+      MENTOR'ü temsil ediyordu.
+
+      Bu test kaymanın sessizce geri gelmesini engelliyor. Rol/durum renkleri
+      artık `lib/ui/rol-renkleri.ts`'te tek kaynaktan geliyor.
+    */
+    expect(ihlaller(MOR_DESENI)).toEqual([]);
   });
 
   /*

@@ -535,12 +535,12 @@ export default function StudentDetailPage() {
                           {project.roadmap ? (
                             <div className="flex items-center justify-between w-full">
                               <span className="text-sm font-medium text-gray-700 flex items-center">
-                                <Map className="w-4 h-4 mr-2 text-purple-600" />
+                                <Map className="w-4 h-4 mr-2 text-[#3e92cc]" />
                                 AI Rotası {project.roadmap.status === "PUBLISHED" ? "Yayında" : "Hazır"} ({project.roadmap.steps?.length || 0} Adım)
                               </span>
                               <Link
                                 href={`/mentor-dashboard/roadmap/${project.roadmap.id}`}
-                                className="text-sm font-semibold text-purple-600 hover:text-purple-800 transition-colors"
+                                className="text-sm font-semibold text-[#2f7cb0] hover:text-primary transition-colors"
                               >
                                 İncele ve Onayla →
                               </Link>
@@ -553,8 +553,8 @@ export default function StudentDetailPage() {
                                 disabled={generatingRoadmapId === project.id}
                                 className={`text-sm font-medium flex items-center transition-all px-3 py-1.5 rounded-md ${
                                   generatingRoadmapId === project.id 
-                                    ? "bg-purple-100 text-purple-600 cursor-wait" 
-                                    : "bg-purple-50 text-purple-700 hover:bg-purple-100"
+                                    ? "bg-[#3e92cc]/15 text-[#3e92cc] cursor-wait" 
+                                    : "bg-[#3e92cc]/10 text-[#2f7cb0] hover:bg-[#3e92cc]/20"
                                 }`}
                               >
                                 {generatingRoadmapId === project.id ? (
@@ -613,8 +613,8 @@ export default function StudentDetailPage() {
                   disabled={isAIThinking || templatesLoading}
                   className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold transition-all shadow-sm ${
                     isAIThinking || templatesLoading
-                      ? "bg-purple-100 text-purple-600 cursor-wait"
-                      : "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-purple-200/50"
+                      ? "bg-[#3e92cc]/15 text-[#3e92cc] cursor-wait"
+                      : "bg-gradient-to-r from-[#3e92cc] to-primary hover:from-[#2f7cb0] hover:to-[#1b2a55] text-primary-foreground shadow-[#3e92cc]/30"
                   }`}
                 >
                   {isAIThinking || templatesLoading ? (
@@ -678,21 +678,21 @@ export default function StudentDetailPage() {
                         key={template.id} 
                         className={`flex flex-col border rounded-2xl overflow-hidden transition-all duration-300 ${
                           isAssigned ? 'bg-gray-50 border-gray-200 opacity-60' : 
-                          aiRec ? 'border-purple-300 shadow-lg shadow-purple-100 bg-purple-50/10 scale-[1.02]' : 
+                          aiRec ? 'border-[#3e92cc] shadow-lg shadow-[#3e92cc]/20 bg-[#3e92cc]/5 scale-[1.02]' : 
                           'hover:shadow-lg border-gray-200 bg-white hover:-translate-y-1'
                         }`}
                       >
                         {aiRec && !isAssigned && (
-                          <div className="bg-gradient-to-r from-purple-100 to-indigo-50 border-b border-purple-100 p-3.5">
+                          <div className="bg-gradient-to-r from-[#3e92cc]/15 to-[#3e92cc]/5 border-b border-[#3e92cc]/20 p-3.5">
                             <div className="flex justify-between items-center mb-1.5">
-                              <span className="flex items-center text-[11px] font-bold text-purple-800 uppercase tracking-wider">
+                              <span className="flex items-center text-[11px] font-bold text-primary uppercase tracking-wider">
                                 <Sparkles className="w-3 h-3 mr-1" /> En İyi Eşleşme
                               </span>
-                              <span className="text-[10px] font-bold text-white bg-purple-600 px-2 py-0.5 rounded-full shadow-sm">
+                              <span className="text-[10px] font-bold text-primary-foreground bg-[#3e92cc] px-2 py-0.5 rounded-full shadow-sm">
                                 %{aiRec.matchScore} Uyum
                               </span>
                             </div>
-                            <p className="text-xs text-purple-700/90 font-medium leading-relaxed">
+                            <p className="text-xs text-[#2f7cb0]/90 font-medium leading-relaxed">
                               {`"${aiRec.reason}"`}
                             </p>
                           </div>
@@ -725,7 +725,7 @@ export default function StudentDetailPage() {
                              isAssigned 
                                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                                : aiRec 
-                                 ? 'bg-purple-600 hover:bg-purple-700 text-white shadow-md hover:shadow-lg' 
+                                 ? 'bg-primary hover:bg-[#1b2a55] text-primary-foreground shadow-md hover:shadow-lg' 
                                  : 'bg-gray-900 hover:bg-black text-white shadow-md'
                            }`}
                           >

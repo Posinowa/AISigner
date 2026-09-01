@@ -2,11 +2,12 @@
 import { useSession } from "next-auth/react";
 import { useState } from "react";
 import { Bug, ChevronDown, ChevronUp } from "lucide-react";
+import { ROL_ROZETI } from "@/lib/ui/rol-renkleri";
 
 const roleColors: Record<string, string> = {
-  ADMIN: "bg-purple-50 text-purple-700 border-purple-200",
-  MENTOR: "bg-blue-50 text-blue-700 border-blue-200",
-  STUDENT: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  ADMIN: ROL_ROZETI.ADMIN.sinif,
+  MENTOR: ROL_ROZETI.MENTOR.sinif,
+  STUDENT: ROL_ROZETI.STUDENT.sinif,
 };
 
 /**

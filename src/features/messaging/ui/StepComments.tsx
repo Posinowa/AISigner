@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { MessageSquare, Send, Loader2, Trash2, Pencil, X, User } from "lucide-react";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { toast } from "sonner";
+import { rolRozetiDolu } from "@/lib/ui/rol-renkleri";
 
 type Comment = {
   id: string;
@@ -43,9 +44,10 @@ export function StepComments({ stepId, currentUserId, currentUserRole, isDraft, 
   const getFullName = (user: { name: string | null; lastName: string | null }) =>
     [user.name, user.lastName].filter(Boolean).join(" ") || "İsimsiz";
 
+  // #338: Renkler merkezi kaynaktan (MessagingPanel ile aynı çelişki vardı).
   const getRoleInfo = (role: string) => {
-    if (role === "MENTOR") return { label: "Mentor", color: "bg-purple-100 text-purple-700", ring: "ring-purple-200" };
-    return { label: "Öğrenci", color: "bg-blue-100 text-blue-700", ring: "ring-blue-200" };
+    const r = rolRozetiDolu(role);
+    return { label: r.etiket, color: r.sinif, ring: r.halka };
   };
 
   const loadComments = useCallback(async () => {
