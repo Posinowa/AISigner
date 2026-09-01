@@ -397,3 +397,41 @@ otomatik olarak tamamlanır. Bunun için GitHub'ın olayları bize göndermesi g
 >
 > Aynı teslimat iki kez gelirse (GitHub yeniden dener) ikinci kez işlenmez;
 > `ProcessedWebhook` tablosu teslimat kimliğini tutuyor.
+
+### 10.1 AI kod incelemesi (#327)
+
+Aynı webhook, **PR açıldığında** Gemini destekli bir ön inceleme yorumu bırakır.
+Ek bir kurulum adımı yoktur — yukarıdaki "Pull requests" olayı yeterlidir — ama
+şunlar sağlanmazsa özellik SESSİZCE devre dışı kalır (bu bilinçlidir; hiçbiri
+uygulamayı çökertmez):
+
+| Koşul | Sağlanmazsa |
+|---|---|
+| `GITHUB_TOKEN` PR'a **yorum yazma** izni taşımalı | yorum yazılamaz, loglanır |
+| `GOOGLE_CLOUD_PROJECT` + kimlik dosyası | inceleme üretilemez, **yorum yazılmaz** |
+| Repo bir `AssignedProject.githubRepoUrl` ile eşleşmeli | dokunulmaz |
+| Öğrenci **yürürlükteki** KVKK metnine rıza vermiş olmalı | inceleme yapılmaz |
+
+**⚠️ Rıza sürümü yükseltildi.** Kod incelemesi öğrencinin **kodunu** da yurt
+dışına gönderdiği için rıza metninin kapsamı genişledi ve `RIZA_METIN_SURUMU`
+`2026-09-v1` oldu. Eski metne rıza vermiş kullanıcılar sohbet/analiz
+özelliklerini KAYBETMEZ, ancak kod incelemesi almazlar; yeniden rıza vermeleri
+gerekir (profil ayarlarındaki AI rızası anahtarı).
+
+**Maliyet tavanları** (`src/features/github/server/pr-inceleme.ts`):
+
+| Sınır | Değer |
+|---|---|
+| Öğrenci başına günlük inceleme | 10 |
+| Platform geneli günlük inceleme | 200 |
+| PR başına azami dosya | 30 |
+| PR başına azami diff | 40.000 karakter |
+
+Lockfile, build çıktısı ve ikili dosyalar diff'e hiç girmez. Aynı PR'a ikinci
+yorum yazılmaz (yorumlardaki `<!-- aisigner-ai-review -->` işareti aranır).
+
+**Doğrulama:**
+
+- [ ] Test PR'ında yorum "🤖 AI ön incelemesi" başlığıyla ve mentör ibaresiyle görünüyor
+- [ ] Aynı PR'a ikinci teslimat gönderildiğinde **ikinci yorum yazılmıyor**
+- [ ] Rızası olmayan bir öğrencinin PR'ında yorum **yazılmıyor**

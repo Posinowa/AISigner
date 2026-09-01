@@ -87,6 +87,7 @@ src/
 | `Suggestion` | Stajyer→admin öneri/istek; type + status + adminNote (#147) |
 | `MentorProfile` / `MentorAnalysis` | mentör başvuru profili + AI eşleştirme analizi (#287/#288) |
 | `StepIssue` | adım ↔ GitHub issue eşlemesi (#218) |
+| `ProcessedWebhook` / `PullRequestReview` | webhook teslimat kimliği (#326) / PR'a inceleme yazıldığının otoriter kaydı (#327) |
 | `Message` / `StepComment` / `StepFile` | mesajlaşma, yorum, dosya (`SecurityAnswer` #264'te düşürüldü) |
 
 ## Kritik Mimari Notlar
@@ -150,6 +151,31 @@ tek atomik SQL ifadesiyle yapılıyor — çok instance güvenli, Redis gerekmiy
 Arayüz **asenkron**: `check`/`peek`/`reset` Promise döner. DB'ye ulaşılamazsa
 **fail-open** (istek geçer + loglanır); kesintide tüm girişleri kilitlememek için
 bilinçli karar.
+
+### AI Kod İncelemesi (#327)
+PR açıldığında (`opened` / `ready_for_review`) webhook Gemini'den ön inceleme alıp PR'a
+**tek bir yorum** yazar. Akış: `pr-inceleme.ts` → `pr-diff.ts` (filtre+bütçe) →
+`ai/server/code-review.ts` (prompt+Zod).
+
+- **Mock fallback YOK** — bilinçli ve diğer AI modüllerinden farklı. Çıktı public bir PR'a
+  yazılıyor; model çuvallarsa doğru davranış susmak.
+- **İki katmanlı idempotens.** Ucuz katman: PR yorumlarında `<!-- aisigner-ai-review -->`
+  aranır. Otoriter katman: `PullRequestReview` tablosu (`@@unique([repoUrl, prNumber])`),
+  yorumdan hemen önce yazılır. ⚠️ İkincisi CANLI TESTTE bulundu: **GitHub'ın liste uçları
+  anında tutarlı değil** — aynı hata `issueHazirla`'da kopya issue açtırdı (#345).
+- **Maliyet kapıları** (`pr-inceleme.ts` başındaki sırayla): rıza → mevcut yorum → günlük
+  tavan (öğrenci 10, platform 200) → diff (≤30 dosya, ≤40k karakter, lockfile/build elenir)
+  → Gemini.
+
+#### ⚠️ Rıza sürümü ve `guncelRizaVar` (#327)
+Kod incelemesi öğrencinin **kodunu** da yurt dışına gönderiyor; bu yeni bir veri türü ve
+yeni bir amaç, yani eski rıza metnini AŞIYOR. `RIZA_METIN_SURUMU` → `2026-09-v1`.
+- `aiRizasiVar` **sürüme bakmaz** — mevcut özellikler (sohbet, analiz) eski rızayla çalışır.
+  Her metin düzeltmesinde herkesin AI'ı kapansaydı platform sürekli işlevsiz kalırdı.
+- `guncelRizaVar` **yürürlükteki sürümü şart koşar** — yalnızca KAPSAMI genişleyen
+  özellikler kullanır. Bugün tek kullanıcısı kod incelemesi.
+- Metnin kapsamını genişleten her değişiklikte sürüm artırılmalı ve ilgili özellik
+  `guncelRizaVar`'a geçirilmeli.
 
 ### Mezuniyet & Sertifika Doğrulama Sistemi (#208)
 - **Mezuniyet Durumu (`accountStatus: GRADUATED`)**: Portfolyo salt-okunur (Seçenek A). Öğrenci dashboard, yol haritası adımları, dosyaları, yorumları ve sertifikasını görüntüleyebilir; ancak adım durumu değiştirme, dosya yükleme/silme ve yorum ekleme/düzenleme/silme API'leri 403 ile engellenir.
