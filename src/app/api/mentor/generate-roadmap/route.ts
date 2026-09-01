@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import {
+  ATAMA_SAHIPLIK_SELECT,
+  erisebilirMi,
+  mentoruMu,
+  ogrencisiMi,
+} from "@/features/teams/server/sahiplik";
 import { generateRoadmap } from "@/features/ai/server/generate-roadmap";
 import { requireAuth } from "@/lib/auth/guard";
 import { isAssignedMentor } from "@/lib/auth/mentor-access";
@@ -40,9 +46,11 @@ export async function POST(req: Request) {
     const assignedProject = await prisma.assignedProject.findUnique({
       where: { id: assignedProjectId },
       include: {
-        studentProfile: {
-          include: { mentorAssignments: { select: { mentorId: true } } },
-        },
+        // #332: Sahiplik bireysel VEYA takım; yetki tek tanımdan gelir.
+        // `generateRoadmap` TAM profili istediği için studentProfile ayrıca
+        // bütünüyle çekiliyor (takım dalı aşağıda erken dönüyor).
+        ...ATAMA_SAHIPLIK_SELECT,
+        studentProfile: { include: { mentorAssignments: { select: { mentorId: true } } } },
         projectTemplate: true,
         roadmap: true // Zaten bir yol haritası var mı diye kontrol etmek için
       }
@@ -53,7 +61,7 @@ export async function POST(req: Request) {
     }
 
     // Mentor ownership kontrolü — #195: öğrencinin mentorlarından biri mi?
-    if (!isAssignedMentor(assignedProject.studentProfile.mentorAssignments, auth.session.user.id)) {
+    if (!mentoruMu(assignedProject, auth.session.user.id)) {
       return NextResponse.json(
         { error: "Bu proje üzerinde işlem yapma yetkiniz yok." },
         { status: 403 }
@@ -63,6 +71,29 @@ export async function POST(req: Request) {
     // #321: KVKK açık rıza. İşlemi MENTÖR tetikliyor ama veri ÖĞRENCİYE ait —
     // rıza da öğrencinin. Rıza yoksa profil verisi Vertex AI'ya (ABD)
     // gönderilmez.
+    // #332: TAKIM YOL HARİTASI ÜRETİMİ BU FAZDA YOK — bilinçli sınır.
+    //
+    // `generateRoadmap` tek bir öğrenci profili (seviye, ilgi alanları,
+    // hedefler) bekliyor; takımda böyle tek bir profil YOK. Üyeleri birleştiren
+    // bir "sentetik profil" uydurmak, üretilen yol haritasının kime göre
+    // ayarlandığını belirsizleştirirdi. Birleştirme kuralları (en düşük seviye,
+    // ilgi alanlarının birleşimi) `sahiplik.ts`'te tanımlı ama bu uca
+    // bağlanması ayrı bir iş.
+    if (assignedProject.team) {
+      return NextResponse.json(
+        {
+          error:
+            "Takım projeleri için AI yol haritası üretimi henüz desteklenmiyor. " +
+            "Adımları elle ekleyebilirsiniz.",
+        },
+        { status: 400 },
+      );
+    }
+
+    if (!assignedProject.studentProfile) {
+      return NextResponse.json({ error: "Atamanın sahibi bulunamadı." }, { status: 400 });
+    }
+
     if (!(await profilSahibininRizasiVar(assignedProject.studentProfile.id))) {
       return NextResponse.json(
         {

@@ -3,11 +3,16 @@ import { requireAuth } from "@/lib/auth/guard";
 
 export type StudentAssignmentProgress = {
   assignmentId: string;
-  studentId: string;
+  // #332: Takım atamasında tek bir öğrenci yok — bu üçü null olabilir.
+  studentId: string | null;
   studentName: string;
-  studentEmail: string;
-  experienceLevel: string;
+  studentEmail: string | null;
+  experienceLevel: string | null;
+  /// #332: Doluysa satır bir TAKIMI temsil eder.
+  teamId: string | null;
+  teamMembers: { name: string; role: string }[];
   // #195: M:N — öğrenciye atanmış mentorlar (0..n).
+  // #332: Takımda mentörler takıma atanır.
   mentors: { id: string; name: string }[];
   projectTemplateId: string;
   projectTitle: string;
@@ -42,6 +47,27 @@ export async function getStudentAssignmentsProgress(): Promise<StudentAssignment
 
   const assignments = await prisma.assignedProject.findMany({
     include: {
+      // #332: Atama bireysel VEYA takım olabilir.
+      team: {
+        select: {
+          id: true,
+          name: true,
+          members: {
+            where: { leftAt: null },
+            select: {
+              role: true,
+              studentProfile: {
+                select: { userId: true, user: { select: { name: true, lastName: true, email: true } } },
+              },
+            },
+          },
+          mentors: {
+            select: {
+              mentor: { select: { id: true, name: true, lastName: true, email: true } },
+            },
+          },
+        },
+      },
       studentProfile: {
         include: {
           user: {
@@ -90,17 +116,29 @@ export async function getStudentAssignmentsProgress(): Promise<StudentAssignment
     },
   });
 
+  const ad = (u: { name: string | null; lastName: string | null; email: string }) =>
+    [u.name, u.lastName].filter(Boolean).join(" ") || u.email;
+
   return assignments.map((assignment) => {
-    const studentUser = assignment.studentProfile.user;
-    const studentName = [studentUser.name, studentUser.lastName]
-      .filter(Boolean)
-      .join(" ") || studentUser.email;
+    const takim = assignment.team;
+    const studentUser = assignment.studentProfile?.user ?? null;
+
+    // #332: Takım atamasında satır TAKIMI temsil eder. Üyelerden birini seçip
+    // "öğrenci" diye göstermek yanıltıcı olurdu — pano ortak.
+    const studentName = takim
+      ? `${takim.name} (${takim.members.length} kişi)`
+      : studentUser
+        ? ad(studentUser)
+        : "—";
 
     // #195: M:N — atanmış mentorların görünen adları.
-    const mentors = assignment.studentProfile.mentorAssignments.map((a) => ({
-      id: a.mentor.id,
-      name: [a.mentor.name, a.mentor.lastName].filter(Boolean).join(" ") || a.mentor.email,
-    }));
+    // #332: Takımda mentörler takıma atanır.
+    const mentors = takim
+      ? takim.mentors.map((m) => ({ id: m.mentor.id, name: ad(m.mentor) }))
+      : (assignment.studentProfile?.mentorAssignments ?? []).map((a) => ({
+          id: a.mentor.id,
+          name: ad(a.mentor),
+        }));
 
     const steps = assignment.roadmap?.steps ?? [];
     const totalSteps = steps.length;
@@ -117,10 +155,16 @@ export async function getStudentAssignmentsProgress(): Promise<StudentAssignment
 
     return {
       assignmentId: assignment.id,
-      studentId: assignment.studentProfile.userId,
+      // #332: Takım atamasında tek bir öğrenci kimliği yok.
+      studentId: assignment.studentProfile?.userId ?? null,
       studentName,
-      studentEmail: studentUser.email,
-      experienceLevel: assignment.studentProfile.experienceLevel,
+      studentEmail: studentUser?.email ?? null,
+      experienceLevel: assignment.studentProfile?.experienceLevel ?? null,
+      // #332: Arayüz satırın takım mı birey mi olduğunu ayırt edebilsin.
+      teamId: takim?.id ?? null,
+      teamMembers: takim
+        ? takim.members.map((m) => ({ name: ad(m.studentProfile.user), role: m.role }))
+        : [],
       mentors,
       projectTemplateId: assignment.projectTemplate.id,
       projectTitle: assignment.projectTemplate.title,

@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import {
+  ATAMA_SAHIPLIK_SELECT,
+  erisebilirMi,
+  mentoruMu,
+  ogrencisiMi,
+} from "@/features/teams/server/sahiplik";
 import { requireAuth } from "@/lib/auth/guard";
 import { isAssignedMentor } from "@/lib/auth/mentor-access";
 import { updateRoadmapSchema } from "@/lib/validations/api";
@@ -19,15 +25,14 @@ export async function GET(
       where: { id: roadmapId },
       include: {
         steps: { orderBy: { order: "asc" } },
+        // #332: Sahiplik bireysel VEYA takım; yetki tek tanımdan gelir.
         assignedProject: {
-          include: {
+          select: {
+            ...ATAMA_SAHIPLIK_SELECT,
             projectTemplate: true,
             studentProfile: {
               include: {
-                user: {
-                  select: { name: true, lastName: true, email: true },
-                },
-                // #195: M:N yetki kontrolü için atanmış mentorlar.
+                user: { select: { name: true, lastName: true, email: true } },
                 mentorAssignments: { select: { mentorId: true } },
               },
             },
@@ -44,7 +49,7 @@ export async function GET(
     }
 
     // Mentor ownership kontrolü — #195: öğrencinin mentorlarından biri mi?
-    if (!isAssignedMentor(roadmap.assignedProject.studentProfile.mentorAssignments, auth.session.user.id)) {
+    if (!mentoruMu(roadmap.assignedProject, auth.session.user.id)) {
       return NextResponse.json(
         { error: "Bu yol haritasına erişim yetkiniz yok." },
         { status: 403 }
@@ -83,9 +88,8 @@ export async function PUT(
       include: {
         assignedProject: {
           include: {
-            studentProfile: {
-              include: { mentorAssignments: { select: { mentorId: true } } },
-            },
+            // #332: Sahiplik bireysel VEYA takım.
+            ...ATAMA_SAHIPLIK_SELECT,
           },
         },
       },
@@ -96,7 +100,7 @@ export async function PUT(
     }
 
     // #195: öğrencinin mentorlarından biri mi?
-    if (!isAssignedMentor(existingRoadmap.assignedProject.studentProfile.mentorAssignments, auth.session.user.id)) {
+    if (!mentoruMu(existingRoadmap.assignedProject, auth.session.user.id)) {
       return NextResponse.json(
         { error: "Bu yol haritasını güncelleme yetkiniz yok." },
         { status: 403 }

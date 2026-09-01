@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import {
+  ATAMA_SAHIPLIK_SELECT,
+  erisebilirMi,
+  mentoruMu,
+  ogrencisiMi,
+} from "@/features/teams/server/sahiplik";
 import { requireAuth } from "@/lib/auth/guard";
 import { isAssignedMentor } from "@/lib/auth/mentor-access";
 import { updateStepSchema } from "@/lib/validations/api";
@@ -19,13 +25,8 @@ export async function PUT(
     const roadmap = await prisma.roadmap.findUnique({
       where: { id: roadmapId },
       include: {
-        assignedProject: {
-          include: {
-            studentProfile: {
-              include: { mentorAssignments: { select: { mentorId: true } } },
-            },
-          },
-        },
+        // #332: Sahiplik bireysel VEYA takım; tek tanımdan gelir.
+        assignedProject: { select: ATAMA_SAHIPLIK_SELECT },
       },
     });
 
@@ -33,7 +34,7 @@ export async function PUT(
       return NextResponse.json({ error: "Yol haritası bulunamadı!" }, { status: 404 });
     }
 
-    if (!isAssignedMentor(roadmap.assignedProject.studentProfile.mentorAssignments, auth.session.user.id)) {
+    if (!mentoruMu(roadmap.assignedProject, auth.session.user.id)) {
       return NextResponse.json(
         { error: "Bu adımı güncelleme yetkiniz yok." },
         { status: 403 }
@@ -80,13 +81,8 @@ export async function DELETE(
     const roadmap = await prisma.roadmap.findUnique({
       where: { id: roadmapId },
       include: {
-        assignedProject: {
-          include: {
-            studentProfile: {
-              include: { mentorAssignments: { select: { mentorId: true } } },
-            },
-          },
-        },
+        // #332: Sahiplik bireysel VEYA takım; tek tanımdan gelir.
+        assignedProject: { select: ATAMA_SAHIPLIK_SELECT },
       },
     });
 
@@ -94,7 +90,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Yol haritası bulunamadı!" }, { status: 404 });
     }
 
-    if (!isAssignedMentor(roadmap.assignedProject.studentProfile.mentorAssignments, auth.session.user.id)) {
+    if (!mentoruMu(roadmap.assignedProject, auth.session.user.id)) {
       return NextResponse.json(
         { error: "Bu adımı silme yetkiniz yok." },
         { status: 403 }

@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import {
+  ATAMA_SAHIPLIK_SELECT,
+  erisebilirMi,
+  mentoruMu,
+  ogrencisiMi,
+} from "@/features/teams/server/sahiplik";
 import { requireAuth } from "@/lib/auth/guard";
 import { updateStepStatusSchema } from "@/lib/validations/api";
 import { adimDurumunuDegistir } from "@/features/roadmap/server/step-status";
@@ -45,10 +51,9 @@ export async function PATCH(
       include: {
         roadmap: {
           include: {
+            // #332: Sahiplik bireysel VEYA takım; tek tanımdan gelir.
             assignedProject: {
-              include: {
-                studentProfile: true,
-              },
+              select: { id: true, status: true, ...ATAMA_SAHIPLIK_SELECT },
             },
             steps: {
               orderBy: { order: "asc" },
@@ -63,8 +68,8 @@ export async function PATCH(
     }
 
     // Bu adım bu öğrenciye mi ait?
-    const profile = step.roadmap.assignedProject.studentProfile;
-    if (profile.userId !== auth.session.user.id) {
+    // #332: Öğrenci = bireysel sahip ya da AKTİF takım üyesi.
+    if (!ogrencisiMi(step.roadmap.assignedProject, auth.session.user.id)) {
       return NextResponse.json(
         { error: "Bu adım size ait değil." },
         { status: 403 }

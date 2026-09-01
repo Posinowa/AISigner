@@ -1,5 +1,11 @@
 import "server-only";
 import { prisma } from "@/lib/db";
+import {
+  ATAMA_SAHIPLIK_SELECT,
+  erisebilirMi,
+  mentoruMu,
+  ogrencisiMi,
+} from "@/features/teams/server/sahiplik";
 import { logger } from "@/lib/logger";
 import { isAssignedMentor } from "@/lib/auth/mentor-access";
 import {
@@ -59,16 +65,15 @@ export async function talepOlustur(params: {
       id: true,
       githubStatus: true,
       roadmap: { select: { steps: { select: { id: true }, take: 1 } } },
-      studentProfile: {
-        select: { mentorAssignments: { select: { mentorId: true } } },
-      },
+      // #332: Sahiplik bireysel VEYA takım; tek tanımdan gelir.
+      ...ATAMA_SAHIPLIK_SELECT,
     },
   });
 
   if (!atama) return { ok: false, neden: "atama-yok" };
 
   // #195: mentörler eşit yetkili, birincil mentör yok.
-  if (!isAssignedMentor(atama.studentProfile.mentorAssignments, params.mentorUserId)) {
+  if (!mentoruMu(atama, params.mentorUserId)) {
     return { ok: false, neden: "yetki-yok" };
   }
 
@@ -138,12 +143,13 @@ export async function atamayaErisebilirMi(
   const atama = await prisma.assignedProject.findUnique({
     where: { id: assignedProjectId },
     select: {
-      studentProfile: { select: { mentorAssignments: { select: { mentorId: true } } } },
+      // #332: Sahiplik bireysel VEYA takım.
+      ...ATAMA_SAHIPLIK_SELECT,
     },
   });
 
   return Boolean(
-    atama && isAssignedMentor(atama.studentProfile.mentorAssignments, mentorUserId),
+    atama && mentoruMu(atama, mentorUserId),
   );
 }
 
