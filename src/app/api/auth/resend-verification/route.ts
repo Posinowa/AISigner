@@ -54,7 +54,7 @@ export async function POST() {
     });
   }
 
-  const rl = limiter.check(userId);
+  const rl = await limiter.check(userId);
   if (!rl.allowed) {
     return NextResponse.json(
       {

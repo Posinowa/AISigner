@@ -58,7 +58,7 @@ export const authOptions : AuthOptions = {
         const emailKey = `email:${normalizedEmail}`
 
         // Bloke kontrolü (sayacı artırmadan): limit aşıldıysa pahalı işe girmeden reddet
-        if (!loginLimiterByIp.peek(ipKey).allowed || !loginLimiterByEmail.peek(emailKey).allowed) {
+        if (!(await loginLimiterByIp.peek(ipKey)).allowed || !(await loginLimiterByEmail.peek(emailKey)).allowed) {
           throw new Error("Çok fazla başarısız giriş denemesi. Lütfen birkaç dakika sonra tekrar deneyin.")
         }
 
@@ -72,14 +72,14 @@ export const authOptions : AuthOptions = {
 
         if (!user || !isValid) {
           // Yalnızca başarısız denemeleri say
-          loginLimiterByIp.check(ipKey)
-          loginLimiterByEmail.check(emailKey)
+          await loginLimiterByIp.check(ipKey)
+          await loginLimiterByEmail.check(emailKey)
           return null
         }
 
         // Başarılı giriş → sayaçları temizle (meşru kullanıcı cezalandırılmasın)
-        loginLimiterByIp.reset(ipKey)
-        loginLimiterByEmail.reset(emailKey)
+        await loginLimiterByIp.reset(ipKey)
+        await loginLimiterByEmail.reset(emailKey)
 
         return user
       },

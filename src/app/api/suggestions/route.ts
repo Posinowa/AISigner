@@ -60,7 +60,7 @@ export async function POST(req: Request) {
   if (!auth.authorized) return auth.response;
 
   // #163 (P1): Kötüye kullanım/spam koruması — kullanıcı bazlı.
-  const rl = createLimiter.check(auth.session.user.id!);
+  const rl = await createLimiter.check(auth.session.user.id!);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Çok fazla öneri gönderdiniz. Lütfen bir süre sonra tekrar deneyin." },

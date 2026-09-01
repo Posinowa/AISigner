@@ -40,7 +40,7 @@ const AYNI_YANIT = {
 export async function POST(req: Request) {
   const ip = getClientIp(await headers());
 
-  const rl = ipLimiter.check(ip);
+  const rl = await ipLimiter.check(ip);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Çok fazla deneme yaptınız. Lütfen bir süre bekleyin." },
@@ -98,7 +98,7 @@ export async function POST(req: Request) {
 
   const normalize = email.toLowerCase().trim();
 
-  const hesapRl = hesapLimiter.check(normalize);
+  const hesapRl = await hesapLimiter.check(normalize);
   if (!hesapRl.allowed) {
     // Sınır aşıldığında da AYNI yanıt: 429 dönmek hesabın varlığını ele verirdi.
     return NextResponse.json(AYNI_YANIT);

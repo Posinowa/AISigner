@@ -61,7 +61,8 @@ src/
     ├── auth/nextauth.ts                  — login rate-limit, timing-safe verify, JWT'de
     │                                       rol+durum her istekte DB'den tazelenir (#44)
     ├── validations/api.ts                — tüm Zod şemaları (github URL'leri dahil)
-    ├── rate-limit.ts (peek/check/reset) · logger.ts · metrics.ts · experience-level.ts
+    ├── rate-limit.ts — ASENKRON, sayaçlar DB'de, atomik (#322) · logger.ts
+    ├── metrics.ts · experience-level.ts
     ├── file-signature.ts                 — upload magic-byte doğrulaması (#113)
     ├── api-error-message.ts              — string/fieldErrors → tek mesaj (#114)
     ├── client-ip.ts                      — rate-limit için GÜVENİLİR istemci IP (#308)
@@ -142,8 +143,13 @@ olduğunu hatırlayın; aksi halde onboarding tamamen çöker.
   (route dosyayı okuyup akıtır) → per-request yetki kontrolü korunur. Detay: `DEPLOYMENT.md`.
 
 ### Process-local durumlar (tek instance varsayımı)
-`rate-limit.ts`, forgot-password `resetTokens`, `metrics.ts` — çok-instance/serverless'ta
-Redis gerekir → `DEPLOYMENT.md`.
+`metrics.ts` süreç-yereldir (yalnız teşhis sayaçları, güvenlik etkisi yok).
+
+**`rate-limit.ts` artık DEĞİL (#322):** sayaçlar `RateLimit` tablosunda ve artırma
+tek atomik SQL ifadesiyle yapılıyor — çok instance güvenli, Redis gerekmiyor.
+Arayüz **asenkron**: `check`/`peek`/`reset` Promise döner. DB'ye ulaşılamazsa
+**fail-open** (istek geçer + loglanır); kesintide tüm girişleri kilitlememek için
+bilinçli karar.
 
 ### Mezuniyet & Sertifika Doğrulama Sistemi (#208)
 - **Mezuniyet Durumu (`accountStatus: GRADUATED`)**: Portfolyo salt-okunur (Seçenek A). Öğrenci dashboard, yol haritası adımları, dosyaları, yorumları ve sertifikasını görüntüleyebilir; ancak adım durumu değiştirme, dosya yükleme/silme ve yorum ekleme/düzenleme/silme API'leri 403 ile engellenir.

@@ -46,7 +46,7 @@ const getVerification = cache(
     | { rateLimited: false; result: Awaited<ReturnType<typeof verifyCertificate>> }
   > => {
     const ip = getClientIp(await headers());
-    if (!verifyLimiter.check(ip).allowed) {
+    if (!(await verifyLimiter.check(ip)).allowed) {
       return { rateLimited: true };
     }
     return { rateLimited: false, result: await verifyCertificate(certificateNumber) };

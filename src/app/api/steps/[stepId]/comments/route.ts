@@ -70,7 +70,7 @@ export async function POST(
   const { stepId } = await params;
   const userId = auth.session.user.id!;
 
-  const rl = limiter.check(userId);
+  const rl = await limiter.check(userId);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Çok fazla yorum gönderdiniz. Lütfen biraz bekleyin." },

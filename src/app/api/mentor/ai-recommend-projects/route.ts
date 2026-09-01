@@ -15,7 +15,7 @@ export async function POST(req: Request) {
   const auth = await requireAuth("MENTOR");
   if (!auth.authorized) return auth.response;
 
-  const rl = limiter.check(auth.session.user.id ?? "anonymous");
+  const rl = await limiter.check(auth.session.user.id ?? "anonymous");
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Çok fazla istek. Lütfen biraz bekleyin." },

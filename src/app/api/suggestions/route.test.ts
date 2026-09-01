@@ -4,12 +4,28 @@ const { requireAuthMock, prismaMock } = vi.hoisted(() => ({
   requireAuthMock: vi.fn(),
   prismaMock: {
     suggestion: { findMany: vi.fn(), create: vi.fn() },
+    // #322: Rate-limit sayaçları artık veritabanında. Gerçek DB olmadan
+    // testin anlamını korumak için sayacı bellekte taklit ediyoruz —
+    // limiter'ın SQL'i "anahtar başına artan sayı" döndürüyor.
+    $queryRaw: vi.fn(),
+    rateLimit: { findUnique: vi.fn(), deleteMany: vi.fn() },
   },
 }));
 vi.mock("@/lib/auth/guard", () => ({
   requireAuth: (...args: unknown[]) => requireAuthMock(...args),
 }));
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
+
+/** Limiter'ın SQL sayacını taklit eder: anahtar başına artan sayaç. */
+const sayaclar = new Map<string, number>();
+prismaMock.$queryRaw.mockImplementation((...args: unknown[]) => {
+  // Sablon parametrelerinin ilki anahtar.
+  const anahtar = String(args[1]);
+  const yeni = (sayaclar.get(anahtar) ?? 0) + 1;
+  sayaclar.set(anahtar, yeni);
+  return Promise.resolve([{ count: yeni, resetAt: new Date(Date.now() + 60_000) }]);
+});
+prismaMock.rateLimit.deleteMany.mockResolvedValue({ count: 0 });
 
 import { GET, POST } from "./route";
 

@@ -68,7 +68,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const rl = limiter.check(userId);
+  const rl = await limiter.check(userId);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Çok fazla mesaj gönderdiniz. Lütfen biraz bekleyin." },
