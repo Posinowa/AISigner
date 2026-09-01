@@ -14,10 +14,13 @@ import {
   Edit3,
   Eye,
   Download,
+  Linkedin,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { CertificateData } from "@/features/certificate/server/certificate";
 import { POSINOWA_LOGO_DATA_URI } from "@/features/certificate/ui/posinowa-logo";
+import { SertifikaQr } from "@/features/certificate/ui/SertifikaQr";
+import { linkedInEkleUrl } from "@/features/certificate/paylasim";
 
 type CertificateModalProps = {
   certificate: CertificateData;
@@ -327,7 +330,7 @@ export function CertificateModal({
         <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-slate-100 bg-slate-50/90 print:hidden">
           
           <div className="flex items-center gap-3">
-            <span className="p-2 rounded-xl bg-purple-100 text-purple-700">
+            <span className="p-2 rounded-xl bg-primary/10 text-primary">
               <Award className="w-5 h-5" />
             </span>
             <div>
@@ -391,6 +394,29 @@ export function CertificateModal({
               <Printer className="w-4 h-4" />
               PDF / Yazdır
             </button>
+
+            {/* #323: LinkedIn "Add to Profile".
+                Bu bir API DEĞİL, parametreli bir URL — token/izin gerekmiyor.
+                LinkedIn'in sertifika formu alanlar dolu olarak açılıyor.
+
+                YALNIZ RESMİ belgede gösteriliyor: `isIssued` false ise seri no
+                ve doğrulama adresi henüz ÖNİZLEME'dir (kayıtlı değil). Onu
+                LinkedIn'e işlemek, doğrulama sayfasının "bulunamadı" dediği
+                bir kayıt üretirdi (#208 sözleşmesi). */}
+            {certificate.isIssued && (
+              <a
+                href={linkedInEkleUrl({
+                  certificateNumber: certificate.certificateNumber,
+                  issuedAt: certificate.issuedAt,
+                })}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0A66C2] hover:bg-[#004182] text-white text-xs font-semibold shadow-sm transition"
+              >
+                <Linkedin className="w-4 h-4" />
+                LinkedIn Profilime Ekle
+              </a>
+            )}
 
             <button
               type="button"
@@ -558,8 +584,8 @@ export function CertificateModal({
               </div>
 
               <div>
-                <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-purple-50 border border-purple-200 text-purple-800 font-bold text-xs">
-                  <Award className="w-3.5 h-3.5 text-purple-600" />
+                <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-primary/5 border border-primary/20 text-primary font-bold text-xs">
+                  <Award className="w-3.5 h-3.5 text-primary" />
                   Başarı Derecesi: <span className="font-extrabold">{completionGrade || "Belirlenmedi"}</span>
                 </span>
               </div>
@@ -647,20 +673,29 @@ export function CertificateModal({
             </div>
 
             {/* Doğrulama & Seri No Alt Çizgisi */}
-            <div className="mt-6 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between text-[10px] text-slate-400">
-              <span>Sertifika No: <strong className="font-mono text-slate-600">{certificate.certificateNumber}</strong></span>
-              <span>
-                Doğrulama:{" "}
-                {/* #280: Önceden düz metindi; ekranda tıklanamıyordu. */}
-                <a
-                  href={certificate.verificationUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-semibold text-primary underline underline-offset-2"
-                >
-                  {certificate.verificationUrl}
-                </a>
-              </span>
+            <div className="mt-6 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-[10px] text-slate-400">
+              <div className="flex flex-col gap-1">
+                <span>Sertifika No: <strong className="font-mono text-slate-600">{certificate.certificateNumber}</strong></span>
+                <span>
+                  Doğrulama:{" "}
+                  {/* #280: Önceden düz metindi; ekranda tıklanamıyordu. */}
+                  <a
+                    href={certificate.verificationUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-semibold text-primary underline underline-offset-2"
+                  >
+                    {certificate.verificationUrl}
+                  </a>
+                </span>
+              </div>
+
+              {/* #323: QR — basılı/PDF sertifikada URL tıklanamaz. Belgeyi alan
+                  işverenin doğrulamaya ulaşabilmesi ancak karekodla mümkün. */}
+              <div className="flex flex-col items-center gap-1">
+                <SertifikaQr url={certificate.verificationUrl} boyut={72} />
+                <span className="text-[8px] uppercase tracking-wider">Doğrula</span>
+              </div>
             </div>
 
           </div>
