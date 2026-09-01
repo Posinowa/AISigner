@@ -94,6 +94,25 @@ function repoAdi(atama: Atama): string {
 }
 
 /**
+ * Kayıtlı milestone URL'inden numarayı çıkarır (#345).
+ *
+ * Numarayı saklamak için ayrı bir kolon eklemek yerine var olan URL'den
+ * okuyoruz: kolon eklemek yıkıcı olmayan ama gereksiz bir migration olurdu ve
+ * URL zaten numarayı içeriyor. Simülasyon modunda üretilen URL'ler de aynı
+ * biçimde olduğu için ayrı bir dal gerekmiyor.
+ *
+ * Beklenmeyen bir biçimde `null` döner — o zaman milestone yeniden hazırlanır,
+ * yani en kötü ihtimalle eski davranışa düşülür.
+ */
+export function milestoneNumarasiCikar(url: string | null): number | null {
+  if (!url) return null;
+  const eslesme = /\/milestone\/(\d+)(?:$|[/?#])/.exec(url);
+  if (!eslesme) return null;
+  const numara = Number(eslesme[1]);
+  return Number.isSafeInteger(numara) && numara > 0 ? numara : null;
+}
+
+/**
  * Yol haritası adımları için AI issue içeriklerini üretir.
  *
  * Bu adım her iki yolda da (gerçek/simülasyon) çalışır — içerikler gerçektir
@@ -211,32 +230,57 @@ async function gercektenKur(atama: Atama, config: GitHubConfig) {
   let createdIssuesCount = 0;
 
   for (const step of atama.roadmap!.steps) {
-    const milestone = await milestoneHazirla(config, {
-      repoName,
-      title: step.title,
-      description: step.description,
-    });
-    if (!milestone.ok) throw new Error(hataMesaji(milestone.neden));
-    if (milestone.olusturuldu) createdMilestonesCount++;
-
-    await prisma.roadmapStep.update({
-      where: { id: step.id },
-      data: {
-        githubIssueUrl: `${githubRepoUrl}/milestone/${milestone.veri.number}`,
-      },
-    });
-
     const stepIssues = await prisma.stepIssue.findMany({ where: { stepId: step.id } });
-    for (const issue of stepIssues) {
+
+    // #345: GÖNDERİLMİŞ KAYITLAR YENİDEN GÖNDERİLMEZ.
+    //
+    // Öncesi her çalıştırmada bütün issue'ları `issueHazirla`'ya veriyor ve
+    // kopya oluşmasını onun BAŞLIK TARAMASINA bırakıyordu. O tarama
+    // güvenilir değil: GitHub'ın liste uçları anında tutarlı DEĞİL, yeni
+    // açılmış bir issue listede gecikmeli görünüyor. Canlı testte art arda
+    // iki çağrı KOPYA issue açtı (#345).
+    //
+    // Artık otoriter kaynak veritabanı: `githubIssueUrl` doluysa o kayıt
+    // GitHub'a gitmiş demektir ve dokunulmaz.
+    const bekleyenIssuelar = stepIssues.filter((i) => !i.githubIssueUrl);
+
+    // Adımın milestone'u kurulmuş VE tüm issue'ları gönderilmişse GitHub'a
+    // hiç uğramıyoruz — güncelleme akışı yalnız eksikleri tamamlar.
+    if (step.githubIssueUrl && bekleyenIssuelar.length === 0) continue;
+
+    // Milestone da aynı mantıkla: kayıtlı URL varsa numarayı ondan okuyup
+    // yeniden oluşturmuyoruz. `milestoneHazirla` de başlık taramasına
+    // dayanıyor ve aynı kopya riskini taşıyor.
+    let milestoneNumarasi = milestoneNumarasiCikar(step.githubIssueUrl);
+
+    if (milestoneNumarasi === null) {
+      const milestone = await milestoneHazirla(config, {
+        repoName,
+        title: step.title,
+        description: step.description,
+      });
+      if (!milestone.ok) throw new Error(hataMesaji(milestone.neden));
+      if (milestone.olusturuldu) createdMilestonesCount++;
+      milestoneNumarasi = milestone.veri.number;
+
+      await prisma.roadmapStep.update({
+        where: { id: step.id },
+        data: { githubIssueUrl: `${githubRepoUrl}/milestone/${milestoneNumarasi}` },
+      });
+    }
+
+    for (const issue of bekleyenIssuelar) {
       const olusan = await issueHazirla(config, {
         repoName,
         title: issue.title,
         body: issue.bodyMarkdown,
-        milestoneNumber: milestone.veri.number,
+        milestoneNumber: milestoneNumarasi,
       });
       if (!olusan.ok) throw new Error(hataMesaji(olusan.neden));
       if (olusan.olusturuldu) createdIssuesCount++;
 
+      // URL HEMEN yazılıyor: araya bir hata girerse bir sonraki çalıştırma
+      // bu issue'yu "gönderilmemiş" sayıp ikinci kez açardı.
       await prisma.stepIssue.update({
         where: { id: issue.id },
         data: { githubIssueUrl: olusan.veri.htmlUrl },

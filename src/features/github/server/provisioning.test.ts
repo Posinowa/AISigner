@@ -68,6 +68,7 @@ import {
   updateGitHubWorkspace,
   baslatGitHubWorkspaceKurulumu,
   KurulumZatenSuruyorError,
+  milestoneNumarasiCikar,
 } from "./provisioning";
 
 function admin() {
@@ -765,3 +766,140 @@ describe("baslatGitHubWorkspaceKurulumu — arka plana alma", () => {
     await expect(arkaPlanIsleri[0]!()).resolves.toBeUndefined();
   });
 });
+
+/**
+ * #345 — KOPYA ISSUE. Canlı testte bulundu: art arda iki `issueHazirla`
+ * çağrısı GitHub'da iki ayrı issue açtı. Sebep, kopya kontrolünün
+ * `issues.listForRepo` başlık taramasına dayanması ve GitHub'ın liste
+ * uçlarının ANINDA TUTARLI OLMAMASI — yeni açılmış issue listede gecikmeli
+ * görünüyor.
+ *
+ * Otoriter kaynak artık veritabanı: `githubIssueUrl` dolu kayıt GitHub'a
+ * hiç gönderilmiyor.
+ */
+describe("kopya issue koruması (#345)", () => {
+  beforeEach(() => {
+    admin();
+    tokenVar();
+    prismaMock.assignedProject.findUnique.mockResolvedValue(
+      atama({ githubStatus: "PROVISIONED", githubRepoUrl: "https://github.com/Posinowa/r" }),
+    );
+    milestoneMock.mockResolvedValue({
+      ok: true,
+      olusturuldu: false,
+      veri: { number: 1, title: "Faz 1" },
+    });
+  });
+
+  it("GÖNDERİLMİŞ issue GitHub'a YENİDEN gönderilmez", async () => {
+    prismaMock.stepIssue.findMany.mockResolvedValue([
+      { id: "i1", title: "Gönderilmiş", bodyMarkdown: "b", githubIssueUrl: "https://github.com/o/r/issues/1" },
+    ]);
+
+    await updateGitHubWorkspace("ap-1");
+
+    expect(issueMock).not.toHaveBeenCalled();
+  });
+
+  it("yalnızca GÖNDERİLMEMİŞ issue gönderilir", async () => {
+    prismaMock.stepIssue.findMany.mockResolvedValue([
+      { id: "i1", title: "Gönderilmiş", bodyMarkdown: "b", githubIssueUrl: "https://github.com/o/r/issues/1" },
+      { id: "i2", title: "Yeni", bodyMarkdown: "b", githubIssueUrl: null },
+    ]);
+    issueMock.mockResolvedValue({
+      ok: true,
+      olusturuldu: true,
+      veri: { number: 2, htmlUrl: "u2", title: "Yeni" },
+    });
+
+    const res = await updateGitHubWorkspace("ap-1");
+
+    expect(issueMock).toHaveBeenCalledTimes(1);
+    expect(issueMock.mock.calls[0][1].title).toBe("Yeni");
+    expect(res.createdIssuesCount).toBe(1);
+  });
+
+  it("milestone kayıtlıysa YENİDEN oluşturulmaz, numara URL'den okunur", async () => {
+    // `milestoneHazirla` de aynı başlık taramasına dayanıyor; aynı kopya riski.
+    prismaMock.assignedProject.findUnique.mockResolvedValue(
+      atama({
+        githubStatus: "PROVISIONED",
+        githubRepoUrl: "https://github.com/Posinowa/r",
+        roadmap: {
+          steps: [
+            {
+              id: "s1",
+              title: "Faz 1",
+              description: "d",
+              githubIssueUrl: "https://github.com/Posinowa/r/milestone/7",
+            },
+          ],
+        },
+      }),
+    );
+    prismaMock.stepIssue.findMany.mockResolvedValue([
+      { id: "i2", title: "Yeni", bodyMarkdown: "b", githubIssueUrl: null },
+    ]);
+    issueMock.mockResolvedValue({
+      ok: true,
+      olusturuldu: true,
+      veri: { number: 2, htmlUrl: "u2", title: "Yeni" },
+    });
+
+    await updateGitHubWorkspace("ap-1");
+
+    expect(milestoneMock).not.toHaveBeenCalled();
+    // Issue yine DOĞRU milestone'a bağlanmalı.
+    expect(issueMock.mock.calls[0][1].milestoneNumber).toBe(7);
+  });
+
+  it("tamamen kurulu adımda GitHub'a HİÇ uğranmaz", async () => {
+    prismaMock.assignedProject.findUnique.mockResolvedValue(
+      atama({
+        githubStatus: "PROVISIONED",
+        githubRepoUrl: "https://github.com/Posinowa/r",
+        roadmap: {
+          steps: [
+            {
+              id: "s1",
+              title: "Faz 1",
+              description: "d",
+              githubIssueUrl: "https://github.com/Posinowa/r/milestone/1",
+            },
+          ],
+        },
+      }),
+    );
+    prismaMock.stepIssue.findMany.mockResolvedValue([
+      { id: "i1", title: "Gönderilmiş", bodyMarkdown: "b", githubIssueUrl: "https://github.com/o/r/issues/1" },
+    ]);
+
+    const res = await updateGitHubWorkspace("ap-1");
+
+    expect(milestoneMock).not.toHaveBeenCalled();
+    expect(issueMock).not.toHaveBeenCalled();
+    expect(res.message).toContain("zaten güncel");
+  });
+});
+
+describe("milestoneNumarasiCikar (#345)", () => {
+  it.each([
+    ["https://github.com/o/r/milestone/7", 7],
+    ["https://github.com/o/r/milestone/12?closed=1", 12],
+    ["https://github.com/o/r/milestone/3#tab", 3],
+  ])("%s -> %i", (url, beklenen) => {
+    expect(milestoneNumarasiCikar(url)).toBe(beklenen);
+  });
+
+  it.each([
+    [null],
+    ["https://github.com/o/r/issues/7"],
+    ["https://github.com/o/r/milestone/abc"],
+    ["https://github.com/o/r/milestone/0"],
+  ])("%s -> null (milestone yeniden hazırlanır)", (url) => {
+    // Tanınmayan biçimde eski davranışa düşülür: en kötü ihtimal, düzeltme
+    // öncesiyle aynı.
+    expect(milestoneNumarasiCikar(url as string | null)).toBeNull();
+  });
+});
+
