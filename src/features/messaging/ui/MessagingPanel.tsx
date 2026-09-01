@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Send, ArrowLeft, Loader2, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { rolRozetiDolu } from "@/lib/ui/rol-renkleri";
+import { useCanliAkis } from "./useCanliAkis";
 
 type Message = {
   id: string;
@@ -110,14 +111,39 @@ export function MessagingPanel({ currentUserId }: Props) {
     loadConversations();
   }, [loadConversations]);
 
-  // Seçili konuşma değiştiğinde mesajları yükle ve polling başlat
+  // #329: Canlı akış. Açık konuşmadan gelen mesajda listeyi, diğer
+  // konuşmalardan gelende konuşma listesini tazeliyoruz.
+  //
+  // Olayın İÇERİĞİNİ doğrudan listeye eklemiyoruz, yeniden yüklüyoruz:
+  // mesajın gönderen bilgisi, okundu durumu ve sıralaması sunucudan geliyor;
+  // olaydan kısmi bir nesne kurmak iki kaynağı ayrıştırırdı.
+  const seciliRef = useRef<string | null>(null);
+  seciliRef.current = selectedPartner?.id ?? null;
+
+  const { bagli } = useCanliAkis(
+    useCallback(
+      (olay) => {
+        if (olay.tip !== "mesaj") return;
+        if (olay.gonderenId === seciliRef.current) {
+          loadMessages(olay.gonderenId, true);
+        }
+        loadConversations();
+      },
+      [loadMessages, loadConversations],
+    ),
+  );
+
+  // Seçili konuşma değiştiğinde mesajları yükle
   useEffect(() => {
     if (!selectedPartner) return;
-
     loadMessages(selectedPartner.id);
+  }, [selectedPartner, loadMessages]);
 
-    // Polling: 5 saniyede bir yeni mesajları kontrol et.
-    // Sekme arka plandayken istek atma (görünürlük-farkında).
+  // #329: YOKLAMA YEDEĞİ — yalnızca akış KOPUKKEN. Tamamen kaldırılsaydı,
+  // SSE'yi kesen bir vekilin arkasında mesajlaşma ölü kalırdı.
+  useEffect(() => {
+    if (!selectedPartner || bagli) return;
+
     pollRef.current = setInterval(() => {
       if (document.visibilityState === "visible") {
         loadMessages(selectedPartner.id, true);
@@ -127,7 +153,7 @@ export function MessagingPanel({ currentUserId }: Props) {
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [selectedPartner, loadMessages]);
+  }, [selectedPartner, loadMessages, bagli]);
 
   // Yeni mesaj geldiğinde scroll aşağı
   useEffect(() => {
