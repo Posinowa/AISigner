@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import LogoutButton from "@/components/LogoutButton";
 import { prisma } from "@/lib/db";
-import { Clock, XCircle, UserPen, GraduationCap, Sparkles, Award } from "lucide-react";
+import { Clock, XCircle, UserPen, Sparkles, Award } from "lucide-react";
+import Image from "next/image";
 
 export const dynamic = "force-dynamic";
 
@@ -86,7 +87,17 @@ export default async function AccountStatusPage() {
               }`}
             >
               {isGraduated ? (
-                <GraduationCap className="w-10 h-10 text-primary animate-pulse" />
+                /* #338: Mezuniyet ekranında jenerik GraduationCap yerine
+                   AISigner markası — #237'de AppShell, #323'te mezuniyet kartı
+                   için verilen kararın aynısı. Mezuniyet, öğrencinin gördüğü
+                   en "resmi" ekran; marka orada olmalı. */
+                <Image
+                  src="/brand/aisigner-mark.png"
+                  alt=""
+                  width={37}
+                  height={32}
+                  className="h-9 w-auto"
+                />
               ) : rejected ? (
                 <XCircle className="w-8 h-8 text-red-600" />
               ) : needsProfile ? (
