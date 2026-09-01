@@ -119,7 +119,7 @@ export default async function StudentDashboardPage() {
     <div className="max-w-5xl mx-auto mt-8 p-6 space-y-8">
       {/* 🎓 Mezun Stajyer Tebrik & Başarı Kartı
 
-          #323: Kart MARKA paletine çekildi. Önceden mor (purple-900/500/400/300)
+          #323: Kart MARKA paletine çekildi. Önceden mor tonlar
           kullanıyordu; mor marka renklerinde YOK — tokenlar logo laciverti
           (--color-primary #23356c) ve logonun orta mavisi (--landing-mid
           #3e92cc). Açılış sayfasıyla panel arasındaki renk dikişini kapatan

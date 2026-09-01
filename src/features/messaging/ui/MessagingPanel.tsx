@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Send, ArrowLeft, Loader2, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
+import { rolRozetiDolu } from "@/lib/ui/rol-renkleri";
 
 type Message = {
   id: string;
@@ -55,9 +56,12 @@ export function MessagingPanel({ currentUserId }: Props) {
   const getFullName = (user: { name: string | null; lastName: string | null }) =>
     [user.name, user.lastName].filter(Boolean).join(" ") || "İsimsiz";
 
+  // #338: Renkler merkezi kaynaktan. Öncesi burada MENTOR=mor, STUDENT=mavi
+  // idi; admin panelinde ise mavi MENTOR'u temsil ediyordu — aynı kişi iki
+  // ekranda iki farklı renkte görünüyordu.
   const getRoleBadge = (role: string) => {
-    if (role === "MENTOR") return { label: "Mentor", color: "bg-purple-100 text-purple-700" };
-    return { label: "Öğrenci", color: "bg-blue-100 text-blue-700" };
+    const r = rolRozetiDolu(role);
+    return { label: r.etiket, color: r.sinif };
   };
 
   // Konuşma listesini yükle

@@ -37,6 +37,7 @@ import {
 } from "@/features/auth/ui/DogrulanmisRozet";
 import { Avatar } from "@/features/profile/ui/Avatar";
 import type { CertificateData } from "@/features/certificate/server/certificate";
+import { ROL_ROZETI, DURUM_ROZETI } from "@/lib/ui/rol-renkleri";
 
 type User = {
   id: string;
@@ -78,21 +79,12 @@ type FilterCategory =
   | "ADMIN";
 
 const roleConfig: Record<User["role"], { label: string; color: string }> = {
-  ADMIN: {
-    label: "Yönetici",
-    color:
-      "bg-purple-50 text-purple-700 border-purple-200",
-  },
-  MENTOR: {
-    label: "Mentor",
-    color:
-      "bg-blue-50 text-blue-700 border-blue-200",
-  },
-  STUDENT: {
-    label: "Öğrenci",
-    color:
-      "bg-emerald-50 text-emerald-700 border-emerald-200",
-  },
+  // #338: Renkler merkezi kaynaktan — DebugNavbar ve mesajlaşma ile aynı
+  // eşlemeyi paylaşıyor. Öncesi her dosya kendi tablosunu tutuyordu ve
+  // birbiriyle çelişiyorlardı.
+  ADMIN: { label: ROL_ROZETI.ADMIN.etiket, color: ROL_ROZETI.ADMIN.sinif },
+  MENTOR: { label: ROL_ROZETI.MENTOR.etiket, color: ROL_ROZETI.MENTOR.sinif },
+  STUDENT: { label: ROL_ROZETI.STUDENT.etiket, color: ROL_ROZETI.STUDENT.sinif },
 };
 
 const statusConfig: Record<
@@ -114,7 +106,7 @@ const statusConfig: Record<
   GRADUATED: {
     label: "Mezun / Staj Bitti",
     color:
-      "bg-purple-50 text-purple-700 border-purple-200",
+      DURUM_ROZETI.GRADUATED,
     icon: GraduationCap,
   },
   REJECTED: {
@@ -584,7 +576,7 @@ export default function AdminDashboard() {
             },
             {
               icon: GraduationCap,
-              color: "text-purple-600 bg-purple-50",
+              color: "text-primary bg-primary/10",
               label: "Mezun / Biten",
               value: stats.graduatedCount,
               filter: "GRADUATED" as FilterCategory,
@@ -746,9 +738,9 @@ export default function AdminDashboard() {
                         ad={getDisplayName(user)}
                         arkaPlanSinifi={
                           user.accountStatus === "GRADUATED"
-                            ? "bg-gradient-to-br from-purple-600 to-indigo-600 ring-2 ring-purple-200"
+                            ? "bg-gradient-to-br from-primary to-[#3e92cc] ring-2 ring-primary/20"
                             : user.role === "ADMIN"
-                              ? "bg-gradient-to-br from-purple-500 to-pink-600"
+                              ? "bg-gradient-to-br from-indigo-500 to-indigo-700"
                               : user.role === "MENTOR"
                                 ? "bg-gradient-to-br from-blue-500 to-cyan-600"
                                 : "bg-gradient-to-br from-emerald-500 to-teal-600"
@@ -760,7 +752,7 @@ export default function AdminDashboard() {
                             {getDisplayName(user)}
                           </p>
                           {user.accountStatus === "GRADUATED" && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-purple-100 text-purple-700 border border-purple-200">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-primary/10 text-primary border border-primary/20">
                               <Award className="w-3 h-3" /> Mezun
                             </span>
                           )}
@@ -828,7 +820,7 @@ export default function AdminDashboard() {
                     <div className="lg:col-span-3 flex items-center">
                       {user.role === "STUDENT" ? (
                         user.accountStatus === "GRADUATED" ? (
-                          <div className="flex items-center gap-2 text-xs text-purple-700 bg-purple-50/70 border border-purple-200 rounded-xl px-3 py-2 w-full">
+                          <div className="flex items-center gap-2 text-xs text-primary bg-primary/5 border border-primary/20 rounded-xl px-3 py-2 w-full">
                             <GraduationCap className="w-4 h-4 shrink-0" />
                             <span className="font-semibold truncate">
                               Staj tamamlandı & mezun edildi
@@ -990,7 +982,7 @@ Onaylandığında mentör paneline erişebilecek.`,
                                     )
                                   }
                                   title="Stajı Bitir & Mezun Et"
-                                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-sm transition-colors"
+                                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-primary hover:bg-[#1b2a55] text-primary-foreground text-xs font-semibold shadow-sm transition-colors"
                                 >
                                   <GraduationCap className="w-3.5 h-3.5" /> Mezun Et
                                 </button>

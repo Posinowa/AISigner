@@ -297,7 +297,7 @@ export default function AdminAssignmentsPage() {
         </div>
 
         <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm flex items-center gap-4">
-          <div className="p-3.5 rounded-xl bg-purple-500/10 text-purple-600">
+          <div className="p-3.5 rounded-xl bg-primary/10 text-primary">
             <Layers className="w-6 h-6" />
           </div>
           <div>
@@ -378,7 +378,7 @@ export default function AdminAssignmentsPage() {
                             ? "bg-emerald-50 text-emerald-700"
                             : item.projectDifficulty === "MEDIUM"
                             ? "bg-indigo-50 text-indigo-700"
-                            : "bg-purple-50 text-purple-700"
+                            : "bg-primary/5 text-primary"
                         }`}
                       >
                         {item.projectDifficulty}

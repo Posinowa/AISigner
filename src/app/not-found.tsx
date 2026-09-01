@@ -9,7 +9,7 @@ export default function NotFound() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 px-4">
       <div className="w-full max-w-md bg-white rounded-3xl shadow-xl ring-1 ring-slate-200/60 overflow-hidden text-center">
-        <div className="h-1.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
+        <div className="h-1.5 bg-gradient-to-r from-primary via-[#3e92cc] to-emerald-500" />
         <div className="p-8">
           <div className="mx-auto mb-4 h-14 w-14 rounded-2xl bg-blue-50 flex items-center justify-center">
             <Compass className="w-7 h-7 text-blue-600" />

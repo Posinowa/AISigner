@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import LogoutButton from "@/components/LogoutButton";
 import { prisma } from "@/lib/db";
-import { Clock, XCircle, UserPen, GraduationCap, Sparkles, Award } from "lucide-react";
+import { Clock, XCircle, UserPen, Sparkles, Award } from "lucide-react";
+import Image from "next/image";
 
 export const dynamic = "force-dynamic";
 
@@ -69,7 +70,7 @@ export default async function AccountStatusPage() {
           <div
             className={`h-2 ${
               isGraduated
-                ? "bg-gradient-to-r from-purple-500 via-indigo-500 to-emerald-500"
+                ? "bg-gradient-to-r from-primary via-[#3e92cc] to-emerald-500"
                 : rejected
                   ? "bg-gradient-to-r from-red-500 via-rose-500 to-orange-500"
                   : "bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500"
@@ -79,14 +80,24 @@ export default async function AccountStatusPage() {
             <div
               className={`mx-auto mb-5 h-20 w-20 rounded-3xl flex items-center justify-center shadow-inner ${
                 isGraduated
-                  ? "bg-gradient-to-br from-purple-50 to-emerald-50 ring-4 ring-purple-100"
+                  ? "bg-gradient-to-br from-primary/5 to-emerald-50 ring-4 ring-primary/10"
                   : rejected
                     ? "bg-red-50"
                     : "bg-amber-50"
               }`}
             >
               {isGraduated ? (
-                <GraduationCap className="w-10 h-10 text-purple-600 animate-pulse" />
+                /* #338: Mezuniyet ekranında jenerik GraduationCap yerine
+                   AISigner markası — #237'de AppShell, #323'te mezuniyet kartı
+                   için verilen kararın aynısı. Mezuniyet, öğrencinin gördüğü
+                   en "resmi" ekran; marka orada olmalı. */
+                <Image
+                  src="/brand/aisigner-mark.png"
+                  alt=""
+                  width={37}
+                  height={32}
+                  className="h-9 w-auto"
+                />
               ) : rejected ? (
                 <XCircle className="w-8 h-8 text-red-600" />
               ) : needsProfile ? (
@@ -97,7 +108,7 @@ export default async function AccountStatusPage() {
             </div>
 
             {isGraduated && (
-              <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-purple-100 text-purple-700 border border-purple-200 mb-3">
+              <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20 mb-3">
                 <Sparkles className="w-3.5 h-3.5" />
                 Tebrikler • Staj Tamamlandı
               </span>
