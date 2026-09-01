@@ -28,6 +28,9 @@ const publicPaths = [
   "/verify-certificate",
   "/api/auth",
   "/api/health",
+  // #326: GitHub webhook'u oturumsuz gelir. Kimlik doğrulaması HMAC imzasıyla
+  // yapılıyor (`webhook-imza.ts`) — oturum kontrolü burada uygulanamaz.
+  "/api/webhooks/github",
 ];
 
 /**

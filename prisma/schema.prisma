@@ -506,3 +506,21 @@ model RateLimit {
   /// Süresi dolmuş satırların temizliği için.
   @@index([resetAt])
 }
+
+/// #326: İşlenmiş GitHub webhook teslimatları — tekrar-oynatma (replay) koruması.
+///
+/// NEDEN: GitHub aynı olayı tekrar gönderebiliyor (ağ hatası, elle "Redeliver",
+/// yeniden deneme). Aynı teslimatı iki kez işlemek adım durumunu iki kez
+/// değiştirir ve durum geçmişine (#324) sahte kayıt düşer.
+///
+/// Ayrıca güvenlik katmanı: geçerli imzalı bir istek yakalanıp tekrar
+/// gönderilse bile ikinci kez işlenmez.
+model ProcessedWebhook {
+  /// GitHub'ın `X-GitHub-Delivery` başlığındaki benzersiz teslimat kimliği.
+  deliveryId String   @id
+  event      String
+  createdAt  DateTime @default(now())
+
+  /// Eski kayıtların temizliği için.
+  @@index([createdAt])
+}

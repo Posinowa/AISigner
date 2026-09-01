@@ -85,6 +85,7 @@ Out Plane konsolunda servisin **Variables** bölümüne girilir.
 | `NEXT_PUBLIC_APP_URL` | `https://aisigner.com` | **#204/SEO** — `robots.txt`, `sitemap.xml` ve canonical/OG URL'lerinin taban adresi. Gerçek domain'e ayarlanmazsa fallback kullanılır. ⚠️ **`NEXT_PUBLIC_` = build-time**: değeri **imaj build edilirken** mevcut olmalı (yalnız runtime env yetmez). Aşağıya bak. |
 | `GCS_BUCKET` | _(yok)_ | **#197** — Dosya yüklemelerinin kalıcılığı. Verilirse yüklemeler bu GCS bucket'ına yazılır (deploy'da silinmez, çok-instance ölçeklenir). Kimlik: mevcut `GCP_CREDENTIALS_JSON` (ADC). Verilmezse yerel disk. |
 | `GITHUB_TOKEN` | _(yok)_ | **#218** — Verilirse GitHub'da **gerçek** repo/milestone/issue oluşturulur. Verilmezse sistem önizleme (simülasyon) modunda kalır: bağlantılar türetilir ama GitHub'da hiçbir şey yaratılmaz. Gerekli yetkiler aşağıda. |
+| `GITHUB_WEBHOOK_SECRET` | _(yok)_ | **#326** — GitHub'dan gelen olayların (issue kapandı, PR merge edildi) HMAC imzasını doğrular. GitHub'da webhook oluştururken girdiğiniz **Secret** ile aynı olmalı. **Tanımsızsa uç 503 döner** ve hiçbir olay işlenmez — bu bilinçli: "sır yoksa geç" davranışı, kimlik doğrulamasız public bir ucu tamamen açık bırakırdı. Üret: `openssl rand -hex 32`. |
 | `GITHUB_ORG` | `Posinowa` | GitHub çalışma alanı URL'lerinde kullanılan org. **Tanımlı ama boş bırakılırsa** entegrasyon bilerek devre dışı kalır — sessizce varsayılana düşmek yanlış hesapta repo açmaya yol açabilir. |
 | `PORT` | `3000` | Platform farklı bir port dayatıyorsa. |
 | `ERROR_ALERT_EMAIL` | _(yok)_ | **#316** — Üretimdeki yakalanmamış sunucu hatalarının bildirileceği operatör adresi. **Tanımsızsa özellik kapalıdır.** SMTP'ye bağımlıdır: `sendMail` hata fırlatmadığı için SMTP eksikse bildirim de sessizce gitmez (gönderim sonucu loglanır). Aynı hata en fazla 15 dk'da bir bildirilir; aradaki tekrarlar sayılıp bir sonraki iletide raporlanır — susturma olmadan bir hata seli SMTP hesabınızı kısıtlatabilir. |
@@ -367,3 +368,32 @@ hatayı tetikleyin.
 > ⚠️ **Bildirim e-postası yığın izi taşır.** Yığın izi ve hata mesajı kullanıcı
 > verisi içerebilir. Adresin operatöre ait, erişimi sınırlı bir kutu olduğundan
 > emin olun. Sorgu dizesi bilerek bildirime konmaz (PII sıklıkla oradadır).
+
+---
+
+## 10. 🔗 GitHub webhook kurulumu (#326)
+
+Issue kapandığında veya PR merge edildiğinde AISigner'daki yol haritası adımı
+otomatik olarak tamamlanır. Bunun için GitHub'ın olayları bize göndermesi gerekir.
+
+**GitHub tarafı** — repo (veya org) → Settings → Webhooks → Add webhook:
+
+| Alan | Değer |
+|---|---|
+| Payload URL | `https://<alan-adi>/api/webhooks/github` |
+| Content type | `application/json` |
+| Secret | `GITHUB_WEBHOOK_SECRET` ile **aynı** değer |
+| Events | "Let me select individual events" → **Issues** ve **Pull requests** |
+
+**Doğrulama:**
+
+- [ ] GitHub'daki webhook sayfasında "Recent Deliveries" sekmesinde son teslimat **200** dönmüş
+- [ ] Bir test issue'su kapatıldığında ilgili adım panelde tamamlandı görünüyor
+- [ ] `GITHUB_WEBHOOK_SECRET` girilmeden test edilirse **503** dönüyor (sessizce başarılı görünmüyor)
+
+> ⚠️ **Uç kimlik doğrulamasız ve public** (middleware `publicPaths`'inde). Tek koruma
+> HMAC imzası. Sır rotasyonunda GitHub'daki değeri de güncellemeyi unutmayın —
+> aksi halde tüm teslimatlar 401 alır ve adımlar sessizce senkronize olmaz.
+>
+> Aynı teslimat iki kez gelirse (GitHub yeniden dener) ikinci kez işlenmez;
+> `ProcessedWebhook` tablosu teslimat kimliğini tutuyor.
