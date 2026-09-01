@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
 /**
  * #265 — yükleme bileşeni.
@@ -48,7 +48,7 @@ describe("AvatarUpload — yükleme", () => {
     render(<AvatarUpload userId="k1" basHarfler="AY" fotografVar={false} />);
     dosyaSec();
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(
         "/api/profile/avatar",
         expect.objectContaining({ method: "POST" }),
@@ -108,7 +108,7 @@ describe("AvatarUpload — kaldırma", () => {
     render(<AvatarUpload userId="k1" basHarfler="AY" fotografVar />);
     fireEvent.click(screen.getByRole("button", { name: /kaldır/i }));
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(
         "/api/profile/avatar",
         expect.objectContaining({ method: "DELETE" }),

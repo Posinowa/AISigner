@@ -10,6 +10,8 @@ export default defineConfig({
     // Varsayılan ortam node (route + lib testleri). Component testleri dosya
     // başına `// @vitest-environment jsdom` docblock'u ile jsdom kullanır (#123).
     environment: "node",
+    // #325: act(...) uyarilarini hataya cevirir; sessizce birikmelerini onler.
+    setupFiles: ["./vitest.setup.ts"],
     globals: true,
     include: ["src/**/*.{test,spec}.{ts,tsx}", "scripts/**/*.{test,spec}.{ts,tsx}"],
   },

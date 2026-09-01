@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
 /**
  * #261 — yeniden gönderme eylemi.
@@ -53,7 +53,7 @@ describe("doğrulanmamış hesap", () => {
     render(<DogrulamaYenidenGonder emailVerified={null} />);
     fireEvent.click(dugme());
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(
         "/api/auth/resend-verification",
         expect.objectContaining({ method: "POST" }),

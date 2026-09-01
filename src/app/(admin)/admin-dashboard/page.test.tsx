@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import "@testing-library/jest-dom/vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { ConfirmDialogProvider } from "@/components/ui/ConfirmDialog";
 
 // #165: LogoutButton/UnreadBadge mock'ları #146'da sayfa header'ı AppShell'e
@@ -57,7 +57,7 @@ describe("Admin dashboard — fetch fail error state (#126-6 / #89-3)", () => {
     const callsBefore = fetchMock.mock.calls.length;
     fireEvent.click(retry);
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(screen.queryByText("Kullanıcılar yüklenemedi")).not.toBeInTheDocument();
     });
     expect(fetchMock.mock.calls.length).toBeGreaterThan(callsBefore);
@@ -157,7 +157,7 @@ describe("Admin dashboard — mentör başvuruları (#250)", () => {
       await screen.findByRole("button", { name: /Mentör Başvuruları/ }),
     );
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(screen.queryByText(/Onayli/)).toBeNull();
     });
     expect(screen.getByText(/Basvuran/)).toBeInTheDocument();
@@ -286,7 +286,7 @@ describe("Admin dashboard — doğrulanmış hesap ibaresi (#259)", () => {
       await screen.findByRole("button", { name: /Doğrulanmamış/ }),
     );
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(screen.queryByText(/Dogrulanmis Test/)).toBeNull();
     });
     expect(screen.getByText(/Dogrulanmamis Test/)).toBeInTheDocument();
