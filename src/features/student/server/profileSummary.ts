@@ -3,6 +3,7 @@
 import { unstable_cache } from "next/cache";
 import { analyzeStudentProfile } from "@/features/ai/server/profile-analysis";
 import { experienceLevelLabel } from "@/lib/experience-level";
+import { aiRizasiVar } from "@/features/kvkk/riza";
 
 /**
  * #282: AI çağrısı için üst sınır.
@@ -84,6 +85,13 @@ export async function getProfileSummary(input: {
   const cached = unstable_cache(
     async () => {
       try {
+        // #321: KVKK açık rıza yoksa profil verisi Vertex AI'ya (ABD)
+        // GÖNDERİLMEZ. Mock özet gösteriliyor — panel boş kalmasın diye — ve
+        // bu içerik zaten "AI üretimi" iddiasında bulunmuyor.
+        if (input.userId && !(await aiRizasiVar(input.userId))) {
+          return getMockProfileSummary(input);
+        }
+
         const result = await zamanAsimiyla(
           analyzeStudentProfile({
             experienceLevel: input.experienceLevel,

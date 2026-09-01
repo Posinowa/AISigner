@@ -4,7 +4,11 @@ import { getCounter, resetCounters } from "@/lib/metrics";
 // --- Bağımlılıkları mock'la ---
 const { requireAuthMock, prismaMock, getTextModelMock } = vi.hoisted(() => ({
   requireAuthMock: vi.fn(),
-  prismaMock: { studentProfile: { findUnique: vi.fn() } },
+  prismaMock: {
+    studentProfile: { findUnique: vi.fn() },
+    // #321: riza kontrolu User.aiConsentAt okuyor.
+    user: { findUnique: vi.fn() },
+  },
   getTextModelMock: vi.fn(),
 }));
 vi.mock("@/lib/auth/guard", () => ({
@@ -44,6 +48,27 @@ describe("POST /api/student/ai-chat — fallback + telemetry (#51/#70/#71)", () 
     vi.clearAllMocks();
     resetCounters();
     prismaMock.studentProfile.findUnique.mockResolvedValue(null);
+    // #321: Varsayilan olarak riza VAR — mevcut testler AI davranisini olcuyor.
+    prismaMock.user.findUnique.mockResolvedValue({ aiConsentAt: new Date() });
+  });
+
+  // #321 KVKK: riza yoksa mesaj Vertex AI'ya (ABD) GONDERILMEZ.
+  it("KVKK rızası yoksa 403 döner ve AI'ya HİÇ gidilmez", async () => {
+    authAsStudent();
+    prismaMock.user.findUnique.mockResolvedValue({ aiConsentAt: null });
+
+    const res = await POST(
+      new Request("http://t", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ message: "merhaba" }),
+      }),
+    );
+
+    expect(res.status).toBe(403);
+    expect((await res.json()).rizaGerekli).toBe(true);
+    // Kritik: model hiç kurulmamali — veri yurt disina cikmamali.
+    expect(getTextModelMock).not.toHaveBeenCalled();
   });
 
   it("AI çağrısı patlarsa 500 değil 200 + dostça fallback reply döner", async () => {

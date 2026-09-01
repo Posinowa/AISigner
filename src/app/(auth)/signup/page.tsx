@@ -10,6 +10,7 @@ import { AuthField } from "@/features/auth/ui/AuthField"
 import { FormAlert } from "@/features/auth/ui/FormAlert"
 import { AuthSubmitButton } from "@/features/auth/ui/AuthSubmitButton"
 import { PasswordRules } from "@/features/auth/ui/PasswordRules"
+import { AI_RIZA_ALANI, RIZA_OZETI } from "@/features/kvkk/riza-alani"
 import {
   BASVURU_ALAN_ADI,
   basvuruTipiCoz,
@@ -117,6 +118,29 @@ function SignupForm() {
           errors={state.error?.password}
           belowField={<PasswordRules password={password} />}
         />
+
+        {/* #321: KVKK AÇIK RIZA — AYRI ve ÖNCEDEN İŞARETLENMEMİŞ.
+            Kullanım Koşulları kabulüyle BİRLEŞTİRİLMEZ: açık rızanın
+            "ayrılabilir" olması gerekiyor. İşaretlenmezse kayıt yine tamamlanır,
+            yalnızca AI özellikleri kapalı kalır — zorunlu tutmak rızayı
+            "özgür irade" olmaktan çıkarırdı. */}
+        <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/60 p-3 text-xs leading-relaxed text-slate-600 cursor-pointer">
+          <input
+            type="checkbox"
+            name={AI_RIZA_ALANI}
+            value="evet"
+            className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 accent-[#23356c]"
+          />
+          <span>
+            {RIZA_OZETI}{" "}
+            <Link href="/privacy" className="underline hover:text-slate-800">
+              Gizlilik Politikası
+            </Link>
+            {". Bu onay isteğe bağlıdır; vermezseniz de kayıt olabilirsiniz, "}
+            {"yalnızca yapay zekâ özellikleri kapalı kalır. Dilediğiniz zaman "}
+            {"profilinizden geri alabilirsiniz."}
+          </span>
+        </label>
 
         {state.error?.general && (
           <FormAlert variant="error">{state.error.general[0]}</FormAlert>

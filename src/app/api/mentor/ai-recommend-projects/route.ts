@@ -4,6 +4,7 @@ import { recommendProjects } from "@/features/ai/server/project-recommendations"
 import { requireAuth } from "@/lib/auth/guard";
 import { recommendProjectsSchema } from "@/lib/validations/api";
 import { createRateLimiter } from "@/lib/rate-limit";
+import { profilSahibininRizasiVar } from "@/features/kvkk/riza";
 
 const limiter = createRateLimiter("ai-recommend-projects", {
   maxRequests: 10,
@@ -48,6 +49,19 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { error: "Öğrenci profili bulunamadı veya bu öğrenci size atanmamış!" }, 
         { status: 404 }
+      );
+    }
+
+    // #321: KVKK açık rıza — veri öğrenciye ait, rıza da öğrencinin.
+    if (!(await profilSahibininRizasiVar(studentProfile.id))) {
+      return NextResponse.json(
+        {
+          error:
+            "Bu öğrenci yapay zekâ işleme onayı vermediği için AI üretimi " +
+            "kullanılamıyor. Öğrenci onayı profilinden verebilir.",
+          rizaGerekli: true,
+        },
+        { status: 403 },
       );
     }
 

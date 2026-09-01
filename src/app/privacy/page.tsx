@@ -60,7 +60,37 @@ export default function PrivacyPage() {
         güvenli belirteçlerle yönetilir; hassas uçlar hız sınırı ile korunur.
       </p>
 
-      <h2>7. Haklarınız</h2>
+      <h2>7. Yurt Dışına Aktarım ve Açık Rıza</h2>
+      <p>
+        Yapay zekâ destekli analiz ve öneriler için profil bilgileriniz ve
+        asistana yazdığınız mesajlar <strong>Google Vertex AI</strong> hizmetine,
+        yani <strong>Amerika Birleşik Devletleri&apos;ne</strong> aktarılır.
+      </p>
+      <p>
+        Bu aktarım <strong>açık rızanıza bağlıdır</strong>. Rıza vermek zorunlu
+        değildir: vermediğinizde platformu kullanmaya devam edersiniz, yalnızca
+        yapay zekâ özellikleri kapalı kalır. Rızanızı kayıt sırasında verebilir,
+        dilediğiniz zaman profilinizden geri alabilirsiniz.
+      </p>
+
+      {/*
+        #321 — AŞAĞIDAKİLER HUKUKİ METİN GEREKTİRİR, UYDURULMAMALI.
+
+        Bu maddeler KVKK'nın zorunlu tuttuğu ama şirket bilgisi olmadan
+        yazılamayacak başlıklar. Bir avukat tarafından doldurulmalı:
+
+        TODO(#321): Veri sorumlusu kimliği — ticari unvan, adres, MERSİS no
+        TODO(#321): Saklama süreleri — her veri kategorisi için ne kadar
+        TODO(#321): KVKK m.11 haklarının tam listesi ve BAŞVURU KANALI
+                    (KEP adresi / başvuru formu / e-posta)
+        TODO(#321): VERBİS kaydı gerekiyor mu, gerekiyorsa kayıt bilgisi
+        TODO(#321): Çerez politikası (ayrı bölüm ya da ayrı sayfa)
+
+        Mekanizma (#321) tamamlandı: açık rıza ayrı bir onay kutusuyla alınıyor,
+        sürümüyle birlikte saklanıyor ve geri alınabiliyor.
+      */}
+
+      <h2>8. Haklarınız</h2>
       <p>
         Hesabınızla ilgili verilere erişim veya düzeltme talepleriniz için platform
         üzerinden yöneticinizle iletişime geçebilirsiniz.

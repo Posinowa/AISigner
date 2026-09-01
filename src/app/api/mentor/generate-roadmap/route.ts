@@ -5,6 +5,7 @@ import { requireAuth } from "@/lib/auth/guard";
 import { isAssignedMentor } from "@/lib/auth/mentor-access";
 import { generateRoadmapSchema } from "@/lib/validations/api";
 import { createRateLimiter } from "@/lib/rate-limit";
+import { profilSahibininRizasiVar } from "@/features/kvkk/riza";
 
 const limiter = createRateLimiter("generate-roadmap", {
   maxRequests: 5,
@@ -56,6 +57,21 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { error: "Bu proje üzerinde işlem yapma yetkiniz yok." },
         { status: 403 }
+      );
+    }
+
+    // #321: KVKK açık rıza. İşlemi MENTÖR tetikliyor ama veri ÖĞRENCİYE ait —
+    // rıza da öğrencinin. Rıza yoksa profil verisi Vertex AI'ya (ABD)
+    // gönderilmez.
+    if (!(await profilSahibininRizasiVar(assignedProject.studentProfile.id))) {
+      return NextResponse.json(
+        {
+          error:
+            "Bu öğrenci yapay zekâ işleme onayı vermediği için AI üretimi " +
+            "kullanılamıyor. Öğrenci onayı profilinden verebilir.",
+          rizaGerekli: true,
+        },
+        { status: 403 },
       );
     }
 

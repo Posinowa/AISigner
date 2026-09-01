@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { incrementCounter } from "@/lib/metrics";
 import { experienceLevelLabel } from "@/lib/experience-level";
+import { aiRizasiVar } from "@/features/kvkk/riza";
 
 const limiter = createRateLimiter("ai-chat", {
   maxRequests: 20,
@@ -51,6 +52,21 @@ export async function POST(req: Request) {
   }
 
   const userId = auth.session.user.id!;
+
+  // #321: KVKK açık rıza. Mesajlar Vertex AI'ya (ABD) gidiyor; rıza yoksa
+  // veri YURT DIŞINA ÇIKARILMAZ. Mock'a düşmüyoruz — kullanıcı neden
+  // çalışmadığını ve nasıl açacağını bilmeli.
+  if (!(await aiRizasiVar(userId))) {
+    return NextResponse.json(
+      {
+        error:
+          "Yapay zekâ asistanını kullanabilmek için profilinizden yapay zekâ " +
+          "işleme onayını vermeniz gerekiyor.",
+        rizaGerekli: true,
+      },
+      { status: 403 },
+    );
+  }
 
   const rl = limiter.check(userId);
   if (!rl.allowed) {

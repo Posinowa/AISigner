@@ -9,6 +9,7 @@ import { authOptions } from "@/lib/auth/nextauth"
 import { normalizeExperienceLevel } from "@/lib/experience-level"
 import { generateAndPersistProfileAnalysis } from "@/features/ai/server/profile-analysis-store"
 import { logger } from "@/lib/logger"
+import { aiRizasiVar } from "@/features/kvkk/riza"
 
 // Tek birleşik şema
 const onboardingSchema = z.object({
@@ -93,8 +94,12 @@ export async function saveOnboarding(rawData: unknown) {
   // 4. #47: Detaylı AI analizini üret + kalıcı sakla. Best-effort — hata olursa
   // onboarding akışı kırılmaz (analyzeStudentProfile zaten fallback döndürür;
   // yalnızca DB persist hatasına karşı try/catch).
+  // #321: KVKK açık rıza yoksa AI analizi HİÇ üretilmez — profil verisi yurt
+  // dışına çıkmaz. Öğrenci rızayı sonradan verirse analiz o zaman üretilir.
+  const rizaVar = await aiRizasiVar(session.user.id!)
+
   try {
-    await generateAndPersistProfileAnalysis(studentProfile.id, {
+    if (rizaVar) await generateAndPersistProfileAnalysis(studentProfile.id, {
       experienceLevel,
       interests: data.experience.interest,
       goals: data.goals.goal,

@@ -40,6 +40,18 @@ model User {
   // #287: Mentör başvurusunun cevapları (yalnızca MENTOR rolünde dolu).
   mentorProfile           MentorProfile?      @relation("MentorProfile_userIdToUser")
   stepStatusChanges       StepStatusHistory[]
+  /// #321: KVKK AÇIK RIZA — yurt dışına (Google Vertex AI, ABD) aktarım.
+  ///
+  /// Neden `User` üzerinde: rıza KAYIT ANINDA alınıyor, o noktada
+  /// `StudentProfile` henüz oluşmamış oluyor.
+  ///
+  /// null = rıza YOK. Rıza geri alınabilir olmalı (KVKK m.11), geri alındığında
+  /// bu alan tekrar null'a çekilir — tarih silinmez, üzerine yazılır; ispat
+  /// yükü veri sorumlusunda olduğu için son durum tutuluyor.
+  aiConsentAt             DateTime?
+  /// Rızanın alındığı metin sürümü. Metin değişirse eski rıza yeni metni
+  /// kapsamaz; hangi sürüme onay verildiği kayıtlı olmalı.
+  aiConsentVersion        String?
 }
 
 model Session {
