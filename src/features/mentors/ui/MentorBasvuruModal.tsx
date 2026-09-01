@@ -59,6 +59,28 @@ function Satir({ etiket, children }: { etiket: string; children: React.ReactNode
  * Cevapların ÜSTÜNDE duruyor: admin onay ekranında önce hızlı bir bakış
  * istiyor, serbest metinleri okumak ikinci adım.
  */
+/**
+ * Analiz yokken gösterilen açıklama (#352).
+ *
+ * Boş bırakmak yanlış olurdu: admin, değerlendirmenin neden görünmediğini
+ * bilmeden bunu bir arıza sanar ve onay kararını eksik bilgiyle verir.
+ * Rıza yokluğu bir HATA DEĞİL — mentörün meşru tercihi.
+ */
+function AnalizYok({ rizaVar }: { rizaVar: boolean }) {
+  return (
+    <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+      <p className="text-sm font-semibold text-slate-700">
+        AI eşleştirme değerlendirmesi yok
+      </p>
+      <p className="mt-1 text-sm leading-relaxed text-slate-600">
+        {rizaVar
+          ? "Değerlendirme henüz üretilmedi. Mentör başvurusunu güncellediğinde oluşacaktır."
+          : "Mentör, verilerinin yapay zekâ ile işlenmesine onay vermediği için değerlendirme üretilmedi. Onay vermek mentörün tercihidir; başvuru bundan bağımsız değerlendirilebilir."}
+      </p>
+    </div>
+  );
+}
+
 function AnalizBolumu({ analiz }: { analiz: MentorAnalizi }) {
   return (
     <div className="mb-5 rounded-xl border border-indigo-100 bg-indigo-50/50 p-4">
@@ -129,6 +151,9 @@ export function MentorBasvuruModal({
   const [yukleniyor, setYukleniyor] = useState(true);
   const [hata, setHata] = useState<string | null>(null);
   const [basvuru, setBasvuru] = useState<MentorBasvurusu | null>(null);
+  // #352: Analizin yokluğunun iki sebebi olabilir; admin hangisi olduğunu
+  // görmeden boş kartı arıza sanar.
+  const [aiRizasiVar, setAiRizasiVar] = useState(true);
 
   useEffect(() => {
     let iptal = false;
@@ -141,6 +166,7 @@ export function MentorBasvuruModal({
           setHata(veri?.error ?? "Başvuru yüklenemedi.");
         } else {
           setBasvuru(veri.profile);
+          setAiRizasiVar(veri.aiRizasiVar !== false);
         }
       } catch {
         if (!iptal) setHata("Başvuru yüklenemedi.");
@@ -206,7 +232,11 @@ export function MentorBasvuruModal({
             </div>
           ) : (
             <>
-              {basvuru.analysis ? <AnalizBolumu analiz={basvuru.analysis} /> : null}
+              {basvuru.analysis ? (
+                <AnalizBolumu analiz={basvuru.analysis} />
+              ) : (
+                <AnalizYok rizaVar={aiRizasiVar} />
+              )}
             <dl>
               <Satir etiket="Ünvan">
                 {basvuru.title}

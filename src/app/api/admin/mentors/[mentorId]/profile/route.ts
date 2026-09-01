@@ -31,7 +31,10 @@ export async function GET(
 
     const kullanici = await prisma.user.findUnique({
       where: { id: mentorId },
-      select: { role: true },
+      // #352: Rıza durumu da geliyor. Analizin YOKLUĞUNUN iki farklı sebebi
+      // var — "henüz üretilmedi" ve "mentör AI onayı vermedi" — ve admin
+      // bunları ayırt edemezse boş kartı arıza sanar.
+      select: { role: true, aiConsentAt: true },
     });
 
     if (!kullanici) {
@@ -75,7 +78,10 @@ export async function GET(
       },
     });
 
-    return NextResponse.json({ profile });
+    return NextResponse.json({
+      profile,
+      aiRizasiVar: Boolean(kullanici.aiConsentAt),
+    });
   } catch (error) {
     console.error("GET /api/admin/mentors/[mentorId]/profile error:", error);
     return NextResponse.json(

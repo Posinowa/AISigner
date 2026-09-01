@@ -224,6 +224,20 @@ PR açıldığında (`opened` / `ready_for_review`) webhook Gemini'den ön incel
   tavan (öğrenci 10, platform 200) → diff (≤30 dosya, ≤40k karakter, lockfile/build elenir)
   → Gemini.
 
+#### ⚠️ Rıza değişikliğinin TÜREV VERİYE etkisi (#352)
+`features/kvkk/riza-etkileri.ts` — rıza açılıp kapanınca yalnız bayrak değişmez:
+- **Geri alma → türev analizler SİLİNİR** (`MentorAnalysis` + `ProfileAnalysis`). KVKK m.11
+  işlemenin sonucunu da kapsıyor; ayrıca #328 rızasız mentörü zaten sıralamaya almıyordu,
+  yani veri duruyor ama kullanılmıyordu. Silme **senkron** (yanıt dönerken silinmiş olmalı).
+- **Verme → EKSİK mentör analizi üretilir** (`after()` ile arka planda). Analiz yalnız başvuru
+  kaydedilirken üretildiği için, rızasız başvurup sonradan onay veren mentör aksi halde
+  eşleştirmeden kalıcı dışlanırdı. Var olan analiz yeniden üretilmez.
+- İkisi de **fırlatmaz**: rızayı kaydedememek, türev kaydın bir süre daha durmasından ağır.
+
+⚠️ Mentör başvurusu (`mentors/server/basvuru.ts`) artık `aiRizasiVar` kapılı — #321 bu
+mekanizmayı kurmuştu ama yalnız stajyer akışlarına uygulanmıştı. **Rıza yoksa başvuru YİNE
+kaydedilir**, sadece analiz üretilmez (rıza özgür iradeyle verilmeli).
+
 #### ⚠️ Rıza sürümü ve `guncelRizaVar` (#327)
 Kod incelemesi öğrencinin **kodunu** da yurt dışına gönderiyor; bu yeni bir veri türü ve
 yeni bir amaç, yani eski rıza metnini AŞIYOR. `RIZA_METIN_SURUMU` → `2026-09-v1`.

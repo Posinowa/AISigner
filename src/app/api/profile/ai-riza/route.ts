@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { requireAuth } from "@/lib/auth/guard";
 import { aiRizasiniAyarla, aiRizasiVar } from "@/features/kvkk/riza";
+import { rizaGeriAlindiginda, rizaVerildiginde } from "@/features/kvkk/riza-etkileri";
 
 /**
  * #321: KVKK açık rızasının okunması ve değiştirilmesi.
@@ -37,7 +38,23 @@ export async function POST(req: Request) {
     );
   }
 
-  await aiRizasiniAyarla(auth.session.user.id!, istenen);
+  const userId = auth.session.user.id!;
+  await aiRizasiniAyarla(userId, istenen);
+
+  // #352: Rıza değişikliği TÜREV VERİYİ de etkiliyor.
+  //
+  // Geri alma SENKRON: kullanıcı "sil" dediğinde yanıt döndüğünde silinmiş
+  // olmalı. Arka plana atılsaydı, kullanıcı ekranda "rıza kaldırıldı"
+  // görürken analizi hâlâ duruyor olabilirdi.
+  //
+  // Verme ARKA PLANDA: analiz üretimi bir AI çağrısı, saniyeler sürebilir.
+  // Kullanıcıyı bir onay kutusu için bekletmenin anlamı yok ve hata rıza
+  // kaydını geri almamalı.
+  if (istenen) {
+    after(() => rizaVerildiginde(userId));
+  } else {
+    await rizaGeriAlindiginda(userId);
+  }
 
   return NextResponse.json({ rizaVar: istenen });
 }

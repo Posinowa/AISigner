@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth/nextauth";
 import { prisma } from "@/lib/db";
 import { mentorBasvuruSchema } from "../models/basvuru";
 import { generateAndPersistMentorAnalysis } from "@/features/ai/server/mentor-analysis-store";
+import { aiRizasiVar } from "@/features/kvkk/riza";
 import { logger } from "@/lib/logger";
 
 /**
@@ -76,9 +77,26 @@ export async function saveMentorBasvuru(rawData: unknown) {
   // onay ekranı bekletilmemeli ve aynı analiz her açılışta yeniden
   // üretilip kota harcamamalı.
   //
+  // #352 — KVKK AÇIK RIZA KAPISI. Mentörün serbest metin cevapları
+  // (`motivation`, `mentoringStyle`) Vertex AI'ya, yani ABD'ye gidiyor.
+  // Bu kapı YOKTU: #321 rıza mekanizmasını kurmuş ama yalnızca stajyer
+  // akışlarına uygulanmıştı, mentör başvurusu açıkta kalmıştı.
+  //
+  // Rıza YOKSA BAŞVURU YİNE KAYDEDİLİR, sadece analiz üretilmez. Rıza
+  // özgür iradeyle verilmeli; vermeyen kişi mentör olamıyorsa rıza özgür
+  // sayılmaz (#321'in 1 numaralı kararı).
+  //
   // Best-effort: analiz üretilemezse başvuru yine de kaydedilmiş olur.
   // (analyzeMentorProfile zaten yedek döndürüyor; buradaki try/catch
   // yalnızca DB persist hatasına karşı.)
+  const rizaVar = await aiRizasiVar(session.user.id);
+  if (!rizaVar) {
+    logger.info("Mentör başvurusu: AI rızası yok, analiz üretilmedi", {
+      mentorProfileId: profil.id,
+    });
+    return;
+  }
+
   try {
     await generateAndPersistMentorAnalysis(profil.id, {
       title: d.title,
