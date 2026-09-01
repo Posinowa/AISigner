@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
 /**
  * #262 — yeni şifre belirleme ekranı.
@@ -75,7 +75,7 @@ describe("reset-password — token var", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /güncelle/i }));
 
-    await vi.waitFor(() => expect(fetch).toHaveBeenCalled());
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
 
     const govde = JSON.parse(
       (vi.mocked(fetch).mock.calls[0][1] as RequestInit).body as string,
