@@ -190,8 +190,8 @@ export default async function VerifyCertificatePage({ params }: Props) {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pb-6 border-b border-slate-100 text-xs">
                   <div className="space-y-1">
                     <span className="font-semibold text-slate-400 block">Başarı Derecesi</span>
-                    <span className="inline-flex items-center gap-1 font-bold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-md">
-                      <Award className="w-3.5 h-3.5 text-purple-600" />
+                    <span className="inline-flex items-center gap-1 font-bold text-primary bg-primary/5 px-2.5 py-1 rounded-md">
+                      <Award className="w-3.5 h-3.5 text-primary" />
                       {result.certificate.completionGrade || "Belirlenmedi"}
                     </span>
                   </div>

@@ -4,8 +4,9 @@ import { RoadmapSteps } from "@/features/student/ui/RoadmapSteps";
 import { prisma } from "@/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/nextauth";
-import { Clock, Briefcase, Target, Github, GraduationCap, Sparkles, CheckCircle2 } from "lucide-react";
+import { Clock, Briefcase, Target, Github, Sparkles, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { Progress } from "@/components/ui/progress";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { StudentCertificateTrigger } from "@/features/student/ui/StudentCertificateTrigger";
@@ -116,25 +117,38 @@ export default async function StudentDashboardPage() {
 
   return (
     <div className="max-w-5xl mx-auto mt-8 p-6 space-y-8">
-      {/* 🎓 Mezun Stajyer Tebrik & Başarı Kartı */}
+      {/* 🎓 Mezun Stajyer Tebrik & Başarı Kartı
+
+          #323: Kart MARKA paletine çekildi. Önceden mor (purple-900/500/400/300)
+          kullanıyordu; mor marka renklerinde YOK — tokenlar logo laciverti
+          (--color-primary #23356c) ve logonun orta mavisi (--landing-mid
+          #3e92cc). Açılış sayfasıyla panel arasındaki renk dikişini kapatan
+          #237 kararının devamı. */}
       {isGraduated && (
-        <div className="rounded-3xl bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-white p-6 sm:p-8 shadow-xl border border-purple-500/30 relative overflow-hidden">
-          <div className="absolute top-0 right-0 -mt-10 -mr-10 w-48 h-48 bg-purple-500/20 rounded-full blur-3xl" />
+        <div className="rounded-3xl bg-gradient-to-r from-primary via-[#1b2a55] to-slate-900 text-primary-foreground p-6 sm:p-8 shadow-xl border border-[#3e92cc]/30 relative overflow-hidden">
+          <div className="absolute top-0 right-0 -mt-10 -mr-10 w-48 h-48 bg-[#3e92cc]/20 rounded-full blur-3xl" />
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 relative z-10">
             <div className="flex items-start gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500 to-emerald-400 p-0.5 shrink-0 shadow-lg">
-                <div className="w-full h-full bg-slate-900 rounded-[14px] flex items-center justify-center">
-                  <GraduationCap className="w-7 h-7 text-purple-400 animate-pulse" />
-                </div>
+              {/* #323: Jenerik GraduationCap yerine AISigner markası — #237'de
+                  AppShell için verilen kararın aynısı. Mezuniyet kartı
+                  öğrencinin gördüğü en "resmi" ekran; marka orada olmalı. */}
+              <div className="w-14 h-14 rounded-2xl bg-white/95 shrink-0 shadow-lg flex items-center justify-center p-2">
+                <Image
+                  src="/brand/aisigner-mark.png"
+                  alt=""
+                  width={37}
+                  height={32}
+                  className="h-8 w-auto"
+                />
               </div>
               <div>
-                <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-400/30 mb-2">
+                <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-[#3e92cc]/20 text-[#9ecbee] border border-[#3e92cc]/40 mb-2">
                   <Sparkles className="w-3.5 h-3.5" /> Posinowa Staj Mezuniyeti
                 </div>
                 <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
                   Stajınız Başarıyla Tamamlandı!
                 </h2>
-                <p className="mt-2 text-purple-100/90 text-sm sm:text-base leading-relaxed max-w-2xl">
+                <p className="mt-2 text-slate-200/90 text-sm sm:text-base leading-relaxed max-w-2xl">
                   Posinowa bünyesinde yaptığınız staj başarıyla tamamlanmıştır. Çalıştığınız projeleri, tamamladığınız yol haritası adımlarını ve tüm dosya/geliştirme geçmişinizi aşağıda incelemeye devam edebilirsiniz. Gelecek kariyerinizde ve profesyonel hayatınızda başarılarınızın devamını dileriz!
                 </p>
               </div>
