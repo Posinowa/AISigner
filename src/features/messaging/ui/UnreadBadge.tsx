@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { MessageCircle } from "lucide-react";
+import { useCanliAkis } from "./useCanliAkis";
 
 type Props = {
   className?: string;
@@ -14,25 +15,38 @@ type Props = {
 export function UnreadBadge({ className = "" }: Props) {
   const [count, setCount] = useState(0);
 
-  useEffect(() => {
-    async function fetchCount() {
-      // Sekme arka plandayken istek atma (görünürlük-farkında polling).
-      if (document.visibilityState === "hidden") return;
-      try {
-        const res = await fetch("/api/messages/unread-count");
-        if (res.ok) {
-          const data = await res.json();
-          setCount(data.unreadCount);
-        }
-      } catch {
-        // Sessiz fail
+  // #329: Sayacı canlı akış besliyor. Akış her tikte "değiştiyse" yolluyor,
+  // yani okundu işaretlemesi de anında yansıyor.
+  const { bagli } = useCanliAkis(
+    useCallback((olay) => {
+      if (olay.tip === "okunmamis") setCount(olay.sayi);
+    }, []),
+  );
+
+  const fetchCount = useCallback(async () => {
+    if (document.visibilityState === "hidden") return;
+    try {
+      const res = await fetch("/api/messages/unread-count");
+      if (res.ok) {
+        const data = await res.json();
+        setCount(data.unreadCount);
       }
+    } catch {
+      // Sessiz fail
     }
+  }, []);
 
+  // İlk değer: akış ilk tikini beklemeden rozet doğru görünsün.
+  useEffect(() => {
     fetchCount();
-    const interval = setInterval(fetchCount, 15000); // 15 saniyede bir kontrol
+  }, [fetchCount]);
 
-    // Sekme tekrar öne geldiğinde beklemeden tazele.
+  // #329: YOKLAMA YEDEĞİ. Akış bağlıyken çalışmaz; koptuğunda devreye girer.
+  // Kaldırılsaydı, SSE'yi kesen bir vekilin arkasında rozet ölü kalırdı.
+  useEffect(() => {
+    if (bagli) return;
+
+    const interval = setInterval(fetchCount, 15000);
     const onVisible = () => {
       if (document.visibilityState === "visible") fetchCount();
     };
@@ -42,7 +56,7 @@ export function UnreadBadge({ className = "" }: Props) {
       clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, []);
+  }, [bagli, fetchCount]);
 
   return (
     <span className={`relative inline-flex ${className}`}>
