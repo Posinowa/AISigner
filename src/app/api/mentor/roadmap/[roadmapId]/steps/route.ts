@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import {
+  ATAMA_SAHIPLIK_SELECT,
+  erisebilirMi,
+  mentoruMu,
+  ogrencisiMi,
+} from "@/features/teams/server/sahiplik";
 import { requireAuth } from "@/lib/auth/guard";
 import { isAssignedMentor } from "@/lib/auth/mentor-access";
 import { createStepSchema } from "@/lib/validations/api";
@@ -19,13 +25,8 @@ export async function POST(
     const roadmap = await prisma.roadmap.findUnique({
       where: { id: roadmapId },
       include: {
-        assignedProject: {
-          include: {
-            studentProfile: {
-              include: { mentorAssignments: { select: { mentorId: true } } },
-            },
-          },
-        },
+        // #332: Sahiplik bireysel VEYA takım; tek tanımdan gelir.
+        assignedProject: { select: ATAMA_SAHIPLIK_SELECT },
       },
     });
 
@@ -34,7 +35,7 @@ export async function POST(
     }
 
     // #195: öğrencinin mentorlarından biri mi?
-    if (!isAssignedMentor(roadmap.assignedProject.studentProfile.mentorAssignments, auth.session.user.id)) {
+    if (!mentoruMu(roadmap.assignedProject, auth.session.user.id)) {
       return NextResponse.json(
         { error: "Bu yol haritasına adım ekleme yetkiniz yok." },
         { status: 403 }

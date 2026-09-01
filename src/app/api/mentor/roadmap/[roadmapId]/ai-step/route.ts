@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import {
+  ATAMA_SAHIPLIK_SELECT,
+  erisebilirMi,
+  mentoruMu,
+  ogrencisiMi,
+} from "@/features/teams/server/sahiplik";
 import { getModel } from "@/lib/ai/gemini-client";
 import { requireAuth } from "@/lib/auth/guard";
 import { isAssignedMentor } from "@/lib/auth/mentor-access";
@@ -30,15 +36,13 @@ export async function POST(
       where: { id: roadmapId },
       include: {
         steps: { orderBy: { order: "asc" } },
+        // #332: Sahiplik bireysel VEYA takım; yetki tek tanımdan gelir.
+        // Prompt'ta öğrenci adı/seviyesi kullanıldığı için profil tümüyle
+        // çekiliyor (takım dalı yukarıda erken dönüyor).
         assignedProject: {
-          include: {
-            studentProfile: {
-              include: {
-                user: true,
-                // #195: M:N yetki kontrolü için atanmış mentorlar.
-                mentorAssignments: { select: { mentorId: true } },
-              },
-            },
+          select: {
+            ...ATAMA_SAHIPLIK_SELECT,
+            studentProfile: { include: { user: true, mentorAssignments: { select: { mentorId: true } } } },
             projectTemplate: true,
           },
         },
@@ -50,11 +54,23 @@ export async function POST(
     }
 
     // #195: öğrencinin mentorlarından biri mi?
-    if (!isAssignedMentor(roadmap.assignedProject.studentProfile.mentorAssignments, auth.session.user.id)) {
+    if (!mentoruMu(roadmap.assignedProject, auth.session.user.id)) {
       return NextResponse.json({ error: "Yetkisiz işlem" }, { status: 403 });
     }
 
+    // #332: Takım panosunda AI adım önerisi bu fazda yok (bkz.
+    // generate-roadmap'teki aynı gerekçe).
+    if (roadmap.assignedProject.team) {
+      return NextResponse.json(
+        { error: "Takım projeleri için AI adım önerisi henüz desteklenmiyor." },
+        { status: 400 },
+      );
+    }
+
     const studentProfile = roadmap.assignedProject.studentProfile;
+    if (!studentProfile) {
+      return NextResponse.json({ error: "Atamanın sahibi bulunamadı." }, { status: 400 });
+    }
     const projectTemplate = roadmap.assignedProject.projectTemplate;
     const existingStepTitles = roadmap.steps.map((s) => s.title).join(", ");
     const nextOrder = (roadmap.steps[roadmap.steps.length - 1]?.order ?? 0) + 1;

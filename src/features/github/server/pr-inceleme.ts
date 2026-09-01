@@ -4,6 +4,7 @@ import { logger } from "@/lib/logger";
 import { incrementCounter } from "@/lib/metrics";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { guncelRizaVar } from "@/features/kvkk/riza";
+import { enDusukSeviye } from "@/features/teams/server/sahiplik";
 import { getOctokit, hataNedeni, readGitHubConfig, type GitHubConfig } from "./client";
 import { yenidenDene } from "./retry";
 import { prDiffiniAl } from "./pr-diff";
@@ -211,6 +212,20 @@ export async function prAcildiginiIncele(govdeHam: unknown): Promise<IsleSonucu>
     where: { githubRepoUrl: pr.repoUrl },
     select: {
       id: true,
+      // #332: Takım deposunda tek bir öğrenci yok — tüm aktif üyeler.
+      team: {
+        select: {
+          id: true,
+          members: {
+            where: { leftAt: null },
+            select: {
+              studentProfile: {
+                select: { id: true, experienceLevel: true, user: { select: { id: true } } },
+              },
+            },
+          },
+        },
+      },
       studentProfile: {
         select: {
           id: true,
@@ -229,7 +244,22 @@ export async function prAcildiginiIncele(govdeHam: unknown): Promise<IsleSonucu>
   // KVKK: kod yurt dışına gidecek. Rıza yoksa BURADA duruyoruz — Gemini'ye
   // giden yolda başka kapı yok. Yürürlükteki metne rıza aranıyor, çünkü kod
   // aktarımı rızanın kapsamına #327 ile eklendi (bkz. `guncelRizaVar`).
-  if (!(await guncelRizaVar(atama.studentProfile.user.id))) {
+  // #332: TAKIM DEPOSUNDA HERKESİN RIZASI ARANIYOR.
+  //
+  // Ortak repoda kimin hangi satırı yazdığını bilmiyoruz (GitHub kullanıcısı ↔
+  // platform kullanıcısı eşlemesi #326'da bilerek ertelendi). Bu belirsizlikte
+  // tek güvenli kural, diff'te kodu bulunabilecek HERKESİN rıza vermiş olması.
+  // Bir üyenin rızası yoksa inceleme hiç yapılmaz — onun kodu da yurt dışına
+  // çıkmasın diye.
+  const rizaGerekenler = atama.team
+    ? atama.team.members.map((m) => m.studentProfile.user.id)
+    : atama.studentProfile
+      ? [atama.studentProfile.user.id]
+      : [];
+
+  const rizalar = await Promise.all(rizaGerekenler.map((id) => guncelRizaVar(id)));
+
+  if (rizaGerekenler.length === 0 || rizalar.some((r) => !r)) {
     incrementCounter("ai.code-review.riza-yok");
     logger.info("PR incelemesi atlandı: güncel AI rızası yok", {
       assignedProjectId: atama.id,
@@ -247,11 +277,14 @@ export async function prAcildiginiIncele(govdeHam: unknown): Promise<IsleSonucu>
     return { islendi: false, aciklama: "mevcut yorumlar okunamadı" };
   }
 
-  const ogrenci = await ogrenciLimiti.check(atama.studentProfile.id);
+  // #332: Takımda tavan TAKIM başına — pano ortak, PR'lar tek repoya geliyor.
+  // Üye başına saymak, kalabalık takıma orantısız bütçe verirdi.
+  const tavanAnahtari = atama.team ? `takim:${atama.team.id}` : atama.studentProfile!.id;
+  const ogrenci = await ogrenciLimiti.check(tavanAnahtari);
   if (!ogrenci.allowed) {
     incrementCounter("ai.code-review.tavan.ogrenci");
-    logger.warn("PR incelemesi atlandı: öğrenci günlük tavanı doldu", {
-      studentProfileId: atama.studentProfile.id,
+    logger.warn("PR incelemesi atlandı: günlük tavan doldu", {
+      tavanAnahtari,
     });
     return { islendi: false, aciklama: "öğrenci günlük inceleme tavanı doldu" };
   }
@@ -287,7 +320,10 @@ export async function prAcildiginiIncele(govdeHam: unknown): Promise<IsleSonucu>
       projeBasligi: atama.projectTemplate.title,
       adimBasligi: adim?.step.title ?? null,
       adimAciklamasi: adim?.step.description ?? null,
-      deneyimSeviyesi: atama.studentProfile.experienceLevel,
+      // #332: Takımda EN DÜŞÜK seviye — inceleme tonu en yeni üyeye de uymalı.
+      deneyimSeviyesi: atama.team
+        ? enDusukSeviye(atama.team.members.map((m) => m.studentProfile.experienceLevel))
+        : (atama.studentProfile?.experienceLevel ?? null),
       prBasligi: pr.baslik,
       kirpildi: diff.kirpildi,
     });

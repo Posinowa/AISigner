@@ -196,7 +196,17 @@ export async function tikAt(): Promise<void> {
         step: {
           roadmap: {
             assignedProject: {
-              studentProfile: { userId: { in: kullanicilar } },
+              // #332: Bireysel VEYA takım üyeliği üzerinden.
+              OR: [
+                { studentProfile: { userId: { in: kullanicilar } } },
+                {
+                  team: {
+                    members: {
+                      some: { leftAt: null, studentProfile: { userId: { in: kullanicilar } } },
+                    },
+                  },
+                },
+              ],
             },
           },
         },
@@ -208,8 +218,20 @@ export async function tikAt(): Promise<void> {
             title: true,
             roadmap: {
               select: {
+                // #332: Adım takıma ait olabilir — kutlama TÜM aktif
+                // üyelere gider, yalnız birine değil.
                 assignedProject: {
-                  select: { studentProfile: { select: { userId: true } } },
+                  select: {
+                    studentProfile: { select: { userId: true } },
+                    team: {
+                      select: {
+                        members: {
+                          where: { leftAt: null },
+                          select: { studentProfile: { select: { userId: true } } },
+                        },
+                      },
+                    },
+                  },
                 },
               },
             },
@@ -220,9 +242,18 @@ export async function tikAt(): Promise<void> {
     });
 
     for (const t of tamamlananlar) {
-      const userId = t.step.roadmap.assignedProject.studentProfile.userId;
-      if (!aboneler.has(userId)) continue;
-      yayinla(userId, { tip: "adim-tamamlandi", stepId: t.stepId, baslik: t.step.title });
+      const atama = t.step.roadmap.assignedProject;
+      // #332: Bireysel atamada tek kişi, takımda tüm aktif üyeler.
+      const userIdler = atama.team
+        ? atama.team.members.map((m) => m.studentProfile.userId)
+        : atama.studentProfile
+          ? [atama.studentProfile.userId]
+          : [];
+
+      for (const userId of userIdler) {
+        if (!aboneler.has(userId)) continue;
+        yayinla(userId, { tip: "adim-tamamlandi", stepId: t.stepId, baslik: t.step.title });
+      }
     }
 
     sonZaman = simdi;

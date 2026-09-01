@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import {
+  ATAMA_SAHIPLIK_SELECT,
+  erisebilirMi,
+  mentoruMu,
+  ogrencisiMi,
+} from "@/features/teams/server/sahiplik";
 import { requireAuth } from "@/lib/auth/guard";
 import { isAssignedMentor } from "@/lib/auth/mentor-access";
 import { readStepFile, deleteStepFile } from "@/lib/storage/step-files";
@@ -28,13 +34,8 @@ export async function GET(
           include: {
             roadmap: {
               include: {
-                assignedProject: {
-                  include: {
-                    studentProfile: {
-                      include: { mentorAssignments: { select: { mentorId: true } } },
-                    },
-                  },
-                },
+                // #332: Sahiplik bireysel VEYA takım; tek tanımdan gelir.
+                assignedProject: { select: ATAMA_SAHIPLIK_SELECT },
               },
             },
           },
@@ -50,9 +51,9 @@ export async function GET(
     }
 
     // Erişim kontrolü
-    const profile = stepFile.step.roadmap.assignedProject.studentProfile;
-    // #195: M:N — sahibi ya da mentorlarından biri değilse reddet.
-    if (profile.userId !== userId && !isAssignedMentor(profile.mentorAssignments, userId)) {
+    // #332: Sahip = bireysel öğrenci ya da aktif takım üyesi; mentör = kendi
+    // mentörü (#195) ya da takımın mentörü.
+    if (!erisebilirMi(stepFile.step.roadmap.assignedProject, userId)) {
       return NextResponse.json(
         { error: "Bu dosyaya erişim yetkiniz yok." },
         { status: 403 }
@@ -126,13 +127,8 @@ export async function DELETE(
           include: {
             roadmap: {
               include: {
-                assignedProject: {
-                  include: {
-                    studentProfile: {
-                      include: { mentorAssignments: { select: { mentorId: true } } },
-                    },
-                  },
-                },
+                // #332: Sahiplik bireysel VEYA takım; tek tanımdan gelir.
+                assignedProject: { select: ATAMA_SAHIPLIK_SELECT },
               },
             },
           },
@@ -148,10 +144,10 @@ export async function DELETE(
     }
 
     // Erişim kontrolü: yükleyen veya mentor silebilir
-    const profile = stepFile.step.roadmap.assignedProject.studentProfile;
     const isUploader = stepFile.uploaderId === userId;
-    // #195: M:N — mentör, öğrencinin mentorlarından biri mi?
-    const isMentor = userRole === "MENTOR" && isAssignedMentor(profile.mentorAssignments, userId);
+    // #195/#332: Mentör = öğrencinin kendi mentörü ya da takımın mentörü.
+    const isMentor =
+      userRole === "MENTOR" && mentoruMu(stepFile.step.roadmap.assignedProject, userId);
 
     if (!isUploader && !isMentor) {
       return NextResponse.json(

@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import {
+  ATAMA_SAHIPLIK_SELECT,
+  erisebilirMi,
+  ogrencisiMi,
+} from "@/features/teams/server/sahiplik";
 import { requireAuth } from "@/lib/auth/guard";
 import { isAssignedMentor } from "@/lib/auth/mentor-access";
 import { createRateLimiter } from "@/lib/rate-limit";
@@ -134,7 +139,7 @@ export async function POST(
 
     // #52: Öğrenci yalnızca PUBLISHED roadmap adımına dosya yükleyebilir.
     // Mentor, taslağı (DRAFT) inceleme/düzenleme için yükleyebilir.
-    const isStudent = step.roadmap.assignedProject.studentProfile.userId === userId;
+    const isStudent = ogrencisiMi(step.roadmap.assignedProject, userId);
     if (isStudent && step.roadmap.status !== "PUBLISHED") {
       return NextResponse.json(
         { error: "Bu yol haritası henüz yayınlanmadı. Yayınlandığında etkileşim kurabilirsiniz." },
@@ -263,13 +268,8 @@ async function getStepWithAccess(stepId: string, userId: string) {
     include: {
       roadmap: {
         include: {
-          assignedProject: {
-            include: {
-              studentProfile: {
-                include: { mentorAssignments: { select: { mentorId: true } } },
-              },
-            },
-          },
+          // #332: Sahiplik bireysel VEYA takım olabilir; tek tanımdan gelir.
+          assignedProject: { select: ATAMA_SAHIPLIK_SELECT },
         },
       },
     },
@@ -277,10 +277,7 @@ async function getStepWithAccess(stepId: string, userId: string) {
 
   if (!step) return null;
 
-  const profile = step.roadmap.assignedProject.studentProfile;
-  if (profile.userId === userId) return step;
-  // #195: M:N — öğrencinin mentorlarından biri mi?
-  if (isAssignedMentor(profile.mentorAssignments, userId)) return step;
-
-  return null;
+  // #332: Öğrenci = bireysel sahip ya da AKTİF takım üyesi.
+  // Mentör = öğrencinin kendi mentörü (#195) ya da takımın mentörü.
+  return erisebilirMi(step.roadmap.assignedProject, userId) ? step : null;
 }

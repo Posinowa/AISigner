@@ -40,6 +40,9 @@ model User {
   // #349: Mentörün açtığı / adminin karara bağladığı çalışma alanı talepleri.
   workspaceRequests       WorkspaceRequest[]  @relation("WorkspaceRequest_requestedByIdToUser")
   decidedWorkspaceRequests WorkspaceRequest[] @relation("WorkspaceRequest_decidedByIdToUser")
+  // #332: Takım mentörlükleri ve üstlenilen adımlar.
+  teamMentorships          TeamMentor[]        @relation("TeamMentor_mentorIdToUser")
+  assignedSteps            RoadmapStep[]       @relation("RoadmapStep_assignee")
   // #287: Mentör başvurusunun cevapları (yalnızca MENTOR rolünde dolu).
   mentorProfile           MentorProfile?      @relation("MentorProfile_userIdToUser")
   stepStatusChanges       StepStatusHistory[]
@@ -110,6 +113,8 @@ model StudentProfile {
   // #195: Tek mentorId yerine M:N. Bir öğrencinin mentorları buradan.
   mentorAssignments MentorAssignment[]
   assignedProjects  AssignedProject[]
+  // #332: Bu stajyerin takım üyelikleri (ayrılmışlar dahil).
+  teamMemberships  TeamMember[]
   surveyAnswers     SurveyAnswer[]
   profileAnalysis   ProfileAnalysis?
 }
@@ -153,8 +158,19 @@ model ProjectTemplate {
 }
 
 model AssignedProject {
-  id                String           @id @default(cuid())
-  studentProfileId  String
+  id String @id @default(cuid())
+
+  /// #332: TAKIM MODELİ İLE NULLABLE OLDU.
+  ///
+  /// Bireysel atamada dolu, TAKIM atamasında NULL — sahiplik o zaman `teamId`
+  /// üzerinden. NOT NULL'dan nullable'a geçiş expand-safe'tir (tersi yıkıcı
+  /// olurdu, bkz. `docs/MIGRATIONS.md`); mevcut satırlar aynen geçerli kalır.
+  ///
+  /// ⚠️ İKİSİNDEN TAM BİRİ dolu olmalı. Prisma bunu ifade edemediği için kısıt
+  /// migration'da ham CHECK olarak duruyor (`assigned_project_sahip_tek`).
+  studentProfileId  String?
+  /// #332: Takım ataması. Bireysel atamada NULL.
+  teamId            String?
   projectTemplateId String
   status            AssignmentStatus @default(PENDING)
   githubRepoUrl     String?
@@ -163,13 +179,17 @@ model AssignedProject {
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
 
-  studentProfile  StudentProfile  @relation(fields: [studentProfileId], references: [id])
+  studentProfile  StudentProfile? @relation(fields: [studentProfileId], references: [id])
+  team            Team?           @relation(fields: [teamId], references: [id])
   projectTemplate ProjectTemplate @relation(fields: [projectTemplateId], references: [id])
   roadmap         Roadmap?
   workspaceRequests WorkspaceRequest[]
 
   // #58: Aynı öğrenciye aynı proje şablonu yalnızca bir kez atanabilir (yarış koşulu koruması).
+  // Postgres çoklu NULL'a izin verdiği için takım satırları bu kısıtta çakışmaz.
   @@unique([studentProfileId, projectTemplateId])
+  // #332: Aynı korumanın takım karşılığı.
+  @@unique([teamId, projectTemplateId])
 }
 
 model Roadmap {
@@ -195,10 +215,19 @@ model RoadmapStep {
   status         StepStatus @default(TODO)
   // #50: Bu adımın bağlı olduğu GitHub issue linki (opsiyonel).
   githubIssueUrl String?
+  /// #332: Adımı ÜSTLENEN takım üyesi.
+  ///
+  /// Adım TAKIMIN; bu alan "kim çekti" bilgisi. Sprint panosunda iş havuzda
+  /// durur, biri üzerine alır. Tamamlayan kişi ayrıca
+  /// `StepStatusHistory.changedById`'de kayıtlı (#324) — sertifika bireysel
+  /// olduğu için katkı bu ikisinden ölçülür.
+  /// Bireysel atamalarda NULL kalır; kimse sahip değil, zaten tek kişi var.
+  assigneeId     String?
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 
   roadmap  Roadmap             @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
+  assignee User?               @relation("RoadmapStep_assignee", fields: [assigneeId], references: [id], onDelete: SetNull)
   comments StepComment[]
   files    StepFile[]
   issues   StepIssue[]
@@ -367,6 +396,66 @@ model Suggestion {
 
   @@index([authorId, createdAt])
   @@index([status, createdAt])
+}
+
+/// #332: Takım/Scrum staj projesi.
+///
+/// NEDEN VAR: Bugüne kadarki model "1 öğrenci = 1 proje" idi ve bu varsayım
+/// şemada kilitliydi. Gerçek iş hayatını simüle etmek için 2-4 kişilik takımlar
+/// AYNI panoyu ve AYNI repoyu paylaşıyor.
+///
+/// SAHİPLİK TAKIMDA, KREDİ KİŞİDE: `AssignedProject` takıma ait (tek kayıt →
+/// tek roadmap → tek repo), ama sertifika BİREYSEL kalıyor. Katkı, adımı
+/// üstlenen (`RoadmapStep.assigneeId`) ve tamamlayan (`StepStatusHistory
+/// .changedById`) kayıtlarından ölçülüyor.
+model Team {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members          TeamMember[]
+  mentors          TeamMentor[]
+  assignedProjects AssignedProject[]
+}
+
+/// #332: Takım üyeliği.
+model TeamMember {
+  id               String @id @default(cuid())
+  teamId           String
+  studentProfileId String
+  /// Takımdaki rol: frontend | backend | qa | fullstack | design
+  role             String
+
+  joinedAt DateTime  @default(now())
+  /// #332: Ayrılma SİLME DEĞİL, işaretlemedir.
+  ///
+  /// Satırı silmek, üyenin panodaki katkı geçmişini (üstlendiği adımlar,
+  /// tamamladığı işler) sahipsiz bırakırdı; sertifika bireysel olduğu için o
+  /// geçmiş kişinin belgesinin dayanağı. Ayrılan üye takımı görmez ama
+  /// yaptıkları kayıtlı kalır.
+  leftAt DateTime?
+
+  team           Team           @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  studentProfile StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, studentProfileId])
+  @@index([studentProfileId])
+}
+
+/// #332: Takımın mentörü.
+///
+/// Mentör TAKIMA atanır; bir üyenin etkin mentörleri = kendi mentörleri (#195)
+/// + takımının mentörleri. Bireysel atamalar bozulmadan çalışmaya devam eder.
+model TeamMentor {
+  teamId   String
+  mentorId String
+
+  team   Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  mentor User @relation("TeamMentor_mentorIdToUser", fields: [mentorId], references: [id], onDelete: Cascade)
+
+  @@id([teamId, mentorId])
+  @@index([mentorId])
 }
 
 /// #349: Mentörün "bu öğrencinin GitHub çalışma alanı kurulsun" talebi.

@@ -60,6 +60,15 @@ function atamayiYukle(assignmentId: string) {
     where: { id: assignmentId },
     include: {
       studentProfile: { include: { user: true } },
+      // #332: Takım ataması — sahip öğrenci değil takım olabilir.
+      team: {
+        include: {
+          members: {
+            where: { leftAt: null },
+            include: { studentProfile: { include: { user: true } } },
+          },
+        },
+      },
       projectTemplate: true,
       roadmap: {
         include: {
@@ -82,15 +91,42 @@ function atamayiYukle(assignmentId: string) {
  * Sonek atama kimliğinden alınıyor: deterministik (aynı atama her zaman aynı
  * ada çözülür, idempotenslik korunur) ve atamalar arasında benzersiz.
  */
+/** Repo açıklamasında görünen sahip: takım adı ya da stajyer adı (#332). */
+function sahipTanimi(atama: Atama): string {
+  if (atama.team) {
+    return `${atama.team.name} takımı (${atama.team.members.length} kişi)`;
+  }
+  return atama.studentProfile?.user.name ?? "stajyer";
+}
+
+/**
+ * Takımın issue üretiminde kullanılacak deneyim seviyesi (#332).
+ *
+ * EN DÜŞÜK seviye seçiliyor: pano ortak ve en yeni üyenin de takip
+ * edebilmesi gerekiyor. Ortalama almak, kimseye uymayan bir seviye üretirdi.
+ */
+function takimSeviyesi(atama: Atama): string {
+  if (!atama.team) return atama.studentProfile?.experienceLevel ?? "BEGINNER";
+
+  const sira = ["BEGINNER", "INTERMEDIATE", "ADVANCED"];
+  const seviyeler = atama.team.members.map((m) => m.studentProfile.experienceLevel);
+  if (seviyeler.length === 0) return "BEGINNER";
+
+  return seviyeler.reduce((enDusuk, s) =>
+    sira.indexOf(s) < sira.indexOf(enDusuk) ? s : enDusuk,
+  );
+}
+
 function repoAdi(atama: Atama): string {
   const kisaKimlik = atama.id.slice(-8).toLowerCase();
 
-  return repoAdiUret([
-    "aisigner",
-    atama.studentProfile.user.name || "student",
-    atama.projectTemplate.title,
-    kisaKimlik,
-  ]);
+  // #332: Takım atamasında repo TAKIM adından türetilir — üyelerden birinin
+  // adını seçmek keyfi olurdu ve üye değiştiğinde repo adı anlamsızlaşırdı.
+  const sahipAdi = atama.team
+    ? atama.team.name
+    : atama.studentProfile?.user.name || "student";
+
+  return repoAdiUret(["aisigner", sahipAdi, atama.projectTemplate.title, kisaKimlik]);
 }
 
 /**
@@ -148,7 +184,9 @@ async function issueIcerikleriniUret(atama: Atama): Promise<void> {
         stepTitle: step.title,
         stepDescription: step.description,
         projectTitle: atama.projectTemplate.title,
-        experienceLevel: atama.studentProfile.experienceLevel,
+        // #332: Takımda issue içerikleri EN DÜŞÜK deneyim seviyesine göre
+        // üretiliyor: pano ortak, en yeni üyenin de takip edebilmesi gerek.
+        experienceLevel: takimSeviyesi(atama),
       });
     }),
   );
@@ -221,7 +259,7 @@ async function gercektenKur(atama: Atama, config: GitHubConfig) {
 
   const repo = await repoyuHazirla(config, {
     repoName,
-    description: `${atama.projectTemplate.title} — ${atama.studentProfile.user.name ?? "stajyer"} (AISigner)`,
+    description: `${atama.projectTemplate.title} — ${sahipTanimi(atama)} (AISigner)`,
   });
   if (!repo.ok) throw new Error(hataMesaji(repo.neden));
 

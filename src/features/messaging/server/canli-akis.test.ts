@@ -164,11 +164,16 @@ describe("olay dağıtımı", () => {
 
     await tikAt();
 
+    // #332: Filtre artık bireysel VEYA takım üyeliği üzerinden (OR).
     const where = prismaMock.stepStatusHistory.findMany.mock.calls[0][0].where;
-    expect(where.step.roadmap.assignedProject.studentProfile.userId.in).toEqual([
+    const [bireysel, takim] = where.step.roadmap.assignedProject.OR;
+    expect(bireysel.studentProfile.userId.in).toEqual(["ogrenci-1", "ogrenci-2"]);
+    expect(takim.team.members.some.studentProfile.userId.in).toEqual([
       "ogrenci-1",
       "ogrenci-2",
     ]);
+    // Ayrılmış üyeye kutlama gitmemeli.
+    expect(takim.team.members.some.leftAt).toBeNull();
   });
 
   it("tamamlanan adımı adımın SAHİBİNE yollar", async () => {

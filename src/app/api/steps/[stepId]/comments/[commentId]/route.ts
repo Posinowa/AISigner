@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import {
+  ATAMA_SAHIPLIK_SELECT,
+  erisebilirMi,
+  mentoruMu,
+  ogrencisiMi,
+} from "@/features/teams/server/sahiplik";
 import { requireAuth } from "@/lib/auth/guard";
 import { isAssignedMentor } from "@/lib/auth/mentor-access";
 import { updateStepCommentSchema } from "@/lib/validations/api";
@@ -125,20 +131,16 @@ export async function DELETE(
       include: {
         roadmap: {
           include: {
-            assignedProject: {
-              include: {
-                studentProfile: {
-                  include: { mentorAssignments: { select: { mentorId: true } } },
-                },
-              },
-            },
+            // #332: Sahiplik bireysel VEYA takım; tek tanımdan gelir.
+            assignedProject: { select: ATAMA_SAHIPLIK_SELECT },
           },
         },
       },
     });
 
     // #195: M:N — öğrencinin mentorlarından biri mi?
-    if (isAssignedMentor(step?.roadmap.assignedProject.studentProfile.mentorAssignments, userId)) {
+    // #195/#332: Mentör = öğrencinin kendi mentörü ya da takımın mentörü.
+    if (step && mentoruMu(step.roadmap.assignedProject, userId)) {
       await prisma.stepComment.delete({ where: { id: commentId } });
       return NextResponse.json({ success: true });
     }
