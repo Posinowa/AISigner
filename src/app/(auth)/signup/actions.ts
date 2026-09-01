@@ -32,7 +32,7 @@ export async function signupAction(
 ): Promise<SignupState> {
   // Rate limiting
   const ip = getClientIp(await headers());
-  const rl = signupLimiter.check(ip);
+  const rl = await signupLimiter.check(ip);
   if (!rl.allowed) {
     return { error: { email: ["Çok fazla kayıt denemesi. Lütfen 5 dakika bekleyin."] } };
   }

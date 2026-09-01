@@ -486,3 +486,23 @@ model MentorAnalysis {
 
   mentorProfile MentorProfile @relation(fields: [mentorProfileId], references: [id], onDelete: Cascade)
 }
+
+/// #322: Rate-limit sayaçları — süreç belleği yerine veritabanında.
+///
+/// NEDEN: Sayaçlar `Map` içinde tutuluyordu ve süreç-yereldi. Birden fazla
+/// instance çalıştığında paylaşılmadıkları için brute-force koruması SESSİZCE
+/// zayıflıyordu: 5 denemelik login limiti 3 pod'da fiilen 15 oluyordu ve bu
+/// hiçbir yerde görünmüyordu.
+///
+/// Redis yerine Postgres seçildi: veritabanı zaten var, yeni bir altyapı
+/// bileşeni ve "Redis düşerse ne olacak" sorusu doğmuyor.
+model RateLimit {
+  /// "<limiter adı>:<kimlik>" — ör. "login-ip:ip:203.0.113.9"
+  key     String   @id
+  count   Int
+  /// Pencerenin bittiği an. Geçmişte ise sayaç sıfırlanır.
+  resetAt DateTime
+
+  /// Süresi dolmuş satırların temizliği için.
+  @@index([resetAt])
+}

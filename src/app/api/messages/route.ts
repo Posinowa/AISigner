@@ -105,7 +105,7 @@ export async function POST(req: Request) {
   const userId = auth.session.user.id!;
   const userRole = auth.session.user.role;
 
-  const rl = limiter.check(userId);
+  const rl = await limiter.check(userId);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Çok fazla mesaj gönderdiniz. Lütfen biraz bekleyin." },

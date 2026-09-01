@@ -41,7 +41,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Oturum geçersiz." }, { status: 401 });
   }
 
-  const rl = limiter.check(userId);
+  const rl = await limiter.check(userId);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Çok fazla yükleme denemesi. Lütfen biraz bekleyin." },

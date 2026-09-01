@@ -189,10 +189,16 @@ npm run create:admin
     oluştur; servis hesabına `Storage Object Admin` yetkisi ver.
   - **`GCS_BUCKET` verme:** yerel disk `/app/uploads`. Volume bağlanmazsa **her deploy'da silinir**;
     kalıcılık için Out Plane Volume'ünü `/app/uploads`'a bağla (tek-instance).
-- **Tek-instance varsayımı**: `rate-limit.ts` ve `metrics.ts` bellek-içi (process-local)
-  tutulur. **Birden çok instance** çalıştıracaksanız bunlar instance'lar arasında
-  paylaşılmaz → sayaçlar instance sayısıyla çarpılır (5 deneme limiti 3 instance'ta
-  fiilen 15 olur). Redis'e taşıyın. Tek instance ile sorun yok.
+- **Rate-limit artık ÇOK-INSTANCE GÜVENLİ (#322)**: sayaçlar veritabanında
+  (`RateLimit` tablosu) tutuluyor ve artırma tek atomik SQL ifadesiyle yapılıyor.
+  Öncesi süreç belleğindeydi ve birden çok instance'ta brute-force koruması
+  **sessizce** zayıflıyordu (5 denemelik limit 3 pod'da fiilen 15 oluyordu).
+  Redis gerekmiyor — veritabanı zaten var.
+  - ⚠️ **Fail-open**: veritabanına ulaşılamazsa istek GEÇİRİLİR ve durum loglanır.
+    Kesintide tüm girişleri kilitlememek için bilinçli karar; rate-limit bir
+    savunma-derinliği katmanı, kimlik doğrulamanın kendisi değil.
+- **`metrics.ts` hâlâ süreç-yerel**: yalnız teşhis amaçlı sayaçlar, instance
+  başına ayrı sayar. Güvenlik etkisi yok.
   - Şifre-sıfırlama ve e-posta-doğrulama token'ları **artık bellekte DEĞİL**: durumsuz
     HMAC (`AUTH_SECRET` ile imzalı), çok-instance'ta sorunsuz çalışır.
 
@@ -353,9 +359,10 @@ hatayı tetikleyin.
 - [ ] `ERROR_ALERT_EMAIL` tanımlı ve okunan bir kutuya gidiyor
 - [ ] SMTP çalışıyor (§2'deki test kaydı akışı ile teyit edilmiş olmalı)
 
-> ⚠️ **Susturma tek instance içindir.** Sayaçlar bellekte (`rate-limit.ts` ve
-> `metrics.ts` ile aynı kısıt). Çok instance çalıştırılırsa her instance kendi
-> susturmasını uygular; bildirim sayısı instance sayısıyla çarpılır.
+> ⚠️ **Susturma tek instance içindir.** Sayaçlar bellekte (`metrics.ts` ile aynı
+> kısıt; rate-limit #322'de veritabanına taşındı). Çok instance çalıştırılırsa her
+> instance kendi susturmasını uygular ve bildirim sayısı instance sayısıyla
+> çarpılır — gürültü artar ama veri kaybı olmaz.
 
 > ⚠️ **Bildirim e-postası yığın izi taşır.** Yığın izi ve hata mesajı kullanıcı
 > verisi içerebilir. Adresin operatöre ait, erişimi sınırlı bir kutu olduğundan
