@@ -1,6 +1,7 @@
 import { DogrulanmisRozet } from "@/features/auth/ui/DogrulanmisRozet";
 import { AvatarUpload } from "@/features/profile/ui/AvatarUpload";
 import { RoadmapSteps } from "@/features/student/ui/RoadmapSteps";
+import { ProjeOnerisi } from "@/features/proposals/ui/ProjeOnerisi";
 import { prisma } from "@/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/nextauth";
@@ -250,6 +251,14 @@ export default async function StudentDashboardPage() {
 
 
       {/* Projeler ve Yol Haritası */}
+      {/* #366: Kendi projeni öner. Mezun stajyer yeni proje öneremez —
+          #208'deki "sistem durumunu değiştiren uçlar kapalı" ilkesi. */}
+      {!isGraduated && (
+        <div className="mb-8">
+          <ProjeOnerisi />
+        </div>
+      )}
+
       {/* #290: Karşılamadaki "Sırada" bağlantısının hedefi. */}
       <div id={PROJELER_CAPASI.slice(1)} className="scroll-mt-24">
         <h2 className="text-xl font-bold mb-6 flex items-center text-slate-900 border-b border-slate-200 pb-3">

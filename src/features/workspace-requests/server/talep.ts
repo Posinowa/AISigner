@@ -46,7 +46,12 @@ export type TalepSonucu =
  * `ERROR` bilerek DIŞARIDA: başarısız bir kurulumun yeniden talep edilebilmesi
  * gerekiyor, aksi halde bir kere patlayan atama kalıcı olarak kilitlenirdi.
  */
-const KURULU_DURUMLAR = new Set(["PROVISIONED", "PROVISIONING"]);
+const KURULU_DURUMLAR = new Set([
+  "PROVISIONED",
+  "PROVISIONING",
+  // #366: Dış depoya bağlı atamada kurulacak bir şey yok; talep açılmamalı.
+  "LINKED",
+]);
 
 /**
  * Mentörün talebini açar.

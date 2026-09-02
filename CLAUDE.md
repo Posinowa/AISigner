@@ -89,6 +89,7 @@ src/
 | `StepIssue` | adım ↔ GitHub issue eşlemesi (#218) |
 | `WorkspaceRequest` | mentörün çalışma alanı talebi, admin onayı (#349); `pendingKey @unique` bekleyen tekilliği |
 | `ProcessedWebhook` / `PullRequestReview` | webhook teslimat kimliği (#326) / PR'a inceleme yazıldığının otoriter kaydı (#327) |
+| `ProjectProposal` | stajyerin kendi proje önerisi (#366); `pendingKey @unique` bekleyen tekilliği, `kaynak`/`kararKaynak` GitHub tercihi |
 | `Message` / `StepComment` / `StepFile` | mesajlaşma, yorum, dosya (`SecurityAnswer` #264'te düşürüldü) |
 
 ## Kritik Mimari Notlar
@@ -178,6 +179,34 @@ bilinçli karar.
   ilk sorgu takım projesini HİÇ getirmez. İkisi de canlıda boş liste olarak görünmüştü.
 - ⚠️ **Takım için AI yol haritası/adım üretimi YOK** — açık 400. Sentetik profil uydurmak
   üretilen içeriğin kime göre ayarlandığını belirsizleştirirdi.
+
+### Kendi Projeni Öner (#366)
+Stajyer hazır havuzdan seçmek yerine **kendi projesini önerir**; admin onaylayınca normal
+bir atamaya dönüşür. `features/proposals/server/oneri.ts` tek doğru kaynak.
+
+Üç GitHub kaynağı **tek akışta** (`kaynak`):
+- **BIZIM** — onaydan sonra depoyu biz açarız (`NOT_PROVISIONED` → #349 akışı).
+- **BAGLA** — depo stajyerde kalır, yalnız atamaya bağlanır.
+- **DEVRET** — depo organizasyona geçer, tüm otomasyon çalışır.
+
+- **⚠️ KAYNAK KARARI ADMİN'İN** (`kararKaynak`). Stajyer TERCİHİNİ belirtir; depo bağlamak
+  da devir almak da organizasyonu ilgilendirdiği için son söz admin'de.
+- **⚠️ DEVRİ PLATFORM BAŞLATAMAZ.** GitHub'ın transfer ucu yalnız depo sahibine açık.
+  `devirTamamlandiMi` sadece **tespit eder** (org altında aynı adla `repos.get`). Onay,
+  devir tamamlanmadan verilemiyor — aksi halde var olmayan bir depoya atama bağlanırdı.
+- **⚠️ `githubStatus: "LINKED"` yeni bir durum: depo VAR ama BİZ KURMADIK.** Provisioning
+  kilidi `notIn: ["PROVISIONING", "LINKED"]` — bu kapı olmasa kurulum **stajyerin kendi
+  deposuna** milestone ve issue açardı. `talep.ts` `KURULU_DURUMLAR`'a da eklendi.
+- **BAGLA'da webhook ve AI kod incelemesi ÇALIŞMAZ** (depo stajyerin hesabında,
+  `GITHUB_TOKEN` orada yetkisiz). Bu bedel **arayüzde seçim anında yazılı** — sonradan
+  öğrenilen kayıp özellik hata gibi görünür. #348 (GitHub App) çözer.
+- **Öneriden türeyen şablon ORTAK HAVUZA GİRMEZ** (`ProjectTemplate.fromProposal`).
+  Fikri öneren kişinin projesi başkalarına önerilirse habersiz dağıtılmış olur.
+- **Bekleyen tekilliği `pendingKey`** ile (#345/#349 deseni): PENDING iken `studentProfileId`,
+  karara bağlanınca NULL. Kısıt **veritabanında**, "önce sorgula sonra oluştur" değil.
+- **Karar yarışında atama SİLİNİR.** Onay `updateMany` count 0 dönerse (başkası araya girdi)
+  az önce oluşturulan `AssignedProject` geri alınır — yetim atama kalmaz.
+- **Red gerekçesi zorunlu** ve stajyere gösterilir; yoksa aynı öneri tekrar açılır.
 
 ### Analitik Panel (#331)
 `features/analytics/server/analiz.ts` (üç ham SQL) → `panel.ts` (önbellek) →

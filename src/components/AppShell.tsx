@@ -19,6 +19,8 @@ const navByRole: Record<Role, { home: string; links: NavLink[] }> = {
       { href: "/admin-dashboard/projects", label: "Projeler" },
       // #349: Mentör taleplerinin kuyruğu. Rozet olmadan kuyruk fark edilmez.
       { href: "/admin-dashboard/workspace-requests", label: "Çalışma Alanı Talepleri" },
+      // #366: Stajyerlerin kendi proje önerileri.
+      { href: "/admin-dashboard/proposals", label: "Proje Önerileri" },
       // #331: Darboğaz, yanıt süresi, gözden geçirilecek öğrenciler.
       { href: "/admin-dashboard/analytics", label: "Analitik" },
       // #332: Takım/Scrum projeleri.

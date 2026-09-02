@@ -30,6 +30,10 @@ function throwIfDuplicateTitle(error: unknown): void {
 export async function listTemplates() {
   try {
     return await prisma.projectTemplate.findMany({
+      // #366: Stajyer önerisinden türeyen şablonlar ORTAK HAVUZDA görünmez.
+      // Aksi halde her onaylanan öneri, tüm mentörlerin gördüğü listeyi
+      // şişirirdi ve o şablon aslında tek bir stajyere özel.
+      where: { fromProposal: false },
       orderBy: {
         createdAt: "desc",
       },

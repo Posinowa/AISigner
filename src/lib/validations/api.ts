@@ -328,3 +328,32 @@ export const assignTeamProjectSchema = z.object({
 export const claimStepSchema = z.object({
   assigneeId: z.string().min(1).nullable(),
 });
+
+// #366: Stajyerin kendi proje önerisi.
+const kaynakEnum = z.enum(["BIZIM", "BAGLA", "DEVRET"]);
+
+export const createProposalSchema = z.object({
+  title: z.string().min(5, "Başlık en az 5 karakter").max(120).transform((v) => v.trim()),
+  description: z
+    .string()
+    .min(30, "Açıklama en az 30 karakter olmalı")
+    .max(4000)
+    .transform((v) => v.trim()),
+  goals: z
+    .string()
+    .min(20, "Hedefler en az 20 karakter olmalı")
+    .max(2000)
+    .transform((v) => v.trim()),
+  technologies: z.array(z.string().min(1).max(40)).max(10, "En fazla 10 teknoloji"),
+  kaynak: kaynakEnum,
+  // BAGLA/DEVRET için zorunluluk sunucu katmanında: burada `superRefine` ile
+  // kurmak kuralı iki yerde tekrarlardı.
+  repoUrl: z.string().url("Geçerli bir GitHub adresi girin").optional().nullable(),
+});
+
+export const decideProposalSchema = z.object({
+  onay: z.boolean(),
+  adminNote: z.string().max(500).optional(),
+  // Admin stajyerin tercihini geçersiz kılabilir.
+  kaynak: kaynakEnum.optional(),
+});
