@@ -98,3 +98,59 @@ export async function issueKapandiginiIsle(
   logger.info("Webhook adımı tamamladı", { stepId: stepIssue.stepId, url });
   return { islendi: true, aciklama: "adım COMPLETED yapıldı" };
 }
+
+/**
+ * Bir GitHub issue/PR YENİDEN AÇILDIĞINDA adımı geri çeker (#378).
+ *
+ * NEDEN GEREKLİ: Webhook yalnız `closed` olayını dinliyordu. Yanlışlıkla
+ * kapatılan bir issue geri açıldığında platform bundan habersiz kalıyor ve
+ * adım veritabanında COMPLETED olarak duruyordu — kaynak (GitHub) ile ayna
+ * (AISigner) sessizce ayrışıyordu. #326'nın çözmeye çalıştığı sorunun aynısı,
+ * ters yönde.
+ *
+ * ⚠️ REVİZYON DURUMU EZİLMEZ. #379 revizyon istendiğinde issue'yu YENİDEN
+ * AÇIYOR; GitHub o işlemin webhook'unu bize geri gönderiyor. Burada körlemesine
+ * IN_PROGRESS yazsaydık mentörün az önce koyduğu REVISION_REQUESTED durumunu
+ * kendi tetiklediğimiz olayla silerdik — gerekçe geçmişte kalır ama öğrenci
+ * panosunda "revizyon istendi" rozeti kaybolurdu.
+ */
+export async function issueYenidenAcildiginiIsle(govde: unknown): Promise<IsleSonucu> {
+  const url = issueUrlAl(govde);
+  if (!url) return { islendi: false, aciklama: "olayda issue/PR url'i yok" };
+
+  const stepIssue = await prisma.stepIssue.findFirst({
+    where: { githubIssueUrl: url },
+    select: { id: true, stepId: true, status: true },
+  });
+  if (!stepIssue) return { islendi: false, aciklama: "eşleşen StepIssue yok" };
+
+  if (stepIssue.status !== "OPEN") {
+    await prisma.stepIssue.update({
+      where: { id: stepIssue.id },
+      data: { status: "OPEN" },
+    });
+  }
+
+  const adim = await prisma.roadmapStep.findUnique({
+    where: { id: stepIssue.stepId },
+    select: { status: true },
+  });
+  if (!adim) return { islendi: true, aciklama: "adım bulunamadı" };
+
+  // Yalnızca TAMAMLANMIŞ adım geri çekilir. REVISION_REQUESTED'a dokunulmaz
+  // (yukarıdaki uyarı), TODO/IN_PROGRESS zaten açık.
+  if (adim.status !== "COMPLETED") {
+    return { islendi: true, aciklama: `adım ${adim.status}, durum korundu` };
+  }
+
+  await adimDurumunuDegistir({
+    stepId: stepIssue.stepId,
+    yeniDurum: "IN_PROGRESS",
+    oncekiDurum: adim.status,
+    // İşlemi bir platform kullanıcısı yapmadı; GitHub'dan geldi.
+    degistirenId: null,
+  });
+
+  logger.info("Webhook adımı geri çekti", { stepId: stepIssue.stepId, url });
+  return { islendi: true, aciklama: "adım IN_PROGRESS yapıldı" };
+}

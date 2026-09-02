@@ -8,7 +8,8 @@ import {
   webhookImzasiniDogrula,
   webhookSirriVarMi,
 } from "@/features/github/server/webhook-imza";
-import { issueKapandiginiIsle } from "@/features/github/server/webhook-isle";
+import { issueKapandiginiIsle, issueYenidenAcildiginiIsle } from "@/features/github/server/webhook-isle";
+import { teslimatKayitlariniTemizle } from "@/features/github/server/teslimat-kaydi";
 import { prAcildiginiIncele } from "@/features/github/server/pr-inceleme";
 
 /**
@@ -92,6 +93,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, tekrar: true });
   }
 
+  // #378: Tablo yalnızca büyüyordu — fırsatçı temizlik. Kaydı ATTIKTAN sonra
+  // çağrılıyor: temizlik patlasa bile idempotens koruması yerinde kalsın.
+  await teslimatKayitlariniTemizle();
+
   if (!ILGILENILEN_OLAYLAR.has(olay)) {
     return NextResponse.json({ ok: true, islendi: false, aciklama: "ilgilenilmeyen olay" });
   }
@@ -121,6 +126,18 @@ export async function POST(req: Request) {
 
     const kapandi =
       govde.action === "closed" && (olay === "issues" || prMergeEdildi);
+
+    /*
+     * #378: YENİDEN AÇILMA.
+     *
+     * Yanlışlıkla kapatılan bir issue geri açıldığında platform habersiz
+     * kalıyor ve adım COMPLETED olarak duruyordu; kaynak ile ayna sessizce
+     * ayrışıyordu. PR'ın yeniden açılması da aynı anlama geliyor.
+     */
+    if (govde.action === "reopened" && (olay === "issues" || olay === "pull_request")) {
+      const sonuc = await issueYenidenAcildiginiIsle(govde);
+      return NextResponse.json({ ok: true, ...sonuc });
+    }
 
     if (!kapandi) {
       return NextResponse.json({ ok: true, islendi: false, aciklama: "kapanma olayı değil" });

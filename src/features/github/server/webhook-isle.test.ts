@@ -15,7 +15,7 @@ vi.mock("@/features/roadmap/server/step-status", () => ({
   adimDurumunuDegistir: (...a: unknown[]) => durumDegistirMock(...a),
 }));
 
-import { issueKapandiginiIsle } from "./webhook-isle";
+import { issueKapandiginiIsle, issueYenidenAcildiginiIsle } from "./webhook-isle";
 
 const olay = (url = "https://github.com/o/r/issues/1") => ({
   action: "closed",
@@ -122,5 +122,96 @@ describe("issueKapandiginiIsle", () => {
   it("url yoksa patlamaz", async () => {
     const s = await issueKapandiginiIsle({ action: "closed" });
     expect(s.islendi).toBe(false);
+  });
+});
+
+/**
+ * #378 — YENİDEN AÇILMA.
+ *
+ * Webhook yalnız `closed` dinliyordu; yanlışlıkla kapatılan bir issue geri
+ * açıldığında adım COMPLETED olarak kalıyor, kaynak ile ayna sessizce
+ * ayrışıyordu.
+ */
+describe("issueYenidenAcildiginiIsle", () => {
+  const acilma = (url = "https://github.com/o/r/issues/1") => ({
+    action: "reopened",
+    issue: { html_url: url },
+  });
+
+  beforeEach(() => {
+    prismaMock.stepIssue.findFirst.mockResolvedValue({
+      id: "si1",
+      stepId: "st1",
+      status: "CLOSED",
+    });
+    prismaMock.roadmapStep.findUnique.mockResolvedValue({ status: "COMPLETED" });
+  });
+
+  it("url yoksa sessizce geçer", async () => {
+    const s = await issueYenidenAcildiginiIsle({ action: "reopened" });
+    expect(s.islendi).toBe(false);
+  });
+
+  it("eşleşen StepIssue yoksa sessizce geçer", async () => {
+    prismaMock.stepIssue.findFirst.mockResolvedValue(null);
+
+    const s = await issueYenidenAcildiginiIsle(acilma());
+
+    expect(s.islendi).toBe(false);
+    expect(durumDegistirMock).not.toHaveBeenCalled();
+  });
+
+  it("issue'yu OPEN işaretler", async () => {
+    await issueYenidenAcildiginiIsle(acilma());
+
+    expect(prismaMock.stepIssue.update).toHaveBeenCalledWith({
+      where: { id: "si1" },
+      data: { status: "OPEN" },
+    });
+  });
+
+  it("TAMAMLANMIŞ adımı IN_PROGRESS'e geri çeker", async () => {
+    const s = await issueYenidenAcildiginiIsle(acilma());
+
+    expect(durumDegistirMock).toHaveBeenCalledWith({
+      stepId: "st1",
+      yeniDurum: "IN_PROGRESS",
+      oncekiDurum: "COMPLETED",
+      // Platform kullanıcısı yapmadı; GitHub'dan geldi.
+      degistirenId: null,
+    });
+    expect(s.islendi).toBe(true);
+  });
+
+  it("⚠️ REVİZYON durumunu EZMEZ — #379 issue'yu kendisi yeniden açıyor", async () => {
+    // #379 revizyon istendiğinde issue'yu reopen ediyor ve GitHub o olayı
+    // bize geri gönderiyor. Körlemesine IN_PROGRESS yazsaydık mentörün az
+    // önce koyduğu durumu kendi tetiklediğimiz olayla silerdik.
+    prismaMock.roadmapStep.findUnique.mockResolvedValue({ status: "REVISION_REQUESTED" });
+
+    const s = await issueYenidenAcildiginiIsle(acilma());
+
+    expect(durumDegistirMock).not.toHaveBeenCalled();
+    expect(s.aciklama).toContain("korundu");
+  });
+
+  it("zaten IN_PROGRESS olan adıma dokunmaz", async () => {
+    prismaMock.roadmapStep.findUnique.mockResolvedValue({ status: "IN_PROGRESS" });
+
+    await issueYenidenAcildiginiIsle(acilma());
+
+    expect(durumDegistirMock).not.toHaveBeenCalled();
+  });
+
+  it("zaten OPEN olan issue'ya gereksiz yazma yapmaz", async () => {
+    prismaMock.stepIssue.findFirst.mockResolvedValue({
+      id: "si1",
+      stepId: "st1",
+      status: "OPEN",
+    });
+
+    await issueYenidenAcildiginiIsle(acilma());
+
+    expect(prismaMock.stepIssue.update).not.toHaveBeenCalled();
   });
 });
