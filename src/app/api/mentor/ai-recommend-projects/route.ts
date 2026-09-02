@@ -5,6 +5,7 @@ import { requireAuth } from "@/lib/auth/guard";
 import { recommendProjectsSchema } from "@/lib/validations/api";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { profilSahibininRizasiVar } from "@/features/kvkk/riza";
+import { mentorunOgrencisiWhere } from "@/features/teams/server/sahiplik";
 
 const limiter = createRateLimiter("ai-recommend-projects", {
   maxRequests: 10,
@@ -38,8 +39,8 @@ export async function POST(req: Request) {
     const studentProfile = await prisma.studentProfile.findFirst({
       where: {
         id: studentProfileId,
-        // #195: M:N — bu mentör öğrencinin mentorlarından biri mi?
-        mentorAssignments: { some: { mentorId: auth.session.user.id } },
+        // #370: bireysel VEYA takım bağı.
+        ...mentorunOgrencisiWhere(auth.session.user.id!),
       },
       // #295: Zaten atanmış projeler aday kümesinden çıkarılacak.
       include: { assignedProjects: { select: { projectTemplateId: true } } },

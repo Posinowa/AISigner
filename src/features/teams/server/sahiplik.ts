@@ -129,6 +129,38 @@ export function mentorErisimiWhere(mentorUserId: string) {
 }
 
 /**
+ * Prisma `where` parçası: bu mentörün öğrencileri (StudentProfile düzeyinde).
+ *
+ * ⚠️ BU FONKSİYON #370'İN SEBEBİ. "Bu öğrenci benim mi?" sorusu kod tabanında
+ * altı ayrı yerde `mentorAssignments: { some: { mentorId } }` diye elle
+ * yazılmıştı ve #332 takım mentörlüğünü eklediğinde hepsi birden eksik kaldı —
+ * ama hepsi AYNI ANDA fark edilmedi:
+ *
+ *   #367 → liste sorgusu düzeltildi (mentör panelinde öğrenciler)
+ *   #367 → öğrenci panosu düzeltildi (takım projesi görünmüyordu)
+ *   #370 → mesajlaşma yetkisi + konuşma listesi
+ *   #370 → öğrenci DETAY ucu — liste düzeltildikten sonra bağlantı 404 veriyordu
+ *
+ * Dördüncü örnekten sonra kural tek yere alındı. Yeni bir "bu öğrenci benim mi"
+ * kontrolü yazmayın; buradan geçirin.
+ *
+ * ⚠️ AYRILMIŞ ÜYE DAHİL DEĞİL (`leftAt: null`). Satır katkı geçmişi için
+ * duruyor, üyelik olarak değil.
+ */
+export function mentorunOgrencisiWhere(mentorUserId: string) {
+  return {
+    OR: [
+      { mentorAssignments: { some: { mentorId: mentorUserId } } },
+      {
+        teamMemberships: {
+          some: { leftAt: null, team: { mentors: { some: { mentorId: mentorUserId } } } },
+        },
+      },
+    ],
+  };
+}
+
+/**
  * AI üretimi için profil bağlamı (#332).
  *
  * Yol haritası ve issue üretimi tek bir öğrenci profili bekliyordu; takım

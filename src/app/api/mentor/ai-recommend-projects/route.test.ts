@@ -68,7 +68,20 @@ describe("ai-recommend-projects (#189)", () => {
     expect(recommendMock).not.toHaveBeenCalled();
     // sorgu mentorId ile sınırlı
     expect(prismaMock.studentProfile.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: "sp-1", mentorAssignments: { some: { mentorId: "mentor-1" } } } }),
+      // #370: bireysel VEYA takım bağı.
+      expect.objectContaining({
+        where: {
+          id: "sp-1",
+      OR: [
+        { mentorAssignments: { some: { mentorId: "mentor-1" } } },
+        {
+          teamMemberships: {
+            some: { leftAt: null, team: { mentors: { some: { mentorId: "mentor-1" } } } },
+          },
+        },
+      ],
+        },
+      }),
     );
   });
 

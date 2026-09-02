@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
+import { mentorunOgrencisiWhere } from "@/features/teams/server/sahiplik";
 
 /**
  * Konuşma erişim kontrolü.
@@ -11,6 +12,12 @@ import { prisma } from "@/lib/db";
  *
  * - ADMIN: herkesle mesajlaşabilir (karşı taraf var olmalı).
  * - MENTOR/STUDENT: yalnızca birbirine atanmış çiftler.
+ *
+ * ⚠️ BAĞ İKİ YOLDAN GELİR (#370). #332 ile mentör TAKIMA da atanabiliyor ve
+ * takım üyeleriyle arasında bireysel bir `MentorAssignment` kaydı YOK. Yalnız
+ * bireysel bağa bakan sürüm, takım mentörü ile üyesinin birbirine mesaj
+ * göndermesini 403 ile engelliyordu — takım özelliğinin en temel iletişim
+ * kanalı kapalıydı. Kural artık `mentorunOgrencisiWhere` içinde tek noktada.
  */
 export async function verifyConversationAccess(
   userId: string,
@@ -35,19 +42,19 @@ export async function verifyConversationAccess(
   });
   if (other?.role === "ADMIN") return true;
 
-  // #195: M:N — karşı taraf, benim (mentör) öğrencilerimden biri mi?
-  const asMentor = await prisma.studentProfile.findFirst({
-    where: { userId: otherUserId, mentorAssignments: { some: { mentorId: userId } } },
+  // Karşı taraf, öğrencilerimden biri mi? (ben mentörüm)
+  const ogrencim = await prisma.studentProfile.findFirst({
+    where: { userId: otherUserId, ...mentorunOgrencisiWhere(userId) },
     select: { id: true },
   });
-  if (asMentor) return true;
+  if (ogrencim) return true;
 
-  // #195: M:N — karşı taraf, benim (öğrenci) mentorlarımdan biri mi?
-  const asStudent = await prisma.studentProfile.findFirst({
-    where: { userId, mentorAssignments: { some: { mentorId: otherUserId } } },
+  // Karşı taraf, mentörlerimden biri mi? (ben öğrenciyim)
+  const mentorum = await prisma.studentProfile.findFirst({
+    where: { userId, ...mentorunOgrencisiWhere(otherUserId) },
     select: { id: true },
   });
-  if (asStudent) return true;
+  if (mentorum) return true;
 
   return false;
 }
