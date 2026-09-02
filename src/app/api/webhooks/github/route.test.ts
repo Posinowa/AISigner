@@ -1,9 +1,19 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import crypto from "crypto";
 
-const { prismaMock, isleMock, incelemeMock, limiterCheckMock, loggerMock } = vi.hoisted(() => ({
+const {
+  prismaMock,
+  isleMock,
+  acilmaMock,
+  temizlikMock,
+  incelemeMock,
+  limiterCheckMock,
+  loggerMock,
+} = vi.hoisted(() => ({
   prismaMock: { processedWebhook: { create: vi.fn() } },
   isleMock: vi.fn(),
+  acilmaMock: vi.fn(),
+  temizlikMock: vi.fn(),
   incelemeMock: vi.fn(),
   limiterCheckMock: vi.fn(),
   loggerMock: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
@@ -15,6 +25,10 @@ vi.mock("@/lib/rate-limit", () => ({
 }));
 vi.mock("@/features/github/server/webhook-isle", () => ({
   issueKapandiginiIsle: (...a: unknown[]) => isleMock(...a),
+  issueYenidenAcildiginiIsle: (...a: unknown[]) => acilmaMock(...a),
+}));
+vi.mock("@/features/github/server/teslimat-kaydi", () => ({
+  teslimatKayitlariniTemizle: (...a: unknown[]) => temizlikMock(...a),
 }));
 vi.mock("@/features/github/server/pr-inceleme", () => ({
   prAcildiginiIncele: (...a: unknown[]) => incelemeMock(...a),
@@ -47,6 +61,8 @@ beforeEach(() => {
   prismaMock.processedWebhook.create.mockResolvedValue({});
   isleMock.mockResolvedValue({ islendi: true, aciklama: "adım COMPLETED yapıldı" });
   incelemeMock.mockResolvedValue({ islendi: true, aciklama: "inceleme yazıldı (1 bulgu)" });
+  acilmaMock.mockResolvedValue({ islendi: true, aciklama: "adım IN_PROGRESS yapıldı" });
+  temizlikMock.mockResolvedValue(undefined);
 });
 
 /** #327 — PR açılma olayları AI incelemesine yönlendirilmeli. */
@@ -200,5 +216,57 @@ describe("dayanıklılık", () => {
     expect(res.status).toBe(429);
     expect(res.headers.get("Retry-After")).toBe("30");
     expect(isleMock).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * #378 — YENİDEN AÇILMA yönlendirmesi ve teslimat kaydı temizliği.
+ */
+describe("yeniden açılma (#378)", () => {
+  it("issue 'reopened' olayını geri çekme akışına yönlendirir", async () => {
+    const res = await POST(
+      istek({ action: "reopened", issue: { html_url: "https://github.com/o/r/issues/1" } }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(acilmaMock).toHaveBeenCalledOnce();
+    expect(isleMock).not.toHaveBeenCalled();
+  });
+
+  it("PR 'reopened' olayı da aynı akışa gider", async () => {
+    const res = await POST(
+      istek(
+        { action: "reopened", pull_request: { number: 7, html_url: "https://github.com/o/r/pull/7" } },
+        { "x-github-event": "pull_request" },
+      ),
+    );
+
+    expect(res.status).toBe(200);
+    expect(acilmaMock).toHaveBeenCalledOnce();
+    // PR açılma incelemesi TETİKLENMEMELİ: bu yeni bir PR değil.
+    expect(incelemeMock).not.toHaveBeenCalled();
+  });
+
+  it("kapanma olayı hâlâ eski akışa gider — regresyon yok", async () => {
+    await POST(istek(kapanmaOlayi));
+
+    expect(isleMock).toHaveBeenCalledOnce();
+    expect(acilmaMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("teslimat kaydı temizliği (#378)", () => {
+  it("her teslimatta temizlik DENENİR (fırsatçı karar modülün içinde)", async () => {
+    await POST(istek(kapanmaOlayi));
+    expect(temizlikMock).toHaveBeenCalledOnce();
+  });
+
+  it("TEKRAR teslimatta temizlik çalışmaz — istek zaten erken dönüyor", async () => {
+    prismaMock.processedWebhook.create.mockRejectedValue(new Error("unique"));
+
+    const res = await POST(istek(kapanmaOlayi));
+
+    expect((await res.json()).tekrar).toBe(true);
+    expect(temizlikMock).not.toHaveBeenCalled();
   });
 });

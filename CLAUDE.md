@@ -258,6 +258,24 @@ merkezinde olmalı.
   bir adımı revizyonda olan proje panoda "tamamlandı" görünürdü.
 - Mezun (`GRADUATED`) stajyerde kapalı (#208).
 
+#### ⚠️ Webhook `reopened` REVİZYON DURUMUNU EZMEZ (#378)
+Webhook yalnız `closed` dinliyordu; yanlışlıkla kapatılan bir issue geri açıldığında
+adım `COMPLETED` kalıyor, kaynak ile ayna sessizce ayrışıyordu. Artık `reopened` de
+işleniyor (`issues` ve `pull_request`).
+
+**Tuzak:** #379 revizyon istendiğinde issue'yu **kendisi yeniden açıyor** ve GitHub o
+işlemin webhook'unu bize geri gönderiyor. Körlemesine `IN_PROGRESS` yazan bir sürüm,
+mentörün az önce koyduğu `REVISION_REQUESTED` durumunu **kendi tetiklediğimiz olayla**
+silerdi. Bu yüzden yalnızca `COMPLETED` geri çekiliyor; diğer durumlar korunuyor.
+
+#### ⚠️ `ProcessedWebhook` artık temizleniyor (#378)
+Şemada `@@index([createdAt])` ve "eski kayıtların temizliği için" notu vardı ama
+`deleteMany` **hiç çağrılmıyordu**; tablo yalnızca büyüyordu. `teslimat-kaydi.ts`
+fırsatçı temizlik yapıyor (`rate-limit.ts` / `TypingSignal` deseni), pencere **7 gün**.
+Pencere GitHub'ın tekrar denemelerinden (saatler) belirgin biçimde uzun olmalı — kısa
+tutmak idempotens korumasını delerdi. Kayıt **atıldıktan sonra** çağrılıyor: temizlik
+patlasa bile koruma yerinde kalsın.
+
 #### ⚠️ GitHub tarafı: MERGE EDİLDİYSE YENİ ISSUE, EDİLMEDİYSE YENİDEN AÇ
 Merge edilmiş bir işin issue'sunu yeniden açmak, **ana dalda duran kodu "yapılmamış"
 gibi** gösterirdi; o iş bitti, revizyon yeni bir iştir. `StepIssue.mergeIleKapandi`
