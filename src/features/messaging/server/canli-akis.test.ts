@@ -17,6 +17,7 @@ const { prismaMock } = vi.hoisted(() => ({
     message: { findMany: vi.fn(), groupBy: vi.fn() },
     stepStatusHistory: { findMany: vi.fn() },
     typingSignal: { findMany: vi.fn() },
+    notification: { groupBy: vi.fn() },
   },
 }));
 
@@ -59,6 +60,7 @@ beforeEach(() => {
   prismaMock.message.groupBy.mockResolvedValue([]);
   prismaMock.stepStatusHistory.findMany.mockResolvedValue([]);
   prismaMock.typingSignal.findMany.mockResolvedValue([]);
+  prismaMock.notification.groupBy.mockResolvedValue([]);
 });
 
 afterEach(() => akisiSifirla());
@@ -354,6 +356,81 @@ describe("yazıyor sinyali (#354)", () => {
     await tikAt();
 
     expect(prismaMock.typingSignal.findMany).toHaveBeenCalledTimes(1);
+    for (const a of aboneler) a.birak();
+  });
+});
+
+/**
+ * #380 — Okunmamış BİLDİRİM sayacı mevcut tikten besleniyor.
+ *
+ * Ayrı bir yoklama kurmak, #329'un "maliyet kullanıcı sayısından bağımsız"
+ * kazanımını aşındırırdı (#354'teki aynı karar).
+ */
+describe("bildirim sayacı (#380)", () => {
+  it("sayı DEĞİŞİNCE olay gider", async () => {
+    const a = abone("u1");
+    prismaMock.notification.groupBy.mockResolvedValue([
+      { userId: "u1", _count: { _all: 3 } },
+    ]);
+
+    await tikAt();
+
+    expect(a.olaylar).toContainEqual({ tip: "bildirim", okunmamis: 3 });
+    a.birak();
+  });
+
+  it("DEĞİŞMEDİKÇE tekrar yollanmaz — akış yoklamaya dönmemeli", async () => {
+    const a = abone("u1");
+    prismaMock.notification.groupBy.mockResolvedValue([
+      { userId: "u1", _count: { _all: 3 } },
+    ]);
+
+    await tikAt();
+    await tikAt();
+    await tikAt();
+
+    expect(a.olaylar.filter((o) => o.tip === "bildirim")).toHaveLength(1);
+    a.birak();
+  });
+
+  it("SIFIRA düşmek de bir değişiklik — kullanıcı zili açtığında rozet sönmeli", async () => {
+    const a = abone("u1");
+    prismaMock.notification.groupBy.mockResolvedValue([
+      { userId: "u1", _count: { _all: 2 } },
+    ]);
+    await tikAt();
+
+    // groupBy sıfır dönen kullanıcıyı HİÇ listelemez.
+    prismaMock.notification.groupBy.mockResolvedValue([]);
+    await tikAt();
+
+    expect(a.olaylar.filter((o) => o.tip === "bildirim")).toEqual([
+      { tip: "bildirim", okunmamis: 2 },
+      { tip: "bildirim", okunmamis: 0 },
+    ]);
+    a.birak();
+  });
+
+  it("BAŞKASININ sayacı bana gelmez", async () => {
+    const a = abone("u1");
+    const b = abone("u2");
+    prismaMock.notification.groupBy.mockResolvedValue([
+      { userId: "u2", _count: { _all: 5 } },
+    ]);
+
+    await tikAt();
+
+    expect(a.olaylar).toContainEqual({ tip: "bildirim", okunmamis: 0 });
+    expect(b.olaylar).toContainEqual({ tip: "bildirim", okunmamis: 5 });
+    a.birak();
+    b.birak();
+  });
+
+  it("tik başına TEK sorgu", async () => {
+    const aboneler = ["u1", "u2", "u3"].map(abone);
+    await tikAt();
+
+    expect(prismaMock.notification.groupBy).toHaveBeenCalledTimes(1);
     for (const a of aboneler) a.birak();
   });
 });

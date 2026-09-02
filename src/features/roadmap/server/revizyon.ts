@@ -1,4 +1,6 @@
 import "server-only";
+import { topluBildirimGonder } from "@/features/bildirim/server/bildirim";
+import { BILDIRIM_TURLERI } from "@/features/bildirim/turler";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { adimDurumunuDegistir } from "./step-status";
@@ -58,12 +60,18 @@ export async function revizyonIste(params: {
               id: true,
               status: true,
               githubRepoUrl: true,
-              studentProfile: { select: { user: { select: { accountStatus: true } } } },
+              studentProfile: {
+                select: { userId: true, user: { select: { accountStatus: true } } },
+              },
               team: {
                 select: {
                   members: {
                     where: { leftAt: null },
-                    select: { studentProfile: { select: { user: { select: { accountStatus: true } } } } },
+                    select: {
+                      studentProfile: {
+                        select: { userId: true, user: { select: { accountStatus: true } } },
+                      },
+                    },
                   },
                 },
               },
@@ -133,6 +141,29 @@ export async function revizyonIste(params: {
       data: { status: "IN_PROGRESS" },
     });
   }
+
+  /*
+   * #380: Öğrenci(ler)e bildir — YALNIZ uygulama içi.
+   *
+   * E-postaya bağlanmadı: revizyon, aktif çalışan bir stajyere gidiyor;
+   * panele zaten giriyor. E-posta listesi bilinçli olarak "kullanıcı sonucu
+   * öğrenmek için giriş yapamayabilir" olaylarıyla sınırlı.
+   */
+  const hedefler = atama.team
+    ? atama.team.members.map((m) => m.studentProfile.userId)
+    : atama.studentProfile
+      ? [atama.studentProfile.userId]
+      : [];
+
+  await topluBildirimGonder(
+    hedefler.map((userId) => ({
+      userId,
+      tur: BILDIRIM_TURLERI.ADIM_REVIZYON,
+      baslik: "Mentörünüz revizyon istedi",
+      govde: gerekce,
+      link: "/student-dashboard",
+    })),
+  );
 
   logger.info("Adım revizyona döndürüldü", { stepId: adim.id });
 

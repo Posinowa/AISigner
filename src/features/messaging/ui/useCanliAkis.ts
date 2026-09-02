@@ -27,9 +27,11 @@ export type CanliOlay =
   | { tip: "okunmamis"; sayi: number }
   | { tip: "adim-tamamlandi"; stepId: string; baslik: string }
   /** #354: Şu an BANA yazanlar. Tam durum — artımlı değil. */
-  | { tip: "yaziyor"; kimler: string[] };
+  | { tip: "yaziyor"; kimler: string[] }
+  /** #380: Okunmamış bildirim sayısı. */
+  | { tip: "bildirim"; okunmamis: number };
 
-const OLAY_TIPLERI = ["mesaj", "okunmamis", "adim-tamamlandi", "yaziyor"] as const;
+const OLAY_TIPLERI = ["mesaj", "okunmamis", "adim-tamamlandi", "yaziyor", "bildirim"] as const;
 
 /**
  * Son abone ayrıldıktan sonra bağlantının kapatılması için beklenen süre.

@@ -32,6 +32,8 @@ model User {
   sentMessages             Message[]           @relation("Message_senderIdToUser")
   receivedMessages         Message[]           @relation("Message_receiverIdToUser")
   // #354: "yazıyor..." sinyalleri.
+  // #380: Kalıcı bildirimler.
+  notifications            Notification[]
   gonderdigiYaziyor        TypingSignal[]      @relation("TypingSignal_fromUserIdToUser")
   aldigiYaziyor            TypingSignal[]      @relation("TypingSignal_toUserIdToUser")
   stepComments             StepComment[]
@@ -309,6 +311,36 @@ model StepIssue {
   step RoadmapStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
 
   @@index([stepId])
+}
+
+/// Kalıcı bildirim (#380).
+///
+/// ⚠️ NEDEN KALICI — #329'un AKSİNE. Canlı akış olayı yalnız AÇIK sekmeye
+/// taşıyor; sekme kapalıysa kaybolur. Bildirimin bütün değeri tam olarak
+/// "yokken olanı sonradan görmek". Bu yüzden ayrı bir tabloda duruyor.
+///
+/// ⚠️ E-POSTA GİTMESE DE SATIR DÜŞER. `mail.ts` yapılandırma yoksa çökmüyor
+/// (#241); bildirim de aynı sözleşmeyi koruyor. Tersi olsaydı SMTP
+/// kesintisinde bildirimler tamamen kaybolurdu.
+model Notification {
+  id     String  @id @default(cuid())
+  userId String
+  /// Olay türü — `features/bildirim/turler.ts` içindeki sabitlerden biri.
+  type   String
+  title  String  @db.VarChar(200)
+  /// Kısa açıklama. Kişisel veri asgaride tutulur (KVKK, #321).
+  body   String  @db.VarChar(500)
+  /// Tıklanınca gidilecek UYGULAMA İÇİ yol. Harici URL değil.
+  link   String? @db.VarChar(300)
+
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Okunmamış sayacı ve liste bu indekslerden okunuyor.
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
 }
 
 /// "Yazıyor..." sinyali (#354).

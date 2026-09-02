@@ -11,7 +11,9 @@ const { prismaMock, deleteStepFileMock, ensureCertificateIssuedMock } = vi.hoist
       count: vi.fn(),
     },
     studentProfile: { upsert: vi.fn() },
-    mentorAssignment: { deleteMany: vi.fn(), createMany: vi.fn() },
+    // #380: Bildirim, hangi bağların YENİ olduğunu bilmek için reconcile
+    // ÖNCESİ durumu okuyor.
+    mentorAssignment: { deleteMany: vi.fn(), createMany: vi.fn(), findMany: vi.fn() },
     stepFile: { findMany: vi.fn() },
     $transaction: vi.fn(),
   },
@@ -39,6 +41,7 @@ describe("setStudentMentors — rol doğrulaması + M:N reconcile (#43/#195)", (
     prismaMock.studentProfile.upsert.mockResolvedValue({ id: "sp-1" });
     prismaMock.mentorAssignment.deleteMany.mockReturnValue("del-op");
     prismaMock.mentorAssignment.createMany.mockReturnValue("create-op");
+    prismaMock.mentorAssignment.findMany.mockResolvedValue([]);
     prismaMock.$transaction.mockResolvedValue([]);
   });
 

@@ -319,6 +319,32 @@ webhook'ta yazılıyor (`pull_request` + `merged`), karar buna bakıyor.
 - ⚠️ Ham SQL gerçek Postgres'e karşı, ekilmiş bilinen değerlerle doğrulandı; birim testler
   yalnız sorgu SONRASI dönüşümleri kapsıyor (mock Prisma SQL'i kanıtlamaz).
 
+### Kalıcı Bildirimler (#380)
+`Notification` tablosu + `features/bildirim/`. Kullanıcı bir şeyin olduğunu ancak ilgili
+sayfayı ziyaret ederse öğreniyordu.
+
+- **⚠️ KALICI — #329'un AKSİNE.** Canlı akış olayı yalnız AÇIK sekmeye taşıyor; sekme
+  kapalıysa kaybolur. Bildirimin bütün değeri "yokken olanı sonradan görmek".
+- **⚠️ E-POSTA LİSTESİ DAR VE BİLİNÇLİ:** hesap kararı, mentör ataması, öneri (#366) ve
+  çalışma alanı (#349) kararı. Ortak özellikleri: **kullanıcı sonucu öğrenmek için giriş
+  yapamayabilir ya da günlerce bekliyordur** — reddedilen hesap sahibi panele zaten giremez.
+  **"Yeni mesaj" dışarıda**: sıklığı yüksek, olay başına e-posta karşılıklı sohbette
+  gürültüye dönerdi.
+- **⚠️ E-POSTA GİTMESE DE SATIR DÜŞER** (`mail.ts`'in #241 sözleşmesi). Tersi olsaydı SMTP
+  kesintisinde bildirimler tamamen kaybolurdu. **Kayıt patlarsa e-posta GÖNDERİLMEZ** —
+  kullanıcı e-postayı görüp uygulamada karşılığını bulamamalı.
+- **⚠️ HİÇBİR DURUMDA FIRLATMAZ.** Bildirim, tetikleyen işlemin (hesap onayı, mentör
+  ataması) yan etkisi; admin bir hesabı onaylayamıyorsa sebebi bildirim tablosu olmamalı.
+- **Okunmamış sayacı #329'un MEVCUT TİKİNDEN** besleniyor, yeni altyapı yok (#354 deseni);
+  yalnız **değiştiğinde** yollanıyor.
+- **Kapsam her zaman OTURUMDAN**; `userId` istemciden alınmıyor.
+- **Tercih ekranı ilk sürümde YOK.** Bedeli açık: e-posta hacmi yanlış ayarlanırsa kaçış
+  yolu olmaz — liste tam bu yüzden dar.
+- E-posta gövdesi **asgari veri** taşır, detay için panele yönlendirir (KVKK, #321).
+- Mentör atamasında **yalnız YENİ bağlar** bildiriliyor: reconcile her çağrıda tüm listeyi
+  yazıyor, hepsini bildirmek listeden tek kişi çıkınca kalan herkese "yeni mentör" göndermek
+  olurdu.
+
 ### Gerçek Zamanlı Mesajlaşma (#329)
 `GET /api/messages/stream` (SSE) + `features/messaging/server/canli-akis.ts`.
 Olaylar: `mesaj`, `okunmamis`, `adim-tamamlandi`.

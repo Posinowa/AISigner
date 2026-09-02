@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import LogoutButton from "@/components/LogoutButton";
 import { UnreadBadge } from "@/features/messaging/ui/UnreadBadge";
 import { BekleyenTalepRozeti } from "@/features/workspace-requests/ui/BekleyenTalepRozeti";
+// #380: Kalıcı bildirimler — canlı akış yalnız açık sekmeye taşıyor.
+import { BildirimZili } from "@/features/bildirim/ui/BildirimZili";
 import Image from "next/image";
 
 type Role = "ADMIN" | "MENTOR" | "STUDENT";
@@ -110,6 +112,7 @@ export function AppShell({ role }: { role: Role }) {
         </div>
 
         <div className="ml-auto shrink-0 flex items-center gap-1">
+          <BildirimZili />
           <LogoutButton />
         </div>
       </nav>

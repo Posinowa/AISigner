@@ -1,4 +1,6 @@
 import "server-only";
+import { bildirimGonder } from "@/features/bildirim/server/bildirim";
+import { BILDIRIM_TURLERI } from "@/features/bildirim/turler";
 import { prisma } from "@/lib/db";
 import {
   ATAMA_SAHIPLIK_SELECT,
@@ -195,6 +197,38 @@ export type KararSonucu =
  * bir atama yeniden talep edilebilir (bkz. `KURULU_DURUMLAR`), yani
  * "onaylandı ama ortada repo yok" hâli görünür kalır ve çıkışı vardır.
  */
+
+/**
+ * #380: Talebi AÇAN MENTÖRE sonucu bildir.
+ *
+ * Mentör talebi açıp bekliyor; bugüne kadar sonucu öğrenmek için paneli
+ * yenilemesi gerekiyordu. `bildirimGonder` fırlatmıyor — karar işlemi
+ * bildirim yüzünden kırılmamalı.
+ */
+async function talepSonucunuBildir(requestId: string, onaylandi: boolean, not?: string | null) {
+  const talep = await prisma.workspaceRequest.findUnique({
+    where: { id: requestId },
+    select: {
+      requestedById: true,
+      requestedBy: { select: { email: true } },
+      assignedProject: { select: { id: true, projectTemplate: { select: { title: true } } } },
+    },
+  });
+  if (!talep) return;
+
+  const proje = talep.assignedProject?.projectTemplate.title ?? "proje";
+  await bildirimGonder({
+    userId: talep.requestedById,
+    tur: BILDIRIM_TURLERI.CALISMA_ALANI_KARARI,
+    baslik: onaylandi ? "Çalışma alanı talebiniz onaylandı" : "Çalışma alanı talebiniz reddedildi",
+    govde: onaylandi
+      ? `"${proje}" için depo kurulumu başlatıldı.`
+      : (not?.trim() || `"${proje}" için talebiniz onaylanmadı.`),
+    link: "/mentor-dashboard",
+    eposta: talep.requestedBy?.email ?? null,
+  });
+}
+
 export async function talebiKararaBagla(params: {
   requestId: string;
   adminUserId: string;
@@ -241,6 +275,7 @@ export async function talebiKararaBagla(params: {
 
   if (!params.onay) {
     logger.info("Çalışma alanı talebi reddedildi", { requestId: params.requestId });
+    await talepSonucunuBildir(params.requestId, false, params.adminNote);
     return { ok: true, durum: "REJECTED", kurulumBaslatildi: false };
   }
 
@@ -287,5 +322,6 @@ export async function talebiKararaBagla(params: {
   logger.info("Çalışma alanı talebi onaylandı, kurulum başlatıldı", {
     requestId: params.requestId,
   });
+  await talepSonucunuBildir(params.requestId, true);
   return { ok: true, durum: "APPROVED", kurulumBaslatildi: true };
 }
