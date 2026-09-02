@@ -26,8 +26,22 @@ export async function GET() {
       conversationPartners = users;
     } else if (userRole === "MENTOR") {
       // #195: M:N — bu mentörün atandığı öğrenciler.
+      //
+      // ⚠️ #370: Bağ İKİ YOLDAN gelir. Yalnız bireysel bağa bakan sürümde
+      // takım üyesi bu listede HİÇ görünmüyordu; mentör mesaj gönderebilse
+      // bile kime göndereceğini bulamazdı. #367'nin liste dersi burada da
+      // geçerli.
       const profiles = await prisma.studentProfile.findMany({
-        where: { mentorAssignments: { some: { mentorId: userId } } },
+        where: {
+          OR: [
+            { mentorAssignments: { some: { mentorId: userId } } },
+            {
+              teamMemberships: {
+                some: { leftAt: null, team: { mentors: { some: { mentorId: userId } } } },
+              },
+            },
+          ],
+        },
         include: {
           user: {
             select: { id: true, name: true, lastName: true, role: true },
@@ -44,6 +58,7 @@ export async function GET() {
       conversationPartners = [...conversationPartners, ...admins];
     } else if (userRole === "STUDENT") {
       // #195: M:N — öğrencinin TÜM mentorları konuşma partneri olur.
+      // #370: Bireysel mentörler + AKTİF takımlarının mentörleri.
       const profile = await prisma.studentProfile.findUnique({
         where: { userId },
         include: {
@@ -54,10 +69,32 @@ export async function GET() {
               },
             },
           },
+          teamMemberships: {
+            where: { leftAt: null },
+            include: {
+              team: {
+                include: {
+                  mentors: {
+                    include: {
+                      mentor: {
+                        select: { id: true, name: true, lastName: true, role: true },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
       });
       if (profile) {
-        conversationPartners = profile.mentorAssignments.map((a) => a.mentor);
+        const takimMentorleri = profile.teamMemberships.flatMap((u) =>
+          u.team.mentors.map((m) => m.mentor),
+        );
+        // Aynı mentör hem bireysel hem takım üzerinden gelebilir — tekilleştir,
+        // yoksa listede iki kez görünürdü.
+        const hepsi = [...profile.mentorAssignments.map((a) => a.mentor), ...takimMentorleri];
+        conversationPartners = [...new Map(hepsi.map((m) => [m.id, m])).values()];
       }
 
       // ADMIN'lerle de mesajlaşabilir

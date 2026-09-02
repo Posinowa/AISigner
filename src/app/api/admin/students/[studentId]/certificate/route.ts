@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { mentorunOgrencisiWhere } from "@/features/teams/server/sahiplik";
 import { requireAuth } from "@/lib/auth/guard";
 import {
   getStudentCertificate,
@@ -23,9 +24,12 @@ export async function GET(
   // studentId = öğrencinin User.id'si; M:N atama üzerinden sahiplik doğrulanır.
   if (auth.session.user.role === "MENTOR") {
     const owns = await prisma.studentProfile.findFirst({
+      // #370: Bireysel VEYA takım bağı. Sertifika BİREYSEL kalıyor (#332) ama
+      // takım mentörü de üyesinin belgesini görebilmeli — göremezse takım
+      // mentörlüğü yarım bir yetki olurdu.
       where: {
         userId: studentId,
-        mentorAssignments: { some: { mentorId: auth.session.user.id } },
+        ...mentorunOgrencisiWhere(auth.session.user.id!),
       },
       select: { id: true },
     });

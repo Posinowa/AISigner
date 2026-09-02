@@ -173,6 +173,13 @@ bilinçli karar.
 - Takımda AI girdileri: seviye **EN DÜŞÜK** (pano ortak, en yeni üye de takip etmeli),
   PR incelemesinde **HERKESİN** rızası aranır (kimin hangi satırı yazdığı bilinmiyor),
   günlük tavan **takım başına**.
+- ⚠️ **"BU ÖĞRENCİ BENİM Mİ?" TEK KAYNAKTAN SORULUR** (#370): `sahiplik.ts`
+  `mentorunOgrencisiWhere()`. Bu kontrol kod tabanında **altı ayrı yerde** elle
+  yazılmıştı ve #332 takım mentörlüğünü eklediğinde hepsi birden eksik kaldı — ama
+  **hepsi aynı anda fark edilmedi**: #367 iki liste sorgusunu, #370 mesajlaşma
+  yetkisini + konuşma listesini + öğrenci DETAY ucunu düzeltti. Detay ucu özellikle
+  sinsiydi: #367 listeyi düzelttikten sonra **liste doluyor ama tıklanan bağlantı 404
+  veriyordu**. Yeni bir "bu öğrenci benim mi" kontrolü yazmayın, buradan geçirin.
 - ⚠️ **Takımın öğrencileri İKİ YOLDAN gelir** (#367): liste sorguları hem bireysel
   `MentorAssignment` hem `TeamMentor`/`TeamMember` bağını sormalı. Aynı şekilde öğrenci
   panosu `studentProfile.assignedProjects` + `teamMemberships.team.assignedProjects`

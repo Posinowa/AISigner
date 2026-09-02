@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { mentorunOgrencisiWhere } from "@/features/teams/server/sahiplik";
 import { Prisma } from "@prisma/client";
 import { logger } from "@/lib/logger";
 
@@ -61,7 +62,19 @@ export async function getMentorStudents(mentorId: string): Promise<StudentWithPr
           ],
         },
       },
-      include: {
+      // ⚠️ `include` DEĞİL `select`: `include` kullanıcının TÜM sütunlarını
+      // döndürüyordu ve içinde `password` (argon2 hash) de vardı — mentör
+      // panelinin JSON yanıtında istemciye kadar gidiyordu. `getAllUsers`
+      // aynı sebeple zaten `select` kullanıyor; burası atlanmıştı.
+      select: {
+        id: true,
+        name: true,
+        lastName: true,
+        email: true,
+        role: true,
+        accountStatus: true,
+        createdAt: true,
+        avatarFile: true,
         studentProfile: {
           include: {
             assignedProjects: {
@@ -136,12 +149,24 @@ export async function getStudentDetail(studentId: string, mentorId: string) {
       where: {
         id: studentId,
         role: "STUDENT",
-        studentProfile: {
-          // #195: M:N — öğrencinin mentorlarından biri bu mentör mü?
-          mentorAssignments: { some: { mentorId } },
-        },
+        // #370: Bağ İKİ YOLDAN gelir. #367 LİSTEYİ düzeltmişti ama burası
+        // bireysel bağa bakmayı sürdürüyordu: takım mentörü üyeyi panelinde
+        // görüyor, tıklayınca 404 alıyordu.
+        studentProfile: mentorunOgrencisiWhere(mentorId),
       },
-      include: {
+      // ⚠️ `include` DEĞİL `select`: `include` kullanıcının TÜM sütunlarını
+      // döndürüyordu ve içinde `password` (argon2 hash) de vardı — mentör
+      // panelinin JSON yanıtında istemciye kadar gidiyordu. `getAllUsers`
+      // aynı sebeple zaten `select` kullanıyor; burası atlanmıştı.
+      select: {
+        id: true,
+        name: true,
+        lastName: true,
+        email: true,
+        role: true,
+        accountStatus: true,
+        createdAt: true,
+        avatarFile: true,
         studentProfile: {
           include: {
             assignedProjects: {
@@ -203,8 +228,8 @@ export async function assignProjectToStudent(
     const studentProfile = await prisma.studentProfile.findFirst({
       where: {
         id: studentProfileId,
-        // #195: M:N — bu mentör öğrencinin mentorlarından biri mi?
-        mentorAssignments: { some: { mentorId } },
+        // #370: bireysel VEYA takım bağı.
+        ...mentorunOgrencisiWhere(mentorId),
       },
     });
 
@@ -277,10 +302,8 @@ export async function updateProjectStatus(
     const assignedProject = await prisma.assignedProject.findFirst({
       where: {
         id: assignedProjectId,
-        studentProfile: {
-          // #195: M:N — öğrencinin mentorlarından biri mi?
-          mentorAssignments: { some: { mentorId } },
-        },
+        // #370: bireysel VEYA takım bağı.
+        studentProfile: mentorunOgrencisiWhere(mentorId),
       },
     });
 
@@ -317,8 +340,8 @@ export async function unassignProject(
   const assignedProject = await prisma.assignedProject.findFirst({
     where: {
       id: assignedProjectId,
-      // #195: M:N — öğrencinin mentorlarından biri mi?
-      studentProfile: { mentorAssignments: { some: { mentorId } } },
+      // #370: bireysel VEYA takım bağı.
+      studentProfile: mentorunOgrencisiWhere(mentorId),
     },
     include: {
       roadmap: {

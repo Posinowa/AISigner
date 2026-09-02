@@ -44,10 +44,13 @@ describe("messages/conversations (#158)", () => {
     const res = await GET();
     const json = await res.json();
 
-    // Kapsam kritik: sorgu bu mentörün atamalarıyla sınırlanmalı (#195 M:N)
-    expect(prismaMock.studentProfile.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { mentorAssignments: { some: { mentorId: "mentor-1" } } } }),
-    );
+    // Kapsam kritik: sorgu bu mentörün öğrencileriyle sınırlanmalı.
+    // #370: bağ İKİ YOLDAN gelir — bireysel atama VEYA takım mentörlüğü.
+    // Yalnız bireysel dal varken takım üyesi listede HİÇ görünmüyordu.
+    const nerede = prismaMock.studentProfile.findMany.mock.calls[0][0].where;
+    expect(nerede.OR[0].mentorAssignments.some.mentorId).toBe("mentor-1");
+    expect(nerede.OR[1].teamMemberships.some.team.mentors.some.mentorId).toBe("mentor-1");
+    expect(nerede.OR[1].teamMemberships.some.leftAt).toBeNull();
     expect(res.status).toBe(200);
     expect(json.conversations.map((c: { partner: { id: string } }) => c.partner.id)).toContain(
       "ogrenci-1",
@@ -61,6 +64,8 @@ describe("messages/conversations (#158)", () => {
       mentorAssignments: [
         { mentor: { id: "mentor-1", name: "Ayşe", lastName: null, role: "MENTOR" } },
       ],
+      // #370: Takım mentörleri de konuşma partneri.
+      teamMemberships: [],
     });
 
     const res = await GET();
