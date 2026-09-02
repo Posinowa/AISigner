@@ -98,7 +98,11 @@ describe("ai-recommend-projects (#189)", () => {
     await POST(req({ studentProfileId: "sp-1" }));
 
     expect(prismaMock.projectTemplate.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: { notIn: ["t9"] } } }),
+      // #366: stajyerin kendi önerisinden türeyen şablon ORTAK HAVUZA girmez;
+      // başkasına önerilirse öneren kişinin fikri habersiz dağıtılmış olurdu.
+      expect.objectContaining({
+        where: { id: { notIn: ["t9"] }, fromProposal: false },
+      }),
     );
   });
 

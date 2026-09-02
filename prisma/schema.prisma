@@ -43,6 +43,8 @@ model User {
   // #332: Takım mentörlükleri ve üstlenilen adımlar.
   teamMentorships          TeamMentor[]        @relation("TeamMentor_mentorIdToUser")
   assignedSteps            RoadmapStep[]       @relation("RoadmapStep_assignee")
+  // #366: Karara bağladığı proje önerileri.
+  decidedProposals         ProjectProposal[]   @relation("ProjectProposal_decidedByIdToUser")
   // #287: Mentör başvurusunun cevapları (yalnızca MENTOR rolünde dolu).
   mentorProfile           MentorProfile?      @relation("MentorProfile_userIdToUser")
   stepStatusChanges       StepStatusHistory[]
@@ -115,6 +117,8 @@ model StudentProfile {
   assignedProjects  AssignedProject[]
   // #332: Bu stajyerin takım üyelikleri (ayrılmışlar dahil).
   teamMemberships  TeamMember[]
+  // #366: Kendi proje önerileri.
+  projectProposals ProjectProposal[]
   surveyAnswers     SurveyAnswer[]
   profileAnalysis   ProfileAnalysis?
 }
@@ -148,6 +152,12 @@ model ProjectTemplate {
   // (admin tarafından oluşturulmuş sayılırlar) — yalnızca EKLEME, yıkıcı değil.
   // Kullanıcı silinirse şablon durur, sahipsizleşir (SetNull).
   createdById   String?
+  /// #366: Bir stajyer önerisinden türetildi mi?
+  ///
+  /// Öneriden doğan şablon ORTAK HAVUZA girmez: `/api/admin/project-templates`
+  /// listesi bunu filtreler. Aksi halde her stajyer önerisi tüm mentörlerin
+  /// gördüğü şablon listesini şişirirdi.
+  fromProposal  Boolean    @default(false)
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
@@ -396,6 +406,65 @@ model Suggestion {
 
   @@index([authorId, createdAt])
   @@index([status, createdAt])
+}
+
+/// #366: Stajyerin KENDİ proje önerisi.
+///
+/// Hazır şablonlardan seçmek yerine stajyer kendi projesini önerebiliyor;
+/// onaylanınca normal bir atamaya dönüşüyor.
+///
+/// ÜÇ GITHUB KAYNAĞI tek akışta toplanıyor (`kaynak`):
+///   BIZIM   — repoyu biz açarız; provisioning/webhook/AI incelemesi aynen çalışır
+///   BAGLA   — stajyerin mevcut deposu atamaya bağlanır, repo AÇILMAZ
+///   DEVRET  — depo organizasyona devredilir
+///
+/// ⚠️ DEVRETMEYİ API'DEN BİZ BAŞLATAMAYIZ. GitHub'ın transfer ucu yalnızca
+/// deponun sahibi tarafından çağrılabilir. Yapabildiğimiz: talimat göstermek ve
+/// transferin GERÇEKLEŞTİĞİNİ tespit etmek (`repos.get` ile org altında arayarak).
+///
+/// ⚠️ BAGLA'da otomasyon YOK: depo stajyerin hesabında kaldığı için
+/// `GITHUB_TOKEN` orada yetkisiz — webhook (#326) ve AI incelemesi (#327)
+/// çalışmaz. #348'deki GitHub App bunu çözer. Arayüz bunu açıkça söylüyor.
+model ProjectProposal {
+  id               String @id @default(cuid())
+  studentProfileId String
+
+  title        String @db.VarChar(120)
+  description  String @db.VarChar(4000)
+  /// Stajyerin bu projeden ne öğrenmeyi hedeflediği.
+  goals        String @db.VarChar(2000)
+  technologies String[]
+
+  /// BIZIM | BAGLA | DEVRET — stajyerin TERCİHİ. Nihai karar admin'in.
+  kaynak    String  @default("BIZIM")
+  /// BAGLA ve DEVRET için zorunlu; BIZIM'de boş.
+  repoUrl   String?
+
+  /// PENDING | APPROVED | REJECTED
+  status    String    @default("PENDING")
+  /// Red gerekçesi — RED durumunda ZORUNLU (stajyer nedenini görmeli).
+  adminNote String?   @db.VarChar(500)
+  /// Admin'in NİHAİ kaynak kararı; stajyerin tercihinden farklı olabilir.
+  kararKaynak String?
+
+  decidedById String?
+  decidedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  /// Onaylanınca oluşan atama — geri izlenebilirlik için.
+  assignedProjectId String? @unique
+
+  /// #345/#349 dersi: bekleyen tekilliği KISITLA korunuyor, taramayla değil.
+  /// PENDING iken `studentProfileId`, karar verilince NULL (Postgres çoklu
+  /// NULL'a izin verir) — bir stajyerin aynı anda tek bekleyen önerisi olur.
+  pendingKey String? @unique
+
+  studentProfile StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  decidedBy      User?          @relation("ProjectProposal_decidedByIdToUser", fields: [decidedById], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([studentProfileId])
 }
 
 /// #332: Takım/Scrum staj projesi.

@@ -5,6 +5,7 @@ import { generateStepIssues } from "@/features/ai/server/issue-generator";
 import { logger } from "@/lib/logger";
 import { readGitHubConfig, hataMesaji, type GitHubConfig } from "./client";
 import { repoAdiUret, repoyuHazirla, milestoneHazirla, issueHazirla } from "./repo";
+import { DIS_DEPO_DURUMU } from "@/features/proposals/server/oneri";
 
 /**
  * GitHub çalışma alanı kurulumu ve güncellenmesi.
@@ -580,11 +581,31 @@ export async function baslatGitHubWorkspaceKurulumu(
    * güncelleyebilir, diğerinin `count`'u 0 döner.
    */
   const kilit = await prisma.assignedProject.updateMany({
-    where: { id: assignmentId, githubStatus: { not: "PROVISIONING" } },
+    where: {
+      id: assignmentId,
+      githubStatus: {
+        // #366: DIŞ DEPOYA ASLA DOKUNMA.
+        //
+        // `LINKED`, stajyerin kendi deposunun bu atamaya bağlandığı anlamına
+        // geliyor (öneri akışında "var olan depomu bağla" / "devrettim").
+        // Kurulum çalışsaydı BAŞKASININ deposuna milestone ve issue açardı.
+        notIn: ["PROVISIONING", DIS_DEPO_DURUMU],
+      },
+    },
     data: { githubStatus: "PROVISIONING" },
   });
 
   if (kilit.count === 0) {
+    // Dış depoyu ayırt et: "kurulum sürüyor" demek yanıltıcı olurdu.
+    const mevcut = await prisma.assignedProject.findUnique({
+      where: { id: assignmentId },
+      select: { githubStatus: true },
+    });
+    if (mevcut?.githubStatus === DIS_DEPO_DURUMU) {
+      throw new Error(
+        "Bu atama mevcut bir GitHub deposuna bağlı; çalışma alanı kurulumu yapılmaz.",
+      );
+    }
     throw new KurulumZatenSuruyorError(
       "Bu çalışma alanı için bir kurulum zaten sürüyor. Tamamlanmasını bekleyin.",
     );

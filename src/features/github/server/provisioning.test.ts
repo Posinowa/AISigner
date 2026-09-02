@@ -706,8 +706,10 @@ describe("baslatGitHubWorkspaceKurulumu — arka plana alma", () => {
     await baslatGitHubWorkspaceKurulumu("ap-1", false);
 
     // Koşul updateMany'nin WHERE'inde olmalı; ayrı bir okuma+yazma değil.
+    // #366: dışarıdan bağlanan depo (LINKED) da aynı WHERE ile eleniyor —
+    // stajyerin kendi deposuna milestone/issue açmak felaket olurdu.
     expect(prismaMock.assignedProject.updateMany).toHaveBeenCalledWith({
-      where: { id: "ap-1", githubStatus: { not: "PROVISIONING" } },
+      where: { id: "ap-1", githubStatus: { notIn: ["PROVISIONING", "LINKED"] } },
       data: { githubStatus: "PROVISIONING" },
     });
   });

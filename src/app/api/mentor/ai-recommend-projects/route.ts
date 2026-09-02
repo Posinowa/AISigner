@@ -71,7 +71,11 @@ export async function POST(req: Request) {
     const atanmisIdler = studentProfile.assignedProjects.map((a) => a.projectTemplateId);
 
     const availableProjects = await prisma.projectTemplate.findMany({
-      where: atanmisIdler.length ? { id: { notIn: atanmisIdler } } : undefined,
+      where: {
+        // #366: Öneriden türeyen şablonlar başka öğrencilere ÖNERİLMEZ.
+        fromProposal: false,
+        ...(atanmisIdler.length ? { id: { notIn: atanmisIdler } } : {}),
+      },
     });
 
     if (!availableProjects || availableProjects.length === 0) {
