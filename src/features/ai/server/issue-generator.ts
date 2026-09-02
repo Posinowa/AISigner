@@ -1,4 +1,6 @@
+import { z } from "zod";
 import { getModel } from "@/lib/ai/gemini-client";
+import { cozVeDogrula, AiCiktiGecersizError } from "@/lib/ai/response";
 import { sinirla, ALAN_SINIRI } from "@/lib/ai/truncate";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
@@ -7,6 +9,28 @@ export type GeneratedIssueSpec = {
   title: string;
   bodyMarkdown: string;
 };
+
+/**
+ * #377: Model çıktısının ŞEKLİ doğrulanıyor.
+ *
+ * Öncesinde ham `JSON.parse(text)` vardı. Model — `responseMimeType` istense
+ * bile — çıktıyı ```json bloğuna sarabiliyor ya da başına açıklama
+ * ekleyebiliyor (#335'in kurduğu `cozVeDogrula` tam bunun için var). O
+ * durumda `JSON.parse` SyntaxError fırlatıyor ve akış SESSİZCE mock
+ * içeriğe düşüyordu: mentör/öğrenci uydurma issue başlıklarıyla çalışıyor,
+ * bunu gerçek AI çıktısından ayırt edemiyordu.
+ *
+ * Boş liste de reddediliyor: "issue üretildi" denip hiçbir şey üretmemek,
+ * mock'a düşmekten daha sinsi bir sessiz başarısızlık olurdu.
+ */
+const issueSemasi = z
+  .array(
+    z.object({
+      title: z.string().trim().min(1),
+      bodyMarkdown: z.string().trim().min(1),
+    }),
+  )
+  .min(1);
 
 /**
  * Bir RoadmapStep (Ana Faz) başlık ve açıklamasını alarak, öğrencinin deneyim seviyesine uygun
@@ -44,19 +68,26 @@ JSON Formatı:
 `;
 
     const response = await model.generateContent(prompt);
-    const text = response.text;
 
-    if (!text) {
-      throw new Error("AI yanıtı boş geldi");
-    }
-
-    const issues: GeneratedIssueSpec[] = JSON.parse(text);
+    // #377: Metin çıkarımı + kod bloğu temizliği + JSON + şema doğrulaması
+    // tek yerden. Boş yanıt da burada yakalanıyor.
+    const issues: GeneratedIssueSpec[] = cozVeDogrula(
+      response,
+      issueSemasi,
+      "issue-generator",
+    );
 
     // DB'ye kaydet
     await storeGeneratedIssues(stepId, issues);
     return issues;
   } catch (error) {
-    logger.error("AI Issue üretimi başarısız oldu, mock fallback kullanılıyor", { error });
+    // ⚠️ DÜŞÜŞ SESSİZ DEĞİL. `cozVeDogrula` sayacı da artırıyor (#335), ama
+    // burada da açıkça loglanıyor: mock içerik üretime karıştığında bunun
+    // izlenebilir olması gerekiyor.
+    logger.error("AI Issue üretimi başarısız oldu, mock fallback kullanılıyor", {
+      error: error instanceof Error ? error.message : String(error),
+      dogrulama: error instanceof AiCiktiGecersizError ? error.kaynak : undefined,
+    });
     const fallbackIssues = getMockIssues(stepTitle, experienceLevel);
     await storeGeneratedIssues(stepId, fallbackIssues);
     return fallbackIssues;

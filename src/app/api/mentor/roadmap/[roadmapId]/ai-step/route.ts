@@ -6,10 +6,27 @@ import {
   mentoruMu,
   ogrencisiMi,
 } from "@/features/teams/server/sahiplik";
+import { z } from "zod";
 import { getModel } from "@/lib/ai/gemini-client";
+import { cozVeDogrula } from "@/lib/ai/response";
+import { logger } from "@/lib/logger";
 import { requireAuth } from "@/lib/auth/guard";
 import { isAssignedMentor } from "@/lib/auth/mentor-access";
 import { experienceLevelLabel } from "@/lib/experience-level";
+
+/**
+ * #377: Model çıktısının ŞEKLİ doğrulanıyor.
+ *
+ * Öncesinde elle `parsed.title && parsed.description` kontrolü vardı; tip
+ * yalnızca varsayılıyordu. `estimatedHours` ve `resources` opsiyonel çünkü
+ * model bunları atlayabiliyor — o durumda fallback değerler kullanılıyor.
+ */
+const adimSemasi = z.object({
+  title: z.string().trim().min(1),
+  description: z.string().trim().min(1),
+  estimatedHours: z.coerce.number().int().positive().optional(),
+  resources: z.array(z.string()).optional(),
+});
 
 export async function POST(
   req: Request,
@@ -102,21 +119,35 @@ JSON Formatı (Sadece geçerli bir JSON objesi döndür, başka hiçbir metin ek
 `;
 
       const response = await model.generateContent(promptText);
-      const text = response.text;
-      if (text) {
-        const cleaned = text.replace(/```json/gi, "").replace(/```/g, "").trim();
-        const parsed = JSON.parse(cleaned);
-        if (parsed.title && parsed.description) {
-          aiStepData = {
-            title: parsed.title,
-            description: parsed.description,
-            estimatedHours: Number(parsed.estimatedHours) || 3,
-            resources: Array.isArray(parsed.resources) ? parsed.resources : ["https://developer.mozilla.org"],
-          };
-        }
-      }
+
+      /*
+       * #377: Elle regex temizliği KALDIRILDI.
+       *
+       * Burada ```json işaretleri elle siliniyor, `cozVeDogrula` içinde de
+       * aynı iş yapılıyordu — iki ayrı "JSON'ı temizle" mantığı, biri
+       * güncellenip diğeri unutulunca ayrışır. Üstelik buradaki sürüm daha
+       * zayıftı: modelin JSON'un başına/sonuna eklediği açıklama metnini
+       * ayıklamıyordu, o durumda `JSON.parse` patlayıp akış SESSİZCE
+       * fallback'e düşüyordu.
+       */
+      const parsed = cozVeDogrula(response, adimSemasi, "ai-step");
+      aiStepData = {
+        title: parsed.title,
+        description: parsed.description,
+        estimatedHours: parsed.estimatedHours ?? 3,
+        resources:
+          parsed.resources && parsed.resources.length > 0
+            ? parsed.resources
+            : ["https://developer.mozilla.org"],
+      };
     } catch (aiErr) {
-      console.warn("Posilog AI step generation failed, using fallback:", aiErr);
+      // ⚠️ Düşüş SESSİZ DEĞİL: `cozVeDogrula` sayacı artırıyor (#335) ve
+      // burada da loglanıyor. Mentör fallback bir adım aldığında bunun
+      // izlenebilir olması gerekiyor.
+      logger.warn("Posilog adım üretimi başarısız, fallback kullanılıyor", {
+        roadmapId,
+        error: aiErr instanceof Error ? aiErr.message : String(aiErr),
+      });
     }
 
     const newStep = await prisma.roadmapStep.create({

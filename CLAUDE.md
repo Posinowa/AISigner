@@ -235,6 +235,21 @@ bir atamaya dönüşür. `features/proposals/server/oneri.ts` tek doğru kaynak.
   az önce oluşturulan `AssignedProject` geri alınır — yetim atama kalmaz.
 - **Red gerekçesi zorunlu** ve stajyere gösterilir; yoksa aynı öneri tekrar açılır.
 
+#### ⚠️ HER AI ÇIKTISI `cozVeDogrula`'DAN GEÇER (#377)
+İki uç bu katmanı atlıyordu: `issue-generator.ts` ham `JSON.parse`, `ai-step` elle
+regex temizliği. Model — `responseMimeType` istense bile — çıktıyı ```json bloğuna
+sarabiliyor ya da başına açıklama ekleyebiliyor; o durumda `JSON.parse` patlayıp akış
+**sessizce mock içeriğe** düşüyordu. Mentör/öğrenci uydurma issue başlıklarıyla
+çalışıyor ve bunu gerçek AI çıktısından **ayırt edemiyordu**.
+
+- Elle regex temizliği **kaldırıldı**: iki ayrı "JSON'ı temizle" mantığı, biri
+  güncellenip diğeri unutulunca ayrışır. Üstelik elle yazılan sürüm daha zayıftı —
+  JSON'un başına eklenen açıklamayı ayıklamıyordu.
+- Çıktının **şekli** Zod ile doğrulanıyor; `issue-generator`'da **boş liste de
+  reddediliyor** ("üretildi" deyip hiçbir şey üretmemek, mock'a düşmekten daha sinsi).
+- **Düşüş sessiz değil**: `cozVeDogrula` sayacı artırıyor (#335) ve çağıran taraf
+  ayrıca loglıyor.
+
 ### Mentör Onay Kapısı — Revizyon (#379)
 Öğrenci bir adımı `COMPLETED` yaptığında **kimse** geri çekemiyordu: öğrenci ucu
 "tamamlanan adımın durumu değiştirilemez" diyor, mentör ucu `status` alanını hiç kabul
