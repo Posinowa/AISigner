@@ -9,9 +9,11 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
  * garantiyi kilitliyor.
  */
 
-const { octokitMock } = vi.hoisted(() => ({
+const { octokitMock, sahipTuruMock } = vi.hoisted(() => ({
+  sahipTuruMock: vi.fn(),
   octokitMock: {
-    repos: { get: vi.fn(), createInOrg: vi.fn() },
+    repos: { get: vi.fn(), createInOrg: vi.fn(), createForAuthenticatedUser: vi.fn() },
+    users: { getByUsername: vi.fn(), getAuthenticated: vi.fn() },
     issues: {
       listMilestones: vi.fn(),
       createMilestone: vi.fn(),
@@ -39,17 +41,27 @@ vi.mock("./retry", async () => {
 
 vi.mock("./client", async () => {
   const gercek = await vi.importActual<typeof import("./client")>("./client");
-  return { ...gercek, getOctokit: () => octokitMock };
+  // ⚠️ `sahipTuruniCoz` burada MOCK'LANIYOR: gerçeği modül içindeki
+  // `getOctokit`'i kullanıyor (dışa aktarılanı değil), yani bu dosyada
+  // gerçek ağa çıkardı. Çözümleme mantığının kendi testleri
+  // `client.test.ts`'te — orada Octokit yapıcısı mock'lanıyor.
+  return { ...gercek, getOctokit: () => octokitMock, sahipTuruniCoz: sahipTuruMock };
 });
 
 import { repoyuHazirla, milestoneHazirla, issueHazirla, repoAdiUret } from "./repo";
+import { resetGitHubClientForTests } from "./client";
 
 const config = { token: "t", owner: "Posinowa" };
 
 /** GitHub 404'ü Octokit'te `status` taşıyan bir hata olarak gelir. */
 const httpHata = (status: number) => Object.assign(new Error("gh"), { status });
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  resetGitHubClientForTests();
+  // Varsayılan: organizasyon (mevcut testlerin varsaydığı dünya).
+  sahipTuruMock.mockResolvedValue({ ok: true, tur: "organizasyon" });
+});
 
 describe("repoAdiUret", () => {
   it("Türkçe karakterleri çevirir", () => {
@@ -278,5 +290,84 @@ describe("GitHub çağrıları yeniden denenir (#218)", () => {
 
     expect(r).toEqual({ ok: false, neden: "bilinmeyen" });
     expect(octokitMock.repos.get).toHaveBeenCalledTimes(3);
+  });
+});
+
+/**
+ * #346 — KİŞİSEL HESAPTA DEPO AÇMA.
+ *
+ * `repos.createInOrg` yalnızca organizasyonlara açık; kişisel hesapta 404
+ * veriyordu ve `repoyuHazirla` orada hiç çalışmıyordu.
+ *
+ * ⚠️ EN KRİTİK GARANTİ: hesap türü TAHMİN EDİLMİYOR, GitHub'a soruluyor.
+ * "createInOrg dene, 404 alırsan kişiseldir" mantığı yanlış yazılmış bir org
+ * adını da kişisel hesap sanıp DEPOYU BAŞKA YERE AÇARDI.
+ */
+describe("repoyuHazirla — hesap türüne göre uç seçimi (#346)", () => {
+  const yokSay = () => octokitMock.repos.get.mockRejectedValue(httpHata(404));
+
+  it("ORGANİZASYON → createInOrg", async () => {
+    yokSay();
+    sahipTuruMock.mockResolvedValue({ ok: true, tur: "organizasyon" });
+    octokitMock.repos.createInOrg.mockResolvedValue({
+      data: { name: "p", html_url: "https://github.com/Posinowa/p" },
+    });
+
+    const s = await repoyuHazirla(config, { repoName: "p", description: "d" });
+
+    expect(s.ok).toBe(true);
+    expect(octokitMock.repos.createInOrg).toHaveBeenCalled();
+    expect(octokitMock.repos.createForAuthenticatedUser).not.toHaveBeenCalled();
+  });
+
+  it("KİŞİSEL hesap → createForAuthenticatedUser", async () => {
+    yokSay();
+    sahipTuruMock.mockResolvedValue({ ok: true, tur: "kendi-hesabim" });
+    octokitMock.repos.createForAuthenticatedUser.mockResolvedValue({
+      data: { name: "p", html_url: "https://github.com/alperenesersu/p" },
+    });
+
+    const s = await repoyuHazirla(config, { repoName: "p", description: "d" });
+
+    expect(s.ok).toBe(true);
+    expect(octokitMock.repos.createForAuthenticatedUser).toHaveBeenCalled();
+    expect(octokitMock.repos.createInOrg).not.toHaveBeenCalled();
+  });
+
+  it("kişisel hesapta da private ve auto_init korunur", async () => {
+    yokSay();
+    sahipTuruMock.mockResolvedValue({ ok: true, tur: "kendi-hesabim" });
+    octokitMock.repos.createForAuthenticatedUser.mockResolvedValue({
+      data: { name: "p", html_url: "u" },
+    });
+
+    await repoyuHazirla(config, { repoName: "p", description: "d" });
+
+    const cagri = octokitMock.repos.createForAuthenticatedUser.mock.calls[0][0];
+    expect(cagri.private).toBe(true);
+    expect(cagri.auto_init).toBe(true);
+    // Kişisel uçta `owner`/`org` alanı YOK — depo token sahibinin altına açılır.
+    expect(cagri.org).toBeUndefined();
+    expect(cagri.owner).toBeUndefined();
+  });
+
+  it("hesap türü ÇÖZÜLEMEZSE hiçbir uç çağrılmaz", async () => {
+    yokSay();
+    sahipTuruMock.mockResolvedValue({ ok: false, neden: "bulunamadi" });
+
+    const s = await repoyuHazirla(config, { repoName: "p", description: "d" });
+
+    expect(s).toEqual({ ok: false, neden: "bulunamadi" });
+    expect(octokitMock.repos.createInOrg).not.toHaveBeenCalled();
+    expect(octokitMock.repos.createForAuthenticatedUser).not.toHaveBeenCalled();
+  });
+
+  it("mevcut repo varsa hesap türü HİÇ sorulmaz — gereksiz istek atılmaz", async () => {
+    octokitMock.repos.get.mockResolvedValue({ data: { name: "p", html_url: "u" } });
+
+    const s = await repoyuHazirla(config, { repoName: "p", description: "d" });
+
+    expect(s.ok).toBe(true);
+    expect(sahipTuruMock).not.toHaveBeenCalled();
   });
 });

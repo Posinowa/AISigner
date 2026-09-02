@@ -9,7 +9,18 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
  * `GITHUB_ORG` boşsa sessizce varsayılana DÜŞÜLMEZ.
  */
 
+const { octokitMock } = vi.hoisted(() => ({
+  octokitMock: {
+    users: { getByUsername: vi.fn(), getAuthenticated: vi.fn() },
+  },
+}));
+
 vi.mock("server-only", () => ({}));
+// #346: `sahipTuruniCoz` modül içindeki `getOctokit`'i kullanıyor; onu
+// yakalamak için Octokit YAPICISI mock'lanıyor.
+// Her çağrıda AYRI nesne: `getOctokit` önbelleğinin "token değişince yeni
+// istemci" davranışı test edilebilir kalmalı. Casuslar paylaşılıyor.
+vi.mock("@octokit/rest", () => ({ Octokit: vi.fn(() => ({ ...octokitMock })) }));
 vi.mock("@/lib/logger", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
@@ -20,6 +31,7 @@ import {
   resetGitHubClientForTests,
   hataNedeni,
   hataMesaji,
+  sahipTuruniCoz,
   VARSAYILAN_ORG,
 } from "./client";
 
@@ -142,5 +154,105 @@ describe("hataMesaji — token sızmaz", () => {
       ["yetki-yok", "bulunamadi", "zaten-var", "oran-siniri", "bilinmeyen"] as const
     ).map(hataMesaji);
     expect(new Set(hepsi).size).toBe(hepsi.length);
+  });
+});
+
+/**
+ * #346 — HESAP TÜRÜ TAHMİN EDİLMEZ, SORULUR.
+ *
+ * `repos.createInOrg` yalnızca organizasyonlara açık. Kişisel hesap desteği
+ * eklenirken cazip yol "createInOrg dene, 404 alırsan kişiseldir" idi; bu
+ * yanlış yazılmış bir org adını, silinmiş bir org'u ve token'ın göremediği bir
+ * org'u da kişisel hesap sanıp DEPOYU BAŞKA YERE AÇARDI.
+ */
+describe("sahipTuruniCoz (#346)", () => {
+  const config = { token: "t", owner: "Posinowa" };
+  const httpHata = (status: number) => Object.assign(new Error("gh"), { status });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetGitHubClientForTests();
+  });
+
+  it("Organization → organizasyon", async () => {
+    octokitMock.users.getByUsername.mockResolvedValue({ data: { type: "Organization" } });
+
+    expect(await sahipTuruniCoz(config)).toEqual({ ok: true, tur: "organizasyon" });
+    // Org ise kimlik sorgusuna gerek yok.
+    expect(octokitMock.users.getAuthenticated).not.toHaveBeenCalled();
+  });
+
+  it("token sahibinin KENDİ hesabı → kendi-hesabim", async () => {
+    octokitMock.users.getByUsername.mockResolvedValue({ data: { type: "User" } });
+    octokitMock.users.getAuthenticated.mockResolvedValue({ data: { login: "Posinowa" } });
+
+    expect(await sahipTuruniCoz(config)).toEqual({ ok: true, tur: "kendi-hesabim" });
+  });
+
+  it("büyük/küçük harf farkı eşleşmeyi bozmaz", async () => {
+    octokitMock.users.getByUsername.mockResolvedValue({ data: { type: "User" } });
+    octokitMock.users.getAuthenticated.mockResolvedValue({ data: { login: "alperenesersu" } });
+
+    const s = await sahipTuruniCoz({ token: "t", owner: "AlperEnesErsu" });
+    expect(s).toEqual({ ok: true, tur: "kendi-hesabim" });
+  });
+
+  it("⚠️ BAŞKASININ kişisel hesabı REDDEDİLİR", async () => {
+    // createForAuthenticatedUser'ın `owner` alanı yok: depo her zaman token'ın
+    // sahibi altında açılır. Bu kapı olmasa depo SESSİZCE yanlış hesaba giderdi.
+    octokitMock.users.getByUsername.mockResolvedValue({ data: { type: "User" } });
+    octokitMock.users.getAuthenticated.mockResolvedValue({ data: { login: "ben" } });
+
+    const s = await sahipTuruniCoz({ token: "t", owner: "baskasi" });
+
+    expect(s.ok).toBe(false);
+    if (!s.ok) {
+      expect(s.neden).toBe("yetki-yok");
+      expect(s.aciklama).toContain("baskasi");
+    }
+  });
+
+  it("hesap bulunamazsa 'bulunamadi' — kişisel hesap VARSAYILMAZ", async () => {
+    octokitMock.users.getByUsername.mockRejectedValue(httpHata(404));
+
+    expect(await sahipTuruniCoz(config)).toEqual({ ok: false, neden: "bulunamadi" });
+  });
+
+  it("yetki hatası kişisel hesap sanılmaz", async () => {
+    octokitMock.users.getByUsername.mockRejectedValue(httpHata(401));
+
+    expect(await sahipTuruniCoz(config)).toEqual({ ok: false, neden: "yetki-yok" });
+  });
+
+  it("sonuç ÖNBELLEKLENİR — hesap türü değişmez", async () => {
+    octokitMock.users.getByUsername.mockResolvedValue({ data: { type: "Organization" } });
+
+    await sahipTuruniCoz(config);
+    await sahipTuruniCoz(config);
+    await sahipTuruniCoz(config);
+
+    expect(octokitMock.users.getByUsername).toHaveBeenCalledTimes(1);
+  });
+
+  it("BAŞARISIZ sonuç önbelleklenmez — geçici hata kalıcı olmamalı", async () => {
+    octokitMock.users.getByUsername.mockRejectedValueOnce(httpHata(500));
+    expect((await sahipTuruniCoz(config)).ok).toBe(false);
+
+    octokitMock.users.getByUsername.mockResolvedValue({ data: { type: "Organization" } });
+    expect(await sahipTuruniCoz(config)).toEqual({ ok: true, tur: "organizasyon" });
+
+    // ⚠️ Asıl kanıt SORULMUŞ olması. Yalnız sonuca bakan bir test, hata
+    // yolunda yanlışlıkla "organizasyon" önbellekleyen bir sürümden de
+    // geçerdi — sonuç aynı görünür, ama tür TAHMİN edilmiş olurdu.
+    expect(octokitMock.users.getByUsername).toHaveBeenCalledTimes(2);
+  });
+
+  it("FARKLI owner ayrı sorulur — önbellek anahtarı owner'ı içerir", async () => {
+    octokitMock.users.getByUsername.mockResolvedValue({ data: { type: "Organization" } });
+
+    await sahipTuruniCoz({ token: "t", owner: "org-a" });
+    await sahipTuruniCoz({ token: "t", owner: "org-b" });
+
+    expect(octokitMock.users.getByUsername).toHaveBeenCalledTimes(2);
   });
 });

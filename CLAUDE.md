@@ -314,6 +314,21 @@ Mentör **talep eder** (`POST /api/mentor/workspace-request`), admin **karara ba
 - Rozet (`BekleyenTalepRozeti`) özelliğin ön koşulu: fark edilmeyen kuyruk darboğazı yalnızca
   yer değiştirir.
 
+#### ⚠️ Hedef hesabın türü TAHMİN EDİLMEZ, SORULUR (#346)
+`repos.createInOrg` yalnızca **organizasyonlara** açık; kişisel hesapta 404 verir.
+`sahipTuruniCoz` (`github/server/client.ts`) `users.getByUsername` ile türü **sorar**
+ve ona göre `createInOrg` / `createForAuthenticatedUser` seçilir.
+
+- **"createInOrg dene, 404 alırsan kişiseldir" YANLIŞ.** 404; silinmiş bir org, yanlış
+  yazılmış bir isim veya token'ın o org'u görememesi de olabilir. Sırayla deneyen mantık
+  bunların hepsini kişisel hesap sanıp **depoyu başka yere açardı**.
+- **⚠️ KİŞİSEL HESAP YALNIZCA TOKEN SAHİBİNİNKİ OLABİLİR.** `createForAuthenticatedUser`
+  uçunda `owner` alanı **yoktur** — depo her zaman token'ın sahibi altında açılır.
+  `GITHUB_ORG` başka birinin kullanıcı adıysa depo **sessizce yanlış hesapta** açılırdı;
+  bu yüzden kimlik karşılaştırılıp uyuşmuyorsa açıkça reddediliyor.
+- Tür değişmez → token+owner başına **bir kez** sorulur; **başarısız sonuç
+  önbelleklenmez** (geçici hata kalıcı olmamalı). Mevcut repo bulunduğunda tür hiç sorulmaz.
+
 #### ⚠️ GitHub'ın liste uçları ANINDA TUTARLI DEĞİL (#345)
 `issueHazirla`/`milestoneHazirla` kopya kontrolünü `listForRepo` başlık taramasıyla
 yapıyor ve **bu bir garanti değil**: yeni açılmış kayıt listede gecikmeli görünüyor.

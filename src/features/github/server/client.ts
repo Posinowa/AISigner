@@ -56,6 +56,84 @@ export function getOctokit(config: GitHubConfig): Octokit {
 
 export function resetGitHubClientForTests(): void {
   onbellek = null;
+  sahipTuruOnbellegi.clear();
+}
+
+/**
+ * Hedef hesabın türü (#346).
+ *
+ * `repos.createInOrg` YALNIZCA organizasyonlara açık; kişisel bir hesapta 404
+ * döner. Kişisel hesap için `repos.createForAuthenticatedUser` gerekiyor.
+ */
+export type SahipTuru = "organizasyon" | "kendi-hesabim";
+
+export type SahipTuruSonucu =
+  | { ok: true; tur: SahipTuru }
+  | { ok: false; neden: GitHubHataNedeni; aciklama?: string };
+
+/** Hesap türü değişmez; token+owner başına bir kez sorulur. */
+const sahipTuruOnbellegi = new Map<string, SahipTuru>();
+
+/**
+ * `owner` bir organizasyon mu, token sahibinin kendi hesabı mı?
+ *
+ * ⚠️ TAHMİN EDİLMEZ, SORULUR. "Önce createInOrg dene, 404 alırsan kişisel
+ * hesaptır" yaklaşımı cazip ama yanlış: 404 silinmiş bir org, yanlış yazılmış
+ * bir isim veya token'ın o org'u görememesi de olabilir. Sırayla deneyen bir
+ * mantık bunların hepsini "kişisel hesap" sanıp DEPOYU BAŞKA YERE AÇARDI.
+ *
+ * ⚠️ KİŞİSEL HESAP YALNIZCA TOKEN SAHİBİNİNKİ OLABİLİR.
+ * `createForAuthenticatedUser` depoyu her zaman TOKEN'IN sahibi altında açar —
+ * `owner` alanı diye bir şey yok. `GITHUB_ORG` başka birinin kullanıcı adıysa
+ * depo sessizce YANLIŞ HESAPTA açılır ve bu hiçbir yerde hata olarak
+ * görünmez. Bu yüzden kimlik karşılaştırılıyor; tutmuyorsa açıkça reddediyoruz.
+ */
+export async function sahipTuruniCoz(config: GitHubConfig): Promise<SahipTuruSonucu> {
+  const anahtar = `${config.token}:${config.owner}`;
+  const onbellekli = sahipTuruOnbellegi.get(anahtar);
+  if (onbellekli) return { ok: true, tur: onbellekli };
+
+  const octokit = getOctokit(config);
+
+  let tur: string;
+  try {
+    const hesap = await octokit.users.getByUsername({ username: config.owner });
+    tur = hesap.data.type;
+  } catch (error) {
+    const neden = hataNedeni(error);
+    logger.error("GitHub hesap türü çözülemedi", { owner: config.owner, neden });
+    return { ok: false, neden };
+  }
+
+  if (tur === "Organization") {
+    sahipTuruOnbellegi.set(anahtar, "organizasyon");
+    return { ok: true, tur: "organizasyon" };
+  }
+
+  // Kişisel hesap: token'ın sahibi mi?
+  let kendiKullaniciAdi: string;
+  try {
+    const ben = await octokit.users.getAuthenticated();
+    kendiKullaniciAdi = ben.data.login;
+  } catch (error) {
+    return { ok: false, neden: hataNedeni(error) };
+  }
+
+  if (kendiKullaniciAdi.toLowerCase() !== config.owner.toLowerCase()) {
+    logger.error("GITHUB_ORG başka bir kullanıcının hesabı", {
+      owner: config.owner,
+    });
+    return {
+      ok: false,
+      neden: "yetki-yok",
+      aciklama:
+        `"${config.owner}" bir organizasyon değil ve token'ın sahibi de değil. ` +
+        "Kişisel hesapta depo yalnızca token'ın kendi hesabında açılabilir.",
+    };
+  }
+
+  sahipTuruOnbellegi.set(anahtar, "kendi-hesabim");
+  return { ok: true, tur: "kendi-hesabim" };
 }
 
 export type GitHubHataNedeni =
