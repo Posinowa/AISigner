@@ -140,3 +140,102 @@ describe("POST /api/student/ai-chat — fallback + telemetry (#51/#70/#71)", () 
     expect(getCounter("ai_chat.attempt")).toBe(0);
   });
 });
+
+/**
+ * #376 — POSİLOG TAKIM PROJELERİNDEN HABERSİZDİ.
+ *
+ * Takım atamasında `AssignedProject.studentProfileId` NULL, sahiplik `teamId`
+ * üzerinde (#332). Yalnız `assignedProjects` çekildiği için takım projesindeki
+ * stajyer Posilog'a sorduğunda, Posilog HİÇ projesi yokmuş gibi cevap
+ * veriyordu. Öğrenci panosunda #367 ile çözülen ayrım bu uca yansımamıştı.
+ */
+describe("takım projeleri bağlama girer (#376)", () => {
+  const profil = (ekle: Record<string, unknown>) => ({
+    experienceLevel: "BEGINNER",
+    interests: ["React"],
+    goals: "hedef",
+    assignedProjects: [],
+    teamMemberships: [],
+    ...ekle,
+  });
+
+  const atama = (baslik: string) => ({
+    projectTemplate: { title: baslik, track: ["Next.js"], difficulty: "MEDIUM" },
+    roadmap: {
+      steps: [
+        { title: "Adim 1", status: "COMPLETED", order: 1 },
+        { title: "Adim 2", status: "IN_PROGRESS", order: 2 },
+      ],
+    },
+  });
+
+  /** Modele giden sistem talimatı + bağlam metni. */
+  function baglamMetni(startChat: { mock: { calls: unknown[][] } }) {
+    return JSON.stringify(startChat.mock.calls[0][0]);
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetCounters();
+    authAsStudent();
+    prismaMock.user.findUnique.mockResolvedValue({ aiConsentAt: new Date() });
+  });
+
+  it("sorgu HEM bireysel HEM takım atamalarını ister", async () => {
+    const { model } = fakeModel(() => ({ response: { text: () => "ok" } }));
+    getTextModelMock.mockReturnValue(model);
+    prismaMock.studentProfile.findUnique.mockResolvedValue(profil({}));
+
+    await POST(makeRequest("merhaba"));
+
+    const dahil = prismaMock.studentProfile.findUnique.mock.calls[0][0].include;
+    expect(dahil.assignedProjects).toBeDefined();
+    expect(dahil.teamMemberships).toBeDefined();
+    // Ayrılmış üyenin projesi artık onun işi değil.
+    expect(dahil.teamMemberships.where.leftAt).toBeNull();
+    expect(dahil.teamMemberships.select.team.select.assignedProjects).toBeDefined();
+  });
+
+  it("SADECE takım projesi olan stajyerde proje bağlama girer", async () => {
+    const { model, startChat } = fakeModel(() => ({ response: { text: () => "ok" } }));
+    getTextModelMock.mockReturnValue(model);
+    prismaMock.studentProfile.findUnique.mockResolvedValue(
+      profil({
+        teamMemberships: [
+          { team: { name: "Takim A", assignedProjects: [atama("Takim Projesi")] } },
+        ],
+      }),
+    );
+
+    await POST(makeRequest("projemde ne yapmaliyim"));
+
+    const metin = baglamMetni(startChat);
+    expect(metin).toContain("Aktif Projeler");
+    expect(metin).toContain("Takim Projesi");
+    // Ortak panoda "şu anki adım" başkasının üstlendiği iş olabilir; model
+    // bunu bireysel bir görev gibi sunmasın diye takım adı yazılıyor.
+    expect(metin).toContain("Takim A");
+  });
+
+  it("bireysel atamada REGRESYON yok", async () => {
+    const { model, startChat } = fakeModel(() => ({ response: { text: () => "ok" } }));
+    getTextModelMock.mockReturnValue(model);
+    prismaMock.studentProfile.findUnique.mockResolvedValue(
+      profil({ assignedProjects: [atama("Bireysel Proje")] }),
+    );
+
+    await POST(makeRequest("merhaba"));
+
+    expect(baglamMetni(startChat)).toContain("Bireysel Proje");
+  });
+
+  it("hiç projesi olmayan stajyerde 'Aktif Projeler' yazılmaz", async () => {
+    const { model, startChat } = fakeModel(() => ({ response: { text: () => "ok" } }));
+    getTextModelMock.mockReturnValue(model);
+    prismaMock.studentProfile.findUnique.mockResolvedValue(profil({}));
+
+    await POST(makeRequest("merhaba"));
+
+    expect(baglamMetni(startChat)).not.toContain("Aktif Projeler");
+  });
+});
