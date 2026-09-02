@@ -32,7 +32,38 @@ type StudentWithProfile = {
       };
       createdAt: Date;
     }[];
+    // #367: Aktif takım üyelikleri — mentör "bu stajyer hangi takımda"
+    // sorusunu panelde görebilsin. Takım mentörü için bu, öğrencinin panele
+    // gelmesinin TEK sebebi olabilir.
+    teamMemberships?: {
+      role: string;
+      team: {
+        id: string;
+        name: string;
+        members: {
+          role: string;
+          studentProfile: {
+            user: { id: string; name: string | null; lastName: string | null; email: string };
+          };
+        }[];
+        assignedProjects: {
+          id: string;
+          githubRepoUrl: string | null;
+          githubStatus: string;
+          projectTemplate: { id: string; title: string };
+          roadmap: { id: string; status: string } | null;
+        }[];
+      };
+    }[];
   } | null;
+};
+
+const TAKIM_ROL_ETIKETLERI: Record<string, string> = {
+  frontend: "Frontend",
+  backend: "Backend",
+  fullstack: "Full-stack",
+  qa: "QA / Test",
+  design: "Tasarım",
 };
 
 const statusConfig = {
@@ -260,6 +291,53 @@ export default function MentorDashboardPage() {
                         )}
                       </div>
                     )}
+
+                    {/* #367: Takım üyelikleri. Takım mentörü için öğrencinin
+                        panelde görünmesinin tek sebebi bu olabilir; ortak
+                        panoya buradan ulaşılır. */}
+                    {hasProfile &&
+                      (student.studentProfile!.teamMemberships ?? []).map((u) => (
+                        <div
+                          key={u.team.id}
+                          className="mb-4 rounded-xl border border-indigo-200 bg-indigo-50/60 p-3"
+                        >
+                          <p className="text-xs font-bold text-indigo-900">
+                            {u.team.name}
+                            <span className="ml-1.5 font-normal text-indigo-700">
+                              · {TAKIM_ROL_ETIKETLERI[u.role] ?? u.role}
+                            </span>
+                          </p>
+                          <p className="mt-1 text-[11px] leading-relaxed text-indigo-800/80">
+                            {u.team.members
+                              .map(
+                                (m) =>
+                                  [m.studentProfile.user.name, m.studentProfile.user.lastName]
+                                    .filter(Boolean)
+                                    .join(" ") || m.studentProfile.user.email,
+                              )
+                              .join(" · ")}
+                          </p>
+                          {u.team.assignedProjects.map((ap) => (
+                            <div key={ap.id} className="mt-1.5 flex flex-wrap items-center gap-2">
+                              <span className="text-[11px] font-medium text-indigo-900">
+                                {ap.projectTemplate.title}
+                              </span>
+                              {ap.roadmap ? (
+                                <Link
+                                  href={`/mentor-dashboard/roadmap/${ap.roadmap.id}`}
+                                  className="text-[11px] font-semibold text-indigo-700 hover:underline"
+                                >
+                                  Ortak panoyu aç →
+                                </Link>
+                              ) : (
+                                <span className="text-[11px] text-indigo-700/70">
+                                  Yol haritası yok
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ))}
 
                     {/* Project stats */}
                     {hasProfile && (

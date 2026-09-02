@@ -20,8 +20,11 @@ export type StudentAssignmentProgress = {
   assignmentId: string;
   studentId: string;
   studentName: string;
-  studentEmail: string;
-  experienceLevel: string;
+  // #332/#367: Takım atamasında tek bir öğrenci yok.
+  studentEmail: string | null;
+  experienceLevel: string | null;
+  teamId: string | null;
+  teamMembers: { name: string; role: string }[];
   // #195: M:N — atanmış mentorlar (0..n).
   mentors: { id: string; name: string }[];
   projectTemplateId: string;
@@ -349,15 +352,31 @@ export default function AdminAssignmentsPage() {
                   >
                     {/* Öğrenci & Mentör */}
                     <td className="py-4 px-6">
-                      <div className="font-semibold text-slate-900">
+                      <div className="flex flex-wrap items-center gap-1.5 font-semibold text-slate-900">
                         {item.studentName}
+                        {/* #367: Satırın takım mı birey mi olduğu görsel olarak
+                            ayırt edilebilmeli — takımda "öğrenci" sütunu tek bir
+                            kişiyi temsil etmiyor. */}
+                        {item.teamId && (
+                          <span className="rounded-md border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700">
+                            TAKIM
+                          </span>
+                        )}
                       </div>
-                      <div className="text-xs text-slate-500 mt-0.5">
-                        {item.studentEmail} &bull;{" "}
-                        <span className="font-medium text-slate-600">
-                          {item.experienceLevel}
-                        </span>
-                      </div>
+                      {item.teamId ? (
+                        <div className="mt-0.5 text-xs text-slate-500">
+                          {item.teamMembers.length > 0
+                            ? item.teamMembers.map((u) => `${u.name} (${u.role})`).join(" · ")
+                            : "Aktif üye yok"}
+                        </div>
+                      ) : (
+                        <div className="text-xs text-slate-500 mt-0.5">
+                          {item.studentEmail} &bull;{" "}
+                          <span className="font-medium text-slate-600">
+                            {item.experienceLevel}
+                          </span>
+                        </div>
+                      )}
                       {item.mentors.length > 0 && (
                         <div className="text-xs text-indigo-600 mt-1 flex items-center gap-1">
                           <Users className="w-3 h-3" />{" "}
