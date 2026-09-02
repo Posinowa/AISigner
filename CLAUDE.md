@@ -235,6 +235,39 @@ bir atamaya dönüşür. `features/proposals/server/oneri.ts` tek doğru kaynak.
   az önce oluşturulan `AssignedProject` geri alınır — yetim atama kalmaz.
 - **Red gerekçesi zorunlu** ve stajyere gösterilir; yoksa aynı öneri tekrar açılır.
 
+### Mentör Onay Kapısı — Revizyon (#379)
+Öğrenci bir adımı `COMPLETED` yaptığında **kimse** geri çekemiyordu: öğrenci ucu
+"tamamlanan adımın durumu değiştirilemez" diyor, mentör ucu `status` alanını hiç kabul
+etmiyordu (`delete safeData.status`). Bir staj platformunda mentör onayı akışın
+merkezinde olmalı.
+
+- **Yeni durum `REVISION_REQUESTED`** — `IN_PROGRESS`'e geri çekmek yerine. Revizyon
+  istendiği bilgisi panoda **hiç çalışılmamış adımdan ayırt edilebilmeli** ve
+  `StepStatusHistory`'de (#324) net iz kalmalı.
+- **Gerekçe ZORUNLU** (`StepStatusHistory.note`, ≥10 karakter) ve öğrenciye gösterilir —
+  #366'daki red gerekçesi deseni. Gerekçe **adımda değil GEÇİŞTE** duruyor: bir adım
+  birden çok kez revize edilebilir, her seferin kendi gerekçesi var.
+- **⚠️ YETKİ TAM AÇILMADI, DARALTILDI.** `delete safeData.status` kaldırılmadı; ayrı bir
+  uç yalnızca **tek geçişi** açıyor: `COMPLETED → REVISION_REQUESTED`. Mentör adımı
+  keyfî durumlara sürükleyemez.
+- Yetki: atanmış mentör (bireysel **veya** takım — `mentorunOgrencisiWhere`, #370) + admin.
+  "Yetki yok" da **404** döner: başkasının adımının var olduğu bile sızmasın.
+- **Öğrenci yeniden başlatabilir**, doğrudan tamamlayamaz — TODO'daki kuralın aynısı.
+  Aksi halde "revize et" demek adımı **kilitlerdi**.
+- **Proje `COMPLETED` kalmaz**: öğrenci ucundaki yeniden hesap bu geçişte çalışmıyordu;
+  bir adımı revizyonda olan proje panoda "tamamlandı" görünürdü.
+- Mezun (`GRADUATED`) stajyerde kapalı (#208).
+
+#### ⚠️ GitHub tarafı: MERGE EDİLDİYSE YENİ ISSUE, EDİLMEDİYSE YENİDEN AÇ
+Merge edilmiş bir işin issue'sunu yeniden açmak, **ana dalda duran kodu "yapılmamış"
+gibi** gösterirdi; o iş bitti, revizyon yeni bir iştir. `StepIssue.mergeIleKapandi`
+webhook'ta yazılıyor (`pull_request` + `merged`), karar buna bakıyor.
+- Bu bayraktan **önce** kapanmış kayıtlarda `false` kalır → yeniden açma. Bilinmeyende
+  geri alınabilir ve görünür olan tercih edildi.
+- **BAGLA/LINKED depolarda hiçbiri çalışmaz** (#366) — sessizce atlanıyor.
+- **GitHub hatası revizyonu geri almaz**: platform durumu tek doğru kaynak, senk `after()`
+  ile arka planda. Tersi olsaydı GitHub erişilemezken mentör revizyon isteyemezdi.
+
 ### Analitik Panel (#331)
 `features/analytics/server/analiz.ts` (üç ham SQL) → `panel.ts` (önbellek) →
 `/api/admin/analytics` (platform) · `/api/mentor/analytics` (kapsam OTURUMDAN daraltılır).

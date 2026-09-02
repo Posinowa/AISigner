@@ -40,7 +40,17 @@ function issueUrlAl(govde: unknown): string | null {
  * Durum geçişi `adimDurumunuDegistir` üzerinden yapılıyor ki geçmişe (#324)
  * yazılsın. `degistirenId: null` — işlemi bir platform kullanıcısı yapmadı.
  */
-export async function issueKapandiginiIsle(govde: unknown): Promise<IsleSonucu> {
+export async function issueKapandiginiIsle(
+  govde: unknown,
+  /**
+   * #379: Kapanma MERGE EDİLMİŞ bir PR'dan mı geldi?
+   *
+   * Kaydediliyor çünkü revizyon istendiğinde GitHub davranışını bu belirliyor:
+   * merge edilmiş iş için YENİ issue açılır (kod ana dalda; eskisini yeniden
+   * açmak yapılmamış gibi gösterirdi), edilmemişse mevcut issue yeniden açılır.
+   */
+  mergeIleKapandi = false,
+): Promise<IsleSonucu> {
   const url = issueUrlAl(govde);
   if (!url) return { islendi: false, aciklama: "olayda issue/PR url'i yok" };
 
@@ -56,7 +66,7 @@ export async function issueKapandiginiIsle(govde: unknown): Promise<IsleSonucu> 
   if (stepIssue.status !== "CLOSED") {
     await prisma.stepIssue.update({
       where: { id: stepIssue.id },
-      data: { status: "CLOSED" },
+      data: { status: "CLOSED", mergeIleKapandi },
     });
   }
 

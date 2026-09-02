@@ -115,17 +115,19 @@ export async function POST(req: Request) {
     }
 
     // issue "closed", PR "closed" + merged.
+    const prMergeEdildi =
+      olay === "pull_request" &&
+      Boolean((govde as { pull_request?: { merged?: boolean } }).pull_request?.merged);
+
     const kapandi =
-      govde.action === "closed" &&
-      (olay === "issues" ||
-        (olay === "pull_request" &&
-          Boolean((govde as { pull_request?: { merged?: boolean } }).pull_request?.merged)));
+      govde.action === "closed" && (olay === "issues" || prMergeEdildi);
 
     if (!kapandi) {
       return NextResponse.json({ ok: true, islendi: false, aciklama: "kapanma olayı değil" });
     }
 
-    const sonuc = await issueKapandiginiIsle(govde);
+    // #379: Merge bilgisi StepIssue'ya yazılıyor; revizyon kararı buna bakıyor.
+    const sonuc = await issueKapandiginiIsle(govde, prMergeEdildi);
     return NextResponse.json({ ok: true, ...sonuc });
   } catch (error) {
     // GitHub'a 500 dönmek webhook'un devre dışı bırakılmasına yol açar.

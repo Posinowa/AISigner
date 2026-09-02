@@ -16,6 +16,8 @@ type Step = {
   estimatedHours: number | null;
   resources: string[];
   githubIssueUrl?: string | null;
+  /** #379: Mentörün revizyon gerekçesi — yalnız REVISION_REQUESTED'da dolu. */
+  revizyonGerekcesi?: string | null;
   // #332/#367: Adımı üstlenen takım üyesi. Bireysel atamada hep null.
   assigneeId?: string | null;
   assignee?: { id: string; name: string | null; lastName: string | null; email: string } | null;
@@ -124,12 +126,17 @@ export function RoadmapSteps({
         {steps.map((step, index) => {
           const isCompleted = step.status === "COMPLETED";
           const isInProgress = step.status === "IN_PROGRESS";
+          // #379: Mentör revizyon istedi. Öğrenci yeniden başlatabilmeli —
+          // aksi halde "eksik, revize et" demek adımı KİLİTLERDİ.
+          const isRevizyon = step.status === "REVISION_REQUESTED";
           const isTodo = step.status === "TODO";
 
           // İlk adım her zaman açık, sonraki adımlar bir önceki COMPLETED ise açık
           const previousCompleted = index === 0 || steps[index - 1].status === "COMPLETED";
           const isLocked = isTodo && !previousCompleted;
-          const isActionable = isTodo && previousCompleted;
+          // Revizyondaki adım her zaman eyleme açık: mentör düzeltilmesini
+          // istiyor, sıralama kuralı burada engel olmamalı.
+          const isActionable = (isTodo && previousCompleted) || isRevizyon;
 
           const isUpdating = updatingId === step.id;
 
@@ -197,6 +204,11 @@ export function RoadmapSteps({
                       Tamamlandı
                     </span>
                   )}
+                  {isRevizyon && (
+                    <span className="flex items-center text-[10px] font-bold uppercase tracking-wider text-amber-800 bg-amber-100 px-2 py-1 rounded">
+                      Revizyon İstendi
+                    </span>
+                  )}
                 </div>
 
                 <h5
@@ -211,6 +223,19 @@ export function RoadmapSteps({
                   <p className={`text-sm leading-relaxed ${isCompleted ? "text-slate-400 " : "text-slate-600 "}`}>
                     {step.description}
                   </p>
+                )}
+
+                {/* #379: Mentörün gerekçesi. Gerekçesiz revizyon öğrenciye
+                    aynı işi tekrar yaptırır — bu yüzden sunucuda ZORUNLU. */}
+                {isRevizyon && step.revizyonGerekcesi && (
+                  <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-amber-800">
+                      Mentörünün revizyon notu
+                    </p>
+                    <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-amber-900">
+                      {step.revizyonGerekcesi}
+                    </p>
+                  </div>
                 )}
 
                 {/* Tahmini süre */}
@@ -262,7 +287,7 @@ export function RoadmapSteps({
                 {/* Aksiyon Butonları — Mezun olmayan ve yayınlanmış adımlarda aktif */}
                 {!isGraduated && !isDraft && !isLocked && !isCompleted && (
                   <div className="mt-4 pt-4 border-t border-slate-100">
-                    {isTodo && isActionable && (
+                    {(isTodo || isRevizyon) && isActionable && (
                       <button
                         onClick={() => updateStepStatus(step.id, "IN_PROGRESS")}
                         disabled={isUpdating || isPending}
@@ -273,7 +298,11 @@ export function RoadmapSteps({
                         ) : (
                           <PlayCircle className="w-4 h-4 mr-2" />
                         )}
-                        {isUpdating ? "Başlatılıyor..." : "Bu Adıma Başla"}
+                        {isUpdating
+                          ? "Başlatılıyor..."
+                          : isRevizyon
+                            ? "Düzeltmeye Başla"
+                            : "Bu Adıma Başla"}
                       </button>
                     )}
                     {isInProgress && (

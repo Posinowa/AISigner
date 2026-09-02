@@ -106,6 +106,21 @@ export async function PATCH(
       );
     }
 
+    /*
+     * #379: REVİZYON İSTENEN ADIM YENİDEN BAŞLATILABİLİR.
+     *
+     * Aksi halde mentörün "eksik, revize et" demesi adımı KİLİTLERDİ —
+     * öğrenci ne düzeltebilir ne tamamlayabilirdi. Doğrudan COMPLETED'a
+     * atlamak yine kapalı: TODO'daki kuralın aynısı, geçmiş (#324) "yeniden
+     * çalıştı" adımını göstersin.
+     */
+    if (step.status === "REVISION_REQUESTED" && newStatus === "COMPLETED") {
+      return NextResponse.json(
+        { error: "Revizyon istenen adımı doğrudan tamamlayamazsınız. Önce yeniden başlatın." },
+        { status: 400 }
+      );
+    }
+
     if (step.status === "TODO" && newStatus === "COMPLETED") {
       return NextResponse.json(
         { error: "Bir adımı doğrudan tamamlayamazsınız. Önce başlatın." },

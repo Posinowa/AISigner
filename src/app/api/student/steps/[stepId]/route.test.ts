@@ -151,6 +151,8 @@ describe("student steps PATCH — IDOR + kurallar (#184)", () => {
         stepId: "s-1",
         fromStatus: "TODO",
         toStatus: "IN_PROGRESS",
+        // #379: Gerekçe alanı — öğrenci geçişlerinde boş.
+        note: null,
         changedById: "student-1",
       },
     });
@@ -186,3 +188,53 @@ describe("student steps PATCH — IDOR + kurallar (#184)", () => {
   });
 });
 
+/**
+ * #379 — REVİZYON İSTENEN ADIM.
+ *
+ * Mentör "eksik, revize et" dediğinde adım KİLİTLENMEMELİ: öğrenci yeniden
+ * başlatıp düzeltebilmeli. Ama doğrudan COMPLETED'a atlamak kapalı —
+ * TODO'daki kuralın aynısı, geçmiş (#324) "yeniden çalıştı" adımını göstersin.
+ */
+describe("revizyon istenen adım (#379)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    requireAuthMock.mockResolvedValue({
+      authorized: true,
+      session: { user: { id: "student-1", role: "STUDENT" } },
+    });
+    prismaMock.roadmapStep.findMany.mockResolvedValue([]);
+    prismaMock.assignedProject.update.mockResolvedValue({});
+    prismaMock.$transaction.mockResolvedValue([{ id: "s-1", status: "IN_PROGRESS" }, {}]);
+  });
+
+  it("yeniden BAŞLATILABİLİR", async () => {
+    prismaMock.roadmapStep.findUnique.mockResolvedValue(
+      stepGraph({ ownerUserId: "student-1", targetStatus: "REVISION_REQUESTED" }),
+    );
+
+    const res = await PATCH(req({ status: "IN_PROGRESS" }), { params: params() });
+
+    expect(res.status).toBe(200);
+  });
+
+  it("DOĞRUDAN tamamlanamaz", async () => {
+    prismaMock.roadmapStep.findUnique.mockResolvedValue(
+      stepGraph({ ownerUserId: "student-1", targetStatus: "REVISION_REQUESTED" }),
+    );
+
+    const res = await PATCH(req({ status: "COMPLETED" }), { params: params() });
+
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain("yeniden başlatın");
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("TAMAMLANMIŞ adım hâlâ değiştirilemez — revizyon yolu mentörden geçer", async () => {
+    prismaMock.roadmapStep.findUnique.mockResolvedValue(
+      stepGraph({ ownerUserId: "student-1", targetStatus: "COMPLETED" }),
+    );
+
+    const res = await PATCH(req({ status: "IN_PROGRESS" }), { params: params() });
+    expect(res.status).toBe(400);
+  });
+});

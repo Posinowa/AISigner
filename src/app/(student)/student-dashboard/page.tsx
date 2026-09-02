@@ -1,6 +1,7 @@
 import { DogrulanmisRozet } from "@/features/auth/ui/DogrulanmisRozet";
 import { AvatarUpload } from "@/features/profile/ui/AvatarUpload";
 import { RoadmapSteps } from "@/features/student/ui/RoadmapSteps";
+import { revizyonGerekceleri } from "@/features/roadmap/server/revizyon";
 import { ProjeOnerisi } from "@/features/proposals/ui/ProjeOnerisi";
 import { prisma } from "@/lib/db";
 import { getServerSession } from "next-auth";
@@ -155,6 +156,20 @@ export default async function StudentDashboardPage() {
     ...profile.assignedProjects.map((p) => ({ ...p, takim: null as (typeof takimlar)[number] | null })),
     ...takimlar.flatMap((t) => t.assignedProjects.map((p) => ({ ...p, takim: t }))),
   ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+  /*
+   * #379: Revizyon gerekçeleri.
+   *
+   * Gerekçe adımda değil GEÇMİŞTE duruyor (#324) — bir adım birden çok kez
+   * revize edilebilir ve her seferin kendi gerekçesi var. TEK sorguyla
+   * çekiliyor: adım başına ayrı sorgu, yol haritası uzadıkça N+1 üretirdi.
+   */
+  const revizyondakiAdimlar = tumProjeler.flatMap((p) =>
+    (p.roadmap?.steps ?? [])
+      .filter((a) => a.status === "REVISION_REQUESTED")
+      .map((a) => a.id),
+  );
+  const gerekceler = await revizyonGerekceleri(revizyondakiAdimlar);
 
   // #290: Karşılama artık "sırada ne var" sorusuna da cevap veriyor.
   // Sıradaki adım = en yeni projenin tamamlanmamış İLK adımı.
@@ -368,7 +383,12 @@ export default async function StudentDashboardPage() {
                       </div>
                     ) : (
                       <RoadmapSteps
-                        steps={steps}
+                        // #379: Gerekçe adımın yanına iliştiriliyor; bileşen
+                        // yalnız REVISION_REQUESTED durumunda gösteriyor.
+                        steps={steps.map((a) => ({
+                          ...a,
+                          revizyonGerekcesi: gerekceler.get(a.id) ?? null,
+                        }))}
                         isDraft={isDraft}
                         isGraduated={isGraduated}
                         currentUserId={session.user.id}
