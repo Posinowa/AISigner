@@ -1,5 +1,13 @@
 import "server-only";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+// #376: Sahiplik kuralının SQL karşılıkları TEK dosyada. Ham sorgular buradan
+// geçmeli; kural iki dilde yaşamak zorunda ama iki yerde YAZILMAMALI.
+import {
+  atamaOgrencininSql,
+  mentorunAtamasiSql,
+  mentorunOgrencisiSql,
+} from "@/features/teams/server/sahiplik-sql";
 
 /**
  * Analitik panel sorguları (#331).
@@ -93,12 +101,11 @@ export async function darbogazAnalizi(mentorUserId?: string): Promise<DarbogazSa
     JOIN "Roadmap" rm           ON rm.id = st."roadmapId"
     JOIN "AssignedProject" ap   ON ap.id = rm."assignedProjectId"
     JOIN "ProjectTemplate" pt   ON pt.id = ap."projectTemplateId"
-    JOIN "StudentProfile" sp    ON sp.id = ap."studentProfileId"
-    WHERE ${mentorUserId ?? null}::text IS NULL
-       OR EXISTS (
-            SELECT 1 FROM "MentorAssignment" ma
-            WHERE ma."studentProfileId" = sp.id AND ma."mentorId" = ${mentorUserId ?? null}::text
-          )
+    -- #376: "StudentProfile" ile INNER JOIN KALDIRILDI. Takim atamasinda
+    -- studentProfileId NULL oldugu icin o join TUM takim projelerini
+    -- darbogaz analizinden eliyordu; panel sessizce eksik tablo gosteriyordu.
+    -- Kapsam artik atama duzeyinde, profile baglanmadan.
+    WHERE ${mentorunAtamasiSql(mentorUserId ?? null)}
     GROUP BY pt."title", st."order"
     ORDER BY "ortancaSaat" DESC NULLS LAST
     LIMIT 20
@@ -248,13 +255,8 @@ export async function riskliOgrenciler(mentorUserId?: string): Promise<RiskliOgr
       JOIN "StudentProfile" sp ON sp."userId" = u.id
       WHERE u."role" = 'STUDENT'
         AND u."accountStatus" = 'APPROVED'
-        AND (
-          ${mentorUserId ?? null}::text IS NULL
-          OR EXISTS (
-               SELECT 1 FROM "MentorAssignment" ma
-               WHERE ma."studentProfileId" = sp.id AND ma."mentorId" = ${mentorUserId ?? null}::text
-             )
-        )
+        -- #376: Bireysel MentorAssignment VEYA TeamMentor bağı.
+        AND ${mentorunOgrencisiSql(mentorUserId ?? null)}
     )
     SELECT o."userId"    AS "studentUserId",
            o."name"      AS "ad",
@@ -266,7 +268,7 @@ export async function riskliOgrenciler(mentorUserId?: string): Promise<RiskliOgr
                JOIN "RoadmapStep" st ON st.id = h."stepId"
                JOIN "Roadmap" rm     ON rm.id = st."roadmapId"
                JOIN "AssignedProject" ap ON ap.id = rm."assignedProjectId"
-               WHERE ap."studentProfileId" = o."profilId"
+               WHERE ${atamaOgrencininSql("ap", Prisma.sql`o."profilId"`)}
              ), TIMESTAMP 'epoch'),
              COALESCE((
                SELECT MAX(m."createdAt") FROM "Message" m WHERE m."senderId" = o."userId"
@@ -276,7 +278,7 @@ export async function riskliOgrenciler(mentorUserId?: string): Promise<RiskliOgr
              SELECT COUNT(*) FROM "RoadmapStep" st2
              JOIN "Roadmap" rm2 ON rm2.id = st2."roadmapId"
              JOIN "AssignedProject" ap2 ON ap2.id = rm2."assignedProjectId"
-             WHERE ap2."studentProfileId" = o."profilId"
+             WHERE ${atamaOgrencininSql("ap2", Prisma.sql`o."profilId"`)}
                AND st2."status" = 'IN_PROGRESS'
                AND st2."updatedAt" < NOW() - (${TAKILMA_GUN} || ' days')::interval
            )                                                        AS "takilanAdim",

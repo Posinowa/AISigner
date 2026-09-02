@@ -97,20 +97,40 @@ export async function POST(req: Request) {
       );
     }
 
-    // Öğrenci bağlamını al (profil, projeler, roadmap)
+    /*
+     * Öğrenci bağlamını al (profil, projeler, roadmap).
+     *
+     * ⚠️ #376: PROJELER İKİ YOLDAN GELİR. Takım atamasında
+     * `AssignedProject.studentProfileId` NULL, sahiplik `teamId` üzerinde
+     * (#332). Yalnız `assignedProjects` çekilen sürümde takım projesindeki
+     * stajyer Posilog'a sorduğunda, Posilog HİÇ projesi ve yol haritası
+     * yokmuş gibi cevap veriyordu. Öğrenci panosunda #367 ile çözülen ayrım
+     * bu uca yansıtılmamıştı.
+     */
+    const ATAMA_ICERIK = {
+      include: {
+        projectTemplate: { select: { title: true, track: true, difficulty: true } },
+        roadmap: {
+          include: {
+            steps: {
+              orderBy: { order: "asc" as const },
+              select: { title: true, status: true, order: true },
+            },
+          },
+        },
+      },
+    };
+
     const profile = await prisma.studentProfile.findUnique({
       where: { userId },
       include: {
-        assignedProjects: {
-          include: {
-            projectTemplate: { select: { title: true, track: true, difficulty: true } },
-            roadmap: {
-              include: {
-                steps: {
-                  orderBy: { order: "asc" },
-                  select: { title: true, status: true, order: true },
-                },
-              },
+        assignedProjects: ATAMA_ICERIK,
+        // Ayrılmış üyelik sayılmaz: adım artık onun işi değil.
+        teamMemberships: {
+          where: { leftAt: null },
+          select: {
+            team: {
+              select: { name: true, assignedProjects: ATAMA_ICERIK },
             },
           },
         },
@@ -125,10 +145,25 @@ export async function POST(req: Request) {
       context += `\n- İlgi Alanları: ${profile.interests.join(", ")}`;
       if (profile.goals) context += `\n- Hedefler: ${profile.goals}`;
 
-      if (profile.assignedProjects.length > 0) {
+      /*
+       * #376: Bireysel + takim atamalari TEK listede.
+       *
+       * Takim adi bilerek yaziliyor: ortak panoda "su anki adim" baskasinin
+       * ustlendigi is olabilir (#332). Model bunu bireysel bir gorev gibi
+       * sunarsa ogrenciyi yanlis yonlendirir.
+       */
+      const projeler = [
+        ...profile.assignedProjects.map((atama) => ({ atama, takim: null as string | null })),
+        ...profile.teamMemberships.flatMap((uyelik) =>
+          uyelik.team.assignedProjects.map((atama) => ({ atama, takim: uyelik.team.name })),
+        ),
+      ];
+
+      if (projeler.length > 0) {
         context += `\n\nAktif Projeler:`;
-        profile.assignedProjects.forEach((ap) => {
+        projeler.forEach(({ atama: ap, takim }) => {
           context += `\n- ${ap.projectTemplate.title} (${ap.projectTemplate.difficulty}, ${ap.projectTemplate.track.join(", ")})`;
+          if (takim) context += ` [takım projesi: ${takim}]`;
           if (ap.roadmap?.steps) {
             const currentStep = ap.roadmap.steps.find(
               (s) => s.status === "IN_PROGRESS"

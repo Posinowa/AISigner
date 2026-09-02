@@ -183,6 +183,15 @@ bilinçli karar.
 - Takımda AI girdileri: seviye **EN DÜŞÜK** (pano ortak, en yeni üye de takip etmeli),
   PR incelemesinde **HERKESİN** rızası aranır (kimin hangi satırı yazdığı bilinmiyor),
   günlük tavan **takım başına**.
+- ⚠️ **HAM SQL'DE SAHİPLİK `sahiplik-sql.ts`'TEN GELİR** (#376). Analitik ham SQL
+  kullanıyor (toplama veritabanında olmalı, #313 dersi), yani kural İKİ DİLDE yaşamak
+  zorunda. Kopyayı kaldıramıyoruz ama **tek dosyaya** hapsettik. Birini değiştiren
+  diğerini de değiştirmeli: `mentorunOgrencisiWhere ↔ mentorunOgrencisiSql`,
+  `mentorErisimiWhere ↔ mentorunAtamasiSql`. Bulunan hata: `JOIN "StudentProfile" sp ON
+  sp.id = ap."studentProfileId"` takım atamasında `studentProfileId` NULL olduğu için
+  **tüm takım projelerini** darboğaz analizinden eliyordu — panel sessizce eksik tablo
+  gösteriyordu. SQL parça testleri yalnız METNİ kilitler; davranış **gerçek Postgres'e
+  ekilmiş bilinen değerlerle** doğrulanmalı.
 - ⚠️ **"BU ÖĞRENCİ BENİM Mİ?" TEK KAYNAKTAN SORULUR** (#370): `sahiplik.ts`
   `mentorunOgrencisiWhere()`. Bu kontrol kod tabanında **altı ayrı yerde** elle
   yazılmıştı ve #332 takım mentörlüğünü eklediğinde hepsi birden eksik kaldı — ama
