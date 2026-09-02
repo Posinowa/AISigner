@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-const { requireAuthMock, prismaMock, getModelMock, loggerMock } = vi.hoisted(() => ({
+const { requireAuthMock, prismaMock, getModelMock, rizaMock, loggerMock } = vi.hoisted(() => ({
   requireAuthMock: vi.fn(),
   prismaMock: {
     roadmap: { findUnique: vi.fn() },
     roadmapStep: { create: vi.fn(), findFirst: vi.fn(), count: vi.fn() },
   },
   getModelMock: vi.fn(),
+  rizaMock: vi.fn(),
   loggerMock: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 vi.mock("@/lib/logger", () => ({ logger: loggerMock }));
@@ -15,6 +16,8 @@ vi.mock("@/lib/auth/guard", () => ({
 }));
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 vi.mock("@/lib/ai/gemini-client", () => ({ getModel: (...a: unknown[]) => getModelMock(...a) }));
+// #389: Kardeş uç generate-roadmap rızayı kontrol ediyordu, burası atlamıştı.
+vi.mock("@/features/kvkk/riza", () => ({ profilSahibininRizasiVar: rizaMock }));
 
 import { POST } from "./route";
 
@@ -92,6 +95,7 @@ describe("model çıktısı çözümleme (#377)", () => {
         projectTemplate: { title: "Proje", description: "aciklama" },
       },
     });
+    rizaMock.mockResolvedValue(true);
     prismaMock.roadmapStep.create.mockImplementation(
       async ({ data }: { data: Record<string, unknown> }) => ({ id: "st-1", ...data }),
     );
@@ -146,5 +150,78 @@ describe("model çıktısı çözümleme (#377)", () => {
 
     expect(res.status).toBe(200);
     expect(loggerMock.warn).toHaveBeenCalled();
+  });
+});
+
+/**
+ * #389 — ai-step KVKK RIZASINI ATLIYORDU.
+ *
+ * Kardeş uç `generate-roadmap` `profilSahibininRizasiVar` ile kapılıydı;
+ * burası değildi. Prompt öğrencinin ADINI, deneyim seviyesini ve proje
+ * bağlamını taşıyor — işlemi mentör başlatsa da veri öğrenciye ait.
+ */
+describe("KVKK açık rızası (#389)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    requireAuthMock.mockResolvedValue({
+      authorized: true,
+      session: { user: { id: "m", role: "MENTOR" } },
+    });
+    prismaMock.roadmap.findUnique.mockResolvedValue({
+      id: "r-1",
+      steps: [],
+      assignedProject: {
+        studentProfile: {
+          id: "sp-1",
+          userId: "o-1",
+          experienceLevel: "BEGINNER",
+          interests: [],
+          user: { name: "Ogrenci" },
+          mentorAssignments: [{ mentorId: "m" }],
+        },
+        team: null,
+        projectTemplate: { title: "Proje", description: "aciklama" },
+      },
+    });
+    getModelMock.mockReturnValue({
+      generateContent: vi.fn().mockResolvedValue({ text: "{}" }),
+    });
+  });
+
+  it("⚠️ RIZA YOKSA 403 ve MODEL ÇAĞRILMAZ", async () => {
+    rizaMock.mockResolvedValue(false);
+
+    const res = await POST(req({ prompt: "auth" }), ctx);
+
+    expect(res.status).toBe(403);
+    expect((await res.json()).rizaGerekli).toBe(true);
+    expect(getModelMock).not.toHaveBeenCalled();
+  });
+
+  it("rıza ÖĞRENCİ PROFİLİ üzerinden sorulur — mentörün değil", async () => {
+    rizaMock.mockResolvedValue(true);
+
+    await POST(req({ prompt: "auth" }), ctx);
+
+    expect(rizaMock).toHaveBeenCalledWith("sp-1");
+  });
+
+  it("⚠️ rıza yokken FALLBACK ADIM da üretilmez", async () => {
+    // Mentör bir adım üretmeyi bilerek istedi; sessizce jenerik bir adım
+    // almamalı. Açık hata dönüyoruz.
+    rizaMock.mockResolvedValue(false);
+
+    await POST(req({ prompt: "auth" }), ctx);
+
+    expect(prismaMock.roadmapStep.create).not.toHaveBeenCalled();
+  });
+
+  it("rıza varsa akış normal — regresyon yok", async () => {
+    rizaMock.mockResolvedValue(true);
+
+    const res = await POST(req({ prompt: "auth" }), ctx);
+
+    expect(res.status).toBe(200);
+    expect(getModelMock).toHaveBeenCalled();
   });
 });

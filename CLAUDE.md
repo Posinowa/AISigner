@@ -452,6 +452,23 @@ PR açıldığında (`opened` / `ready_for_review`) webhook Gemini'den ön incel
   eşleştirmeden kalıcı dışlanırdı. Var olan analiz yeniden üretilmez.
 - İkisi de **fırlatmaz**: rızayı kaydedememek, türev kaydın bir süre daha durmasından ağır.
 
+#### ⚠️ RIZA SORUSU ARTIK ATAMA DÜZEYİNDE TEK KAYNAKTAN (#389)
+`kvkk/riza.ts` `atamaninAiRizasiVar()`. Rıza kontrolü bugüne kadar **her AI çağrısının
+yanına elle** yazıldı ve **dört kez atlandı**: #321 mekanizmayı kurdu, #352 mentör
+başvurusunu, #389 hem GitHub kurulumunu (`provisioning.ts`) hem `ai-step` ucunu kapattı.
+Yeni bir AI çağrısı eklerken rızayı buradan sorun.
+
+- **⚠️ TAKIMDA HERKESİN RIZASI ARANIR.** Üretilen içerik ORTAK panoya yazılıyor, girdi tüm
+  üyelerden türüyor (#332'deki PR incelemesi kararının aynısı). Ayrılmış üyenin rızası
+  aranmaz.
+- **Sahip bulunamazsa `false`** — dayanaksız rıza varsayılmaz.
+- **Sürüm kontrolü yok** (`aiRizasiVar`): issue metni yol haritası adımından türüyor,
+  #327'deki gibi bir kapsam genişlemesi yok.
+- **⚠️ RIZA YOKSA KURULUM ÇÖKMEZ.** Depo/milestone/issue AI'sız da açılır; AI üretimi
+  atlanır ve loglanır. Rızanın yokluğu yüzünden çalışma alanını hiç kurmamak cezayı yanlış
+  yere keserdi. `ai-step` ise **açık 403** döner — mentör bilerek AI istedi, sessizce
+  jenerik bir adım almamalı.
+
 ⚠️ Mentör başvurusu (`mentors/server/basvuru.ts`) artık `aiRizasiVar` kapılı — #321 bu
 mekanizmayı kurmuştu ama yalnız stajyer akışlarına uygulanmıştı. **Rıza yoksa başvuru YİNE
 kaydedilir**, sadece analiz üretilmez (rıza özgür iradeyle verilmeli).
