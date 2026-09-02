@@ -48,7 +48,12 @@ export type CanliOlay =
    * artımlı değil: kaçan tek bir "bıraktı" olayı göstergeyi sonsuza dek
    * açık bırakırdı.
    */
-  | { tip: "yaziyor"; kimler: string[] };
+  | { tip: "yaziyor"; kimler: string[] }
+  /**
+   * #380: Okunmamış BİLDİRİM sayısı. Mesaj sayacıyla aynı desen — yalnızca
+   * DEĞİŞTİĞİNDE gider, yeni altyapı kurulmadı (#354 dersi).
+   */
+  | { tip: "bildirim"; okunmamis: number };
 
 type Abone = {
   userId: string;
@@ -83,6 +88,8 @@ const sonOkunmamis = new Map<string, number>();
  * bir olay giderdi — akışın "olay olunca konuş" davranışı yoklamaya dönerdi.
  */
 const sonYazanlar = new Map<string, string>();
+/** #380: Kullanıcı başına en son gönderilen okunmamış BİLDİRİM sayısı. */
+const sonBildirim = new Map<string, number>();
 
 export function aboneOl(abone: Abone): () => void {
   let kume = aboneler.get(abone.userId);
@@ -106,6 +113,7 @@ export function aboneOl(abone: Abone): () => void {
       aboneler.delete(abone.userId);
       sonOkunmamis.delete(abone.userId);
       sonYazanlar.delete(abone.userId);
+      sonBildirim.delete(abone.userId);
     }
     // Son abone de gittiyse döngüyü durdur.
     if (aboneler.size === 0 && zamanlayici) {
@@ -122,6 +130,7 @@ export function akisiSifirla(): void {
   aboneler.clear();
   sonOkunmamis.clear();
   sonYazanlar.clear();
+  sonBildirim.clear();
   sonZaman = new Date();
 }
 
@@ -284,6 +293,26 @@ export async function tikAt(): Promise<void> {
       if (sonYazanlar.get(userId) === imza) continue;
       sonYazanlar.set(userId, imza);
       yayinla(userId, { tip: "yaziyor", kimler });
+    }
+
+    // 5) #380: Okunmamış bildirim sayacı — TEK sorgu, yalnız DEĞİŞİNCE.
+    //
+    // `groupBy` sıfır dönen kullanıcıyı listelemez; okunmamış sayısının
+    // sıfıra düşmesi de bir değişikliktir (kullanıcı zili açtı), o yüzden
+    // aşağıda sıfırla dolduruluyor.
+    const bildirimSayimlari = await prisma.notification.groupBy({
+      by: ["userId"],
+      where: { userId: { in: kullanicilar }, readAt: null },
+      _count: { _all: true },
+    });
+    const bildirimHaritasi = new Map(
+      bildirimSayimlari.map((b) => [b.userId, b._count._all]),
+    );
+    for (const userId of kullanicilar) {
+      const sayi = bildirimHaritasi.get(userId) ?? 0;
+      if (sonBildirim.get(userId) === sayi) continue;
+      sonBildirim.set(userId, sayi);
+      yayinla(userId, { tip: "bildirim", okunmamis: sayi });
     }
 
     sonZaman = simdi;

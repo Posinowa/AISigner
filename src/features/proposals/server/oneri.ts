@@ -1,4 +1,6 @@
 import "server-only";
+import { bildirimGonder } from "@/features/bildirim/server/bildirim";
+import { BILDIRIM_TURLERI } from "@/features/bildirim/turler";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { readGitHubConfig, getOctokit } from "@/features/github/server/client";
@@ -232,7 +234,8 @@ export async function oneriyiKararaBagla(params: {
       technologies: true,
       kaynak: true,
       repoUrl: true,
-      studentProfile: { select: { id: true, userId: true } },
+      // #380: Bildirim e-postası için.
+      studentProfile: { select: { id: true, userId: true, user: { select: { email: true } } } },
     },
   });
   if (!oneri) return { ok: false, neden: "oneri-yok" };
@@ -251,6 +254,18 @@ export async function oneriyiKararaBagla(params: {
       },
     });
     if (kilit.count === 0) return { ok: false, neden: "zaten-karara-baglanmis" };
+
+    // #380: Stajyer günlerce bekliyor olabilir; sonucu öğrenmek için panele
+    // girmesi gerekiyordu. Red gerekçesi ZATEN zorunlu — bildirimde de o var.
+    await bildirimGonder({
+      userId: oneri.studentProfile.userId,
+      tur: BILDIRIM_TURLERI.ONERI_KARARI,
+      baslik: "Proje öneriniz reddedildi",
+      govde: not ?? "",
+      link: "/student-dashboard",
+      eposta: oneri.studentProfile.user?.email ?? null,
+    });
+
     return { ok: true, assignedProjectId: "", kaynak: "BIZIM" };
   }
 
@@ -311,6 +326,15 @@ export async function oneriyiKararaBagla(params: {
     await prisma.assignedProject.delete({ where: { id: atama.id } }).catch(() => {});
     return { ok: false, neden: "zaten-karara-baglanmis" };
   }
+
+  await bildirimGonder({
+    userId: oneri.studentProfile.userId,
+    tur: BILDIRIM_TURLERI.ONERI_KARARI,
+    baslik: "Proje öneriniz onaylandı",
+    govde: "Öneriniz kabul edildi ve size proje olarak atandı.",
+    link: "/student-dashboard",
+    eposta: oneri.studentProfile.user?.email ?? null,
+  });
 
   logger.info("Proje önerisi onaylandı", { proposalId: oneri.id, kaynak });
   return { ok: true, assignedProjectId: atama.id, kaynak };

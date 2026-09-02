@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/db";
+import { bildirimGonder, topluBildirimGonder } from "@/features/bildirim/server/bildirim";
+import { BILDIRIM_TURLERI } from "@/features/bildirim/turler";
 import { deleteStepFile } from "@/lib/storage/step-files";
 import { ensureCertificateIssued } from "@/features/certificate/server/certificate";
 import { logger } from "@/lib/logger";
@@ -144,6 +146,39 @@ export async function updateAccountStatus(
     await ensureCertificateIssued(userId);
   }
 
+  /*
+   * #380: Hesabın kaderini belirleyen olay — e-postaya da bağlı.
+   *
+   * REDDEDİLEN kullanıcı panele zaten giremez; e-posta olmasa sonucu HİÇ
+   * öğrenemezdi. `bildirimGonder` fırlatmıyor: onay işlemi bildirim yüzünden
+   * kırılmamalı.
+   */
+  const kararMetni: Record<string, { baslik: string; govde: string }> = {
+    APPROVED: {
+      baslik: "Hesabınız onaylandı",
+      govde: "AISigner hesabınız onaylandı. Artık panelinize erişebilirsiniz.",
+    },
+    REJECTED: {
+      baslik: "Hesap başvurunuz reddedildi",
+      govde: "AISigner hesap başvurunuz onaylanmadı.",
+    },
+    GRADUATED: {
+      baslik: "Tebrikler, mezun oldunuz",
+      govde: "Stajınız tamamlandı ve sertifikanız hazır.",
+    },
+  };
+  const karar = kararMetni[accountStatus];
+  if (karar) {
+    await bildirimGonder({
+      userId: updated.id,
+      tur: BILDIRIM_TURLERI.HESAP_KARARI,
+      baslik: karar.baslik,
+      govde: karar.govde,
+      link: accountStatus === "REJECTED" ? "/account-status" : "/",
+      eposta: updated.email,
+    });
+  }
+
   return updated;
 }
 
@@ -263,6 +298,16 @@ export async function setStudentMentors(studentId: string, mentorIds: string[]) 
     select: { id: true },
   });
 
+  // #380: Hangi bağların YENİ olduğunu bilmek için reconcile ÖNCESİ durum.
+  const oncekiMentorIdler = new Set(
+    (
+      await prisma.mentorAssignment.findMany({
+        where: { studentProfileId: profile.id },
+        select: { mentorId: true },
+      })
+    ).map((m) => m.mentorId),
+  );
+
   // Atomik reconcile: listede olmayanları sil + eksikleri ekle.
   await prisma.$transaction([
     prisma.mentorAssignment.deleteMany({
@@ -280,6 +325,52 @@ export async function setStudentMentors(studentId: string, mentorIds: string[]) 
       skipDuplicates: true, // aynı mentor tekrar → sessizce atla (@@unique)
     }),
   ]);
+
+  /*
+   * #380: Mentör ataması — stajyerin süreci gerçekten burada başlıyor.
+   *
+   * KARŞILIKLI: mentör de yeni öğrencisini öğreniyor. Düşük sıklıkta, yüksek
+   * değerli bir bildirim; e-postaya bağlı.
+   *
+   * ⚠️ Yalnız YENİ eklenen bağlar bildiriliyor. Reconcile her çağrıda tüm
+   * listeyi yazıyor; hepsini bildirmek, listeden tek kişi çıkarıldığında
+   * kalan herkese "yeni mentör atandı" göndermek olurdu.
+   */
+  const yeniMentorIdler = uniqueMentorIds.filter((id) => !oncekiMentorIdler.has(id));
+  if (yeniMentorIdler.length > 0) {
+    const [ogrenci, mentorlar] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: studentId },
+        select: { email: true, name: true, lastName: true },
+      }),
+      prisma.user.findMany({
+        where: { id: { in: yeniMentorIdler } },
+        select: { id: true, email: true, name: true, lastName: true },
+      }),
+    ]);
+
+    const ad = (u: { name: string | null; lastName: string | null } | null) =>
+      [u?.name, u?.lastName].filter(Boolean).join(" ") || "Kullanıcı";
+
+    await topluBildirimGonder([
+      {
+        userId: studentId,
+        tur: BILDIRIM_TURLERI.MENTOR_ATANDI,
+        baslik: "Mentörünüz atandı",
+        govde: `Size ${mentorlar.map(ad).join(", ")} mentör olarak atandı.`,
+        link: "/student-dashboard",
+        eposta: ogrenci?.email ?? null,
+      },
+      ...mentorlar.map((m) => ({
+        userId: m.id,
+        tur: BILDIRIM_TURLERI.MENTOR_ATANDI,
+        baslik: "Yeni öğrenciniz var",
+        govde: `${ad(ogrenci)} size stajyer olarak atandı.`,
+        link: `/mentor-dashboard/${studentId}`,
+        eposta: m.email,
+      })),
+    ]);
+  }
 
   return { studentProfileId: profile.id, mentorIds: uniqueMentorIds };
 }

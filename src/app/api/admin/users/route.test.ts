@@ -6,7 +6,9 @@ const { requireAuthMock, prismaMock } = vi.hoisted(() => ({
   prismaMock: {
     user: { findUnique: vi.fn(), findMany: vi.fn() },
     studentProfile: { upsert: vi.fn() },
-    mentorAssignment: { deleteMany: vi.fn(), createMany: vi.fn() },
+    // #380: Bildirim, hangi bağların YENİ olduğunu bilmek için reconcile
+    // ÖNCESİ durumu okuyor.
+    mentorAssignment: { deleteMany: vi.fn(), createMany: vi.fn(), findMany: vi.fn() },
     $transaction: vi.fn(),
   },
 }));
@@ -50,6 +52,7 @@ describe("POST /api/admin/users — mentor atama rol doğrulaması (#43/#195)", 
     prismaMock.studentProfile.upsert.mockResolvedValue({ id: "sp-1" });
     prismaMock.mentorAssignment.deleteMany.mockReturnValue("del-op");
     prismaMock.mentorAssignment.createMany.mockReturnValue("create-op");
+    prismaMock.mentorAssignment.findMany.mockResolvedValue([]);
     prismaMock.$transaction.mockResolvedValue([]);
   });
 
