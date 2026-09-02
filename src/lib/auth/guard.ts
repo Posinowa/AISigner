@@ -35,6 +35,34 @@ export async function requireAuth(
     };
   }
 
+  /*
+   * ⚠️ #391: ROLÜN VARLIĞI ZORUNLU — rol istensin istenmesin.
+   *
+   * `nextauth.ts` JWT callback'i silinmiş kullanıcıda yetkiyi doğru şekilde
+   * kaldırıyor (`token.role = undefined`), ama bu kapı iki yerden birden
+   * kaçıyordu:
+   *
+   *   1. Rol kontrolü `if (requiredRole)` içindeydi — `requireAuth()` rolsüz
+   *      çağrıldığında (ör. `/api/suggestions`) blok hiç çalışmıyordu.
+   *   2. Durum kapısı `role === "STUDENT" || role === "MENTOR"` ile sınırlı;
+   *      `role` undefined olduğu için o da devre dışı kalıyordu.
+   *
+   * Sonuç: silinen hesabın jetonu, süresi dolana kadar iş görmeye devam
+   * ediyordu. #44 tam bu pencereyi kapatmak için kurulmuştu.
+   *
+   * 401 dönüyoruz, 403 değil: hesap artık YOK — istemci oturumu temizleyip
+   * yeniden giriş yapmalı. 403 "giriş yaptın ama yetkin yok" derdi.
+   */
+  if (!session.user.role) {
+    return {
+      authorized: false as const,
+      response: NextResponse.json(
+        { error: "Oturumunuz artık geçerli değil. Lütfen yeniden giriş yapın." },
+        { status: 401 },
+      ),
+    };
+  }
+
   if (requiredRole) {
     const allowedRoles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
     if (!allowedRoles.includes(session.user.role as Role)) {

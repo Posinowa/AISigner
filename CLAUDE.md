@@ -115,6 +115,16 @@ yapmadan önce doğrulanmış olmasını şart koşar. Kapı bilerek **yalnız A
 kapı KONMADI: SMTP sessizce çökebildiği için (`mail.ts` hata fırlatmaz) herkesi
 kilitleme riski var. `create:admin` ve `seed` doğrulanmış hesap üretir.
 
+#### ⚠️ ROLÜN VARLIĞI ZORUNLU — rol istensin istenmesin (#391)
+`nextauth.ts` silinmiş kullanıcıda `token.role = undefined` yapıyor (doğru), ama
+`guard.ts` bunu iki yerden birden kaçırıyordu: rol kontrolü `if (requiredRole)` içindeydi
+(rolsüz `requireAuth()` çağrılarında hiç çalışmıyordu) ve hesap durumu kapısı
+`role === "STUDENT" || "MENTOR"` ile sınırlıydı (`undefined` olduğu için o da atlanıyordu).
+**Silinen hesabın jetonu, süresi dolana kadar iş görmeye devam ediyordu.**
+
+Artık `session.user.role` yoksa **401** — 403 değil: hesap YOK, istemci oturumu temizleyip
+yeniden giriş yapmalı. `allowUnapprovedStudent` (#143) bu kapıyı **açmaz**.
+
 #### ⚠️ API rotaları YÖNLENDİRİLMEZ, 401/403 JSON döner (#375)
 `middleware.ts`'te `/api/` kontrolü dosyanın **sonunda** duruyordu ("guard.ts zaten
 koruma sağlıyor") — niyet doğruydu ama oturumsuz kullanıcıyı `/signin`'e yollayan blok
