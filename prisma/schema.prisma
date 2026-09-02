@@ -25,29 +25,32 @@ model User {
   updatedAt     DateTime      @updatedAt
 
   // Relations
-  sessions                Session[]
-  studentProfile          StudentProfile?     @relation("StudentProfile_userIdToUser")
+  sessions                 Session[]
+  studentProfile           StudentProfile?     @relation("StudentProfile_userIdToUser")
   // #195: Mentor→öğrenci artık M:N (join tablosu). Bir mentörün öğrencileri buradan.
-  mentorAssignments       MentorAssignment[]  @relation("MentorAssignment_mentorIdToUser")
-  sentMessages            Message[]           @relation("Message_senderIdToUser")
-  receivedMessages        Message[]           @relation("Message_receiverIdToUser")
-  stepComments            StepComment[]
-  stepFiles               StepFile[]
-  suggestions             Suggestion[]        @relation("Suggestion_authorIdToUser")
+  mentorAssignments        MentorAssignment[]  @relation("MentorAssignment_mentorIdToUser")
+  sentMessages             Message[]           @relation("Message_senderIdToUser")
+  receivedMessages         Message[]           @relation("Message_receiverIdToUser")
+  // #354: "yazıyor..." sinyalleri.
+  gonderdigiYaziyor        TypingSignal[]      @relation("TypingSignal_fromUserIdToUser")
+  aldigiYaziyor            TypingSignal[]      @relation("TypingSignal_toUserIdToUser")
+  stepComments             StepComment[]
+  stepFiles                StepFile[]
+  suggestions              Suggestion[]        @relation("Suggestion_authorIdToUser")
   // #253: Bu kullanıcının oluşturduğu proje şablonları.
-  createdProjectTemplates ProjectTemplate[]   @relation("ProjectTemplate_createdBy")
-  reviewedSuggestions     Suggestion[]        @relation("Suggestion_reviewedByIdToUser")
+  createdProjectTemplates  ProjectTemplate[]   @relation("ProjectTemplate_createdBy")
+  reviewedSuggestions      Suggestion[]        @relation("Suggestion_reviewedByIdToUser")
   // #349: Mentörün açtığı / adminin karara bağladığı çalışma alanı talepleri.
-  workspaceRequests       WorkspaceRequest[]  @relation("WorkspaceRequest_requestedByIdToUser")
-  decidedWorkspaceRequests WorkspaceRequest[] @relation("WorkspaceRequest_decidedByIdToUser")
+  workspaceRequests        WorkspaceRequest[]  @relation("WorkspaceRequest_requestedByIdToUser")
+  decidedWorkspaceRequests WorkspaceRequest[]  @relation("WorkspaceRequest_decidedByIdToUser")
   // #332: Takım mentörlükleri ve üstlenilen adımlar.
   teamMentorships          TeamMentor[]        @relation("TeamMentor_mentorIdToUser")
   assignedSteps            RoadmapStep[]       @relation("RoadmapStep_assignee")
   // #366: Karara bağladığı proje önerileri.
   decidedProposals         ProjectProposal[]   @relation("ProjectProposal_decidedByIdToUser")
   // #287: Mentör başvurusunun cevapları (yalnızca MENTOR rolünde dolu).
-  mentorProfile           MentorProfile?      @relation("MentorProfile_userIdToUser")
-  stepStatusChanges       StepStatusHistory[]
+  mentorProfile            MentorProfile?      @relation("MentorProfile_userIdToUser")
+  stepStatusChanges        StepStatusHistory[]
   /// #321: KVKK AÇIK RIZA — yurt dışına (Google Vertex AI, ABD) aktarım.
   ///
   /// Neden `User` üzerinde: rıza KAYIT ANINDA alınıyor, o noktada
@@ -56,10 +59,10 @@ model User {
   /// null = rıza YOK. Rıza geri alınabilir olmalı (KVKK m.11), geri alındığında
   /// bu alan tekrar null'a çekilir — tarih silinmez, üzerine yazılır; ispat
   /// yükü veri sorumlusunda olduğu için son durum tutuluyor.
-  aiConsentAt             DateTime?
+  aiConsentAt              DateTime?
   /// Rızanın alındığı metin sürümü. Metin değişirse eski rıza yeni metni
   /// kapsamaz; hangi sürüme onay verildiği kayıtlı olmalı.
-  aiConsentVersion        String?
+  aiConsentVersion         String?
 }
 
 model Session {
@@ -116,9 +119,9 @@ model StudentProfile {
   mentorAssignments MentorAssignment[]
   assignedProjects  AssignedProject[]
   // #332: Bu stajyerin takım üyelikleri (ayrılmışlar dahil).
-  teamMemberships  TeamMember[]
+  teamMemberships   TeamMember[]
   // #366: Kendi proje önerileri.
-  projectProposals ProjectProposal[]
+  projectProposals  ProjectProposal[]
   surveyAnswers     SurveyAnswer[]
   profileAnalysis   ProfileAnalysis?
 }
@@ -189,10 +192,10 @@ model AssignedProject {
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
 
-  studentProfile  StudentProfile? @relation(fields: [studentProfileId], references: [id])
-  team            Team?           @relation(fields: [teamId], references: [id])
-  projectTemplate ProjectTemplate @relation(fields: [projectTemplateId], references: [id])
-  roadmap         Roadmap?
+  studentProfile    StudentProfile?    @relation(fields: [studentProfileId], references: [id])
+  team              Team?              @relation(fields: [teamId], references: [id])
+  projectTemplate   ProjectTemplate    @relation(fields: [projectTemplateId], references: [id])
+  roadmap           Roadmap?
   workspaceRequests WorkspaceRequest[]
 
   // #58: Aynı öğrenciye aynı proje şablonu yalnızca bir kez atanabilir (yarış koşulu koruması).
@@ -287,6 +290,29 @@ model StepIssue {
   step RoadmapStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
 
   @@index([stepId])
+}
+
+/// "Yazıyor..." sinyali (#354).
+///
+/// ⚠️ SÜREÇ BELLEĞİNDE TUTULAMAZ. Sinyal geçici ama yine de pod'lar arası
+/// görünmeli; süreç-yerel bir küme, #329'da mesajlaşma için elenen hatanın
+/// aynısı olurdu (A pod'una yazan kullanıcı, B pod'una bağlı karşı tarafta
+/// hiç görünmez).
+///
+/// Satır SAYISI kullanıcı çiftiyle sınırlı, yazma sayısıyla değil: bileşik
+/// birincil anahtar sayesinde aktif yazan biri aynı satırı güncelliyor.
+model TypingSignal {
+  fromUserId String
+  toUserId   String
+  /// Bu andan sonra sinyal yok sayılır. Gösterge kendiliğinden sönsün diye:
+  /// sekmesini kapatan kullanıcı aksi halde sonsuza dek "yazıyor" görünürdü.
+  expiresAt  DateTime
+
+  from User @relation("TypingSignal_fromUserIdToUser", fields: [fromUserId], references: [id], onDelete: Cascade)
+  to   User @relation("TypingSignal_toUserIdToUser", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@id([fromUserId, toUserId])
+  @@index([toUserId, expiresAt])
 }
 
 model Message {
@@ -429,21 +455,21 @@ model ProjectProposal {
   id               String @id @default(cuid())
   studentProfileId String
 
-  title        String @db.VarChar(120)
-  description  String @db.VarChar(4000)
+  title        String   @db.VarChar(120)
+  description  String   @db.VarChar(4000)
   /// Stajyerin bu projeden ne öğrenmeyi hedeflediği.
-  goals        String @db.VarChar(2000)
+  goals        String   @db.VarChar(2000)
   technologies String[]
 
   /// BIZIM | BAGLA | DEVRET — stajyerin TERCİHİ. Nihai karar admin'in.
-  kaynak    String  @default("BIZIM")
+  kaynak  String  @default("BIZIM")
   /// BAGLA ve DEVRET için zorunlu; BIZIM'de boş.
-  repoUrl   String?
+  repoUrl String?
 
   /// PENDING | APPROVED | REJECTED
-  status    String    @default("PENDING")
+  status      String  @default("PENDING")
   /// Red gerekçesi — RED durumunda ZORUNLU (stajyer nedenini görmeli).
-  adminNote String?   @db.VarChar(500)
+  adminNote   String? @db.VarChar(500)
   /// Admin'in NİHAİ kaynak kararı; stajyerin tercihinden farklı olabilir.
   kararKaynak String?
 
@@ -503,7 +529,7 @@ model TeamMember {
   /// tamamladığı işler) sahipsiz bırakırdı; sertifika bireysel olduğu için o
   /// geçmiş kişinin belgesinin dayanağı. Ayrılan üye takımı görmez ama
   /// yaptıkları kayıtlı kalır.
-  leftAt DateTime?
+  leftAt   DateTime?
 
   team           Team           @relation(fields: [teamId], references: [id], onDelete: Cascade)
   studentProfile StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
@@ -539,11 +565,11 @@ model TeamMentor {
 /// kirletir; #348'de GitHub App'e verilecek `administration: write` de
 /// listedeki en riskli izin.
 model WorkspaceRequest {
-  id                String    @id @default(cuid())
+  id                String @id @default(cuid())
   assignedProjectId String
   requestedById     String
   /// PENDING | APPROVED | REJECTED
-  status            String    @default("PENDING")
+  status            String @default("PENDING")
 
   /// Mentörün gerekçesi (opsiyonel).
   mentorNote String? @db.VarChar(500)

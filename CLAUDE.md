@@ -90,6 +90,7 @@ src/
 | `WorkspaceRequest` | mentörün çalışma alanı talebi, admin onayı (#349); `pendingKey @unique` bekleyen tekilliği |
 | `ProcessedWebhook` / `PullRequestReview` | webhook teslimat kimliği (#326) / PR'a inceleme yazıldığının otoriter kaydı (#327) |
 | `ProjectProposal` | stajyerin kendi proje önerisi (#366); `pendingKey @unique` bekleyen tekilliği, `kaynak`/`kararKaynak` GitHub tercihi |
+| `TypingSignal` | "yazıyor..." sinyali (#354); `@@id([fromUserId, toUserId])` — yazma satır biriktirmez, `expiresAt` ile kendiliğinden söner |
 | `Message` / `StepComment` / `StepFile` | mesajlaşma, yorum, dosya (`SecurityAnswer` #264'te düşürüldü) |
 
 ## Kritik Mimari Notlar
@@ -246,7 +247,31 @@ Olaylar: `mesaj`, `okunmamis`, `adim-tamamlandi`.
   bağlantıyı yeniden kurmasın). Öncesinde her bileşen kendi bağlantısını kuruyordu ve
   öğrenci mesajlar sayfası **3 kalıcı bağlantı** açıyordu.
   ⚠️ Paylaşımlı durum modül düzeyinde: testlerde `canliAkisiSifirlaForTests()` çağrılmalı.
-- **"Yazıyor..." bu PR'a ALINMADI** → #354 (paylaşımlı geçici durum gerektiriyor).
+- **"Yazıyor..." #354 ile eklendi** (aşağıya bakın).
+
+### "Yazıyor..." Göstergesi (#354)
+`TypingSignal` tablosu + #329'un mevcut tiki. Yeni altyapı yok.
+
+- **⚠️ SÜREÇ BELLEĞİNDE TUTULMADI.** Sinyal saniyeler yaşıyor, akla ilk gelen bellek;
+  ama #329'da elenen hatanın aynısı olurdu — A pod'una yazanın sinyali B pod'una bağlı
+  karşı tarafa hiç ulaşmaz ve bu hiçbir yerde hata olarak görünmez.
+- **⚠️ YAZMA SATIR BİRİKTİRMEZ.** Bileşik birincil anahtar `(from, to)` sayesinde aktif
+  yazan kişi hep AYNI satırı günceller. Ölçüldü: **1 dk kesintisiz yazma = 20 upsert,
+  tabloya +1 satır** (mesaj tablosunun aksine kalıcı değil, fırsatçı temizlikle siliniyor).
+- **Olay yalnızca DEĞİŞTİĞİNDE gider** (`sonYazanlar` imzası). Her tikte gitseydi biri
+  yazarken karşı tarafa 2 sn'de bir olay giderdi — akış yoklamaya dönerdi.
+- **"Bıraktı" olayı YOK; küme boşalır.** Gösterge tam durumla sürülüyor, artımlı değil:
+  kaçan tek bir "bıraktı" olayı göstergeyi sonsuza dek açık bırakırdı. Sekmesini kapatan
+  kullanıcı için sönme de buna dayanıyor (`expiresAt` 7 sn).
+- **İstemci KISILIR** (3 sn). Kısılmasaydı hızlı yazan biri saniyede 5–6 istek üretirdi —
+  kozmetik bir gösterge mesaj göndermekten pahalı olurdu.
+- **⚠️ Erişim kuralı `messaging/server/erisim.ts`'e ÇIKARILDI.** "Yazıyor" sinyali
+  mesajlaşmayla AYNI yetkiyi ister; iki yerde ayrı yazılsaydı biri güncellenip diğeri
+  unutulduğunda "bu kullanıcı var mı / aktif mi" sorularına yetkisiz yanıt veren bir yan
+  kanal kalırdı.
+- **Rate-limit SESSİZ geçer**: kozmetik sinyalde hata göstermek mesajlaşmayı bozulmuş
+  gösterirdi.
+- **Gecikme dürüst rakam: ~2 sn** (tik aralığı). Ölçüldü.
 
 ### Akıllı Eşleştirme (#328)
 `POST /api/admin/match-mentors` — öğrencinin `ProfileAnalysis`'i ile mentörlerin

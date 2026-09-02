@@ -16,6 +16,7 @@ const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
     message: { findMany: vi.fn(), groupBy: vi.fn() },
     stepStatusHistory: { findMany: vi.fn() },
+    typingSignal: { findMany: vi.fn() },
   },
 }));
 
@@ -57,6 +58,7 @@ beforeEach(() => {
   prismaMock.message.findMany.mockResolvedValue([]);
   prismaMock.message.groupBy.mockResolvedValue([]);
   prismaMock.stepStatusHistory.findMany.mockResolvedValue([]);
+  prismaMock.typingSignal.findMany.mockResolvedValue([]);
 });
 
 afterEach(() => akisiSifirla());
@@ -237,5 +239,121 @@ describe("dayanıklılık", () => {
     await tikAt();
 
     expect(a.olaylar.filter((o) => o.tip === "mesaj")).toHaveLength(1);
+  });
+});
+
+/**
+ * #354 — "yazıyor..." göstergesi.
+ *
+ * Kilitlenen kararlar:
+ *   - Olay yalnızca DEĞİŞTİĞİNDE gider; her tikte gitmesi akışı yoklamaya
+ *     çevirirdi (biri yazarken 2 sn'de bir olay).
+ *   - Küme BOŞALMASI da bir değişikliktir — sekmesini kapatan kullanıcı için
+ *     göstergenin sönmesi buna dayanıyor, ayrı bir "bıraktı" olayı yok.
+ *   - Kullanıcı yalnızca KENDİSİNE yazanları görür.
+ */
+describe("yazıyor sinyali (#354)", () => {
+  it("bana yazanı bildirir", async () => {
+    const a = abone("u1");
+    prismaMock.typingSignal.findMany.mockResolvedValue([
+      { fromUserId: "men-1", toUserId: "u1" },
+    ]);
+
+    await tikAt();
+
+    expect(a.olaylar).toContainEqual({ tip: "yaziyor", kimler: ["men-1"] });
+    a.birak();
+  });
+
+  it("BAŞKASINA yazılan sinyal bana gelmez", async () => {
+    const a = abone("u1");
+    const b = abone("u2");
+    prismaMock.typingSignal.findMany.mockResolvedValue([
+      { fromUserId: "men-1", toUserId: "u2" },
+    ]);
+
+    await tikAt();
+
+    expect(a.olaylar.filter((o) => o.tip === "yaziyor")).toEqual([
+      { tip: "yaziyor", kimler: [] },
+    ]);
+    expect(b.olaylar).toContainEqual({ tip: "yaziyor", kimler: ["men-1"] });
+    a.birak();
+    b.birak();
+  });
+
+  it("DEĞİŞMEDİKÇE tekrar yollanmaz — akış yoklamaya dönmemeli", async () => {
+    const a = abone("u1");
+    prismaMock.typingSignal.findMany.mockResolvedValue([
+      { fromUserId: "men-1", toUserId: "u1" },
+    ]);
+
+    await tikAt();
+    await tikAt();
+    await tikAt();
+
+    expect(a.olaylar.filter((o) => o.tip === "yaziyor")).toHaveLength(1);
+    a.birak();
+  });
+
+  it("sinyal DÜŞÜNCE gösterge sönsün diye boş küme yollanır", async () => {
+    const a = abone("u1");
+    prismaMock.typingSignal.findMany.mockResolvedValue([
+      { fromUserId: "men-1", toUserId: "u1" },
+    ]);
+    await tikAt();
+
+    // Süre doldu / durduruldu: satır artık dönmüyor.
+    prismaMock.typingSignal.findMany.mockResolvedValue([]);
+    await tikAt();
+
+    const yaziyorOlaylari = a.olaylar.filter((o) => o.tip === "yaziyor");
+    expect(yaziyorOlaylari).toEqual([
+      { tip: "yaziyor", kimler: ["men-1"] },
+      { tip: "yaziyor", kimler: [] },
+    ]);
+    a.birak();
+  });
+
+  it("kimlik sırası değişince YENİDEN yollanmaz — sıralı karşılaştırma", async () => {
+    const a = abone("u1");
+    prismaMock.typingSignal.findMany.mockResolvedValue([
+      { fromUserId: "b", toUserId: "u1" },
+      { fromUserId: "a", toUserId: "u1" },
+    ]);
+    await tikAt();
+
+    prismaMock.typingSignal.findMany.mockResolvedValue([
+      { fromUserId: "a", toUserId: "u1" },
+      { fromUserId: "b", toUserId: "u1" },
+    ]);
+    await tikAt();
+
+    expect(a.olaylar.filter((o) => o.tip === "yaziyor")).toHaveLength(1);
+    a.birak();
+  });
+
+  it("ayrılan abonenin durumu UNUTULUR — yeniden bağlanınca gösterge doğru kurulur", async () => {
+    const a = abone("u1");
+    prismaMock.typingSignal.findMany.mockResolvedValue([
+      { fromUserId: "men-1", toUserId: "u1" },
+    ]);
+    await tikAt();
+    a.birak();
+
+    const b = abone("u1");
+    await tikAt();
+
+    // Durum sıfırlanmasaydı yeni bağlantı "kimse yazmıyor" sanırdı.
+    expect(b.olaylar).toContainEqual({ tip: "yaziyor", kimler: ["men-1"] });
+    b.birak();
+  });
+
+  it("tik başına TEK sorgu — kullanıcı sayısından bağımsız", async () => {
+    const aboneler = ["u1", "u2", "u3", "u4"].map(abone);
+    await tikAt();
+
+    expect(prismaMock.typingSignal.findMany).toHaveBeenCalledTimes(1);
+    for (const a of aboneler) a.birak();
   });
 });

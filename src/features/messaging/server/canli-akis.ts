@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { yazanlariGetir } from "./yaziyor";
 
 /**
  * Canlı akış merkezi (#329).
@@ -41,7 +42,13 @@ import { logger } from "@/lib/logger";
 export type CanliOlay =
   | { tip: "mesaj"; mesajId: string; gonderenId: string; icerik: string; createdAt: string }
   | { tip: "okunmamis"; sayi: number }
-  | { tip: "adim-tamamlandi"; stepId: string; baslik: string };
+  | { tip: "adim-tamamlandi"; stepId: string; baslik: string }
+  /**
+   * #354: Şu an BANA yazanların kimlikleri. Liste tam durum olarak gider,
+   * artımlı değil: kaçan tek bir "bıraktı" olayı göstergeyi sonsuza dek
+   * açık bırakırdı.
+   */
+  | { tip: "yaziyor"; kimler: string[] };
 
 type Abone = {
   userId: string;
@@ -69,6 +76,13 @@ let zamanlayici: ReturnType<typeof setInterval> | null = null;
 let sonZaman = new Date();
 /** Kullanıcı başına en son gönderilen okunmamış sayısı — değişmedikçe yollamayız. */
 const sonOkunmamis = new Map<string, number>();
+/**
+ * #354: Kullanıcı başına en son gönderilen "yazıyor" kümesi.
+ *
+ * Değişmedikçe yollamıyoruz; aksi halde biri yazarken KARŞI TARAFA 2 saniyede
+ * bir olay giderdi — akışın "olay olunca konuş" davranışı yoklamaya dönerdi.
+ */
+const sonYazanlar = new Map<string, string>();
 
 export function aboneOl(abone: Abone): () => void {
   let kume = aboneler.get(abone.userId);
@@ -91,6 +105,7 @@ export function aboneOl(abone: Abone): () => void {
     if (kume!.size === 0) {
       aboneler.delete(abone.userId);
       sonOkunmamis.delete(abone.userId);
+      sonYazanlar.delete(abone.userId);
     }
     // Son abone de gittiyse döngüyü durdur.
     if (aboneler.size === 0 && zamanlayici) {
@@ -106,6 +121,7 @@ export function akisiSifirla(): void {
   zamanlayici = null;
   aboneler.clear();
   sonOkunmamis.clear();
+  sonYazanlar.clear();
   sonZaman = new Date();
 }
 
@@ -254,6 +270,20 @@ export async function tikAt(): Promise<void> {
         if (!aboneler.has(userId)) continue;
         yayinla(userId, { tip: "adim-tamamlandi", stepId: t.stepId, baslik: t.step.title });
       }
+    }
+
+    // 4) #354: "Yazıyor..." — TEK sorgu, yalnızca DEĞİŞTİĞİNDE yollanır.
+    //
+    // Sinyalin süresi dolduğunda küme kendiliğinden boşalır ve boşalma da bir
+    // değişikliktir: sekmesini kapatan kullanıcı için "yazıyor" göstergesi
+    // sönsün diye ayrıca bir "bıraktı" olayına ihtiyaç yok.
+    const yazanlar = await yazanlariGetir(kullanicilar);
+    for (const userId of kullanicilar) {
+      const kimler = (yazanlar.get(userId) ?? []).sort();
+      const imza = kimler.join(",");
+      if (sonYazanlar.get(userId) === imza) continue;
+      sonYazanlar.set(userId, imza);
+      yayinla(userId, { tip: "yaziyor", kimler });
     }
 
     sonZaman = simdi;

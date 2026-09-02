@@ -5,6 +5,7 @@ import { Send, ArrowLeft, Loader2, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { rolRozetiDolu } from "@/lib/ui/rol-renkleri";
 import { useCanliAkis } from "./useCanliAkis";
+import { useYaziyorGonder } from "./useYaziyorGonder";
 
 type Message = {
   id: string;
@@ -46,6 +47,8 @@ export function MessagingPanel({ currentUserId }: Props) {
   const [selectedPartner, setSelectedPartner] = useState<Conversation["partner"] | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
+  // #354: Şu an BANA yazanların kimlikleri (sunucudan tam durum olarak gelir).
+  const [yazanlar, setYazanlar] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
@@ -123,6 +126,11 @@ export function MessagingPanel({ currentUserId }: Props) {
   const { bagli } = useCanliAkis(
     useCallback(
       (olay) => {
+        // #354: Gösterge tam durumla değişiyor — "bıraktı" olayı yok, küme boşalır.
+        if (olay.tip === "yaziyor") {
+          setYazanlar(olay.kimler);
+          return;
+        }
         if (olay.tip !== "mesaj") return;
         if (olay.gonderenId === seciliRef.current) {
           loadMessages(olay.gonderenId, true);
@@ -131,6 +139,11 @@ export function MessagingPanel({ currentUserId }: Props) {
       },
       [loadMessages, loadConversations],
     ),
+  );
+
+  // #354: Yazma sinyalini gönderen taraf.
+  const { yazdiginiBildir, durdur: yazmayiDurdur } = useYaziyorGonder(
+    selectedPartner?.id ?? null,
   );
 
   // Seçili konuşma değiştiğinde mesajları yükle
@@ -179,6 +192,9 @@ export function MessagingPanel({ currentUserId }: Props) {
         const data = await res.json();
         setMessages((prev) => [...prev, data.message]);
         setNewMessage("");
+        // Mesaj gitti; süre dolmasını beklemeden göstergeden düş — aksi halde
+        // karşı taraf mesajı okurken hâlâ "yazıyor" görürdü.
+        yazmayiDurdur();
         // Konuşma listesini güncelle
         loadConversations();
       } else {
@@ -362,6 +378,30 @@ export function MessagingPanel({ currentUserId }: Props) {
                   );
                 })
               )}
+              {/* #354: Yalnızca AÇIK konuşmanın karşı tarafı yazıyorsa. Sunucu
+                  bize yazan herkesi yolluyor; başka bir konuşmadaki yazma
+                  bu balonu göstermemeli. */}
+              {selectedPartner && yazanlar.includes(selectedPartner.id) && (
+                <div className="flex justify-start">
+                  <div
+                    className="bg-white border rounded-2xl rounded-bl-md px-4 py-2.5 shadow-sm"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <span className="sr-only">{getFullName(selectedPartner)} yazıyor</span>
+                    <span className="flex items-center gap-1" aria-hidden="true">
+                      {[0, 150, 300].map((gecikme) => (
+                        <span
+                          key={gecikme}
+                          className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce"
+                          style={{ animationDelay: `${gecikme}ms` }}
+                        />
+                      ))}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               <div ref={messagesEndRef} />
             </div>
 
@@ -370,7 +410,12 @@ export function MessagingPanel({ currentUserId }: Props) {
               <input
                 type="text"
                 value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
+                onChange={(e) => {
+                  setNewMessage(e.target.value);
+                  // Metin SİLİNİP boşaldıysa yazma bitti sayılır.
+                  if (e.target.value.trim()) yazdiginiBildir();
+                  else yazmayiDurdur();
+                }}
                 placeholder="Mesajınızı yazın..."
                 maxLength={2000}
                 className="flex-1 px-4 py-2.5 bg-gray-100 border-0 rounded-full text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-ring"

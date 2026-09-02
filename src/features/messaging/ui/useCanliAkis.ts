@@ -25,9 +25,11 @@ import { useEffect, useRef, useState } from "react";
 export type CanliOlay =
   | { tip: "mesaj"; mesajId: string; gonderenId: string; icerik: string; createdAt: string }
   | { tip: "okunmamis"; sayi: number }
-  | { tip: "adim-tamamlandi"; stepId: string; baslik: string };
+  | { tip: "adim-tamamlandi"; stepId: string; baslik: string }
+  /** #354: Şu an BANA yazanlar. Tam durum — artımlı değil. */
+  | { tip: "yaziyor"; kimler: string[] };
 
-const OLAY_TIPLERI = ["mesaj", "okunmamis", "adim-tamamlandi"] as const;
+const OLAY_TIPLERI = ["mesaj", "okunmamis", "adim-tamamlandi", "yaziyor"] as const;
 
 /**
  * Son abone ayrıldıktan sonra bağlantının kapatılması için beklenen süre.
