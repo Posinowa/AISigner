@@ -4,10 +4,8 @@ import {
   ATAMA_SAHIPLIK_SELECT,
   erisebilirMi,
   mentoruMu,
-  ogrencisiMi,
 } from "@/features/teams/server/sahiplik";
 import { requireAuth } from "@/lib/auth/guard";
-import { isAssignedMentor } from "@/lib/auth/mentor-access";
 import { readStepFile, deleteStepFile } from "@/lib/storage/step-files";
 import { logger } from "@/lib/logger";
 import { incrementCounter } from "@/lib/metrics";

@@ -2,13 +2,10 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import {
   ATAMA_SAHIPLIK_SELECT,
-  erisebilirMi,
   mentoruMu,
-  ogrencisiMi,
 } from "@/features/teams/server/sahiplik";
 import { generateRoadmap } from "@/features/ai/server/generate-roadmap";
 import { requireAuth } from "@/lib/auth/guard";
-import { isAssignedMentor } from "@/lib/auth/mentor-access";
 import { generateRoadmapSchema } from "@/lib/validations/api";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { profilSahibininRizasiVar } from "@/features/kvkk/riza";
