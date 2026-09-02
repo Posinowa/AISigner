@@ -67,6 +67,47 @@ export default async function StudentDashboardPage() {
       },
       // #195: M:N — "mentörün var mı?" kontrolü için atamalar.
       mentorAssignments: { select: { mentorId: true } },
+      // #367: TAKIM ATAMALARI AYRI GELİR.
+      //
+      // `assignedProjects` yalnız `studentProfileId` dolu satırları getiriyor;
+      // takım atamasında o alan NULL (sahiplik `teamId` üzerinden, #332).
+      // Bu olmadan takım üyesi kendi panosunda projesini HİÇ göremiyordu.
+      teamMemberships: {
+        where: { leftAt: null },
+        select: {
+          team: {
+            select: {
+              id: true,
+              name: true,
+              members: {
+                where: { leftAt: null },
+                select: {
+                  role: true,
+                  studentProfile: {
+                    select: { user: { select: { id: true, name: true, lastName: true, email: true } } },
+                  },
+                },
+              },
+              assignedProjects: {
+                include: {
+                  projectTemplate: true,
+                  roadmap: {
+                    include: {
+                      steps: {
+                        orderBy: { order: "asc" },
+                        include: {
+                          assignee: { select: { id: true, name: true, lastName: true, email: true } },
+                        },
+                      },
+                    },
+                  },
+                },
+                orderBy: { createdAt: "desc" },
+              },
+            },
+          },
+        },
+      },
     },
   });
 
@@ -97,13 +138,30 @@ export default async function StudentDashboardPage() {
 
   const firstName = session.user.name?.split(" ")[0] ?? "Öğrenci";
 
+  /**
+   * #367: BİREYSEL + TAKIM atamaları tek listede.
+   *
+   * Takım ataması `studentProfile.assignedProjects`'te GÖRÜNMEZ (o alan
+   * `studentProfileId`'ye bakıyor, takımda NULL). Birleştirmeseydik takım
+   * üyesi kendi panosunda hiçbir proje görmezdi.
+   *
+   * Her projeye ait takımı da taşıyoruz: üstlenme arayüzü yalnız takım
+   * panosunda açılıyor.
+   */
+  const takimlar = profile.teamMemberships.map((u) => u.team);
+
+  const tumProjeler = [
+    ...profile.assignedProjects.map((p) => ({ ...p, takim: null as (typeof takimlar)[number] | null })),
+    ...takimlar.flatMap((t) => t.assignedProjects.map((p) => ({ ...p, takim: t }))),
+  ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
   // #290: Karşılama artık "sırada ne var" sorusuna da cevap veriyor.
   // Sıradaki adım = en yeni projenin tamamlanmamış İLK adımı.
-  const enYeniProje = profile.assignedProjects[0];
+  const enYeniProje = tumProjeler[0];
   const bekleyenAdim = enYeniProje?.roadmap?.steps.find((a) => a.status !== "COMPLETED");
   const { durum, siradaki } = stajyerDurumu({
     mezun: isGraduated,
-    projeSayisi: profile.assignedProjects.length,
+    projeSayisi: tumProjeler.length,
     mentorSayisi: profile.mentorAssignments.length,
     siradakiAdim: bekleyenAdim
       ? { baslik: bekleyenAdim.title, projeAdi: enYeniProje.projectTemplate.title }
@@ -199,7 +257,7 @@ export default async function StudentDashboardPage() {
           Aktif Projeler ve İş Akışı
         </h2>
 
-        {profile.assignedProjects.length === 0 ? (
+        {tumProjeler.length === 0 ? (
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-10 text-center">
             <Clock className="w-10 h-10 text-slate-400 mx-auto mb-4" />
             <h3 className="text-slate-900 font-semibold text-lg">Bekleyen Görev Yok</h3>
@@ -209,7 +267,7 @@ export default async function StudentDashboardPage() {
           </div>
         ) : (
           <div className="space-y-8">
-            {profile.assignedProjects.map((project) => {
+            {tumProjeler.map((project) => {
               
               const steps = project.roadmap?.steps || [];
               const totalSteps = steps.length;
@@ -226,8 +284,23 @@ export default async function StudentDashboardPage() {
                       <div>
                         <div className="flex items-center gap-3 mb-3">
                           <span className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-md text-xs font-semibold tracking-wide">
-                            ANA PROJE
+                            {project.takim ? "TAKIM PROJESİ" : "ANA PROJE"}
                           </span>
+                          {/* #367: Ortak panoda kiminle çalıştığını bilmek,
+                              iş bölümü yapabilmenin ön koşulu. */}
+                          {project.takim && (
+                            <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-md text-xs font-semibold">
+                              {project.takim.name} ·{" "}
+                              {project.takim.members
+                                .map(
+                                  (m) =>
+                                    [m.studentProfile.user.name, m.studentProfile.user.lastName]
+                                      .filter(Boolean)
+                                      .join(" ") || m.studentProfile.user.email,
+                                )
+                                .join(", ")}
+                            </span>
+                          )}
                           <span className="text-xs text-slate-500 flex items-center">
                             <Clock className="w-3.5 h-3.5 mr-1" />
                             Atanma: {new Date(project.createdAt).toLocaleDateString("tr-TR")}
@@ -291,6 +364,20 @@ export default async function StudentDashboardPage() {
                         isGraduated={isGraduated}
                         currentUserId={session.user.id}
                         currentUserRole={session.user.role}
+                        // #367: Üstlenme arayüzü YALNIZ takım panosunda açılır;
+                        // bireysel atamada tek kişi var, "üstlenme"nin anlamı yok.
+                        takimUyeleri={
+                          project.takim
+                            ? project.takim.members.map((m) => ({
+                                userId: m.studentProfile.user.id,
+                                ad:
+                                  [m.studentProfile.user.name, m.studentProfile.user.lastName]
+                                    .filter(Boolean)
+                                    .join(" ") || m.studentProfile.user.email,
+                                role: m.role,
+                              }))
+                            : undefined
+                        }
                       />
                     )}
                   </div>

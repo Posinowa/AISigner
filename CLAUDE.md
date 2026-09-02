@@ -171,6 +171,11 @@ bilinçli karar.
 - Takımda AI girdileri: seviye **EN DÜŞÜK** (pano ortak, en yeni üye de takip etmeli),
   PR incelemesinde **HERKESİN** rızası aranır (kimin hangi satırı yazdığı bilinmiyor),
   günlük tavan **takım başına**.
+- ⚠️ **Takımın öğrencileri İKİ YOLDAN gelir** (#367): liste sorguları hem bireysel
+  `MentorAssignment` hem `TeamMentor`/`TeamMember` bağını sormalı. Aynı şekilde öğrenci
+  panosu `studentProfile.assignedProjects` + `teamMemberships.team.assignedProjects`
+  birleşimini göstermeli — takım atamasında `studentProfileId` NULL olduğu için tek başına
+  ilk sorgu takım projesini HİÇ getirmez. İkisi de canlıda boş liste olarak görünmüştü.
 - ⚠️ **Takım için AI yol haritası/adım üretimi YOK** — açık 400. Sentetik profil uydurmak
   üretilen içeriğin kime göre ayarlandığını belirsizleştirirdi.
 

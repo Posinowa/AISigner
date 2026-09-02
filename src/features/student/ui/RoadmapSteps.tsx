@@ -16,6 +16,16 @@ type Step = {
   estimatedHours: number | null;
   resources: string[];
   githubIssueUrl?: string | null;
+  // #332/#367: Adımı üstlenen takım üyesi. Bireysel atamada hep null.
+  assigneeId?: string | null;
+  assignee?: { id: string; name: string | null; lastName: string | null; email: string } | null;
+};
+
+/** #367: Takım üyeleri — üstlenme göstergesi ve devralma için. */
+export type TakimUyesi = {
+  userId: string;
+  ad: string;
+  role: string;
 };
 
 type Props = {
@@ -24,12 +34,56 @@ type Props = {
   isGraduated?: boolean;
   currentUserId?: string;
   currentUserRole?: string;
+  /** #367: Doluysa bu bir TAKIM panosudur; üstlenme arayüzü açılır. */
+  takimUyeleri?: TakimUyesi[];
 };
 
-export function RoadmapSteps({ steps, isDraft, isGraduated = false, currentUserId, currentUserRole }: Props) {
+export function RoadmapSteps({
+  steps,
+  isDraft,
+  isGraduated = false,
+  currentUserId,
+  currentUserRole,
+  takimUyeleri,
+}: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [ustlenenId, setUstlenenId] = useState<string | null>(null);
+
+  const takimPanosu = (takimUyeleri?.length ?? 0) > 0;
+
+  /**
+   * Adımı üstlen / bırak (#332).
+   *
+   * Adım TAKIMIN; bu yalnızca "kim çekti" bilgisi. BAŞKASININ üstlendiği adım
+   * da devralınabiliyor — sprint panosunda iş havuzda durur ve biri çeker;
+   * kilitlemek o modeli bozardı.
+   */
+  async function ustlen(stepId: string, assigneeId: string | null) {
+    if (isGraduated) {
+      toast.info("Mezuniyet sonrası staj adımları salt-okunur durumdadır.");
+      return;
+    }
+    setUstlenenId(stepId);
+    try {
+      const res = await fetch(`/api/steps/${stepId}/assignee`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assigneeId }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.error(typeof err.error === "string" ? err.error : "Adım güncellenemedi.");
+        return;
+      }
+      startTransition(() => router.refresh());
+    } catch {
+      toast.error("Bağlantı hatası. Lütfen tekrar deneyin.");
+    } finally {
+      setUstlenenId(null);
+    }
+  }
 
   async function updateStepStatus(stepId: string, newStatus: "IN_PROGRESS" | "COMPLETED") {
     if (isGraduated) {
@@ -116,6 +170,20 @@ export function RoadmapSteps({ steps, isDraft, isGraduated = false, currentUserI
                   >
                     Aşama {step.order}
                   </span>
+
+                  {/* #367: Kim üstlendi + devral/bırak. Yalnız TAKIM panosunda
+                      görünür; bireysel atamada tek kişi var, "üstlenme"nin
+                      anlamı yok. */}
+                  {takimPanosu && !isCompleted && (
+                    <UstlenmeSeridi
+                      step={step}
+                      currentUserId={currentUserId}
+                      takimUyeleri={takimUyeleri!}
+                      calisiyor={ustlenenId === step.id}
+                      devre={isDraft || isGraduated}
+                      onUstlen={(assigneeId) => ustlen(step.id, assigneeId)}
+                    />
+                  )}
 
                   {/* Durum Badge */}
                   {isInProgress && (
@@ -255,3 +323,63 @@ export function RoadmapSteps({ steps, isDraft, isGraduated = false, currentUserI
   );
 }
 
+/**
+ * Adımı kim üstlendi + devral/bırak (#367).
+ *
+ * ⚠️ "Devral" düğmesi BAŞKASININ üstlendiği adımda da görünür. Sprint panosunda
+ * iş havuzda durur ve biri çeker; kilitlemek pull modelini bozardı. Kimin
+ * gerçekten tamamladığı ayrıca `StepStatusHistory`'de tutuluyor (#324).
+ */
+function UstlenmeSeridi({
+  step,
+  currentUserId,
+  takimUyeleri,
+  calisiyor,
+  devre,
+  onUstlen,
+}: {
+  step: Step;
+  currentUserId?: string;
+  takimUyeleri: TakimUyesi[];
+  calisiyor: boolean;
+  devre: boolean;
+  onUstlen: (assigneeId: string | null) => void;
+}) {
+  const ustlenen = step.assigneeId
+    ? takimUyeleri.find((u) => u.userId === step.assigneeId)
+    : null;
+  const benimMi = Boolean(currentUserId && step.assigneeId === currentUserId);
+
+  return (
+    <span className="flex items-center gap-2">
+      {ustlenen ? (
+        <span className="rounded-md border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700">
+          {benimMi ? "Sen üstlendin" : `${ustlenen.ad} üstlendi`}
+        </span>
+      ) : (
+        <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-500">
+          Havuzda
+        </span>
+      )}
+
+      {!devre && (
+        <button
+          type="button"
+          disabled={calisiyor}
+          onClick={() => onUstlen(benimMi ? null : (currentUserId ?? null))}
+          className="text-[11px] font-semibold text-blue-700 hover:text-blue-800 disabled:opacity-50"
+        >
+          {calisiyor ? (
+            <Loader2 className="inline h-3 w-3 animate-spin" />
+          ) : benimMi ? (
+            "Bırak"
+          ) : ustlenen ? (
+            "Devral"
+          ) : (
+            "Üstlen"
+          )}
+        </button>
+      )}
+    </span>
+  );
+}

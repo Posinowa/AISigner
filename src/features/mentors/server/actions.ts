@@ -42,8 +42,23 @@ export async function getMentorStudents(mentorId: string): Promise<StudentWithPr
       where: {
         role: "STUDENT",
         studentProfile: {
-          // #195: M:N — bu mentörün atandığı öğrenciler.
-          mentorAssignments: { some: { mentorId } },
+          // #367: MENTÖRÜN ÖĞRENCİLERİ İKİ YOLDAN GELİR.
+          //
+          // Öncesi yalnız bireysel bağa bakıyordu. #332 ile mentör TAKIMA da
+          // atanabiliyor ve takım üyeleriyle arasında bireysel bir
+          // `MentorAssignment` kaydı YOK — dolayısıyla takım mentörü kendi
+          // panelinde HİÇBİR ŞEY göremiyordu. Yetki katmanı doğru çalışıyordu
+          // (API 200 dönüyordu), ama arayüzde takıma giden yol yoktu.
+          OR: [
+            // #195: M:N — bu mentörün doğrudan atandığı öğrenciler.
+            { mentorAssignments: { some: { mentorId } } },
+            // #332: Bu mentörün takımlarındaki AKTİF üyeler.
+            {
+              teamMemberships: {
+                some: { leftAt: null, team: { mentors: { some: { mentorId } } } },
+              },
+            },
+          ],
         },
       },
       include: {
@@ -61,6 +76,40 @@ export async function getMentorStudents(mentorId: string): Promise<StudentWithPr
               },
               orderBy: {
                 createdAt: "desc",
+              },
+            },
+            // #367: Öğrencinin AKTİF takım üyelikleri — mentör panelinde
+            // "bu stajyer hangi takımda, ortak projesi ne" görünsün.
+            teamMemberships: {
+              where: { leftAt: null },
+              select: {
+                role: true,
+                team: {
+                  select: {
+                    id: true,
+                    name: true,
+                    members: {
+                      where: { leftAt: null },
+                      select: {
+                        role: true,
+                        studentProfile: {
+                          select: {
+                            user: { select: { id: true, name: true, lastName: true, email: true } },
+                          },
+                        },
+                      },
+                    },
+                    assignedProjects: {
+                      select: {
+                        id: true,
+                        githubRepoUrl: true,
+                        githubStatus: true,
+                        projectTemplate: { select: { id: true, title: true } },
+                        roadmap: { select: { id: true, status: true } },
+                      },
+                    },
+                  },
+                },
               },
             },
           },
