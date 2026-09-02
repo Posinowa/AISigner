@@ -1,5 +1,5 @@
 import "server-only";
-import { getOctokit, hataNedeni, type GitHubConfig } from "./client";
+import { getOctokit, hataNedeni, sahipTuruniCoz, type GitHubConfig } from "./client";
 import { yenidenDene } from "./retry";
 import { logger } from "@/lib/logger";
 
@@ -72,18 +72,39 @@ export async function repoyuHazirla(
     // 404 → henüz yok, oluşturmaya devam.
   }
 
+  // #346: Organizasyon ve kişisel hesap AYRI uçlar kullanıyor.
+  // Hangisi olduğu GitHub'a SORULUYOR — "createInOrg dene, 404 alırsan
+  // kişiseldir" mantığı yanlış yazılmış bir org adını da kişisel hesap sanıp
+  // depoyu başka yere açardı.
+  const sahip = await sahipTuruniCoz(config);
+  if (!sahip.ok) {
+    logger.error("GitHub repo oluşturulamadı: hesap türü belirsiz", {
+      repoName,
+      neden: sahip.neden,
+    });
+    return { ok: false, neden: sahip.neden };
+  }
+
   try {
-    // Organizasyon altında açmak ayrı bir uç; kişisel hesapta bu 404 verir.
     const yeni = await yenidenDene(
       () =>
-        octokit.repos.createInOrg({
-          org: config.owner,
-          name: repoName,
-          description: params.description,
-          private: params.private ?? true,
-          auto_init: true,
-        }),
-      { ad: "repos.createInOrg" },
+        sahip.tur === "organizasyon"
+          ? octokit.repos.createInOrg({
+              org: config.owner,
+              name: repoName,
+              description: params.description,
+              private: params.private ?? true,
+              auto_init: true,
+            })
+          : // Kişisel hesap: uçta `owner` alanı YOK, depo her zaman token'ın
+            // sahibi altında açılır. `sahipTuruniCoz` kimliği zaten doğruladı.
+            octokit.repos.createForAuthenticatedUser({
+              name: repoName,
+              description: params.description,
+              private: params.private ?? true,
+              auto_init: true,
+            }),
+      { ad: sahip.tur === "organizasyon" ? "repos.createInOrg" : "repos.createForAuthenticatedUser" },
     );
     return {
       ok: true,
