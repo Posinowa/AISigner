@@ -257,3 +257,92 @@ describe("Middleware — mentörün profil tamamlama yolu (#287)", () => {
     expect(sonuc.hedef).toBe("/student-dashboard");
   });
 });
+
+/**
+ * #375 — API ROTALARI HTML'E YÖNLENDİRİLMEZ.
+ *
+ * `/api/` kontrolü dosyanın SONUNDA duruyordu ("guard.ts zaten koruma
+ * sağlıyor") ve niyeti doğruydu; ama oturumsuz kullanıcıyı `/signin`'e yollayan
+ * blok ondan ÖNCE çalışıyordu, yani API istekleri o satıra hiç ulaşmıyordu.
+ *
+ * Sonucu sinsiydi: oturumu düşen istemcide `fetch(...).json()` HTML alıp
+ * SyntaxError fırlatıyor, bileşenler bunu "veri yüklenemedi" diye
+ * gösteriyordu — kullanıcı oturumunun düştüğünü öğrenemiyordu.
+ */
+describe("API yanıt sözleşmesi (#375)", () => {
+  const API_YOLLARI = [
+    "/api/student/proposals",
+    "/api/messages/conversations",
+    "/api/mentor/students",
+    "/api/admin/proposals",
+    "/api/messages/stream",
+  ];
+
+  describe("oturumsuz", () => {
+    beforeEach(() => getTokenMock.mockResolvedValue(null));
+
+    it.each(API_YOLLARI)("%s → 401 JSON, yönlendirme YOK", async (yol) => {
+      const r = await middleware(istek(yol));
+
+      expect(r.status).toBe(401);
+      expect(r.headers.get("location")).toBeNull();
+      expect(r.headers.get("content-type")).toContain("application/json");
+      expect(await r.json()).toEqual({ error: "Oturum açılmamış. Lütfen giriş yapın." });
+    });
+
+    it("SAYFA rotaları hâlâ /signin'e yönlenir — davranış değişmemeli", async () => {
+      const r = await git("/student-dashboard");
+      expect(r.yonlendirdi).toBe(true);
+      expect(r.hedef).toBe("/signin");
+      expect(r.callbackUrl).toBe("/student-dashboard");
+    });
+
+    it.each(["/api/auth/csrf", "/api/auth/session", "/api/webhooks/github", "/api/health"])(
+      "%s public kalır — oturumsuz erişilebilir",
+      async (yol) => {
+        const r = await middleware(istek(yol));
+        // Public liste middleware'i erkenden geçiriyor; 401 DÖNMEMELİ.
+        expect(r.status).not.toBe(401);
+        expect(r.headers.get("location")).toBeNull();
+      },
+    );
+  });
+
+  /**
+   * ⚠️ Aşağıdaki iki test SONUCU kilitliyor, MEKANİZMAYI değil.
+   *
+   * Ölçüldü: `if (apiIstegi) return next()` bloğu kaldırılsa bu testler yine
+   * geçiyor — çünkü mevcut yönlendirmelerin hiçbiri `/api/...` ile eşleşmiyor.
+   * Blok, gelecekte bir yönlendirme genişlediğinde kuralı korumak için
+   * savunma amaçlı duruyor; testler de sözleşmenin kendisini bekliyor:
+   * "oturumlu bir API isteği HTML'e yönlendirilmez", nasıl sağlandığından
+   * bağımsız.
+   */
+  describe("oturum var ama rol uymuyor", () => {
+    it("API isteği yönlendirilmez — yetki kararı guard.ts'e bırakılır", async () => {
+      // STUDENT, admin ucunu çağırıyor. Middleware bunu /student-dashboard'a
+      // yönlendirseydi istemci yine HTML alırdı.
+      getTokenMock.mockResolvedValue({ role: "STUDENT", accountStatus: "APPROVED" });
+
+      const r = await middleware(istek("/api/admin/proposals"));
+
+      expect(r.headers.get("location")).toBeNull();
+      expect(r.status).not.toBeGreaterThanOrEqual(300);
+    });
+
+    it("onaysız stajyerin API isteği de yönlendirilmez", async () => {
+      getTokenMock.mockResolvedValue({ role: "STUDENT", accountStatus: "PENDING" });
+
+      const r = await middleware(istek("/api/student/steps/abc"));
+
+      expect(r.headers.get("location")).toBeNull();
+    });
+
+    it("SAYFA rotasında onaysız stajyer hâlâ /account-status'a gider", async () => {
+      getTokenMock.mockResolvedValue({ role: "STUDENT", accountStatus: "PENDING" });
+
+      const r = await git("/student-dashboard");
+      expect(r.hedef).toBe("/account-status");
+    });
+  });
+});

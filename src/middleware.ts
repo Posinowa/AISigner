@@ -95,8 +95,31 @@ export async function middleware(request: NextRequest) {
     secret: process.env.AUTH_SECRET,
   });
 
+  /**
+   * #375: API rotaları HTML'e YÖNLENDİRİLMEZ.
+   *
+   * Bu kontrol dosyanın SONUNDA duruyordu ("guard.ts zaten koruma sağlıyor")
+   * ve niyeti doğruydu — ama oturumsuz kullanıcıyı `/signin`'e yollayan blok
+   * ondan ÖNCE çalışıyordu. Yani API istekleri o satıra hiç ulaşmıyordu.
+   *
+   * Sonucu sinsiydi: oturumu düşen istemcide `fetch(...).json()` HTML alıp
+   * `SyntaxError` fırlatıyor, bileşenler bunu "veri yüklenemedi" diye
+   * gösteriyordu. Kullanıcı oturumunun düştüğünü değil, sistemin bozuk
+   * olduğunu sanıyordu.
+   */
+  const apiIstegi = pathname.startsWith("/api/");
+
   // Giriş yapmamış kullanıcıları signin'e yönlendir
   if (!token) {
+    if (apiIstegi) {
+      // Metin `guard.ts` ile AYNI: istemci iki farklı kaynaktan aynı cevabı
+      // almalı, yoksa "oturum düştü" durumu iki ayrı mesajla görünürdü.
+      return NextResponse.json(
+        { error: "Oturum açılmamış. Lütfen giriş yapın." },
+        { status: 401 },
+      );
+    }
+
     // Ana sayfa hariç (landing page olabilir)
     if (pathname === "/") {
       return NextResponse.next();
@@ -105,6 +128,24 @@ export async function middleware(request: NextRequest) {
     const signinUrl = new URL("/signin", request.url);
     signinUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(signinUrl);
+  }
+
+  /**
+   * Oturum VAR: API'de rol ve hesap durumu kararı `guard.ts`'e ait.
+   *
+   * ⚠️ BU BLOK BUGÜN DAVRANIŞI DEĞİŞTİRMİYOR — bilerek duruyor.
+   * Aşağıdaki yönlendirmelerin hiçbiri `/api/...` ile eşleşmiyor (hepsi
+   * `/admin-dashboard`, `/student-dashboard` gibi sayfa öneklerine bakıyor),
+   * yani kaldırılsa da bugün sonuç aynı olurdu.
+   *
+   * Yine de duruyor çünkü #375 tam olarak sözleşmenin ÖRTÜK olmasından çıktı:
+   * "API yönlendirilmez" kuralı bir yorum satırı olarak dosyanın sonunda
+   * duruyordu ve yeni bir yönlendirme onun önüne geçtiğinde kimse fark etmedi.
+   * Buraya `protectedRoutes`'a bir `/api/...` girdisi eklendiğinde ya da
+   * durum kapısı genişlediğinde kural kendiliğinden korunur.
+   */
+  if (apiIstegi) {
+    return NextResponse.next();
   }
 
   // Rol bazlı erişim kontrolü
@@ -171,11 +212,6 @@ export async function middleware(request: NextRequest) {
       // Bilinmeyen rol → signin
       return NextResponse.redirect(new URL("/signin", request.url));
     }
-  }
-
-  // API route'ları için middleware'den geç (guard.ts zaten koruma sağlıyor)
-  if (pathname.startsWith("/api/")) {
-    return NextResponse.next();
   }
 
   return NextResponse.next();
