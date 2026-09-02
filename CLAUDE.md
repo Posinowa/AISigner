@@ -115,6 +115,16 @@ yapmadan önce doğrulanmış olmasını şart koşar. Kapı bilerek **yalnız A
 kapı KONMADI: SMTP sessizce çökebildiği için (`mail.ts` hata fırlatmaz) herkesi
 kilitleme riski var. `create:admin` ve `seed` doğrulanmış hesap üretir.
 
+#### ⚠️ API rotaları YÖNLENDİRİLMEZ, 401/403 JSON döner (#375)
+`middleware.ts`'te `/api/` kontrolü dosyanın **sonunda** duruyordu ("guard.ts zaten
+koruma sağlıyor") — niyet doğruydu ama oturumsuz kullanıcıyı `/signin`'e yollayan blok
+ondan **önce** çalışıyordu. Sonuç: her API isteği **307 ile HTML login sayfasına**
+gidiyordu; `fetch(...).json()` `SyntaxError` fırlatıyor, bileşenler bunu "veri
+yüklenemedi" diye gösteriyordu — kullanıcı oturumunun düştüğünü öğrenemiyordu.
+
+Kontrol artık yönlendirmelerden **önce**. Yeni bir yönlendirme eklerken bu sıra
+korunmalı; sözleşmenin örtük kalması bu hatanın kök nedeniydi.
+
 #### ⚠️ Rate-limit IP'si sağdan okunur (#308)
 `X-Forwarded-For`'un **en solu istemcinin uydurduğudur** (vekil ekleme yapar, silme
 değil). `lib/client-ip.ts` sağdan `TRUSTED_PROXY_HOPS` kadar sayar. Bu dosyayı
