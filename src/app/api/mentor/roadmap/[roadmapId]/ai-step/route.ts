@@ -2,16 +2,13 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import {
   ATAMA_SAHIPLIK_SELECT,
-  erisebilirMi,
   mentoruMu,
-  ogrencisiMi,
 } from "@/features/teams/server/sahiplik";
 import { z } from "zod";
 import { getModel } from "@/lib/ai/gemini-client";
 import { cozVeDogrula } from "@/lib/ai/response";
 import { logger } from "@/lib/logger";
 import { requireAuth } from "@/lib/auth/guard";
-import { isAssignedMentor } from "@/lib/auth/mentor-access";
 import { experienceLevelLabel } from "@/lib/experience-level";
 
 /**

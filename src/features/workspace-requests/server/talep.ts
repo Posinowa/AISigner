@@ -2,12 +2,9 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import {
   ATAMA_SAHIPLIK_SELECT,
-  erisebilirMi,
   mentoruMu,
-  ogrencisiMi,
 } from "@/features/teams/server/sahiplik";
 import { logger } from "@/lib/logger";
-import { isAssignedMentor } from "@/lib/auth/mentor-access";
 import {
   baslatGitHubWorkspaceKurulumu,
   KurulumZatenSuruyorError,

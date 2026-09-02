@@ -6,7 +6,6 @@ import {
   ogrencisiMi,
 } from "@/features/teams/server/sahiplik";
 import { requireAuth } from "@/lib/auth/guard";
-import { isAssignedMentor } from "@/lib/auth/mentor-access";
 import { createStepCommentSchema } from "@/lib/validations/api";
 import { createRateLimiter } from "@/lib/rate-limit";
 
@@ -162,8 +161,6 @@ async function getStepWithAccess(stepId: string, userId: string) {
   });
 
   if (!step) return null;
-
-  const profile = step.roadmap.assignedProject.studentProfile;
 
   // #332: Öğrenci = bireysel sahip ya da AKTİF takım üyesi.
   // Mentör = öğrencinin kendi mentörü (#195) ya da takımın mentörü.

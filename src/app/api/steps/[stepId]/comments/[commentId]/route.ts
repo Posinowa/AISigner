@@ -2,12 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import {
   ATAMA_SAHIPLIK_SELECT,
-  erisebilirMi,
   mentoruMu,
-  ogrencisiMi,
 } from "@/features/teams/server/sahiplik";
 import { requireAuth } from "@/lib/auth/guard";
-import { isAssignedMentor } from "@/lib/auth/mentor-access";
 import { updateStepCommentSchema } from "@/lib/validations/api";
 
 /**
