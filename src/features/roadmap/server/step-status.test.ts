@@ -51,6 +51,9 @@ describe("adimDurumunuDegistir", () => {
         stepId: "s1",
         fromStatus: "IN_PROGRESS",
         toStatus: "COMPLETED",
+        // #379: Geçişin gerekçesi. Normal geçişlerde null; revizyon
+        // isteğinde ZORUNLU olarak dolduruluyor.
+        note: null,
         changedById: "u1",
       },
     });

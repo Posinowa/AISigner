@@ -368,3 +368,17 @@ export const typingSignalSchema = z.object({
   to: z.string().min(1, "Alıcı gerekli"),
   yaziyor: z.boolean(),
 });
+
+/**
+ * Adım revizyon isteği (#379).
+ *
+ * Gerekçe ZORUNLU ve boş olamaz: gerekçesiz revizyon öğrenciye aynı işi
+ * tekrar yaptırır (#366'daki red gerekçesi deseni).
+ */
+export const revizyonIsteSchema = z.object({
+  gerekce: z
+    .string()
+    .trim()
+    .min(10, "Gerekçe en az 10 karakter olmalı")
+    .max(1000, "Gerekçe en fazla 1000 karakter olabilir"),
+});

@@ -24,8 +24,10 @@ export async function adimDurumunuDegistir(params: {
   yeniDurum: string;
   oncekiDurum: string | null;
   degistirenId: string | null;
+  /** #379: Geçişin gerekçesi. Revizyon isteğinde ZORUNLU. */
+  not?: string | null;
 }) {
-  const { stepId, yeniDurum, oncekiDurum, degistirenId } = params;
+  const { stepId, yeniDurum, oncekiDurum, degistirenId, not } = params;
 
   const [guncellenen] = await prisma.$transaction([
     prisma.roadmapStep.update({
@@ -37,6 +39,7 @@ export async function adimDurumunuDegistir(params: {
         stepId,
         fromStatus: oncekiDurum,
         toStatus: yeniDurum,
+        note: not ?? null,
         changedById: degistirenId,
       },
     }),

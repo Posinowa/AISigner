@@ -263,6 +263,13 @@ model StepStatusHistory {
   /// İlk kayıtta null olabilir (durum bilinmeyen bir noktadan geliyorsa).
   fromStatus  String?
   toStatus    String
+  /// #379: Geçişin gerekçesi. Bugün yalnız REVISION_REQUESTED'da doldurulur
+  /// ve ZORUNLUDUR — gerekçesiz revizyon öğrenciye aynı işi tekrar yaptırır
+  /// (#366'daki red gerekçesi deseni).
+  ///
+  /// Adımda değil GEÇİŞTE duruyor: bir adım birden çok kez revize edilebilir
+  /// ve her seferin kendi gerekçesi olmalı.
+  note        String?  @db.VarChar(1000)
   /// Değişikliği yapan kullanıcı. Hesap silinirse kayıt KALIR (SetNull):
   /// analitik geçmişi tek bir kullanıcı silindi diye bozulmamalı.
   changedById String?
@@ -277,15 +284,27 @@ model StepStatusHistory {
 }
 
 model StepIssue {
-  id             String   @id @default(cuid())
-  stepId         String
-  order          Int      @default(1)
-  title          String
-  bodyMarkdown   String   @db.VarChar(4000)
-  githubIssueUrl String?
-  status         String   @default("OPEN")
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id              String   @id @default(cuid())
+  stepId          String
+  order           Int      @default(1)
+  title           String
+  bodyMarkdown    String   @db.VarChar(4000)
+  githubIssueUrl  String?
+  status          String   @default("OPEN")
+  /// #379: Bu issue MERGE EDİLMİŞ bir PR ile mi kapandı?
+  ///
+  /// Revizyon istenince GitHub tarafındaki davranışı bu belirliyor:
+  ///   merge edildiyse  → YENİ issue açılır (o iş gerçekten bitti, kod ana
+  ///                       dalda; eskisini yeniden açmak yapılmamış gibi
+  ///                       gösterirdi)
+  ///   edilmediyse      → mevcut issue yeniden açılır
+  ///
+  /// ⚠️ Bu bayraktan ÖNCE kapanmış kayıtlarda `false` kalır. Bilinmeyen
+  /// durumda yeniden açma tercih ediliyor: geri alınabilir ve görünür bir
+  /// işlem, kopya issue açmaktan daha az gürültülü.
+  mergeIleKapandi Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   step RoadmapStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
 
@@ -650,6 +669,13 @@ enum StepStatus {
   TODO
   IN_PROGRESS
   COMPLETED
+  /// #379: Mentör "bu adım eksik, revize et" dedi.
+  ///
+  /// IN_PROGRESS'e geri çekmek yerine AYRI bir durum: revizyon istendiği
+  /// bilgisi panoda hiç çalışılmamış bir adımdan ayırt edilebilmeli, ve
+  /// StepStatusHistory'de (#324) net bir iz kalmalı — sertifika katkı ölçümü
+  /// "tamamladı → geri çekildi" farkını görebilsin.
+  REVISION_REQUESTED
 }
 
 /// #287: Mentör başvurusunun cevapları.

@@ -1,12 +1,14 @@
 "use client";
 
+import { RevizyonIste } from "@/features/roadmap/ui/RevizyonIste";
+
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { extractApiErrorMessage } from "@/lib/api-error-message";
-import {
+import { RotateCcw,
   ArrowLeft,
   Save,
   CheckCircle,
@@ -72,6 +74,13 @@ const stepStatusConfig: Record<string, { label: string; color: string; icon: typ
   TODO: { label: "Yapılacak", color: "bg-gray-100 text-gray-700", icon: Clock },
   IN_PROGRESS: { label: "Devam Ediyor", color: "bg-blue-100 text-blue-700", icon: BookOpen },
   COMPLETED: { label: "Tamamlandı", color: "bg-green-100 text-green-700", icon: CheckCircle },
+  // #379: Mentör "eksik, revize et" dedi. Ayrı bir renk: panoda hiç
+  // çalışılmamış adımdan ayırt edilebilmeli.
+  REVISION_REQUESTED: {
+    label: "Revizyon istendi",
+    color: "bg-amber-100 text-amber-800",
+    icon: RotateCcw,
+  },
 };
 
 // #50: Boş input -> null (issue linki opsiyonel; boş string geçersiz URL sayılmasın).
@@ -668,6 +677,16 @@ export default function RoadmapReviewPage() {
                       <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
                         {step.description}
                       </p>
+
+                      {/* #379: Mentör onay kapısı. Yalnız TAMAMLANMIŞ adımda
+                          görünür — bileşen kendi içinde karar veriyor. */}
+                      <div className="mt-4">
+                        <RevizyonIste
+                          stepId={step.id}
+                          stepStatus={step.status}
+                          onTamamlandi={loadRoadmap}
+                        />
+                      </div>
 
                       {step.resources.length > 0 && (
                         <div className="mt-4">

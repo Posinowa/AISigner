@@ -48,7 +48,9 @@ describe("issueKapandiginiIsle", () => {
 
     expect(prismaMock.stepIssue.update).toHaveBeenCalledWith({
       where: { id: "si1" },
-      data: { status: "CLOSED" },
+      // #379: Kapanmanın merge'den gelip gelmediği KAYDEDİLİYOR — revizyon
+      // istenince "yeni issue mu, yeniden açma mı" kararı buna bakıyor.
+      data: { status: "CLOSED", mergeIleKapandi: false },
     });
   });
 
