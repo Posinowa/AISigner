@@ -357,3 +357,14 @@ export const decideProposalSchema = z.object({
   // Admin stajyerin tercihini geçersiz kılabilir.
   kaynak: kaynakEnum.optional(),
 });
+
+/**
+ * "Yazıyor..." sinyali (#354).
+ *
+ * `yaziyor: false` sinyali SİLER — mesaj gönderen ya da alanı terk eden
+ * kullanıcı, süre dolmasını beklemeden göstergeden düşmeli.
+ */
+export const typingSignalSchema = z.object({
+  to: z.string().min(1, "Alıcı gerekli"),
+  yaziyor: z.boolean(),
+});
