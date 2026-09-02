@@ -1,8 +1,10 @@
 import { after } from "next/server";
+import { atamaninAiRizasiVar } from "@/features/kvkk/riza";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth/guard";
 import { generateStepIssues } from "@/features/ai/server/issue-generator";
 import { logger } from "@/lib/logger";
+import { incrementCounter } from "@/lib/metrics";
 import { readGitHubConfig, hataMesaji, type GitHubConfig } from "./client";
 import { repoAdiUret, repoyuHazirla, milestoneHazirla, issueHazirla } from "./repo";
 import { DIS_DEPO_DURUMU } from "@/features/proposals/server/oneri";
@@ -165,6 +167,26 @@ export function milestoneNumarasiCikar(url: string | null): number | null {
  * Yani güncelleme, var olan adımlara dokunmadan yalnızca eksikleri tamamlıyor.
  */
 async function issueIcerikleriniUret(atama: Atama): Promise<void> {
+  /*
+   * ⚠️ #389: KVKK AÇIK RIZASI OLMADAN GEMINI'YE GİTMEZ.
+   *
+   * Bu kontrol yoktu ve rızası olmayan öğrencinin adım metinleri sessizce
+   * yurt dışındaki modele gönderiliyordu. Kurulumu ÖĞRENCİ tetiklemiyor
+   * (mentör talep eder, admin onaylar — #349), yani rızasız öğrencinin
+   * süreci durdurabileceği hiçbir nokta yoktu.
+   *
+   * ⚠️ RIZA YOKSA KURULUM ÇÖKMEZ. Depo, milestone ve adım issue'ları AI'sız
+   * da açılabilmeli; `generateStepIssues` zaten mock içeriğe düşebiliyor.
+   * Rızayı yokluğu yüzünden çalışma alanını hiç kurmamak, cezayı yanlış yere
+   * keserdi.
+   */
+  const rizaVar = await atamaninAiRizasiVar(atama.id);
+  if (!rizaVar) {
+    logger.info("AI issue üretimi ATLANDI — açık rıza yok", { assignmentId: atama.id });
+    incrementCounter("provisioning.issue-uretimi.riza-yok");
+    return;
+  }
+
   // PERFORMANS: adımlar PARALEL işleniyor.
   //
   // Öncesi seriydi ve her adım bir Gemini çağrısı olduğu için toplam süre adım

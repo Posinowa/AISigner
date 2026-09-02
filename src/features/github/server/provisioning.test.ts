@@ -19,7 +19,10 @@ const {
   repoMock,
   milestoneMock,
   issueMock,
+  rizaMock,
 } = vi.hoisted(() => ({
+  // #389: Kurulum artık KVKK açık rızası olmadan Gemini'ye gitmiyor.
+  rizaMock: vi.fn(),
   requireAuthMock: vi.fn(),
   prismaMock: {
     assignedProject: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
@@ -49,6 +52,7 @@ vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 vi.mock("@/features/ai/server/issue-generator", () => ({
   generateStepIssues: (...a: unknown[]) => genIssuesMock(...a),
 }));
+vi.mock("@/features/kvkk/riza", () => ({ atamaninAiRizasiVar: rizaMock }));
 vi.mock("@/lib/logger", () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn() },
 }));
@@ -100,6 +104,8 @@ function tokenYok() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // #389: Varsayılan olarak rıza VAR — mevcut testlerin varsaydığı dünya.
+  rizaMock.mockResolvedValue(true);
   genIssuesMock.mockResolvedValue([]);
   prismaMock.stepIssue.findMany.mockResolvedValue([]);
   prismaMock.stepIssue.count.mockResolvedValue(0);
@@ -905,3 +911,70 @@ describe("milestoneNumarasiCikar (#345)", () => {
   });
 });
 
+/**
+ * #389 — KURULUM KVKK AÇIK RIZASINI ATLIYORDU.
+ *
+ * `issueIcerikleriniUret` rıza kontrolü yapmadan `generateStepIssues`
+ * çağırıyordu; rızası olmayan öğrencinin adım metinleri sessizce yurt
+ * dışındaki modele gidiyordu. Kurulumu öğrenci tetiklemiyor (mentör talep
+ * eder, admin onaylar — #349), yani durdurabileceği hiçbir nokta yoktu.
+ */
+describe("KVKK açık rızası (#389)", () => {
+  beforeEach(() => {
+    arkaPlanIsleri.length = 0;
+    admin();
+    tokenYok(); // simülasyon yolu: GitHub'a gidilmez, AI kararı izole ölçülür
+    prismaMock.assignedProject.findUnique.mockResolvedValue({
+      id: "ap-1",
+      githubStatus: "NOT_PROVISIONED",
+      roadmap: { steps: [{ id: "s1" }] },
+    });
+    prismaMock.assignedProject.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.assignedProject.update.mockResolvedValue({});
+    prismaMock.stepIssue.count.mockResolvedValue(0);
+  });
+
+  /** Arka plandaki asıl işi çalıştırır; tam atama kaydını yükler. */
+  async function arkaPlaniCalistir() {
+    prismaMock.assignedProject.findUnique.mockResolvedValue(atama());
+    await arkaPlanIsleri[0]!();
+  }
+
+  it("⚠️ RIZA YOKSA Gemini ÇAĞRILMAZ", async () => {
+    rizaMock.mockResolvedValue(false);
+
+    await baslatGitHubWorkspaceKurulumu("ap-1", false);
+    await arkaPlaniCalistir();
+
+    expect(genIssuesMock).not.toHaveBeenCalled();
+  });
+
+  it("rıza yoksa da KURULUM TAMAMLANIR", async () => {
+    rizaMock.mockResolvedValue(false);
+
+    await baslatGitHubWorkspaceKurulumu("ap-1", false);
+    await arkaPlaniCalistir();
+
+    // Rızanın yokluğu yüzünden çalışma alanını hiç kurmamak, cezayı yanlış
+    // yere keserdi: repo/milestone/issue AI'sız da açılabilir.
+    expect(prismaMock.assignedProject.update).toHaveBeenCalled();
+  });
+
+  it("rıza VARSA AI üretimi çalışır — regresyon yok", async () => {
+    rizaMock.mockResolvedValue(true);
+
+    await baslatGitHubWorkspaceKurulumu("ap-1", false);
+    await arkaPlaniCalistir();
+
+    expect(genIssuesMock).toHaveBeenCalled();
+  });
+
+  it("rıza ATAMA düzeyinde sorulur — takım kuralı tek yerde", async () => {
+    rizaMock.mockResolvedValue(true);
+
+    await baslatGitHubWorkspaceKurulumu("ap-1", false);
+    await arkaPlaniCalistir();
+
+    expect(rizaMock).toHaveBeenCalledWith("ap-1");
+  });
+});

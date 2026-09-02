@@ -90,6 +90,56 @@ export async function profilSahibininRizasiVar(studentProfileId: string): Promis
   return Boolean(p?.user?.aiConsentAt);
 }
 
+/**
+ * Bir ATAMANIN sahibi/sahipleri AI rızası vermiş mi? (#389)
+ *
+ * ⚠️ NEDEN AYRI BİR FONKSİYON: Rıza kontrolü bugüne kadar her AI çağrısının
+ * YANINA ELLE yazıldı ve üç kez atlandı — #321 mekanizmayı kurdu, #352 mentör
+ * başvurusundaki boşluğu kapattı, #389 GitHub kurulumundakini. Üçünde de
+ * kontrol "unutulabilir" olduğu için atlandı. Atama düzeyindeki soru artık
+ * tek yerden soruluyor.
+ *
+ * ⚠️ TAKIMDA HERKESİN RIZASI ARANIR. Üretilen içerik ORTAK panoya yazılıyor
+ * ve girdi (deneyim seviyesi, yol haritası adımları) tüm üyelerden türüyor;
+ * kimin katkısının hangi metne yansıdığı ayrıştırılamıyor. #332'deki PR
+ * incelemesi kararının aynısı — orada da "kimin hangi satırı yazdığı
+ * bilinmiyor" gerekçesiyle herkesin rızası aranıyor.
+ *
+ * ⚠️ SÜRÜM KONTROLÜ YOK (`aiRizasiVar`). Üretilen issue metni yol haritası
+ * adımından türüyor; #327'deki "kodun da gönderilmesi" gibi bir KAPSAM
+ * genişlemesi söz konusu değil. Eski rızası olan öğrenci bu özelliği
+ * kaybetmemeli.
+ *
+ * Sahibi hiç bulunamazsa `false` döner: dayanağı olmayan bir rızayı varsaymak
+ * yerine AI atlanır.
+ */
+export async function atamaninAiRizasiVar(assignmentId: string): Promise<boolean> {
+  const atama = await prisma.assignedProject.findUnique({
+    where: { id: assignmentId },
+    select: {
+      studentProfile: { select: { user: { select: { aiConsentAt: true } } } },
+      team: {
+        select: {
+          members: {
+            // Ayrılmış üye artık panoyu kullanmıyor; rızası da aranmaz.
+            where: { leftAt: null },
+            select: { studentProfile: { select: { user: { select: { aiConsentAt: true } } } } },
+          },
+        },
+      },
+    },
+  });
+  if (!atama) return false;
+
+  const rizalar = atama.team
+    ? atama.team.members.map((m) => Boolean(m.studentProfile.user.aiConsentAt))
+    : atama.studentProfile
+      ? [Boolean(atama.studentProfile.user.aiConsentAt)]
+      : [];
+
+  return rizalar.length > 0 && rizalar.every(Boolean);
+}
+
 /** Rızayı kaydeder ya da geri alır. */
 export async function aiRizasiniAyarla(userId: string, verildi: boolean): Promise<void> {
   await prisma.user.update({

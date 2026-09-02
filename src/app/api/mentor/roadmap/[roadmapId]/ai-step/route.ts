@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { profilSahibininRizasiVar } from "@/features/kvkk/riza";
 import { prisma } from "@/lib/db";
 import {
   ATAMA_SAHIPLIK_SELECT,
@@ -85,6 +86,28 @@ export async function POST(
     if (!studentProfile) {
       return NextResponse.json({ error: "Atamanın sahibi bulunamadı." }, { status: 400 });
     }
+    /*
+     * ⚠️ #389: KVKK açık rızası — kardeş uç `generate-roadmap` bunu yapıyordu,
+     * burası ATLAMIŞTI.
+     *
+     * Prompt öğrencinin ADINI, deneyim seviyesini ve proje bağlamını taşıyor;
+     * işlemi mentör başlatsa da veri ÖĞRENCİYE ait, rıza da öğrencinin.
+     *
+     * Burada fallback'e düşmüyoruz, AÇIK HATA dönüyoruz: mentör bir adım
+     * üretmeyi bilerek istedi, sessizce jenerik bir adım almamalı.
+     */
+    if (!(await profilSahibininRizasiVar(studentProfile.id))) {
+      return NextResponse.json(
+        {
+          error:
+            "Bu öğrenci yapay zekâ işleme onayı vermediği için AI üretimi " +
+            "kullanılamıyor. Öğrenci onayı profilinden verebilir.",
+          rizaGerekli: true,
+        },
+        { status: 403 },
+      );
+    }
+
     const projectTemplate = roadmap.assignedProject.projectTemplate;
     const existingStepTitles = roadmap.steps.map((s) => s.title).join(", ");
     const nextOrder = (roadmap.steps[roadmap.steps.length - 1]?.order ?? 0) + 1;
