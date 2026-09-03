@@ -65,6 +65,32 @@ export function resetBlobCacheForTests(): void {
 }
 
 /**
+ * Depolanan dosya adını doğrular.
+ *
+ * `storedName` bugün HER İKİ çağırma yerinde de sunucuda üretiliyor
+ * (`${stepId}_${uniqueId}${safeExt}` ve `${randomUUID()}.${uzanti}`), yani
+ * kullanıcıdan gelen bir yol YOK. Kapı yine de burada çünkü bu modülün
+ * sözleşmesi "adı bana ver, nereye yazacağımı ben bilirim" — ve o adı
+ * `path.join` ile birleştiriyor. Ad bir gün DB'den ya da istekten gelirse
+ * `../` ile dizinin dışına çıkılabilirdi.
+ *
+ * ⚠️ GCS tarafı da korunuyor: orada `path.join` yok ama önek düz metin
+ * birleştiriliyor (`gcsPrefix + storedName`), yani `steps/../gizli` aynı
+ * kaçışı bucket içinde yapardı.
+ *
+ * Bilerek FIRLATIYOR: geçersiz ad çağıranın hatası; sessizce temizlemek
+ * yanlış dosyayı okumak/silmek anlamına gelebilirdi.
+ */
+const DOSYA_ADI_KALIBI = /^[A-Za-z0-9._-]+$/;
+
+function guvenliDosyaAdi(storedName: string): string {
+  if (!DOSYA_ADI_KALIBI.test(storedName) || storedName === "." || storedName === "..") {
+    throw new Error(`Geçersiz depolama adı: ${JSON.stringify(storedName)}`);
+  }
+  return storedName;
+}
+
+/**
  * Bir depolama alanı üretir.
  *
  * @param gcsPrefix bucket içindeki klasör öneki (ör. "steps/")
@@ -77,6 +103,7 @@ export function createBlobStore(gcsPrefix: string, yerelDizin: string): BlobStor
     usingGcs,
 
     async save(storedName, buffer, mimeType) {
+      guvenliDosyaAdi(storedName);
       if (usingGcs()) {
         const bucket = await getBucket(gcsPrefix);
         await bucket.file(gcsPrefix + storedName).save(buffer, {
@@ -90,6 +117,7 @@ export function createBlobStore(gcsPrefix: string, yerelDizin: string): BlobStor
     },
 
     async read(storedName) {
+      guvenliDosyaAdi(storedName);
       if (usingGcs()) {
         const bucket = await getBucket(gcsPrefix);
         try {
@@ -107,6 +135,7 @@ export function createBlobStore(gcsPrefix: string, yerelDizin: string): BlobStor
     },
 
     async remove(storedName) {
+      guvenliDosyaAdi(storedName);
       if (usingGcs()) {
         const bucket = await getBucket(gcsPrefix);
         await bucket.file(gcsPrefix + storedName).delete({ ignoreNotFound: true });
