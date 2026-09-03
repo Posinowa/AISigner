@@ -10,7 +10,12 @@ import { BildirimZili } from "@/features/bildirim/ui/BildirimZili";
 import Image from "next/image";
 
 type Role = "ADMIN" | "MENTOR" | "STUDENT";
-type NavLink = { href: string; label: string };
+type NavLink = {
+  href: string;
+  label: string;
+  /** #420: Mezun stajyerde gizlenir — erişemeyeceği sayfaya bağlantı verilmez. */
+  mezunGizle?: boolean;
+};
 
 // Rol bazlı kalıcı üst navigasyon (#2). Route-group layout'larına gömülür.
 const navByRole: Record<Role, { home: string; links: NavLink[] }> = {
@@ -47,6 +52,20 @@ const navByRole: Record<Role, { home: string; links: NavLink[] }> = {
       { href: "/student-dashboard/messages", label: "Mesajlar" },
       { href: "/student-dashboard/ai-analiz", label: "AI Analizim" },
       { href: "/student-dashboard/suggestions", label: "Öneri & İstek" },
+      /*
+       * #420: Panodaki iki blok kendi sayfalarına taşındı. Ölçülmüştü (#415):
+       * öneri formu tek başına 745px'di ve üç adım kartının toplamından
+       * büyüktü. Yılda bir kez kullanılan bir araç çalışma masasında durmamalı.
+       *
+       * ⚠️ "Projemi Öner" MEZUNA GÖSTERİLMİYOR (`mezunGizle`): #208'de
+       * sistem durumunu değiştiren uçlar mezuna kapalı. Erişemeyeceği bir
+       * sayfaya bağlantı göstermek yanıltıcı olurdu.
+       *
+       * ⚠️ "Mentör Görüşmesi" MEZUNA AÇIK — #398'deki bilinçli karar:
+       * görüşme, mesajlaşma gibi *insan iletişimi* kanalı.
+       */
+      { href: "/student-dashboard/proposals", label: "Projemi Öner", mezunGizle: true },
+      { href: "/student-dashboard/ofis-saati", label: "Mentör Görüşmesi" },
     ],
   },
 };
@@ -54,14 +73,15 @@ const navByRole: Record<Role, { home: string; links: NavLink[] }> = {
 // Tam ekran akışlarda (onboarding / profil kurulumu) kabuk gizlenir.
 const HIDDEN_PREFIXES = ["/student-onboarding", "/profile-setup"];
 
-export function AppShell({ role }: { role: Role }) {
+export function AppShell({ role, mezun = false }: { role: Role; mezun?: boolean }) {
   const pathname = usePathname();
 
   if (HIDDEN_PREFIXES.some((p) => pathname.startsWith(p))) {
     return null;
   }
 
-  const { home, links } = navByRole[role];
+  const { home, links: tumLinkler } = navByRole[role];
+  const links = mezun ? tumLinkler.filter((l) => !l.mezunGizle) : tumLinkler;
 
   // Ana panel linki tam eşleşme ister (alt sayfalarda vurgulanmasın);
   // diğerleri (Mesajlar/Projeler) prefix eşleşmesiyle vurgulanır.

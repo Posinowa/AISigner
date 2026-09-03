@@ -20,7 +20,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
 
   return (
     <>
-      <AppShell role="STUDENT" />
+      <AppShell role="STUDENT" mezun={session.user.accountStatus === "GRADUATED"} />
       {/* #329: Adım tamamlandığında (ör. #326 webhook'u ile) anında kutlama. */}
       <AdimKutlamasi />
       {children}
