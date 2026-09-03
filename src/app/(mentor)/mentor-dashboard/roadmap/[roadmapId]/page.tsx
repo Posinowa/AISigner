@@ -24,6 +24,7 @@ import { RotateCcw,
   ChevronDown,
   ChevronUp,
   AlertTriangle,
+  MessageSquare,
   ArrowUp,
   ArrowDown,
   Github,
@@ -38,6 +39,8 @@ import { useConfirm } from "@/components/ui/ConfirmDialog";
 type RoadmapStep = {
   id: string;
   order: number;
+  /** #407: Bu adımdaki yorum sayısı (toplam — okunma izi şemada yok). */
+  _count?: { comments: number };
   title: string;
   description: string;
   estimatedHours: number | null;
@@ -650,6 +653,17 @@ export default function RoadmapReviewPage() {
                     <span className="text-xs text-gray-400 flex items-center gap-1">
                       <Clock className="w-3 h-3" />
                       {step.estimatedHours}s
+                    </span>
+                  )}
+                  {/* #407: Stajyer yorum yazdığında mentör de fark etmiyordu —
+                      yorumlar akordeonun içindeydi. Sıfırsa basılmıyor. */}
+                  {(step._count?.comments ?? 0) > 0 && (
+                    <span
+                      title={`${step._count?.comments} yorum`}
+                      className="flex items-center gap-1 rounded bg-gray-100 px-2 py-0.5 text-[10px] font-bold text-gray-600"
+                    >
+                      <MessageSquare className="w-3 h-3" />
+                      {step._count?.comments}
                     </span>
                   )}
                   <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full uppercase ${statusInfo.color}`}>

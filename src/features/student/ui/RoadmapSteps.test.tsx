@@ -266,3 +266,49 @@ describe("RoadmapSteps — tamamlanan adımların katlanması (#417)", () => {
     expect(screen.getByText("Önceki aşamanın tamamlanması bekleniyor")).toBeInTheDocument();
   });
 });
+
+describe("RoadmapSteps — yorum sayısı (#407)", () => {
+  /*
+   * Mentör bir adıma yorum bıraktığında stajyer, o adımın akordeonunu
+   * AÇMADIKÇA yorumun varlığını fark edemiyordu; `StepComments` yalnız
+   * akordeon gövdesinde render ediliyor.
+   */
+  it("yorum varsa sayı başlıkta görünür", () => {
+    render(<RoadmapSteps steps={[adim({ yorumSayisi: 3 })]} isDraft={false} />);
+    expect(screen.getByTitle("3 yorum")).toBeInTheDocument();
+    expect(screen.getByTitle("3 yorum")).toHaveTextContent("3");
+  });
+
+  it("⚠️ SIFIR yorumda hiç basılmaz — '0 yorum' yer kaplamaktan başka bir şey yapmaz", () => {
+    render(<RoadmapSteps steps={[adim({ yorumSayisi: 0 })]} isDraft={false} />);
+    expect(screen.queryByTitle(/yorum/)).not.toBeInTheDocument();
+  });
+
+  it("alan hiç verilmezse de basılmaz", () => {
+    render(<RoadmapSteps steps={[adim()]} isDraft={false} />);
+    expect(screen.queryByTitle(/yorum/)).not.toBeInTheDocument();
+  });
+
+  /*
+   * ⚠️ "YENİ" DEĞİL, TOPLAM. `StepComment`'ta okunma izi yok; "1 yeni yorum"
+   * demek yeni bir şema ister ve okunma izi olmadan "yeni" demek uydurma
+   * olurdu.
+   */
+  it("⚠️ metin 'yeni' iddiası taşımaz — yalnız sayı", () => {
+    render(<RoadmapSteps steps={[adim({ yorumSayisi: 2 })]} isDraft={false} />);
+    expect(screen.getByTitle("2 yorum")).not.toHaveTextContent(/yeni/i);
+  });
+
+  it("kilitli adımda da sayı görünür — konuşma olduğunu bilmek yeterli", () => {
+    render(
+      <RoadmapSteps
+        steps={[
+          adim({ id: "s1", order: 1, status: "TODO" }),
+          adim({ id: "s2", order: 2, yorumSayisi: 1 }),
+        ]}
+        isDraft={false}
+      />,
+    );
+    expect(screen.getByTitle("1 yorum")).toBeInTheDocument();
+  });
+});

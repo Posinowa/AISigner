@@ -21,7 +21,11 @@ export async function GET(
     const roadmap = await prisma.roadmap.findUnique({
       where: { id: roadmapId },
       include: {
-        steps: { orderBy: { order: "asc" } },
+        steps: {
+          orderBy: { order: "asc" },
+          // #407: Yorum sayısı liste sorgusundan — adım başına ayrı istek N+1 olurdu.
+          include: { _count: { select: { comments: true } } },
+        },
         // #332: Sahiplik bireysel VEYA takım; yetki tek tanımdan gelir.
         assignedProject: {
           select: {
@@ -112,7 +116,11 @@ export async function PUT(
       where: { id: roadmapId },
       data: updateData,
       include: {
-        steps: { orderBy: { order: "asc" } },
+        steps: {
+          orderBy: { order: "asc" },
+          // #407: Yorum sayısı liste sorgusundan — adım başına ayrı istek N+1 olurdu.
+          include: { _count: { select: { comments: true } } },
+        },
       },
     });
 
