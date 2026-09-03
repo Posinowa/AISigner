@@ -1,6 +1,8 @@
 "use client";
 
 import { taslakMi, TASLAK_ROZETI, TASLAK_SONUCU } from "@/features/roadmap/taslak";
+import { KodIncelemesiDurumuRozeti } from "@/features/kvkk/ui/KodIncelemesiDurumu";
+import type { KodIncelemesiDurumu } from "@/features/kvkk/kod-incelemesi-durumu";
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { ArrowLeft, User, Clock, BookOpen, Plus, CheckCircle, AlertCircle, Trash2, Sparkles, Map, Github, Loader2 } from "lucide-react";
@@ -47,6 +49,13 @@ type Roadmap = {
 };
 
 type StudentDetail = {
+  /**
+   * #394: Atama kimliği -> AI kod incelemesi durumu.
+   *
+   * Kural (takımda herkesin güncel rızası) değişmiyor; eksik olan
+   * sessizliğiydi — engelleme hiç kimseye söylenmiyordu.
+   */
+  kodIncelemesi?: Record<string, KodIncelemesiDurumu>;
   id: string;
   name: string | null;
   lastName: string | null;
@@ -639,6 +648,17 @@ export default function StudentDetailPage() {
                           yolHaritasiHazir={(project.roadmap?.steps?.length ?? 0) > 0}
                           onDegisti={loadStudentDetail}
                         />
+
+                        {/* #394: AI kod incelemesi neden çalışmıyor — kural
+                            değişmiyor, GÖRÜNÜR oluyor. Depo kurulmamışken
+                            gösterilmiyor: henüz PR gelmeyecek. */}
+                        {project.githubStatus !== "NOT_PROVISIONED" &&
+                          student.kodIncelemesi?.[project.id] && (
+                            <KodIncelemesiDurumuRozeti
+                              durum={student.kodIncelemesi[project.id]}
+                              githubStatus={project.githubStatus}
+                            />
+                          )}
                       </div>
                     );
                   })}

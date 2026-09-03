@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { mentorunOgrencisiWhere } from "@/features/teams/server/sahiplik";
 import { Prisma } from "@prisma/client";
 import { logger } from "@/lib/logger";
+import { kodIncelemesiDurumu } from "@/features/kvkk/kod-incelemesi-durumu";
 
 // #58: Aynı proje aynı öğrenciye iki kez atanmaya çalışılırsa — route bunu 409'a çevirir.
 export class AssignmentConflictError extends Error {
@@ -233,7 +234,27 @@ export async function getStudentDetail(studentId: string, mentorId: string) {
       },
     });
 
-    return student;
+    if (!student) return student;
+
+    /*
+     * #394: AI KOD İNCELEMESİNİN DURUMU.
+     *
+     * Kural (takımda herkesin güncel rızası) doğru ve gevşetilmiyor; eksik
+     * olan SESSİZLİĞİYDİ. Engelleme hiç kimseye söylenmiyordu: PR'ı açan
+     * öğrenci incelemenin neden gelmediğini bilmiyor, mentör de durumu
+     * göremiyordu (sayaç artıyor ama o yalnızca teşhis).
+     *
+     * ⚠️ Atama başına TEK sorgu; öğrencinin birkaç projesi olabilir ama
+     * sayı küçük ve durum atamaya özgü (takım üyeleri farklı olabilir).
+     */
+    const atamalar = student.studentProfile?.assignedProjects ?? [];
+    const kodIncelemesi = Object.fromEntries(
+      await Promise.all(
+        atamalar.map(async (a) => [a.id, await kodIncelemesiDurumu(a.id)] as const),
+      ),
+    );
+
+    return { ...student, kodIncelemesi };
   } catch (error) {
     // "Bulunamadı" durumunu findFirst zaten null ile döner (exception atmaz);
     // buraya yalnızca gerçek DB hatasında düşülür → yutmak yerine rethrow.
