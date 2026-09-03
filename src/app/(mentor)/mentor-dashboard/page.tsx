@@ -14,6 +14,7 @@ import { PanelKarsilama } from "@/features/dashboard/ui/PanelKarsilama";
 import { ProfilTamamlaSeridi } from "@/features/dashboard/ui/ProfilTamamlaSeridi";
 import { mentorDurumu } from "@/features/dashboard/models/mentorDurumu";
 import { experienceLevelLabel } from "@/lib/experience-level";
+import { OfisSaatiMentor } from "@/features/ofis-saati/ui/OfisSaatiMentor";
 
 type StudentWithProfile = {
   id: string;
@@ -227,6 +228,12 @@ export default function MentorDashboardPage() {
               </div>
             </div>
           ))}
+        </div>
+
+        {/* #398: Ofis saati — stajyer listesinin üstünde, mentörün
+            gününü planlarken ilk gördüğü yer. */}
+        <div className="mb-8">
+          <OfisSaatiMentor />
         </div>
 
         {/* Student List */}

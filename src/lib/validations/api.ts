@@ -382,3 +382,40 @@ export const revizyonIsteSchema = z.object({
     .min(10, "Gerekçe en az 10 karakter olmalı")
     .max(1000, "Gerekçe en fazla 1000 karakter olabilir"),
 });
+
+/**
+ * Ofis saati (#398).
+ *
+ * ⚠️ GÖRÜŞME LİNKİ MENTÖRÜN GİRDİĞİ METİN. Yalnız http/https kabul ediliyor;
+ * `javascript:` gibi şemalar stajyerin tıkladığı yerde kod çalıştırırdı.
+ */
+export const gorusmeLinkiSchema = z.object({
+  link: z
+    .string()
+    .trim()
+    .max(500)
+    .refine(
+      (v) => {
+        if (v === "") return true;
+        try {
+          return ["http:", "https:"].includes(new URL(v).protocol);
+        } catch {
+          return false;
+        }
+      },
+      { message: "Geçerli bir http(s) adresi girin." },
+    ),
+});
+
+export const ofisSaatiAcSchema = z.object({
+  baslangic: z.string().datetime(),
+  bitis: z.string().datetime(),
+});
+
+export const ofisSaatiRezerveSchema = z.object({
+  not: z.string().trim().max(500).optional(),
+});
+
+export const gorusmeNotuSchema = z.object({
+  not: z.string().trim().max(2000),
+});

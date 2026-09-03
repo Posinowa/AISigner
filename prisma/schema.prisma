@@ -34,6 +34,9 @@ model User {
   // #354: "yazıyor..." sinyalleri.
   // #380: Kalıcı bildirimler.
   notifications            Notification[]
+  // #398: Ofis saati — açtığı slotlar ve rezerve ettikleri.
+  ofisSaatleri             OfisSaatiSlotu[]    @relation("OfisSaati_mentorIdToUser")
+  rezervasyonlari          OfisSaatiSlotu[]    @relation("OfisSaati_rezerveEdenIdToUser")
   gonderdigiYaziyor        TypingSignal[]      @relation("TypingSignal_fromUserIdToUser")
   aldigiYaziyor            TypingSignal[]      @relation("TypingSignal_toUserIdToUser")
   stepComments             StepComment[]
@@ -325,6 +328,57 @@ model StepIssue {
   step RoadmapStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
 
   @@index([stepId])
+}
+
+/// Ofis saati slotu (#398).
+///
+/// Mentör bir zaman aralığı açar, sistem 20 dakikalık dilimlere böler,
+/// stajyer tek tıkla rezerve eder.
+///
+/// ⚠️ ÇİFT REZERVASYON VERİTABANINDA ENGELLENİR. Rezervasyon "önce sorgula
+/// sonra yaz" ile değil, tek bir koşullu UPDATE ile yapılıyor
+/// (`WHERE id = ? AND rezerveEdenId IS NULL`). Aynı anda iki stajyer tıklarsa
+/// yalnız biri satırı yakalar. #345/#349/#366'daki ders: taramaya değil
+/// kısıta/kayda güven.
+///
+/// ⚠️ Tekrar eden (haftalık) slot YOK — bilinçli. Yineleme kuralı, istisna
+/// yönetimi ve takvim genişletmesi ayrı bir iş; somut zaman dilimleri
+/// belirsizlik bırakmıyor.
+model OfisSaatiSlotu {
+  id        String   @id @default(cuid())
+  mentorId  String
+  /// UTC saklanır, kullanıcıya yerel saatiyle gösterilir.
+  baslangic DateTime
+  bitis     DateTime
+
+  /// Rezerve eden stajyer. NULL = slot boş.
+  rezerveEdenId   String?
+  rezerveEdildiAt DateTime?
+  /// Stajyerin rezervasyon sırasında yazdığı kısa not.
+  ogrenciNotu     String?   @db.VarChar(500)
+
+  /// #398: Görüşme sonrası mentörün KENDİ cümleleriyle yazdığı not.
+  ///
+  /// ⚠️ AI HİÇ KARIŞMIYOR. Kayıt resmî ve öğrenci hakkında; AI'ın genişlettiği
+  /// bir cümle mentörün sözü gibi durur ve öğrenci itiraz ederse kimin sözü
+  /// olduğu belirsiz kalır (#328'deki "uydurma kesinlik üretme" sınırı).
+  mentorNotu String? @db.VarChar(2000)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  mentor      User  @relation("OfisSaati_mentorIdToUser", fields: [mentorId], references: [id], onDelete: Cascade)
+  rezerveEden User? @relation("OfisSaati_rezerveEdenIdToUser", fields: [rezerveEdenId], references: [id], onDelete: SetNull)
+
+  /// ⚠️ Aynı mentör aynı ana İKİ slot açamaz — kural VERİTABANINDA.
+  ///
+  /// Canlı testte bulundu: "Aralık aç" iki kez tıklandığında takvim
+  /// ikizleniyordu ve stajyer aynı 14:00 dilimini iki kez görüyordu.
+  /// "Önce sorgula sonra yaz" bu yarışı kaybederdi (#345/#349/#366 dersi);
+  /// çağıran taraf `skipDuplicates` ile yeniden açmayı idempotent yapıyor.
+  @@unique([mentorId, baslangic])
+  @@index([mentorId, baslangic])
+  @@index([rezerveEdenId, baslangic])
 }
 
 /// Kalıcı bildirim (#380).
@@ -759,6 +813,14 @@ model MentorProfile {
   capacity    Int @default(1)
   /// Haftada ayırabileceği saat.
   weeklyHours Int
+
+  /// #398: Ofis saati görüşmelerinde kullanılacak bağlantı (Meet/Zoom/…).
+  ///
+  /// ⚠️ Otomatik Google Meet üretmiyoruz: yeni OAuth akışı, token saklama,
+  /// Calendar API kotası ve mentörün takvimine erişim demekti — yani yeni bir
+  /// KVKK aydınlatma yüzeyi. #330'da sesli/görüntülü görüşme aynı gerekçeyle
+  /// kapatılmıştı. Mentör kendi linkini bir kez giriyor.
+  gorusmeLinki String? @db.VarChar(500)
 
   /// Neden mentörlük yapmak istiyor.
   motivation     String @db.VarChar(2000)
