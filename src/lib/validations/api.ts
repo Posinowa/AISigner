@@ -349,18 +349,48 @@ export const claimStepSchema = z.object({
 // #366: Stajyerin kendi proje önerisi.
 const kaynakEnum = z.enum(["BIZIM", "BAGLA", "DEVRET"]);
 
+/**
+ * Proje önerisi alan sınırları — TEK KAYNAK (#408).
+ *
+ * ⚠️ Arayüz de bu sayıları okuyor. Elle kopyalanan bir "30", biri
+ * değiştirilip diğeri unutulduğunda sessizce ayrışırdı ve kullanıcıya
+ * yanlış bir eşik gösterilirdi.
+ */
+export const ONERI_SINIRLARI = {
+  baslik: { enAz: 5, enCok: 120 },
+  aciklama: { enAz: 30, enCok: 4000 },
+  hedefler: { enAz: 20, enCok: 2000 },
+} as const;
+
 export const createProposalSchema = z.object({
-  title: z.string().min(5, "Başlık en az 5 karakter").max(120).transform((v) => v.trim()),
+  /*
+   * ⚠️ `.trim()` ÖNCE, `.min()` SONRA — sıra önemli.
+   *
+   * Öncesi `.min(30).transform(v => v.trim())` idi: 35 BOŞLUK `min(30)`'u
+   * geçiyor ve BOŞ STİNG olarak kaydediliyordu. Ölçüldü. `.trim()`
+   * zincirin başında olduğunda kırpılmış uzunluk doğrulanıyor.
+   */
+  title: z
+    .string()
+    .trim()
+    .min(ONERI_SINIRLARI.baslik.enAz, `Başlık en az ${ONERI_SINIRLARI.baslik.enAz} karakter`)
+    .max(ONERI_SINIRLARI.baslik.enCok),
   description: z
     .string()
-    .min(30, "Açıklama en az 30 karakter olmalı")
-    .max(4000)
-    .transform((v) => v.trim()),
+    .trim()
+    .min(
+      ONERI_SINIRLARI.aciklama.enAz,
+      `Açıklama en az ${ONERI_SINIRLARI.aciklama.enAz} karakter olmalı`,
+    )
+    .max(ONERI_SINIRLARI.aciklama.enCok),
   goals: z
     .string()
-    .min(20, "Hedefler en az 20 karakter olmalı")
-    .max(2000)
-    .transform((v) => v.trim()),
+    .trim()
+    .min(
+      ONERI_SINIRLARI.hedefler.enAz,
+      `Hedefler en az ${ONERI_SINIRLARI.hedefler.enAz} karakter olmalı`,
+    )
+    .max(ONERI_SINIRLARI.hedefler.enCok),
   technologies: z.array(z.string().min(1).max(40)).max(10, "En fazla 10 teknoloji"),
   kaynak: kaynakEnum,
   // BAGLA/DEVRET için zorunluluk sunucu katmanında: burada `superRefine` ile
