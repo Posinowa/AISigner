@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { uygulamaUrl } from "@/lib/app-url";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { DebugNavbar } from "@/components/DebugNavbar"
@@ -16,7 +17,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://aisigner.com";
+const baseUrl = uygulamaUrl();
 
 export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),

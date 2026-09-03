@@ -1,7 +1,8 @@
 import type { MetadataRoute } from "next";
+import { uygulamaUrl } from "@/lib/app-url";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://aisigner.com";
+  const baseUrl = uygulamaUrl();
   const now = new Date();
 
   return [

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { uygulamaUrl } from "@/lib/app-url";
 import { logger } from "@/lib/logger";
 
 export type CertificateData = {
@@ -81,7 +82,7 @@ function isUniqueViolation(err: unknown): boolean {
 
 /** Doğrulama URL'i üretir. */
 export function getCertificateVerificationUrl(certNumber: string): string {
-  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://posinowa.com").replace(/\/+$/, "");
+  const baseUrl = uygulamaUrl();
   return `${baseUrl}/verify-certificate/${encodeURIComponent(certNumber)}`;
 }
 

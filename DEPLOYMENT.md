@@ -35,6 +35,17 @@ Out Plane konsolunda servisin **Variables** bölümüne girilir.
 | `DATABASE_URL` | Postgres bağlantısı. **`?sslmode=require` ekleyin.** | `postgresql://user:pass@host:5432/aisigner?sslmode=require` |
 | `AUTH_SECRET` | **JWT imzalama sırrı** (oturum + middleware). Yoksa uygulama prod'da açılmaz. **Yeni ve güçlü üretin.** | `openssl rand -base64 32` çıktısı |
 | `NEXTAUTH_URL` | Uygulamanın public URL'i (NextAuth callback'leri). | `https://aisigner.example.com` |
+| `NEXT_PUBLIC_APP_URL` | **Sertifika doğrulama, QR, LinkedIn ve e-posta bağlantılarının tabanı.** Tanımsızsa uygulama üretimde **açılmaz** (#392). | `https://aisigner.example.com` |
+
+> **`NEXT_PUBLIC_APP_URL` neden sessizce varsayılmıyor (#392).** Bu değer yedi
+> ayrı yerde okunuyordu ve **üç farklı** varsayılana düşüyordu; sonucu
+> sertifikanın QR bağlantısı bir alan adına, LinkedIn paylaşımı **başka** bir
+> alan adına gidiyordu. Sertifika basılıp paylaşıldıktan sonra **geri
+> alınamaz**: yanlış alan adı taşıyan belgeler dolaşımda kalır. Bu yüzden
+> eksikse gürültülü şekilde başarısız oluyoruz.
+>
+> ⚠️ `NEXT_PUBLIC_*` değişkenleri **derleme anında** gömülür — imajı
+> oluştururken tanımlı olmalı, yalnızca çalıştırma anında vermek yetmez.
 
 > **`NEXTAUTH_SECRET` GİRMEYİN.** Bu proje NextAuth v4'ü `AUTH_SECRET` ile
 > yapılandırır ve kodda `NEXTAUTH_SECRET` hiç okunmaz. Parola-sıfırlama ve

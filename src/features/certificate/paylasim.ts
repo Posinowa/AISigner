@@ -1,3 +1,5 @@
+import { uygulamaUrl } from "@/lib/app-url";
+
 /**
  * Sertifikanın DIŞARIYA açılan bağlantıları (#323).
  *
@@ -7,7 +9,7 @@
 
 /** Uygulamanın public adresi. SEO ile aynı kaynağı kullanır (#204). */
 function uygulamaAdresi(): string {
-  return (process.env.NEXT_PUBLIC_APP_URL ?? "https://aisigner.com").replace(/\/+$/, "");
+  return uygulamaUrl();
 }
 
 /**
