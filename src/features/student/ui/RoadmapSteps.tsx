@@ -2,8 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, PlayCircle, Lock, ExternalLink, Loader2, Github } from "lucide-react";
+import { CheckCircle2, PlayCircle, Lock, ExternalLink, Loader2, Github, ChevronDown, ChevronUp } from "lucide-react";
 import { adimKilitli, adimEylemeAcik } from "@/features/roadmap/odak";
+import { adimlariGrupla } from "@/features/roadmap/gruplama";
 import { adimDurumunuGuncelle } from "@/features/roadmap/ui/adim-durumu-guncelle";
 import { StepComments } from "@/features/messaging/ui/StepComments";
 import { StepFiles } from "@/features/files/ui/StepFiles";
@@ -106,13 +107,58 @@ export function RoadmapSteps({
     setUpdatingId(null);
   }
 
+  /*
+   * #417: Tamamlanan adımlar tek satıra iniyor.
+   *
+   * Ölçüm: tamamlanmış adım kartı açık adımla AYNI boyutta (~300px);
+   * kilitli adım zaten 116px'e iniyordu. 10 adımlı bir yol haritasında 6
+   * tamamlanmış adım ≈ 1800px gereksiz yükseklik.
+   */
+  const gruplar = adimlariGrupla(steps);
+
+  /*
+   * ⚠️ MEZUNDA VARSAYILAN AÇIK. Mezunun portfolyosu salt okunur ama
+   * GÖRÜNÜR olmalı (#208): tüm adımları tamamlanmış olduğu için
+   * körlemesine katlamak, sertifikanın dayanağı olan işi gizlerdi.
+   *
+   * ⚠️ Tercih KALICI DEĞİL (bilerek): sayfa her açıldığında aktif işe
+   * odaklanmak varsayılan. Kullanıcının bir kez açtığı geçmiş, haftalar
+   * sonra da açık gelmemeli.
+   */
+  const [acikliklar, setAciklik] = useState<Record<string, boolean>>({});
+  const grupAcik = (anahtar: string) => acikliklar[anahtar] ?? Boolean(isGraduated);
+
   return (
     <div className="relative pl-4 md:pl-0">
       {/* Dikey Çizgi (Timeline) */}
       <div className="absolute left-[1.35rem] top-2 bottom-2 w-px bg-slate-200 hidden md:block" />
 
       <div className="space-y-6">
-        {steps.map((step, index) => {
+        {gruplar.map((grup) =>
+          grup.tip === "adim" ? (
+            adimKarti(grup.adim, grup.indeks)
+          ) : (
+            <TamamlananGrup
+              key={grup.anahtar}
+              adet={grup.adimlar.length}
+              acik={grupAcik(grup.anahtar)}
+              onDegistir={() =>
+                setAciklik((ö) => ({
+                  ...ö,
+                  [grup.anahtar]: !grupAcik(grup.anahtar),
+                }))
+              }
+            >
+              {grup.adimlar.map((a, i) => adimKarti(a, grup.indeksler[i]))}
+            </TamamlananGrup>
+          ),
+        )}
+      </div>
+    </div>
+  );
+
+  function adimKarti(step: Step, index: number) {
+    {
           const isCompleted = step.status === "COMPLETED";
           const isInProgress = step.status === "IN_PROGRESS";
           // #379: Mentör revizyon istedi. Öğrenci yeniden başlatabilmeli —
@@ -353,10 +399,8 @@ export function RoadmapSteps({
               </div>
             </div>
           );
-        })}
-      </div>
-    </div>
-  );
+    }
+  }
 }
 
 /**
@@ -417,5 +461,51 @@ function UstlenmeSeridi({
         </button>
       )}
     </span>
+  );
+}
+
+/**
+ * Tamamlanmış adımların katlanmış satırı (#417).
+ *
+ * ⚠️ Zaman çizgisindeki YERİNDE duruyor, listenin başına toplanmıyor:
+ * adımlar her zaman sırayla bitmiyor (bir adım revizyondayken sonraki
+ * tamamlanmış olabilir) ve hepsini tek yere yığmak "hangi iş nerede bitti"
+ * bilgisini kaybettirirdi.
+ */
+function TamamlananGrup({
+  adet,
+  acik,
+  onDegistir,
+  children,
+}: {
+  adet: number;
+  acik: boolean;
+  onDegistir: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={onDegistir}
+        aria-expanded={acik}
+        className="flex w-full items-center gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-2.5 text-left transition-colors hover:bg-emerald-50"
+      >
+        <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+        <span className="flex-1 text-sm font-medium text-emerald-900">
+          {adet} adım tamamlandı
+        </span>
+        <span className="text-xs font-medium text-emerald-700">
+          {acik ? "Gizle" : "Detayları göster"}
+        </span>
+        {acik ? (
+          <ChevronUp className="h-4 w-4 text-emerald-600" />
+        ) : (
+          <ChevronDown className="h-4 w-4 text-emerald-600" />
+        )}
+      </button>
+
+      {acik && <div className="mt-6 space-y-6">{children}</div>}
+    </div>
   );
 }
