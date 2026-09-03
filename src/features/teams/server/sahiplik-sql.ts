@@ -2,6 +2,28 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 
 /**
+ * SQL takma adını doğrular.
+ *
+ * `Prisma.raw` PARAMETRELEŞTİRMEZ — verdiğin metni sorguya OLDUĞU GİBİ
+ * gömer. Takma ad bugün yalnızca kod içi sabitlerden geliyor (`"ap"`,
+ * `"ap2"`), yani sömürülebilir bir yol YOK. Kapı yine de burada:
+ * `Prisma.raw`'ın tek doğrulanmamış girdisi buydu ve bu fonksiyonun
+ * imzası `string` — yarın bir çağıran oraya kullanıcı verisinden türeyen
+ * bir değer geçirdiğinde hiçbir şey uyarmazdı.
+ *
+ * Bilerek FIRLATIYOR, sessizce kırpmıyor: geçersiz bir takma ad çağıranın
+ * hatasıdır ve sorgunun yanlış satırları eşlemesindense patlaması yeğdir.
+ */
+const TAKMA_AD_KALIBI = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+function guvenliTakmaAd(ad: string): string {
+  if (!TAKMA_AD_KALIBI.test(ad)) {
+    throw new Error(`Geçersiz SQL takma adı: ${JSON.stringify(ad)}`);
+  }
+  return ad;
+}
+
+/**
  * Sahiplik kurallarının SQL karşılıkları (#376).
  *
  * ⚠️ NEDEN AYRI BİR DOSYA — VE NEDEN TEHLİKELİ:
@@ -100,7 +122,7 @@ export function ogrenciMentoreBagliSql(mentorIfadesi: Prisma.Sql) {
  * @param profilSutunu  karşılaştırılacak profil kimliği ifadesi
  */
 export function atamaOgrencininSql(atamaTakmaAdi: string, profilSutunu: Prisma.Sql) {
-  const ap = Prisma.raw(`"${atamaTakmaAdi}"`);
+  const ap = Prisma.raw(`"${guvenliTakmaAd(atamaTakmaAdi)}"`);
   return Prisma.sql`(
     ${ap}."studentProfileId" = ${profilSutunu}
     OR EXISTS (

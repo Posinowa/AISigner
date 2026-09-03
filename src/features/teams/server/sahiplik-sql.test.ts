@@ -74,3 +74,48 @@ describe("atamaOgrencininSql", () => {
     expect(s).toContain('o."profilId"');
   });
 });
+
+describe("takma ad doğrulaması — `Prisma.raw` kapısı", () => {
+  /*
+   * `Prisma.raw` PARAMETRELEŞTİRMEZ: verdiğin metin sorguya olduğu gibi
+   * girer. `atamaOgrencininSql`'in takma ad parametresi bugün yalnız kod içi
+   * sabitlerden besleniyor, yani sömürülebilir bir yol YOK — ama imza
+   * `string` ve `Prisma.raw`'a giden tek doğrulanmamış girdi buydu.
+   *
+   * Testin işi bu kapıyı KİLİTLEMEK: yarın biri buraya kullanıcı verisinden
+   * türeyen bir değer geçirdiğinde sessizce çalışmasın.
+   */
+  it("meşru takma adlar kabul edilir", () => {
+    expect(() => atamaOgrencininSql("ap", Prisma.sql`x`)).not.toThrow();
+    expect(() => atamaOgrencininSql("ap2", Prisma.sql`x`)).not.toThrow();
+    expect(() => atamaOgrencininSql("_a_1", Prisma.sql`x`)).not.toThrow();
+  });
+
+  it("⚠️ tırnak kaçışı REDDEDİLİR — enjeksiyonun asıl yolu", () => {
+    // `"` kapatıp kendi SQL'ini yazmak: kalıbın engellediği şey tam bu.
+    expect(() => atamaOgrencininSql('ap" OR "1"="1', Prisma.sql`x`)).toThrow(
+      /Geçersiz SQL takma adı/,
+    );
+  });
+
+  it("boşluk, noktalı virgül ve yorum işareti reddedilir", () => {
+    for (const kotu of ["ap ", "ap;DROP TABLE x", "ap--", "ap/*", "a b"]) {
+      expect(() => atamaOgrencininSql(kotu, Prisma.sql`x`)).toThrow();
+    }
+  });
+
+  it("boş ad ve rakamla başlayan ad reddedilir", () => {
+    expect(() => atamaOgrencininSql("", Prisma.sql`x`)).toThrow();
+    expect(() => atamaOgrencininSql("1ap", Prisma.sql`x`)).toThrow();
+  });
+
+  it("SESSİZCE KIRPMAZ, fırlatır", () => {
+    // Kırpmak sorgunun YANLIŞ satırları eşlemesine yol açardı; patlaması yeğ.
+    try {
+      atamaOgrencininSql("ap; --", Prisma.sql`x`);
+      expect.unreachable("fırlatmalıydı");
+    } catch (e) {
+      expect((e as Error).message).toContain("Geçersiz SQL takma adı");
+    }
+  });
+});
