@@ -161,6 +161,27 @@ export function mentorunOgrencisiWhere(mentorUserId: string) {
 }
 
 /**
+ * Bu ÖĞRENCİye ait atamaları seçen `AssignedProject` koşulu (#423).
+ *
+ * ⚠️ `atamaOgrencininSql`'in Prisma karşılığı — ikisi birlikte
+ * değişmeli (`sahiplik-sql.ts`'teki uyarının aynısı).
+ *
+ * ⚠️ #332'nin can alıcı noktası: takım atamasında `studentProfileId`
+ * **NULL**. Yalnız eşitliğe bakan bir koşul takım projelerini komple eler ve
+ * bu HATA OLARAK GÖRÜNMEZ, sadece liste eksik gelir.
+ *
+ * ⚠️ AYRILMIŞ ÜYE DAHİL DEĞİL (`leftAt: null`).
+ */
+export function ogrencininAtamalariWhere(studentProfileId: string) {
+  return {
+    OR: [
+      { studentProfileId },
+      { team: { members: { some: { studentProfileId, leftAt: null } } } },
+    ],
+  };
+}
+
+/**
  * AI üretimi için profil bağlamı (#332).
  *
  * Yol haritası ve issue üretimi tek bir öğrenci profili bekliyordu; takım

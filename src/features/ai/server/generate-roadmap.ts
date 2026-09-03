@@ -1,10 +1,18 @@
 import { getModel } from "@/lib/ai/gemini-client";
-import { guvenliMetin, guvenliListe, veriBlogu } from "@/lib/ai/prompt";
+import { guvenliMetin, guvenliListe, veriBlogu, AZAMI_GECMIS_ADIM } from "@/lib/ai/prompt";
 import { cozVeDogrula } from "@/lib/ai/response";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
 import { experienceLevelLabel } from "@/lib/experience-level";
 import { StudentProfile, ProjectTemplate } from "@prisma/client";
+
+/**
+ * Mentör yönlendirmesinin azami uzunluğu (#423).
+ *
+ * Prompt bütçesini korumak için: uzun bir serbest metin, profil analizi ve
+ * geçmiş bloğuyla birlikte prompt'u şişirir.
+ */
+export const YONLENDIRME_SINIRI = 500;
 
 /** Prompt'un istediği adım aralığı — şema da AYNI sayıları kullanıyor. */
 export const EN_AZ_ADIM = 4;
@@ -99,6 +107,55 @@ ${parcalar.join(arasi)}
 }
 
 /**
+ * Mentörün üretimi yönlendiren serbest metni (#423).
+ *
+ * ⚠️ MENTÖR METNİ DE KULLANICI METNİDİR — `veriBlogu` ile sarılıyor (#390).
+ * Mentör güvenilir bir roldür ama metni yine de modele giden bir girdi;
+ * "yetkili kişi yazdı" varsayımı #390'da tam olarak bu yüzden reddedilmişti.
+ *
+ * ⚠️ ÖNCELİK AÇIKÇA YAZILI. Yönlendirme, profil analizinden gelen blokla
+ * (#410) çelişebilir: analiz "önce veri modeli" derken mentör "önce arayüz"
+ * diyebilir. İki talimat sessizce yarışırsa hangisinin kazandığı modele
+ * kalır ve çıktı açıklanamaz olur. Mentör insan, analiz türetilmiş bir
+ * tahmin — son söz mentörde.
+ */
+function yonlendirmeBlogu(yonlendirme?: string | null): string {
+  const metin = yonlendirme?.trim();
+  if (!metin) return "";
+
+  return `
+      MENTÖR YÖNLENDİRMESİ:
+${veriBlogu("- Mentörün isteği", guvenliMetin(metin, YONLENDIRME_SINIRI))}
+      Bu istek, yukarıdaki öğrenci analizinden ÖNCELİKLİDİR: ikisi çelişirse
+      mentörün isteğini uygula.
+`;
+}
+
+/**
+ * Öğrencinin ÖNCEKİ projelerinde tamamladığı adımlar (#423).
+ *
+ * ⚠️ İKİNCİ PROJEDE AYNI ADIMLAR TEKRARLANIYORDU. Stajyer yine "Proje
+ * Kurulumu ve Gerekli Araçlar" adımını alıyordu, çünkü geçmiş iş prompt'a
+ * hiç girmiyordu.
+ *
+ * ⚠️ YALNIZ BAŞLIKLAR gidiyor, açıklamalar değil. Tüm geçmişi göndermek
+ * prompt bütçesini şişirirdi; tekrarı önlemek için başlık yeterli.
+ *
+ * ⚠️ Başlıklar öğrencinin kendi yol haritalarından geliyor ama içerikleri
+ * AI ürünü ve dolaylı olarak kullanıcı metninden türüyor — sarılıyorlar.
+ */
+function gecmisBlogu(tamamlananBasliklar: string[]): string {
+  if (tamamlananBasliklar.length === 0) return "";
+
+  return `
+      DAHA ÖNCE TAMAMLADIĞI ADIMLAR:
+${veriBlogu("- Geçmiş adımlar", guvenliListe(tamamlananBasliklar))}
+      Bu konuları TEKRAR ETME; öğrenci onları zaten yaptı. Yeni yol haritası
+      bu noktadan İLERİ gitsin.
+`;
+}
+
+/**
  * Modelin verdiği sırayı koruyup numaraları 1..n olarak YENİDEN yazar.
  *
  * ⚠️ MODELİN `order` DEĞERİ VERİTABANINA OLDUĞU GİBİ YAZILIYORDU. Model
@@ -132,10 +189,19 @@ export type YolHaritasiAnalizi = {
   recommendedPath: string;
 };
 
+/** #423: Üretimi şekillendiren ek bağlam. */
+export type UretimBaglami = {
+  /** Mentörün serbest metni — analizden ÖNCELİKLİ. */
+  yonlendirme?: string | null;
+  /** Öğrencinin ÖNCEKİ projelerinde tamamladığı adım başlıkları. */
+  gecmisAdimlar?: string[];
+};
+
 export async function generateRoadmap(
   studentProfile: StudentProfile,
   projectTemplate: ProjectTemplate,
   analiz?: YolHaritasiAnalizi | null,
+  baglam?: UretimBaglami | null,
 ): Promise<RoadmapStepData[]> {
   try {
     const model = getModel();
@@ -163,7 +229,7 @@ export async function generateRoadmap(
       - Seviye: ${experienceLevelLabel(studentProfile.experienceLevel)}
       ${veriBlogu("- İlgi Alanları", guvenliListe(interests))}
       ${veriBlogu("- Hedefler", guvenliMetin(studentProfile.goals))}
-${analizBlogu(analiz)}
+${analizBlogu(analiz)}${gecmisBlogu((baglam?.gecmisAdimlar ?? []).slice(-AZAMI_GECMIS_ADIM))}${yonlendirmeBlogu(baglam?.yonlendirme)}
       PROJE BİLGİLERİ:
       ${veriBlogu("- Proje Adı", guvenliMetin(projectTemplate.title, 200))}
       ${veriBlogu("- Açıklama", guvenliMetin(projectTemplate.description))}

@@ -110,6 +110,14 @@ export const generateRoadmapSchema = z.object({
   // #178-4: Var olan yol haritasını silip yeniden üretme. Ham `as` cast yerine
   // şemadan geçer; route yalnızca DRAFT roadmap için siler (PUBLISHED korunur).
   overwrite: z.boolean().optional(),
+  /**
+   * #423: Mentörün üretimi yönlendiren serbest metni.
+   *
+   * ⚠️ Mentör metni de KULLANICI METNİDİR; prompt'a `veriBlogu` ile
+   * sarılarak giriyor (#390). "Yetkili kişi yazdı" varsayımı #390'da tam
+   * olarak bu yüzden reddedilmişti.
+   */
+  yonlendirme: z.string().max(500, "Yönlendirme en fazla 500 karakter").optional(),
 });
 
 // Mentor: AI proje önerisi

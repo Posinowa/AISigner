@@ -275,13 +275,25 @@ export default function StudentDetailPage() {
   }
 
   // 🚀 SPRINT 3: YENİ FONKSİYON - AI Yol Haritası Üret
+  /*
+   * #423: Mentör üretimi yönlendirebiliyor.
+   *
+   * ⚠️ Metin sunucuda `veriBlogu` ile sarılıyor (#390) ve prompt'ta profil
+   * analizinden ÖNCELİKLİ olduğu açıkça yazılı — ikisi çelişirse hangisinin
+   * kazandığı modele bırakılmamış.
+   */
+  const [yonlendirmeler, setYonlendirmeler] = useState<Record<string, string>>({});
+
   async function handleGenerateRoadmap(assignedProjectId: string) {
     try {
       setGeneratingRoadmapId(assignedProjectId);
       const res = await fetch("/api/mentor/generate-roadmap", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assignedProjectId }),
+        body: JSON.stringify({
+          assignedProjectId,
+          yonlendirme: yonlendirmeler[assignedProjectId]?.trim() || undefined,
+        }),
       });
 
       if (res.ok) {
@@ -568,7 +580,29 @@ export default function StudentDetailPage() {
                               )}
                             </div>
                           ) : (
-                            <div className="flex items-center justify-between w-full">
+                            <div className="w-full">
+                              {/* #423: Mentör yönlendirmesi — isteğe bağlı. */}
+                              <label
+                                htmlFor={`yonlendirme-${project.id}`}
+                                className="block text-xs font-medium text-gray-600"
+                              >
+                                Yönlendirme (isteğe bağlı)
+                              </label>
+                              <input
+                                id={`yonlendirme-${project.id}`}
+                                value={yonlendirmeler[project.id] ?? ""}
+                                onChange={(e) =>
+                                  setYonlendirmeler((ö) => ({ ...ö, [project.id]: e.target.value }))
+                                }
+                                maxLength={500}
+                                placeholder="Örn: Testlere ağırlık versin, GitHub akışını da öğrensin."
+                                className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-[#3e92cc] focus:outline-none"
+                              />
+                              <p className="mt-1 text-[11px] text-gray-400">
+                                Yazdığın istek, öğrencinin AI analizinden önceliklidir.
+                              </p>
+
+                            <div className="mt-3 flex items-center justify-between w-full">
                               <span className="text-sm text-gray-500">Öğrenci için rota çizilmemiş.</span>
                               <button
                                 onClick={() => handleGenerateRoadmap(project.id)}
@@ -591,6 +625,7 @@ export default function StudentDetailPage() {
                                   </>
                                 )}
                               </button>
+                            </div>
                             </div>
                           )}
                         </div>
