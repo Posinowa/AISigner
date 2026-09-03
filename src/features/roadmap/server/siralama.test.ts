@@ -22,7 +22,7 @@ const { prismaMock } = vi.hoisted(() => ({
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 
-import { adimiTasi, komsuylaTakasEt } from "./siralama";
+import { adimiTasi, komsuylaTakasEt, yenidenNumaralandir } from "./siralama";
 
 const MENTOR = "men-1";
 
@@ -167,6 +167,47 @@ describe("adimiTasi — yazma", () => {
   it("SON adım aşağı → sinirda, HİÇBİR yazma olmaz", async () => {
     const s = await adimiTasi({ roadmapId: "rm-1", stepId: "c", yon: "asagi", mentorUserId: MENTOR });
     expect(s).toEqual({ ok: false, neden: "sinirda" });
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * ⚠️ #411: Silme sonrası yeniden numaralandırma KAPSAMI.
+ *
+ * Eski silme ucu adımı kimliğine göre siliyor ama sırayı URL'deki
+ * `roadmapId`'ye göre numaralandırıyordu; ikisi farklı olduğunda YANLIŞ yol
+ * haritası yeniden numaralanıyordu.
+ */
+describe("yenidenNumaralandir", () => {
+  it("kapsam roadmapId ile daraltılır", async () => {
+    prismaMock.roadmapStep.findMany.mockResolvedValue(adimlar("a", "b"));
+    await yenidenNumaralandir("rm-1");
+
+    const cagri = prismaMock.roadmapStep.findMany.mock.calls[0][0] as {
+      where: { roadmapId: string };
+    };
+    expect(cagri.where).toEqual({ roadmapId: "rm-1" });
+  });
+
+  it("kalan adımlar 1..n yazılır, TEK transaction içinde", async () => {
+    prismaMock.roadmapStep.findMany.mockResolvedValue(adimlar("a", "b", "c"));
+    await yenidenNumaralandir("rm-1");
+
+    const yazilan = prismaMock.roadmapStep.update.mock.calls.map((c) => ({
+      id: (c[0] as { where: { id: string } }).where.id,
+      order: (c[0] as { data: { order: number } }).data.order,
+    }));
+    expect(yazilan).toEqual([
+      { id: "a", order: 1 },
+      { id: "b", order: 2 },
+      { id: "c", order: 3 },
+    ]);
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("adım kalmadıysa hiç yazma yapılmaz", async () => {
+    prismaMock.roadmapStep.findMany.mockResolvedValue([]);
+    await yenidenNumaralandir("rm-1");
     expect(prismaMock.$transaction).not.toHaveBeenCalled();
   });
 });

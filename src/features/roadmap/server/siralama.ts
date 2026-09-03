@@ -92,14 +92,46 @@ export async function adimiTasi(params: {
   const yeniSira = komsuylaTakasEt(adimlar, indeks, params.yon);
   if (!yeniSira) return { ok: false, neden: "sinirda" };
 
+  await sirayiYaz(yeniSira);
+
+  return { ok: true, veri: { sira: yeniSira.map((a, i) => ({ id: a.id, order: i + 1 })) } };
+}
+
+/**
+ * Verilen diziyi 1..n olarak yazar.
+ *
+ * TEK `$transaction`: yarıda kalan bir yeniden numaralandırma sırayı büsbütün
+ * bozardı. `(roadmapId, order)` üzerinde benzersizlik kısıtı olmadığı için ara
+ * durumda çakışma oluşmuyor.
+ */
+async function sirayiYaz(adimlar: { id: string }[]): Promise<void> {
   await prisma.$transaction(
-    yeniSira.map((adim, i) =>
+    adimlar.map((adim, i) =>
       prisma.roadmapStep.update({
         where: { id: adim.id },
         data: { order: i + 1 },
       }),
     ),
   );
+}
 
-  return { ok: true, veri: { sira: yeniSira.map((a, i) => ({ id: a.id, order: i + 1 })) } };
+/**
+ * Yol haritasının adımlarını baştan 1..n numaralandırır.
+ *
+ * Adım silindikten sonra çağrılıyor: silme, sırada bir boşluk bırakır.
+ *
+ * ⚠️ Kapsam `roadmapId` ile daraltılıyor. Silme ucundaki eski sürüm URL'den
+ * gelen `roadmapId`'ye göre numaralandırıyor ama adımı kimliğine göre
+ * siliyordu; ikisi farklı olduğunda YANLIŞ yol haritası yeniden
+ * numaralanıyordu (#411).
+ */
+export async function yenidenNumaralandir(roadmapId: string): Promise<void> {
+  const adimlar = await prisma.roadmapStep.findMany({
+    where: { roadmapId },
+    orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+    select: { id: true },
+  });
+
+  if (adimlar.length === 0) return;
+  await sirayiYaz(adimlar);
 }
