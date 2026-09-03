@@ -16,6 +16,7 @@ import { ProfilTamamlaSeridi } from "@/features/dashboard/ui/ProfilTamamlaSeridi
 import { mentorDurumu } from "@/features/dashboard/models/mentorDurumu";
 import { experienceLevelLabel } from "@/lib/experience-level";
 import { taslakMi, taslakUyarisi, TASLAK_ROZETI } from "@/features/roadmap/taslak";
+import { IlerlemeSeridi } from "@/features/progress/ui/IlerlemeSeridi";
 import { OfisSaatiMentor } from "@/features/ofis-saati/ui/OfisSaatiMentor";
 
 type StudentWithProfile = {
@@ -39,7 +40,12 @@ type StudentWithProfile = {
         difficulty: string;
       };
       // #405: Taslak yol haritası panoda işaretlenebilsin.
-      roadmap?: { id: string; status: string } | null;
+      // #432: Adım durumları — ilerleme çubuğu ve duraklama sinyali için.
+      roadmap?: {
+        id: string;
+        status: string;
+        steps?: { status: string; updatedAt: string | Date }[];
+      } | null;
       createdAt: Date;
     }[];
     // #367: Aktif takım üyelikleri — mentör "bu stajyer hangi takımda"
@@ -404,7 +410,8 @@ export default function MentorDashboardPage() {
                           const statusInfo = statusConfig[project.status as keyof typeof statusConfig];
                           const difficultyInfo = difficultyConfig[project.projectTemplate.difficulty as keyof typeof difficultyConfig];
                           return (
-                            <div key={project.id} className="flex items-center justify-between gap-2 bg-slate-50 rounded-lg px-3 py-2">
+                            <div key={project.id} className="space-y-2 bg-slate-50 rounded-lg px-3 py-2">
+                              <div className="flex items-center justify-between gap-2">
                               <span className="text-xs text-slate-700 truncate font-medium">
                                 {project.projectTemplate.title}
                               </span>
@@ -423,6 +430,16 @@ export default function MentorDashboardPage() {
                                   {difficultyInfo.label}
                                 </span>
                               </div>
+                              </div>
+
+                              {/* #432: Mentör öğrencisinin NEREDE olduğunu panodan
+                                  görebilsin — öncesi yalnız "aktif/tamamlanan proje"
+                                  sayacıydı (#393) ve nerede olduğu için detay sayfasına
+                                  girmek gerekiyordu. */}
+                              <IlerlemeSeridi
+                                adimlar={project.roadmap?.steps ?? []}
+                                taslakMi={taslakMi(project.roadmap?.status)}
+                              />
                             </div>
                           );
                         })}

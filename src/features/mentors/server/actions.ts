@@ -106,7 +106,17 @@ export async function getMentorStudents(mentorId: string): Promise<StudentWithPr
                 // projelerinde bu alan zaten seçiliydi, bireysel projelerde
                 // hiç çekilmiyordu — dolayısıyla mentör "yol haritası var mı,
                 // yayında mı" sorusunu panodan yanıtlayamıyordu.
-                roadmap: { select: { id: true, status: true } },
+                //
+                // #432: Adım durumları da geliyor — mentör öğrencisinin NEREDE
+                // olduğunu panodan görebilsin. Yalnız `status` ve `updatedAt`:
+                // başlık/açıklama pano için gereksiz yük.
+                roadmap: {
+                  select: {
+                    id: true,
+                    status: true,
+                    steps: { select: { status: true, updatedAt: true } },
+                  },
+                },
               },
               orderBy: {
                 createdAt: "desc",
@@ -143,7 +153,14 @@ export async function getMentorStudents(mentorId: string): Promise<StudentWithPr
                         githubRepoUrl: true,
                         githubStatus: true,
                         projectTemplate: { select: { id: true, title: true } },
-                        roadmap: { select: { id: true, status: true } },
+                        // #432: Takım projesinin ilerlemesi de panoda görünsün.
+                        roadmap: {
+                          select: {
+                            id: true,
+                            status: true,
+                            steps: { select: { status: true, updatedAt: true } },
+                          },
+                        },
                       },
                     },
                   },

@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   GitBranch,
   Clock,
+  AlertTriangle,
   ExternalLink,
   Loader2,
   RefreshCw,
@@ -37,6 +38,8 @@ export type StudentAssignmentProgress = {
   totalSteps: number;
   completedSteps: number;
   progressPercentage: number;
+  /** #432: Durakladıysa "10 gündür hareket yok", aksi halde null. */
+  duraklamaMetni: string | null;
   lastActivity: {
     title: string;
     updatedAt: Date;
@@ -50,6 +53,15 @@ export default function AdminAssignmentsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filterTab, setFilterTab] = useState<"ALL" | "NOT_PROVISIONED" | "PROVISIONED">("ALL");
+  /*
+   * #432: MENTÖRE GÖRE FİLTRE. Sayfa düz bir atama listesiydi; "şu
+   * mentörün öğrencileri toplu hâlde ne durumda" diye bakılamıyordu.
+   *
+   * ⚠️ FİLTRE, SIRALAMA DEĞİL. #331'de mentörleri yanıt süresine göre
+   * sıralayan bir liste BİLEREK reddedilmişti — bir insanı ölçüp
+   * sıralamak olurdu. Burada da yalnızca kapsam daraltılıyor.
+   */
+  const [mentorFiltresi, setMentorFiltresi] = useState<string>("HEPSI");
 
   // Modal State
   const [selectedAssignment, setSelectedAssignment] = useState<StudentAssignmentProgress | null>(null);
@@ -185,9 +197,24 @@ export default function AdminAssignmentsPage() {
       ? Math.round(assignments.reduce((acc, curr) => acc + curr.progressPercentage, 0) / totalAssigned)
       : 0;
 
+  // #432: Mentör listesi atamalardan türetiliyor — ayrı bir istek gereksiz.
+  // Aynı mentör birden çok atamada geçtiği için kimliğe göre tekilleştiriliyor.
+  const mentorSecenekleri = [
+    ...new Map(
+      assignments.flatMap((a) => a.mentors.map((m) => [m.id, m] as const)),
+    ).values(),
+  ].sort((a, b) => a.name.localeCompare(b.name, "tr"));
+
   const filteredAssignments = assignments.filter((item) => {
-    if (filterTab === "NOT_PROVISIONED") return item.githubStatus !== "PROVISIONED";
-    if (filterTab === "PROVISIONED") return item.githubStatus === "PROVISIONED";
+    if (filterTab === "NOT_PROVISIONED" && item.githubStatus === "PROVISIONED") return false;
+    if (filterTab === "PROVISIONED" && item.githubStatus !== "PROVISIONED") return false;
+
+    // ⚠️ "Mentörü yok" ayrı bir seçenek: mentörsüz atamalar tam da
+    // gözünden kaçmaması gereken satırlar, filtreyle gizlenmemeli.
+    if (mentorFiltresi === "MENTORSUZ") return item.mentors.length === 0;
+    if (mentorFiltresi !== "HEPSI") {
+      return item.mentors.some((m) => m.id === mentorFiltresi);
+    }
     return true;
   });
 
@@ -244,7 +271,7 @@ export default function AdminAssignmentsPage() {
       </div>
 
       {/* Filtre Tabları */}
-      <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3">
         <button
           onClick={() => setFilterTab("ALL")}
           className={`px-4 py-2 rounded-xl text-xs font-semibold transition ${
@@ -275,6 +302,32 @@ export default function AdminAssignmentsPage() {
         >
           Repo Açılmış Projeler ({assignments.filter((a) => a.githubStatus === "PROVISIONED").length})
         </button>
+
+        {/* #432: MENTÖRE GÖRE FİLTRE — admin "şu mentörün öğrencileri ne
+            durumda" sorusunu tek bakışta yanıtlayabilsin.
+
+            ⚠️ FİLTRE, SIRALAMA DEĞİL: #331'de mentörleri yanıt süresine göre
+            sıralayan bir liste bilerek reddedilmişti. */}
+        <div className="ml-auto flex items-center gap-2">
+          <label htmlFor="mentor-filtresi" className="text-xs font-medium text-slate-600">
+            Mentör
+          </label>
+          <select
+            id="mentor-filtresi"
+            value={mentorFiltresi}
+            onChange={(e) => setMentorFiltresi(e.target.value)}
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700"
+          >
+            <option value="HEPSI">Hepsi</option>
+            {mentorSecenekleri.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+            {/* Mentörsüz atamalar tam da gözünden kaçmaması gereken satırlar. */}
+            <option value="MENTORSUZ">Mentörü yok</option>
+          </select>
+        </div>
       </div>
 
       {/* İstatistik Kartları */}
@@ -438,6 +491,19 @@ export default function AdminAssignmentsPage() {
                               minute: "2-digit",
                             })}
                           </div>
+
+                          {/* #432: Tarih vardı ama "ne kadar oldu" yoktu — admin
+                              her satırda zihinden gün saymak zorundaydı.
+
+                              ⚠️ SKOR DEĞİL SİNYAL (#331/#397): metin verinin
+                              kendisi, uydurma bir risk yüzdesi değil. Eşik de
+                              analitikteki `SESSIZLIK_GUN` ile AYNI. */}
+                          {item.duraklamaMetni && (
+                            <div className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-amber-700">
+                              <AlertTriangle className="w-3 h-3 shrink-0" />
+                              {item.duraklamaMetni}
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <span className="text-slate-400 italic">Henüz hareket yok</span>
