@@ -84,7 +84,10 @@ export default async function StudentDashboardPage() {
           roadmap: {
             include: {
               steps: {
-                orderBy: { order: "asc" }
+                orderBy: { order: "asc" },
+                // #407: Yorum sayısı LİSTE SORGUSUNDAN geliyor. Adım başına
+                // ayrı istek, uzun bir yol haritasında N+1 üretirdi.
+                include: { _count: { select: { comments: true } } },
               }
             }
           }
@@ -123,6 +126,8 @@ export default async function StudentDashboardPage() {
                         orderBy: { order: "asc" },
                         include: {
                           assignee: { select: { id: true, name: true, lastName: true, email: true } },
+                          // #407: Yorum sayısı — bireysel sorguyla aynı.
+                          _count: { select: { comments: true } },
                         },
                       },
                     },
@@ -507,6 +512,8 @@ export default async function StudentDashboardPage() {
                         steps={steps.map((a) => ({
                           ...a,
                           revizyonGerekcesi: gerekceler.get(a.id) ?? null,
+                          // #407: Adım başlığında yorum sayısı.
+                          yorumSayisi: a._count?.comments ?? 0,
                         }))}
                         isDraft={isDraft}
                         isGraduated={isGraduated}

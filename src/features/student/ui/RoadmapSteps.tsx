@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, PlayCircle, Lock, ExternalLink, Loader2, Github, ChevronDown, ChevronUp } from "lucide-react";
+import { CheckCircle2, PlayCircle, Lock, ExternalLink, Loader2, Github, ChevronDown, ChevronUp, MessageSquare } from "lucide-react";
 import { adimKilitli, adimEylemeAcik } from "@/features/roadmap/odak";
 import { adimlariGrupla } from "@/features/roadmap/gruplama";
 import { adimDurumunuGuncelle } from "@/features/roadmap/ui/adim-durumu-guncelle";
@@ -21,6 +21,15 @@ type Step = {
   githubIssueUrl?: string | null;
   /** #379: Mentörün revizyon gerekçesi — yalnız REVISION_REQUESTED'da dolu. */
   revizyonGerekcesi?: string | null;
+  /**
+   * #407: Bu adımdaki yorum sayısı.
+   *
+   * ⚠️ "YENİ" DEĞİL, TOPLAM. `StepComment`'ta okunma izi YOK
+   * (`id, stepId, authorId, content, createdAt`); "1 yeni yorum" demek yeni
+   * bir şema ister. Okunma izi olmadan "yeni" demek uydurma olurdu — sayı,
+   * değerin büyük kısmını yanlış bir iddia üretmeden taşıyor.
+   */
+  yorumSayisi?: number;
   // #332/#367: Adımı üstlenen takım üyesi. Bireysel atamada hep null.
   assigneeId?: string | null;
   assignee?: { id: string; name: string | null; lastName: string | null; email: string } | null;
@@ -253,6 +262,19 @@ export function RoadmapSteps({
                   {isRevizyon && (
                     <span className="flex items-center text-[10px] font-bold uppercase tracking-wider text-amber-800 bg-amber-100 px-2 py-1 rounded">
                       Revizyon İstendi
+                    </span>
+                  )}
+
+                  {/* #407: Yorum sayısı. Öğrenci akordeonu açmadan bu adımda
+                      konuşma olduğunu göremİyordu. Sıfırsa hiç basılmıyor —
+                      "0 yorum" yer kaplamaktan başka bir şey yapmaz. */}
+                  {(step.yorumSayisi ?? 0) > 0 && (
+                    <span
+                      title={`${step.yorumSayisi} yorum`}
+                      className="flex items-center gap-1 rounded bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-600"
+                    >
+                      <MessageSquare className="h-3 w-3" />
+                      {step.yorumSayisi}
                     </span>
                   )}
                 </div>
