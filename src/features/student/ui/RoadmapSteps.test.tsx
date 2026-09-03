@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
@@ -145,5 +145,124 @@ describe("RoadmapSteps — eyleme açıklık ortak modülden", () => {
   it("mezun stajyerde (#208) hiçbir eylem yok", () => {
     render(<RoadmapSteps steps={[adim()]} isDraft={false} isGraduated />);
     expect(screen.queryByRole("button", { name: /Bu Adıma Başla/ })).not.toBeInTheDocument();
+  });
+});
+
+describe("RoadmapSteps — tamamlanan adımların katlanması (#417)", () => {
+  it("tamamlanan adım tek satıra iner, içeriği gizlenir", () => {
+    render(
+      <RoadmapSteps
+        steps={[
+          adim({ id: "s1", order: 1, title: "Birinci", status: "COMPLETED", description: "Bitmiş iş" }),
+          adim({ id: "s2", order: 2, title: "İkinci" }),
+        ]}
+        isDraft={false}
+      />,
+    );
+
+    expect(screen.getByText("1 adım tamamlandı")).toBeInTheDocument();
+    expect(screen.queryByText("Bitmiş iş")).not.toBeInTheDocument();
+    // Aktif adım açık kalır.
+    expect(screen.getByText("İkinci")).toBeInTheDocument();
+  });
+
+  it("ardışık tamamlananlar tek satırda sayılır", () => {
+    render(
+      <RoadmapSteps
+        steps={[
+          adim({ id: "s1", order: 1, status: "COMPLETED" }),
+          adim({ id: "s2", order: 2, status: "COMPLETED" }),
+          adim({ id: "s3", order: 3, status: "COMPLETED" }),
+          adim({ id: "s4", order: 4, title: "Aktif" }),
+        ]}
+        isDraft={false}
+      />,
+    );
+    expect(screen.getByText("3 adım tamamlandı")).toBeInTheDocument();
+  });
+
+  it("'Detayları göster' katlanmış adımları açar", () => {
+    render(
+      <RoadmapSteps
+        steps={[
+          adim({ id: "s1", order: 1, status: "COMPLETED", description: "Bitmiş iş" }),
+          adim({ id: "s2", order: 2, title: "İkinci" }),
+        ]}
+        isDraft={false}
+      />,
+    );
+
+    expect(screen.queryByText("Bitmiş iş")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /adım tamamlandı/ }));
+    expect(screen.getByText("Bitmiş iş")).toBeInTheDocument();
+  });
+
+  /*
+   * ⚠️ Mezunun portfolyosu salt okunur ama GÖRÜNÜR olmalı (#208). Tüm
+   * adımları tamamlanmış olduğu için körlemesine katlamak, sertifikanın
+   * dayanağı olan işi gizlerdi.
+   */
+  it("⚠️ MEZUN stajyerde tamamlananlar VARSAYILAN AÇIK (#208)", () => {
+    render(
+      <RoadmapSteps
+        steps={[adim({ id: "s1", order: 1, status: "COMPLETED", description: "Bitmiş iş" })]}
+        isDraft={false}
+        isGraduated
+      />,
+    );
+    expect(screen.getByText("Bitmiş iş")).toBeInTheDocument();
+  });
+
+  it("mezun da katlayabilir — varsayılan açık ama kilitli değil", () => {
+    render(
+      <RoadmapSteps
+        steps={[adim({ id: "s1", order: 1, status: "COMPLETED", description: "Bitmiş iş" })]}
+        isDraft={false}
+        isGraduated
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /adım tamamlandı/ }));
+    expect(screen.queryByText("Bitmiş iş")).not.toBeInTheDocument();
+  });
+
+  it("⚠️ REVİZYON istenen adım katlanmaz — tam da görülmesi gereken şey (#379)", () => {
+    render(
+      <RoadmapSteps
+        steps={[
+          adim({ id: "s1", order: 1, status: "COMPLETED" }),
+          adim({
+            id: "s2",
+            order: 2,
+            status: "REVISION_REQUESTED",
+            description: "Revizyondaki açıklama",
+          }),
+        ]}
+        isDraft={false}
+      />,
+    );
+    expect(screen.getByText("Revizyondaki açıklama")).toBeInTheDocument();
+  });
+
+  it("hiç tamamlanmamışsa katlama satırı YOK", () => {
+    render(<RoadmapSteps steps={[adim({ status: "IN_PROGRESS" })]} isDraft={false} />);
+    expect(screen.queryByText(/adım tamamlandı/)).not.toBeInTheDocument();
+  });
+
+  it("⚠️ katlanmış grup açıldığında kilit kuralı ORİJİNAL sıraya göre çalışır", () => {
+    // 1. tamamlanmış, 2. açık, 3. kilitli olmalı — gruplama indeksleri
+    // kaydırırsa 3. adım yanlışlıkla açık görünürdü.
+    render(
+      <RoadmapSteps
+        steps={[
+          adim({ id: "s1", order: 1, status: "COMPLETED" }),
+          adim({ id: "s2", order: 2, title: "İkinci", description: "İkinci açıklama" }),
+          adim({ id: "s3", order: 3, title: "Üçüncü", description: "Üçüncü açıklama" }),
+        ]}
+        isDraft={false}
+      />,
+    );
+    expect(screen.getByText("İkinci açıklama")).toBeInTheDocument();
+    expect(screen.queryByText("Üçüncü açıklama")).not.toBeInTheDocument();
+    expect(screen.getByText("Önceki aşamanın tamamlanması bekleniyor")).toBeInTheDocument();
   });
 });
