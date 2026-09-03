@@ -86,3 +86,42 @@ describe("stajyerDurumu — eylemi olan durumlar", () => {
     expect(sonuc.durum).toContain("hazırlıyor");
   });
 });
+
+/**
+ * #416: Odak kartı varken karşılamadaki "SIRADA" bağlantısı bastırılır.
+ *
+ * Aynı adımı iki yerde göstermek, biri güncellenip diğeri unutulduğunda
+ * ayrışırdı; üstelik kart eylemleri de taşıdığı için bağlantı daha azını
+ * sunuyor.
+ */
+describe("stajyerDurumu — odak kartıyla çakışma (#416)", () => {
+  const girdi = {
+    mezun: false,
+    projeSayisi: 1,
+    mentorSayisi: 1,
+    siradakiAdim: { baslik: "Faz 2", projeAdi: "Portföy" },
+  };
+
+  it("kart YOKKEN bağlantı gösterilir (mevcut davranış)", () => {
+    const s = stajyerDurumu(girdi);
+    expect(s.siradaki?.etiket).toBe("Faz 2");
+  });
+
+  it("⚠️ kart VARKEN bağlantı bastırılır", () => {
+    const s = stajyerDurumu({ ...girdi, siradakiAdimKartta: true });
+    expect(s.siradaki).toBeNull();
+  });
+
+  it("durum cümlesi her iki durumda da aynı kalır", () => {
+    expect(stajyerDurumu(girdi).durum).toBe("Çalışma masan hazır.");
+    expect(stajyerDurumu({ ...girdi, siradakiAdimKartta: true }).durum).toBe(
+      "Çalışma masan hazır.",
+    );
+  });
+
+  it("adım yokken bayrak bir şeyi değiştirmez", () => {
+    const s = stajyerDurumu({ ...girdi, siradakiAdim: null, siradakiAdimKartta: true });
+    expect(s.durum).toBe("Atanan adımların hepsini tamamladın.");
+    expect(s.siradaki?.etiket).toBe("Mentörüne haber ver");
+  });
+});

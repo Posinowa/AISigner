@@ -3,6 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, PlayCircle, Lock, ExternalLink, Loader2, Github } from "lucide-react";
+import { adimKilitli, adimEylemeAcik } from "@/features/roadmap/odak";
+import { adimDurumunuGuncelle } from "@/features/roadmap/ui/adim-durumu-guncelle";
 import { StepComments } from "@/features/messaging/ui/StepComments";
 import { StepFiles } from "@/features/files/ui/StepFiles";
 import { toast } from "sonner";
@@ -88,33 +90,20 @@ export function RoadmapSteps({
   }
 
   async function updateStepStatus(stepId: string, newStatus: "IN_PROGRESS" | "COMPLETED") {
-    if (isGraduated) {
-      toast.info("Mezuniyet sonrası staj adımları salt-okunur durumdadır.");
-      return;
-    }
     setUpdatingId(stepId);
-    try {
-      const res = await fetch(`/api/student/steps/${stepId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        toast.error(err.error || "Bir hata oluştu.");
-        return;
-      }
-
+    // #416: Çağrı ortak yardımcıda — odak kartı da aynını kullanıyor.
+    const oldu = await adimDurumunuGuncelle({
+      stepId,
+      yeniDurum: newStatus,
+      mezunMu: Boolean(isGraduated),
+    });
+    if (oldu) {
       // Sayfayı yenile (RSC re-render)
       startTransition(() => {
         router.refresh();
       });
-    } catch {
-      toast.error("Bağlantı hatası. Lütfen tekrar deneyin.");
-    } finally {
-      setUpdatingId(null);
     }
+    setUpdatingId(null);
   }
 
   return (
@@ -131,17 +120,28 @@ export function RoadmapSteps({
           const isRevizyon = step.status === "REVISION_REQUESTED";
           const isTodo = step.status === "TODO";
 
-          // İlk adım her zaman açık, sonraki adımlar bir önceki COMPLETED ise açık
-          const previousCompleted = index === 0 || steps[index - 1].status === "COMPLETED";
-          const isLocked = isTodo && !previousCompleted;
-          // Revizyondaki adım her zaman eyleme açık: mentör düzeltilmesini
-          // istiyor, sıralama kuralı burada engel olmamalı.
-          const isActionable = (isTodo && previousCompleted) || isRevizyon;
+          /*
+           * #416: Kilit ve eyleme açıklık kuralı artık `roadmap/odak.ts`'te.
+           *
+           * Hesap burada gömülüyken pano aynı soruyu kendi satırıyla
+           * yanıtlıyordu; odak kartı üçüncü bir kopya üretecekti. Bu kod
+           * tabanında "aynı kural iki yerde" hatası dört kez yaşandı
+           * (#367/#370/#376/#393).
+           */
+          const isLocked = adimKilitli(steps, index);
+          const isActionable = adimEylemeAcik(steps, index);
 
           const isUpdating = updatingId === step.id;
 
           return (
-            <div key={step.id} className="relative flex items-start gap-4">
+            <div
+              key={step.id}
+              /* #416: Odak kartı buraya bağ veriyor. Kaynaklar, dosyalar ve
+                 yorumlar kartta KOPYALANMIYOR — iki yerde duran bir
+                 yükleyici iki ayrı doğruluk kaynağı olurdu. */
+              id={`adim-${step.id}`}
+              className="relative flex scroll-mt-24 items-start gap-4"
+            >
               {/* Status Icon / Timeline Node */}
               <div
                 className={`hidden md:flex relative z-10 items-center justify-center w-11 h-11 rounded-full bg-white border-2 shrink-0 mt-1
@@ -287,7 +287,14 @@ export function RoadmapSteps({
                 {/* Aksiyon Butonları — Mezun olmayan ve yayınlanmış adımlarda aktif */}
                 {!isGraduated && !isDraft && !isLocked && !isCompleted && (
                   <div className="mt-4 pt-4 border-t border-slate-100">
-                    {(isTodo || isRevizyon) && isActionable && (
+                    {/* ⚠️ Burada `isActionable` KONTROLÜ YOK — ölü mantıktı.
+                        Dış kapı zaten `!isLocked` diyor; TODO adımda
+                        `isLocked === !isActionable`, revizyonda ise
+                        `isActionable` hep true. Yani bu noktaya ulaşıldığında
+                        değeri her zaman true oluyordu. Mutasyon testinde
+                        bulundu: sabit `true` yapan sürümü hiçbir test
+                        öldüremiyordu, çünkü öldürülecek bir davranış yoktu. */}
+                    {(isTodo || isRevizyon) && (
                       <button
                         onClick={() => updateStepStatus(step.id, "IN_PROGRESS")}
                         disabled={isUpdating || isPending}

@@ -6,6 +6,8 @@ import { ProjeOnerisi } from "@/features/proposals/ui/ProjeOnerisi";
 import { TakilmaBildirimiAyari } from "@/features/radar/ui/TakilmaBildirimiAyari";
 import { OfisSaatiOgrenci } from "@/features/ofis-saati/ui/OfisSaatiOgrenci";
 import { IdariBolum } from "@/features/dashboard/ui/IdariBolum";
+import { odaktakiAdimIndeksi } from "@/features/roadmap/odak";
+import { OdakKarti } from "@/features/roadmap/ui/OdakKarti";
 import { prisma } from "@/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/nextauth";
@@ -18,6 +20,25 @@ import { StudentCertificateTrigger } from "@/features/student/ui/StudentCertific
 import { PanelKarsilama } from "@/features/dashboard/ui/PanelKarsilama";
 import { ProfilTamamlaSeridi } from "@/features/dashboard/ui/ProfilTamamlaSeridi";
 import { stajyerDurumu, PROJELER_CAPASI } from "@/features/dashboard/models/stajyerDurumu";
+
+/**
+ * #416/#332: Adımı başkası üstlendiyse adını çözer, yoksa null.
+ *
+ * ⚠️ `assignee` yalnız TAKIM sorgusunda seçiliyor; bireysel atamada
+ * `assigneeId` zaten hep NULL (şemada yazılı) ve alan hiç çekilmiyor. Bu
+ * yüzden alanın varlığı isteğe bağlı okunuyor.
+ */
+function ustlenenAdiCoz(
+  adim: {
+    assigneeId?: string | null;
+    assignee?: { name: string | null; lastName: string | null } | null;
+  },
+  kullaniciId: string,
+): string | null {
+  if (!adim.assigneeId || adim.assigneeId === kullaniciId) return null;
+  const ad = [adim.assignee?.name, adim.assignee?.lastName].filter(Boolean).join(" ");
+  return ad || "Bir takım arkadaşın";
+}
 
 export const dynamic = "force-dynamic";
 
@@ -174,17 +195,53 @@ export default async function StudentDashboardPage() {
   );
   const gerekceler = await revizyonGerekceleri(revizyondakiAdimlar);
 
-  // #290: Karşılama artık "sırada ne var" sorusuna da cevap veriyor.
-  // Sıradaki adım = en yeni projenin tamamlanmamış İLK adımı.
-  const enYeniProje = tumProjeler[0];
-  const bekleyenAdim = enYeniProje?.roadmap?.steps.find((a) => a.status !== "COMPLETED");
+  /*
+   * #416: BUGÜNÜN ODAĞI.
+   *
+   * ⚠️ Kural `roadmap/odak.ts`'te — pano, adım listesi ve odak kartı aynı
+   * soruyu üç ayrı yerden yanıtlamasın (#367/#370/#376/#393'ün hata sınıfı).
+   *
+   * ⚠️ Öncelik "tamamlanmamış ilk adım"dan FARKLI: revizyon istenen adım
+   * her şeyin önünde. Eski kural, 1. adım devam ederken 2. adım revizyona
+   * düştüğünde mentörün geri gönderdiği işi hiç göstermiyordu.
+   *
+   * ⚠️ TASLAK yol haritasında öğrenci etkileşemez (#52/#405) — orada odak
+   * kartı da çıkmıyor; göremediği adımları işaret etmek anlamsız olurdu.
+   */
+  const odakProjesi = tumProjeler.find(
+    (p) => p.roadmap?.status === "PUBLISHED" && (p.roadmap?.steps.length ?? 0) > 0,
+  );
+  const odakAdimlari = odakProjesi?.roadmap?.steps ?? [];
+  const odakIndeksi = odaktakiAdimIndeksi(odakAdimlari);
+  const odakAdimi = odakIndeksi === null ? null : odakAdimlari[odakIndeksi];
+
+  const odak =
+    odakAdimi && odakProjesi
+      ? {
+          stepId: odakAdimi.id,
+          baslik: odakAdimi.title,
+          aciklama: odakAdimi.description,
+          durum: odakAdimi.status,
+          sira: odakAdimi.order,
+          projeAdi: odakProjesi.projectTemplate.title,
+          githubIssueUrl: odakAdimi.githubIssueUrl ?? null,
+          revizyonGerekcesi: gerekceler.get(odakAdimi.id) ?? null,
+          capa: `#adim-${odakAdimi.id}`,
+          // #332: Takım panosunda adım başkasının üzerinde olabilir; "senin
+          // sıradaki adımın" demek yanlış olurdu.
+          ustlenenAdi: ustlenenAdiCoz(odakAdimi, session.user.id),
+        }
+      : null;
+
+  // #290: Karşılama "sırada ne var" sorusuna cevap veriyor.
+  // ⚠️ Odak kartı varken aynı adımı KARŞILAMADA DA göstermiyoruz: iki yerde
+  // duran aynı bilgi, biri güncellenip diğeri unutulduğunda ayrışır.
   const { durum, siradaki } = stajyerDurumu({
     mezun: isGraduated,
     projeSayisi: tumProjeler.length,
     mentorSayisi: profile.mentorAssignments.length,
-    siradakiAdim: bekleyenAdim
-      ? { baslik: bekleyenAdim.title, projeAdi: enYeniProje.projectTemplate.title }
-      : null,
+    siradakiAdim: odak ? { baslik: odak.baslik, projeAdi: odak.projeAdi } : null,
+    siradakiAdimKartta: Boolean(odak),
   });
 
   // #265/#290: Fotoğrafın varlığı — arayüz depolama adına ihtiyaç duymuyor.
@@ -264,6 +321,14 @@ export default async function StudentDashboardPage() {
         emailVerified={session.user.emailVerified}
         fotografVar={fotografVar}
       />
+
+      {/* #416: Bugünün odağı — karşılamanın hemen altında, çalışma alanının
+          üstünde. Ölçüm (#415): ilk adım kartı 1.5 ekran aşağıdaydı; GitHub'a
+          gitmek ya da adımı tamamlamak için oraya kadar kaydırmak gerekiyordu.
+
+          ⚠️ Mezun stajyerde SALT OKUNUR (#208): portfolyo görünür kalıyor
+          ama yazma uçları kapalı. */}
+      {odak && <OdakKarti odak={odak} saltOkunur={isGraduated} />}
 
       {/* #398: Mentör görüşmesi. Mezun stajyere de AÇIK — #208 ayrımında
           görüşme, mesajlaşma gibi *insan iletişimi* kanalı.

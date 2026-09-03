@@ -16,8 +16,17 @@ export type StajyerDurumGirdisi = {
   mezun: boolean;
   projeSayisi: number;
   mentorSayisi: number;
-  /** Tamamlanmamış ilk adım. Yoksa null. */
+  /** Odaktaki adım. Yoksa null. */
   siradakiAdim: { baslik: string; projeAdi: string } | null;
+  /**
+   * #416: Adım ayrı bir odak kartında gösteriliyor mu.
+   *
+   * ⚠️ Doluysa karşılamadaki "SIRADA" bağlantısı BASTIRILIR. Aynı adımı iki
+   * yerde göstermek, biri güncellenip diğeri unutulduğunda ayrışırdı; üstelik
+   * kart eylemleri de taşıdığı için bağlantı artık daha azını sunuyor.
+   * Durum cümlesi ("Çalışma masan hazır.") aynen kalıyor.
+   */
+  siradakiAdimKartta?: boolean;
 };
 
 export type StajyerDurumu = {
@@ -42,11 +51,13 @@ export function stajyerDurumu(girdi: StajyerDurumGirdisi): StajyerDurumu {
   if (girdi.siradakiAdim) {
     return {
       durum: "Çalışma masan hazır.",
-      siradaki: {
-        etiket: girdi.siradakiAdim.baslik,
-        aciklama: `${girdi.siradakiAdim.projeAdi} · sıradaki adım`,
-        href: PROJELER_CAPASI,
-      },
+      siradaki: girdi.siradakiAdimKartta
+        ? null
+        : {
+            etiket: girdi.siradakiAdim.baslik,
+            aciklama: `${girdi.siradakiAdim.projeAdi} · sıradaki adım`,
+            href: PROJELER_CAPASI,
+          },
     };
   }
 
