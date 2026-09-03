@@ -6,6 +6,8 @@ import {
 } from "@/features/teams/server/sahiplik";
 import { generateRoadmap } from "@/features/ai/server/generate-roadmap";
 import { getStoredProfileAnalysis } from "@/features/ai/server/profile-analysis-store";
+import { tamamlananAdimBasliklari } from "@/features/roadmap/server/gecmis";
+import { AZAMI_GECMIS_ADIM } from "@/lib/ai/prompt";
 import { requireAuth } from "@/lib/auth/guard";
 import { generateRoadmapSchema } from "@/lib/validations/api";
 import { createRateLimiter } from "@/lib/rate-limit";
@@ -150,6 +152,20 @@ export async function POST(req: Request) {
      */
     const analiz = await getStoredProfileAnalysis(assignedProject.studentProfile.id);
 
+    /*
+     * #423: ÖĞRENCİNİN GEÇMİŞ İŞİ.
+     *
+     * İkinci projesinde stajyer yine "Proje Kurulumu ve Gerekli Araçlar"
+     * adımını alıyordu; tamamlanmış adımlar prompt'a hiç girmiyordu.
+     * Sahiplik `sahiplik.ts`'ten soruluyor — takım atamasında
+     * `studentProfileId` NULL (#332).
+     */
+    const gecmisAdimlar = await tamamlananAdimBasliklari({
+      studentProfileId: assignedProject.studentProfile.id,
+      haricAtamaId: assignedProject.id,
+      azami: AZAMI_GECMIS_ADIM,
+    });
+
     const roadmapStepsData = await generateRoadmap(
       assignedProject.studentProfile,
       assignedProject.projectTemplate,
@@ -160,6 +176,7 @@ export async function POST(req: Request) {
             recommendedPath: analiz.recommendedPath,
           }
         : null,
+      { yonlendirme: parsed.data.yonlendirme, gecmisAdimlar },
     );
 
     // 5. 🚀 Prisma Nested Create: Ana Roadmap'i ve ona bağlı tüm adımları tek bir işlemde veritabanına kaydediyoruz

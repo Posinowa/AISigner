@@ -7,6 +7,8 @@ const { requireAuthMock, prismaMock, generateRoadmapMock } = vi.hoisted(() => ({
     roadmap: { delete: vi.fn(), create: vi.fn() },
     // #410: Kayıtlı profil analizi prompt'a giriyor.
     profileAnalysis: { findUnique: vi.fn() },
+    // #423: Geçmişte tamamlanan adım başlıkları prompt'a giriyor.
+    roadmapStep: { findMany: vi.fn() },
   },
   generateRoadmapMock: vi.fn(),
 }));
@@ -58,6 +60,7 @@ describe("generate-roadmap overwrite koruması (#178-4)", () => {
     generateRoadmapMock.mockResolvedValue([]);
     prismaMock.roadmap.create.mockResolvedValue({ id: "r-new", steps: [] });
     prismaMock.profileAnalysis.findUnique.mockResolvedValue(null);
+    prismaMock.roadmapStep.findMany.mockResolvedValue([]);
     rizaMock.mockResolvedValue(true);
   });
 
@@ -164,6 +167,7 @@ describe("profil analizi üretime geçiyor (#410)", () => {
     generateRoadmapMock.mockResolvedValue([]);
     prismaMock.roadmap.create.mockResolvedValue({ id: "r-new", steps: [] });
     prismaMock.assignedProject.findUnique.mockResolvedValue(assignedProject(null));
+    prismaMock.roadmapStep.findMany.mockResolvedValue([]);
     rizaMock.mockResolvedValue(true);
   });
 
@@ -182,6 +186,7 @@ describe("profil analizi üretime geçiyor (#410)", () => {
 
   it("⚠️ analiz YOKSA null geçer, üretim ÇÖKMEZ (#352 — rıza geri alınınca silinir)", async () => {
     prismaMock.profileAnalysis.findUnique.mockResolvedValue(null);
+    prismaMock.roadmapStep.findMany.mockResolvedValue([]);
 
     const res = await POST(req({ assignedProjectId: "ap-1" }));
 

@@ -76,3 +76,17 @@ export function veriBlogu(baslik: string, icerik: string): string {
     AYRAC_KAPANIS,
   ].join("\n");
 }
+
+/**
+ * Prompt'a giren azami geçmiş adım başlığı (#423).
+ *
+ * ⚠️ BURADA — üretim modülünde değil: hem sorguyu yazan taraf hem
+ * prompt'u kuran taraf aynı sayıyı kullanmalı. Üretim modülüne koyulduğunda
+ * rota onu oradan import ediyor ve rotayı test eden dosya üretimi
+ * mocklediği için sabit kayboluyordu.
+ *
+ * ⚠️ EN YENİLERİ alınıyor: öğrencinin uzun bir geçmişi olabilir ve tamamını
+ * göndermek maliyeti şişirir. Yakın geçmiş, tekrar riskinin en yüksek
+ * olduğu yer.
+ */
+export const AZAMI_GECMIS_ADIM = 20;
