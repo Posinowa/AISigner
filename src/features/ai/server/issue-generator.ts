@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { guvenliMetin, guvenliListe, veriBlogu } from "@/lib/ai/prompt";
+import { guvenliMetin, veriBlogu } from "@/lib/ai/prompt";
 import { getModel } from "@/lib/ai/gemini-client";
 import { cozVeDogrula, AiCiktiGecersizError } from "@/lib/ai/response";
 import { sinirla, ALAN_SINIRI } from "@/lib/ai/truncate";

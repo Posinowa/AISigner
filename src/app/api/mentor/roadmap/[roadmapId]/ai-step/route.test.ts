@@ -1,7 +1,19 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-const { requireAuthMock, prismaMock, getModelMock, rizaMock, loggerMock } = vi.hoisted(() => ({
+const { requireAuthMock, prismaMock, getModelMock, rizaMock, loggerMock, limitMock } = vi.hoisted(() => ({
   requireAuthMock: vi.fn(),
+  /*
+   * Gemini çağıran her uç gibi kısıtlı.
+   *
+   * Varsayılan İZİN VERİR ve bu bir TABAN UYGULAMA (`vi.fn(impl)`) —
+   * `mockResolvedValue` DEĞİL. Dosyadaki describe'lar `vi.clearAllMocks()`
+   * çağırıyor; o çağrıları siler ama uygulamayı silmez. Taban uygulama
+   * olmasaydı limit mock'u `undefined` dönüp `rl.allowed` falsy olurdu ve
+   * limitle ilgisi olmayan her test 429 alırdı.
+   */
+  limitMock: vi.fn<
+    (anahtar: string) => Promise<{ allowed: boolean; retryAfterSeconds?: number }>
+  >(async () => ({ allowed: true })),
   prismaMock: {
     roadmap: { findUnique: vi.fn() },
     roadmapStep: { create: vi.fn(), findFirst: vi.fn(), count: vi.fn() },
@@ -18,6 +30,9 @@ vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 vi.mock("@/lib/ai/gemini-client", () => ({ getModel: (...a: unknown[]) => getModelMock(...a) }));
 // #389: Kardeş uç generate-roadmap rızayı kontrol ediyordu, burası atlamıştı.
 vi.mock("@/features/kvkk/riza", () => ({ profilSahibininRizasiVar: rizaMock }));
+vi.mock("@/lib/rate-limit", () => ({
+  createRateLimiter: () => ({ check: (anahtar: string) => limitMock(anahtar) }),
+}));
 
 import { POST } from "./route";
 
@@ -223,5 +238,58 @@ describe("KVKK açık rızası (#389)", () => {
 
     expect(res.status).toBe(200);
     expect(getModelMock).toHaveBeenCalled();
+  });
+});
+
+describe("maliyet kapısı — rate limit", () => {
+  /*
+   * Bu uç Gemini çağırıyor ama limitleyicisi YOKTU; kardeşi
+   * `generate-roadmap` 60 sn'de 5 istekle sınırlıydı. Yetkili bir mentör
+   * gerekiyor, ama üretim tek tıkla tekrarlanabildiği için tek oturum
+   * faturayı sınırsız büyütebilirdi.
+   */
+  beforeEach(() => {
+    vi.clearAllMocks();
+    requireAuthMock.mockResolvedValue({
+      authorized: true,
+      session: { user: { id: "men-1", role: "MENTOR" } },
+    });
+  });
+
+  it("tavan dolduğunda 429 + Retry-After", async () => {
+    limitMock.mockResolvedValueOnce({ allowed: false, retryAfterSeconds: 42 });
+
+    const res = await POST(req(), ctx);
+
+    expect(res.status).toBe(429);
+    expect(res.headers.get("Retry-After")).toBe("42");
+  });
+
+  it("tavan dolduğunda ne DB'ye ne MODELE gidilir", async () => {
+    limitMock.mockResolvedValueOnce({ allowed: false, retryAfterSeconds: 1 });
+
+    await POST(req(), ctx);
+
+    expect(prismaMock.roadmap.findUnique).not.toHaveBeenCalled();
+    expect(getModelMock).not.toHaveBeenCalled();
+  });
+
+  it("sayaç MENTÖR BAŞINA — kapsam oturumdan", async () => {
+    prismaMock.roadmap.findUnique.mockResolvedValue(null);
+
+    await POST(req(), ctx);
+
+    expect(limitMock).toHaveBeenCalledWith("men-1");
+  });
+
+  it("kapı YETKİDEN SONRA — oturumsuz istek sayacı tüketmez", async () => {
+    requireAuthMock.mockResolvedValue({
+      authorized: false,
+      response: new Response(null, { status: 403 }),
+    });
+
+    await POST(req(), ctx);
+
+    expect(limitMock).not.toHaveBeenCalled();
   });
 });

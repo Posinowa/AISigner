@@ -40,6 +40,20 @@ export async function POST(req: Request) {
   const auth = await requireAuth("STUDENT");
   if (!auth.authorized) return auth.response;
 
+  /*
+   * #208: Mezun stajyer YENİ öneri açamaz.
+   *
+   * Öneri onaylanırsa bir `AssignedProject`'e dönüşür — yani sistem durumunu
+   * değiştiren bir uç. #208'in ayrımına göre bu kapalı, GET (kendi geçmişini
+   * okuma) açık kalıyor.
+   */
+  if (auth.session.user.accountStatus === "GRADUATED") {
+    return NextResponse.json(
+      { error: "Mezun öğrenciler yeni proje önerisi oluşturamaz." },
+      { status: 403 },
+    );
+  }
+
   const body = await req.json().catch(() => null);
   const parsed = createProposalSchema.safeParse(body);
   if (!parsed.success) {
