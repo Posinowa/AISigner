@@ -354,6 +354,29 @@ webhook'ta yazılıyor (`pull_request` + `merged`), karar buna bakıyor.
 - ⚠️ Ham SQL gerçek Postgres'e karşı, ekilmiş bilinen değerlerle doğrulandı; birim testler
   yalnız sorgu SONRASI dönüşümleri kapsıyor (mock Prisma SQL'i kanıtlamaz).
 
+### Takılma Radarı (#397)
+`features/radar/` — stajyer bir adımda takılınca **mentöre** bildirim, **öğrenciye** (izin
+verirse) hatırlatma.
+
+- **⚠️ SKOR YOK, SİNYAL VAR** (#331'in aynısı). Mentöre gösterilen şey verinin kendisi:
+  "3 gündür bu adımda, GitHub'da da hareket yok".
+- **⚠️ ÖĞRENCİ BİLDİRİMİ OPT-IN, VARSAYILAN KAPALI** (`StudentProfile.takilmaBildirimi`).
+  Posilog bugüne kadar yalnız YANIT veriyordu; kendiliğinden yazmak yeni bir davranış ve
+  istenmeyen temas taciz gibi hissettirebilir. **Bilinen bedeli:** tam da hedef kitle
+  (çekingen stajyer) ayarı açmayı akıl etmeyebilir — bu yüzden ayar panoda **görünür**
+  yerde ve metin "gözetleniyorsun" değil "yardım isteyebilirsin" tonunda.
+- **Mentör bildirimi bu ayardan BAĞIMSIZ.** Mentörün öğrencisinin takıldığını bilmesi,
+  öğrencinin kendi tercihine bağlanamaz.
+- **⚠️ "VERİ YOK" ≠ "SİNYAL YOK".** Commit sinyali webhook `push` olayından geliyor ama
+  **BAGLA depolarında webhook hiç çalışmıyor** (#366) ve kurulmamış atamalarda da gelmez.
+  `sonCommitAt` NULL ise mentöre **açıkça** "bu projede GitHub verisi yok" yazılıyor;
+  yoksa o öğrenciler radarda sessizce eksik görünürdü.
+- **Adım başına BİR kez** — tekrar koruması `Notification.refId` ile veritabanında.
+- **Mezun (`GRADUATED`) kapsam dışı** (#208).
+- **⚠️ ZAMANLAYICI YOK.** Tarama #329'un mevcut tikinden, **saatte bir** tetikleniyor.
+  Bilinen sınır: tik yalnız en az bir kullanıcı bağlıyken çalışır, yani kimse çevrimiçi
+  değilken tarama yapılmaz. Alıcı mentör olduğu için kabul edilebilir gecikme.
+
 ### Kalıcı Bildirimler (#380)
 `Notification` tablosu + `features/bildirim/`. Kullanıcı bir şeyin olduğunu ancak ilgili
 sayfayı ziyaret ederse öğreniyordu.

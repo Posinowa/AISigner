@@ -8,7 +8,11 @@ import {
   webhookImzasiniDogrula,
   webhookSirriVarMi,
 } from "@/features/github/server/webhook-imza";
-import { issueKapandiginiIsle, issueYenidenAcildiginiIsle } from "@/features/github/server/webhook-isle";
+import {
+  issueKapandiginiIsle,
+  issueYenidenAcildiginiIsle,
+  pushIsle,
+} from "@/features/github/server/webhook-isle";
 import { teslimatKayitlariniTemizle } from "@/features/github/server/teslimat-kaydi";
 import { prAcildiginiIncele } from "@/features/github/server/pr-inceleme";
 
@@ -36,7 +40,8 @@ const limiter = createRateLimiter("github-webhook", {
 });
 
 /** İşlediğimiz olaylar. Diğerleri sessizce yok sayılır. */
-const ILGILENILEN_OLAYLAR = new Set(["issues", "pull_request"]);
+// #397: `push` — takılma radarı commit sinyalini buradan alıyor.
+const ILGILENILEN_OLAYLAR = new Set(["issues", "pull_request", "push"]);
 
 export async function POST(req: Request) {
   const h = await headers();
@@ -126,6 +131,13 @@ export async function POST(req: Request) {
 
     const kapandi =
       govde.action === "closed" && (olay === "issues" || prMergeEdildi);
+
+    // #397: Commit sinyali — radar "GitHub'da çalışıyor mu" sorusunu buna
+    // bakarak yanıtlıyor.
+    if (olay === "push") {
+      const sonuc = await pushIsle(govde);
+      return NextResponse.json({ ok: true, ...sonuc });
+    }
 
     /*
      * #378: YENİDEN AÇILMA.

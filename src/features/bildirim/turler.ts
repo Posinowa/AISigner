@@ -22,6 +22,8 @@ export const BILDIRIM_TURLERI = {
   CALISMA_ALANI_KARARI: "CALISMA_ALANI_KARARI",
   YENI_MESAJ: "YENI_MESAJ",
   ADIM_REVIZYON: "ADIM_REVIZYON",
+  /** #397: Takılma radarı — mentöre bildirim, öğrenciye opt-in. */
+  ADIM_TAKILDI: "ADIM_TAKILDI",
   DOSYA_YUKLENDI: "DOSYA_YUKLENDI",
 } as const;
 

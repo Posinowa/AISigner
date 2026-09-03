@@ -3,6 +3,7 @@ import { AvatarUpload } from "@/features/profile/ui/AvatarUpload";
 import { RoadmapSteps } from "@/features/student/ui/RoadmapSteps";
 import { revizyonGerekceleri } from "@/features/roadmap/server/revizyon";
 import { ProjeOnerisi } from "@/features/proposals/ui/ProjeOnerisi";
+import { TakilmaBildirimiAyari } from "@/features/radar/ui/TakilmaBildirimiAyari";
 import { prisma } from "@/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/nextauth";
@@ -266,6 +267,14 @@ export default async function StudentDashboardPage() {
 
 
       {/* Projeler ve Yol Haritası */}
+      {/* #397: Takılma bildirimi tercihi — profil bloğunun yanında GÖRÜNÜR
+          yerde. Opt-in'in bilinen bedeli, ayarın fark edilmemesi. */}
+      {!isGraduated && (
+        <div className="mb-6">
+          <TakilmaBildirimiAyari baslangic={profile.takilmaBildirimi} />
+        </div>
+      )}
+
       {/* #366: Kendi projeni öner. Mezun stajyer yeni proje öneremez —
           #208'deki "sistem durumunu değiştiren uçlar kapalı" ilkesi. */}
       {!isGraduated && (

@@ -154,3 +154,45 @@ export async function issueYenidenAcildiginiIsle(govde: unknown): Promise<IsleSo
   logger.info("Webhook adımı geri çekti", { stepId: stepIssue.stepId, url });
   return { islendi: true, aciklama: "adım IN_PROGRESS yapıldı" };
 }
+
+/**
+ * `push` olayı — depodaki son commit zamanını kaydeder (#397).
+ *
+ * NEDEN: Takılma radarı "platform içi hareketsizlik" ile "GitHub'da çalışıyor"
+ * durumunu ayırt edebilmeli. Öğrenci commit atıp platforma dokunmuyorsa
+ * "takıldı" demek yanlış olur.
+ *
+ * ⚠️ BU SİNYAL HER ÖĞRENCİDE YOK. BAGLA depolarında webhook hiç çalışmıyor
+ * (#366) ve çalışma alanı kurulmamış atamalarda da gelmez. `sonCommitAt`
+ * NULL kalması "commit yok" değil **"veri yok"** demek olabilir; radar bu
+ * ayrımı mentöre açıkça söylemek zorunda.
+ */
+export async function pushIsle(govde: unknown): Promise<IsleSonucu> {
+  const g = govde as {
+    repository?: { html_url?: string };
+    head_commit?: { timestamp?: string } | null;
+  };
+
+  const repoUrl = g?.repository?.html_url;
+  if (!repoUrl) return { islendi: false, aciklama: "olayda repo url'i yok" };
+
+  // Silinen dal push'u `head_commit: null` gönderir — commit yok, atla.
+  const zamanDamgasi = g?.head_commit?.timestamp;
+  if (!zamanDamgasi) return { islendi: false, aciklama: "head_commit yok" };
+
+  const zaman = new Date(zamanDamgasi);
+  if (Number.isNaN(zaman.getTime())) {
+    return { islendi: false, aciklama: "geçersiz zaman damgası" };
+  }
+
+  const { count } = await prisma.assignedProject.updateMany({
+    // Bizim açmadığımız depolardan da push gelebilir; eşleşme yoksa sessizce geç.
+    where: { githubRepoUrl: repoUrl },
+    data: { sonCommitAt: zaman },
+  });
+
+  if (count === 0) return { islendi: false, aciklama: "eşleşen atama yok" };
+
+  logger.info("Push kaydedildi", { repoUrl });
+  return { islendi: true, aciklama: "son commit zamanı güncellendi" };
+}
