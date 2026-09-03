@@ -90,6 +90,7 @@ src/
 | `WorkspaceRequest` | mentörün çalışma alanı talebi, admin onayı (#349); `pendingKey @unique` bekleyen tekilliği |
 | `ProcessedWebhook` / `PullRequestReview` | webhook teslimat kimliği (#326) / PR'a inceleme yazıldığının otoriter kaydı (#327) |
 | `ProjectProposal` | stajyerin kendi proje önerisi (#366); `pendingKey @unique` bekleyen tekilliği, `kaynak`/`kararKaynak` GitHub tercihi |
+| `OfisSaatiSlotu` | mentörün 1-e-1 görüşme dilimi (#398); `@@unique([mentorId, baslangic])` çift açmayı, koşullu UPDATE çift rezervasyonu engeller |
 | `TypingSignal` | "yazıyor..." sinyali (#354); `@@id([fromUserId, toUserId])` — yazma satır biriktirmez, `expiresAt` ile kendiliğinden söner |
 | `Message` / `StepComment` / `StepFile` | mesajlaşma, yorum, dosya (`SecurityAnswer` #264'te düşürüldü) |
 
@@ -376,6 +377,50 @@ verirse) hatırlatma.
 - **⚠️ ZAMANLAYICI YOK.** Tarama #329'un mevcut tikinden, **saatte bir** tetikleniyor.
   Bilinen sınır: tik yalnız en az bir kullanıcı bağlıyken çalışır, yani kimse çevrimiçi
   değilken tarama yapılmaz. Alıcı mentör olduğu için kabul edilebilir gecikme.
+
+### 1-e-1 Ofis Saati (#398)
+`features/ofis-saati/` — mentör müsait bir aralık açar, sistem **20 dakikalık**
+dilimlere böler, stajyer tek tıkla rezerve eder.
+
+- **⚠️ AI HİÇ KARIŞMIYOR.** Görüşme notu mentörün kendi cümleleri: kayıt resmî ve
+  öğrenci hakkında; AI'ın genişlettiği bir cümle mentörün sözü gibi durur ve öğrenci
+  itiraz ederse kimin sözü olduğu belirsiz kalır.
+- **⚠️ ÇİFT REZERVASYON VERİTABANINDA ENGELLENİR.** Tek koşullu UPDATE
+  (`id` eşleşsin **VE** `rezerveEdenId` NULL olsun); yarışı kaybeden `409` alır.
+  "Önce sorgula sonra yaz" bu yarışı kaybederdi (#345/#349/#366 dersi).
+- **⚠️ ÇİFT AÇMA DA VERİTABANINDA** — `@@unique([mentorId, baslangic])`. **Canlı
+  testte bulundu:** "Aralık aç" iki kez çalışınca takvim ikizleniyor, stajyer aynı
+  14:00 dilimini iki kez görüyordu. `createMany` `skipDuplicates` ile idempotent:
+  14:00–15:00 açtıktan sonra 14:00–16:00 açmak meşru bir istek, hata değil.
+  Dönen `count` **gerçekten oluşan** sayı — arayüz atlananları saymıyor.
+- **⚠️ YETKİSİZLİK DE `slot-yok` DÖNER** (404). Başkasının takvimindeki bir slotun
+  **var olduğu** bile sızmamalı. "Bu öğrenci benim mi" sorusu `mentorunOgrencisiWhere`
+  (#370) — bireysel **veya** takım bağı.
+- **⚠️ GÖRÜŞME BAĞLANTISI YALNIZ REZERVE EDİLMİŞ SLOTTA DÖNER.** **Canlı testte
+  bulundu:** arayüz "rezervasyon sonrası görürsün" diyordu ama API bağlantıyı her
+  slotta dönüyordu — mentörün kalıcı toplantı odası rezervasyon yapmamış her
+  stajyerin ağ yanıtında duruyordu. Sözü tutan yer **sunucu**.
+- **⚠️ OTOMATİK MEET LİNKİ ÜRETMİYORUZ.** Google Calendar entegrasyonu yeni bir OAuth
+  akışı, token saklama ve mentörün takvimine erişim demekti — yeni bir KVKK
+  aydınlatma yüzeyi (#330'da sesli/görüntülü görüşme aynı gerekçeyle kapatılmıştı).
+  Mentör kendi linkini bir kez giriyor; **yalnız http(s)** kabul ediliyor — aksi
+  halde stajyerin tıkladığı yerde `javascript:` çalıştırılabilirdi.
+- **⚠️ SAAT UTC SAKLANIR, YEREL GÖSTERİLİR.** `dilimlereBol` bilerek **epoch
+  aritmetiği** kullanıyor; takvim alanlarıyla (`setMinutes`) yaz saati geçişinde
+  bir dilim 80 dakikaya sıçrıyor. **Test kendi saat dilimini değiştirmek zorunda:**
+  geliştirme makineleri UTC+3'te ve Türkiye yaz saati uygulamadığı için hatalı bir
+  uygulama testten geçerdi (mutasyon testinde ölçüldü).
+- **Artan kısım ATILIR**: 50 dakikalık aralık 2 dilim verir, 2,5 değil — yarım dilim
+  rezerve edilirse görüşme süresi sözleşmesi bozulurdu.
+- **REZERVE EDİLMİŞ SLOT SİLİNEMEZ**, önce iptal edilmeli — aksi halde stajyerin
+  görüşmesi habersiz kaybolurdu. İptal edilen slot yeniden **BOŞA** düşer.
+- **⚠️ MEZUN (`GRADUATED`) STAJYER REZERVE EDEBİLİR** — #208 ayrımı: *sistem
+  durumunu değiştiren* ve *ücretli AI* uçları kapalı, *insan iletişimi* açık.
+  Görüşme mesajlaşmanın eşi (referans, kariyer tavsiyesi) ve kıtlık mentörün
+  kendi kontrolünde — slotu o açıyor, iptal edebiliyor.
+- **Bilinen sınır:** bağlantı alanı `MentorProfile`'da, o da yalnız başvuru akışında
+  (#287) oluşuyor. Seed/admin eliyle açılan mentör **slot açabilir ama bağlantı
+  kaydedemez**; hata mesajı bunu açıkça söylüyor.
 
 ### Kalıcı Bildirimler (#380)
 `Notification` tablosu + `features/bildirim/`. Kullanıcı bir şeyin olduğunu ancak ilgili

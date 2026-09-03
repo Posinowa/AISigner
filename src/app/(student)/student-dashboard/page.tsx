@@ -4,6 +4,7 @@ import { RoadmapSteps } from "@/features/student/ui/RoadmapSteps";
 import { revizyonGerekceleri } from "@/features/roadmap/server/revizyon";
 import { ProjeOnerisi } from "@/features/proposals/ui/ProjeOnerisi";
 import { TakilmaBildirimiAyari } from "@/features/radar/ui/TakilmaBildirimiAyari";
+import { OfisSaatiOgrenci } from "@/features/ofis-saati/ui/OfisSaatiOgrenci";
 import { prisma } from "@/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/nextauth";
@@ -282,6 +283,12 @@ export default async function StudentDashboardPage() {
           <ProjeOnerisi />
         </div>
       )}
+
+      {/* #398: Mentör görüşmesi. Mezun stajyere de AÇIK — #208 ayrımında
+          görüşme, mesajlaşma gibi *insan iletişimi* kanalı. */}
+      <div className="mb-8">
+        <OfisSaatiOgrenci kullaniciId={session.user.id} />
+      </div>
 
       {/* #290: Karşılamadaki "Sırada" bağlantısının hedefi. */}
       <div id={PROJELER_CAPASI.slice(1)} className="scroll-mt-24">
