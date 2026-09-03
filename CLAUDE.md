@@ -52,8 +52,15 @@ src/
 │   ├── ai/server/                        — profile-analysis(+store), recommendations, roadmap
 │   ├── ai/ui/                            — AIChatBot (Posilog), ProfileAnalysisCard
 │   ├── student/models/                   — onboarding, compiledGoals, onboardingInitial
+│   ├── progress/                         — ilerleme + duraklama, TEK kaynak (#432)
 │   ├── suggestions/                      — öneri/istek: labels + server (#147)
 │   ├── survey/                           — answers + server/survey (#45/#46)
+│   ├── roadmap/odak.ts                    — "hangi adımdayım" TEK kaynak (#416)
+│   ├── roadmap/gruplama.ts                — tamamlananları katlama (#417)
+│   ├── roadmap/taslak.ts                  — taslak uyarı metinleri (#405)
+│   ├── roadmap/server/siralama.ts         — adım sırası, 1..n yeniden yazar (#406)
+│   ├── roadmap/server/gecmis.ts           — geçmiş adım başlıkları (#423)
+│   ├── kvkk/kod-incelemesi-durumu.ts      — rıza engelinin sebebi (#394)
 │   └── mentors|messaging|projects|files|auth/...
 └── lib/
     ├── ai/gemini-client.ts               — getModel() JSON / getTextModel() düz metin
@@ -189,6 +196,11 @@ bilinçli karar.
 - **Ayrılmış üye sahip DEĞİL** ama satırı SİLİNMİYOR (`leftAt`) — katkı geçmişi sertifikanın
   dayanağı. Ayrılınca üstlendiği adımlar panoya geri düşer.
 - **Mentör TAKIMA atanır**; etkin mentörler = kendi mentörleri (#195) + takımınkiler.
+  ⚠️ **BU SATIR ŞU AN KODLA ÇELİŞİYOR — #434.** `mentoruMu()` takım atamasında
+  `atama.studentProfile`'a bakıyor, ama takım atamasında o alan NULL (#332), yani
+  kişisel mentör dalı HİÇ çalışmıyor: üyenin kişisel mentörü takım panosuna
+  erişemiyor. Hangisinin doğru olduğu (#434) karara bağlanana kadar bu cümleye
+  DAYANARAK kod yazmayın.
 - **Adım kilitlenmez:** başkasının üstlendiği adım devralınabilir (havuzdan iş çekme).
   Adım yalnızca ATAMANIN ÖĞRENCİLERİNE atanabilir — yoksa mentör panoya kendini yazardı.
 - Takımda AI girdileri: seviye **EN DÜŞÜK** (pano ortak, en yeni üye de takip etmeli),
@@ -378,6 +390,81 @@ verirse) hatırlatma.
   Bilinen sınır: tik yalnız en az bir kullanıcı bağlıyken çalışır, yani kimse çevrimiçi
   değilken tarama yapılmaz. Alıcı mentör olduğu için kabul edilebilir gecikme.
 
+### Yol Haritası Adım Sıralaması (#406) ve Adım/Yol Haritası Bağı (#411)
+
+Adımın sırası arayüzden **hiç** değiştirilemiyordu: düzenleme formu `title`,
+`description`, `estimatedHours`, `resources`, `githubIssueUrl` tutuyordu, `order`
+yoktu. AI sırayı yanlış kurduğunda mentörün tek çaresi adımı silip yeniden yazmaktı.
+
+- **Sıralama AYRI bir uçta** (`POST .../steps/reorder`). Mevcut `PUT .../steps/[stepId]`
+  tek bir adımın `order`'ını kabul ediyordu; komşusu güncellenmeden yazılırsa iki adım
+  aynı sırada kalırdı. İstemci sıra numarası **hesaplamıyor**, yalnız "hangi adım,
+  hangi yön" diyor.
+- **⚠️ SIRA HER YAZMADA 1..n YENİDEN NUMARALANIR** (`roadmap/server/siralama.ts`).
+  İki kaydı takas etmek, veride zaten bozuk bir sıra varsa (AI'ın dönebildiği
+  yinelenen/atlamalı `order`, #410) bozukluğu KORURDU. Tamamı tek `$transaction`
+  içinde; `(roadmapId, order)` benzersiz olmadığı için ara durumda çakışma yok.
+- Sıralama `order`, eşitlikte `createdAt` ile çözülür — bozuk veride aynı düğmeye
+  iki kez basmak aksi halde farklı sonuç verirdi.
+
+#### ⚠️ YETKİ YOL HARİTASINDA, İŞLEM ADIMDA — bağ sorulmalı (#411)
+
+`PUT`/`DELETE .../roadmap/[roadmapId]/steps/[stepId]` yetkiyi **yol haritası**
+üzerinde kontrol ediyor ama işlemi `where: { id: stepId }` ile yapıyordu. Mentör
+kendi yol haritasının kimliğini URL'e koyup **başka bir stajyerin adımının**
+kimliğini vererek o adımı **düzenleyebiliyor ve silebiliyordu**. `DELETE` ayrıca
+silme sonrası sırayı URL'deki `roadmapId`'ye göre numaralandırdığı için hasar iki
+yol haritasına birden dağılıyordu: adım birinden siliniyor, **diğeri** yeniden
+numaralanıyordu. Canlı olarak doğrulandı (kurbanın başlığı değişti, sırası
+`1, 3` boşluklu kaldı).
+
+İşlem artık `where: { id: stepId, roadmapId }` ile daraltılıyor; bulunamayan adım
+**404** (başkasının adımının var olduğu bile sızmasın). Yeniden numaralandırma
+ortak yardımcıdan geçiyor.
+
+⚠️ **Kardeş uçlarda bu hata YOK**: `steps/[stepId]/assignee`, `comments`, `files`
+yetkiyi ADIMIN KENDİSİNDEN türetiyor ve URL'de `roadmapId` taşımıyor. Hata yalnızca
+**her iki kimliği de URL'den alıp birini kontrol edip diğerine yazan** uçta vardı.
+
+⚠️ `PUT` artık `order`'ı da yok sayıyor (`status` gibi). Yazılacak alan kalmadıysa
+güncelleme HİÇ çağrılmıyor: Prisma boş `data` ile `count: 0` döndürüyor ve bu, var
+olan bir adım için yanıltıcı 404 üretiyordu (canlı testte bulundu).
+
+### AI Yol Haritası Üretiminin Girdileri (#410, #423)
+
+Prompt yalnız üç şey görüyordu: `experienceLevel`, `interests`, `goals`. Oysa
+platform her stajyer için #47'de zengin bir analiz üretip **kalıcı saklıyor**.
+
+- **⚠️ `ProfileAnalysis` prompt'a giriyor** (`strengths`, `developmentAreas`,
+  `recommendedPath`). Canlı Gemini ile ölçüldü: analizsiz üretimde veritabanı 3.
+  adımdaydı ve test hiçbir adımda yoktu; analizle veritabanı modelleme 1. adıma
+  çıktı, testler 4/5 adıma girdi, arayüz sona bırakıldı — `recommendedPath`'in
+  dediği sıra birebir yansıdı.
+- **⚠️ ANALİZ YOKSA ÇÖKMEZ**, eski davranışa düşer: henüz üretilmemiş ya da rıza
+  geri alınınca SİLİNMİŞ olabilir (#352).
+- **⚠️ MENTÖR YÖNLENDİRMESİ ANALİZDEN ÖNCELİKLİ** ve bu prompt'ta AÇIKÇA yazılı.
+  İkisi çelişebilir (analiz "önce veri modeli", mentör "önce arayüz"); sessizce
+  yarışırlarsa hangisinin kazandığı modele kalır ve çıktı açıklanamaz olur. Mentör
+  insan, analiz türetilmiş bir tahmin. Analiz bloğu SİLİNMİYOR, sıralanıyor.
+  Ölçüldü: "her adımda test yaz, CI kur" yönlendirmesiyle test/CI geçen adım
+  **0/7 → 5/5**.
+- **⚠️ GEÇMİŞ İŞ prompt'a giriyor** (`roadmap/server/gecmis.ts`). İkinci projesinde
+  stajyer yine "Proje Kurulumu ve Gerekli Araçlar" adımını alıyordu. Ölçüldü:
+  geçmişle örtüşen adım **3/6 → 0/4**. Yalnız BAŞLIKLAR ve en yeni 20 tanesi gidiyor
+  (prompt bütçesi); sahiplik `sahiplik.ts`'ten sorulur (takımda `studentProfileId`
+  NULL).
+- **⚠️ MENTÖR METNİ DE KULLANICI METNİDİR** — `veriBlogu` ile sarılır (#390).
+  "Yetkili kişi yazdı" varsayımı #390'da tam olarak bu yüzden reddedilmişti.
+
+#### ⚠️ Çıktı doğrulaması sayıları da sınırlar
+`estimatedHours` 1–60; dizi `.min(4).max(7)` (prompt 4–7 adım isterken şema TEK
+adımlı yol haritasını sessizce geçiriyordu — "üretildi" deyip tek satır vermek
+mock'a düşmekten sinsi, #377 kararının aynısı). **Modelin `order` değeri
+veritabanına olduğu gibi yazılıyordu**; artık 1..n yeniden numaralanıyor.
+Prompt **arama terimi** istiyor, URL değil: uydurma bir kaynak linki hiç link
+olmamasından kötü (stajyer tıklar, 404 alır). Canlı ölçümde dönen kaynakların
+**0'ı URL'di**.
+
 ### 1-e-1 Ofis Saati (#398)
 `features/ofis-saati/` — mentör müsait bir aralık açar, sistem **20 dakikalık**
 dilimlere böler, stajyer tek tıkla rezerve eder.
@@ -422,6 +509,83 @@ dilimlere böler, stajyer tek tıkla rezerve eder.
   (#287) oluşuyor. Seed/admin eliyle açılan mentör **slot açabilir ama bağlantı
   kaydedemez**; hata mesajı bunu açıkça söylüyor.
 
+### Taslak Yol Haritası Görünürlüğü (#405)
+
+Mentör yol haritası oluşturduğunda varsayılan `DRAFT`; yayınlanmazsa **stajyerin
+panosunda hiçbir adım görünmüyor** ve kimse fark etmiyordu.
+
+- **⚠️ SORUN DURUMUN GÖRÜNMEMESİ DEĞİL, SONUCUNUN SÖYLENMEMESİYDİ.** Yol haritası
+  sayfasında zaten "Taslak" rozeti vardı; eksik olan "stajyer hiçbir adımı
+  göremiyor" cümlesiydi.
+- **⚠️ Asıl körlük sayfanın DIŞINDAYDI.** Mentör panosunda ve öğrenci detayında
+  hiçbir işaret yoktu — üstelik öğrenci detayı taslak bir rotaya **"AI Rotası
+  HAZIR"** diyordu, yani gerçeğin tersi. Yanlış bir işaret, işaretsizlikten zararlı.
+- Metin tek kaynakta (`features/roadmap/taslak.ts`); üç yüzeyde farklı sözcük
+  kullanmak aynı durumu farklı şeyler sanmaya yol açardı.
+- **⚠️ UYARILAR ENGELLEYİCİ DEĞİL**: taslağa geri almak düzenleme sırasında meşru.
+- `getMentorStudents` bireysel projelerde `roadmap` alanını hiç çekmiyordu; takım
+  projelerinde **zaten seçiliydi ama hiç kullanılmıyordu**.
+
+### Öğrenci Panosunun Yoğunluğu (#415, #416, #417, #420)
+
+Ölçüldü (1280×900, **yalnızca 3 adımlık** yol haritasıyla): sayfa **3388px
+(3.8 ekran)**, ilk adım kartı **2366px aşağıda (2.6 ekran)**, "Kendi projeni öner"
+formu tek başına **745px** — üç adım kartının toplamından (706px) BÜYÜK.
+
+**⚠️ Kök sebep: sayfa kullanım sıklığına göre değil, ÖZELLİKLERİN EKLENME SIRASINA
+göre dizilmişti.** #397, #366 ve #398 geldiklerinde çalışma alanının üstüne kondular.
+
+- **#415 — idari bloklar tek katlanır bölümde** (`<details>`, istemci durumu değil:
+  sunucu bileşeni kalıyor, JS'siz çalışıyor). **Sekme YAPILMADI**: yeni gezinme
+  modeli + derin bağlantı + "her şey nerede" hissinin kaybı; katlanır blok aynı
+  kazancı sıfır gezinme değişikliğiyle verdi.
+  ⚠️ Takılma bildirimi (#397) ayarının ADI ve DURUMU katlanmış başlıkta yazılı —
+  opt-in'in bilinen bedeli tam da çekingen stajyerin ayarı fark etmemesiydi.
+  ⚠️ Özeti İÇERİĞİ SEÇEN taraf kurar: sabit liste, mezunda olmayan formu
+  duyuruyordu (canlı testte bulundu).
+  ⚠️ Blok, bekleyen iş varken AÇIK gelir — `#profil` çapası kapalı `<details>`
+  içindeyken "Fotoğraf ekle" bağlantısı Chrome 148'de ne bloğu açtı ne kaydırdı.
+- **#416 — "bugünün odağı" kartı.** ⚠️ YENİ İŞARET DEĞİL: panoda zaten "SIRADA"
+  bağlantısı vardı (#290), eksik olan EYLEMDİ. Kart varken karşılamadaki bağlantı
+  **bastırılır** (aynı bilgi iki yerde ayrışırdı).
+  ⚠️ **ÖNCELİK "tamamlanmamış ilk adım"dan FARKLI**: revizyon istenen adım her şeyin
+  önünde, sonra devam eden, sonra eyleme açık ilk adım. Eski kural, 1. adım devam
+  ederken 2. adım revizyona düştüğünde mentörün geri gönderdiği işi HİÇ göstermiyordu.
+  ⚠️ Kural tek kaynakta: `roadmap/odak.ts` (`adimKilitli`, `adimEylemeAcik`,
+  `odaktakiAdimIndeksi`) — `RoadmapSteps` de oradan geçer.
+- **#417 — tamamlanan adımlar katlanır.** Ölçüldü: 8 tamamlanmış adımla
+  **4522px → 2298px (−%49)**. ⚠️ ARDIŞIK RUN'lar hâlinde, "tüm tamamlananlar" olarak
+  değil: adımlar her zaman sırayla bitmiyor ve hepsini tek yere yığmak zaman
+  çizgisini bozardı. ⚠️ Revizyon istenen adım gruba GİRMEZ. ⚠️ MEZUNDA VARSAYILAN
+  AÇIK (#208 — portfolyo sertifikanın dayanağı). Tercih kalıcı değil.
+- **#420 — öneri ve ofis saati kendi sayfalarına taşındı**, üst menüden erişiliyor.
+  ⚠️ Mezunda "Projemi Öner" gizli ve sayfa yönlendiriyor (#208), "Mentör Görüşmesi"
+  AÇIK (#398 — insan iletişimi). ⚠️ Rezervasyonu OLAN öğrenci panoda hatırlatma
+  görmeye devam eder: "rezerve edilmiş görüşme zamana bağlı bilgidir, saklanırsa
+  kaçırılır" (#398).
+
+Sonuç: **3388px → ~2200px**, ilk adım **2.6 → 1.5 ekran** (odak kartı EKLENDİKTEN
+sonra).
+
+### İlerleme Takibi (#432)
+
+`features/progress/ilerleme.ts` — ilerleme yüzdesi ve duraklama, admin ile mentör
+arasında TEK kaynaktan. Hesap `assignment-progress.ts` içinde gömülüydü ve mentör
+panosunda hiç yoktu.
+
+- **Admin**: mentöre göre FİLTRE + duraklama işareti. ⚠️ **FİLTRE, SIRALAMA DEĞİL** —
+  #331'de mentörleri yanıt süresine göre sıralayan liste bilerek reddedilmişti.
+  ⚠️ "Mentörü yok" ayrı bir seçenek: mentörsüz atamalar tam da gözden kaçmaması
+  gereken satırlar.
+- **Mentör**: pano kartlarında ilerleme çubuğu + duraklama (öncesi yalnız
+  aktif/tamamlanan sayacıydı, #393).
+- **⚠️ YENİ EŞİK UYDURULMADI**: `SESSIZLIK_GUN = 10` zaten analitikteydi. Eşikler
+  `analytics/sabitler.ts`'e taşındı — `server/analiz.ts` `server-only` + prisma
+  çekiyor, sabitleri oradan almak sunucu kodunu istemci paketine sürüklerdi.
+- **⚠️ SKOR DEĞİL SİNYAL** (#331/#397): "14 gündür hareket yok". Tamamlanmış iş
+  duraklamış sayılmaz (mezun portfolyosu aksi halde baştan sona duraklamış görünürdü).
+  "Adım yok" ile "hiç ilerlemedi" ayrı şeyler.
+
 ### Kalıcı Bildirimler (#380)
 `Notification` tablosu + `features/bildirim/`. Kullanıcı bir şeyin olduğunu ancak ilgili
 sayfayı ziyaret ederse öğreniyordu.
@@ -447,6 +611,56 @@ sayfayı ziyaret ederse öğreniyordu.
 - Mentör atamasında **yalnız YENİ bağlar** bildiriliyor: reconcile her çağrıda tüm listeyi
   yazıyor, hepsini bildirmek listeden tek kişi çıkınca kalan herkese "yeni mentör" göndermek
   olurdu.
+
+### Mentör Yükü ve Rıza Görünürlüğü (#404, #394)
+
+**#404 — admin mentör atarken yükü görüyor.** Açılır listede yalnız ad + e-posta
+vardı. `MentorProfile.capacity` alanı **zaten tanımlıydı ve hiç kullanılmıyordu**;
+artık "1/3 stajyer" gösteriliyor.
+
+- **⚠️ SAYIM İKİ YOLDAN BAĞI DA SORAR** (`ogrenciMentoreBagliSql`): bireysel
+  `MentorAssignment` VEYA takım üzerinden `TeamMentor`. Yalnız ilkine bakan bir
+  sayaç takımı olup bireysel bağı olmayan stajyerleri sessizce düşürürdü — #393'te
+  tam olarak bu yaşandı. Kural kopyalanmadı: `sahiplik-sql.ts`'teki koşul sütun
+  ifadesi alacak şekilde genelleştirildi, SQL tarafında tek tanım korundu.
+- **⚠️ MEZUN VE REDDEDİLEN SAYILMAZ**: kapasite EŞZAMANLI yükü anlatır; sayarsak
+  eski mentörler kalıcı olarak "dolu" görünür ve yeni atama alamazdı.
+- **⚠️ KAPASİTE BEYAN EDİLMEMİŞSE ORAN GÖSTERİLMEZ**, yalnız sayı. Uydurma bir
+  payda, olmayan bir sınırı varmış gibi gösterirdi (#328'in "yüzde skor üretme"
+  kararı).
+- **⚠️ DOLU/AŞKIN MENTÖR ENGELLENMEZ** — geçici devir meşru olabilir; son söz admin'in.
+
+**#394 — AI kod incelemesi engellendiğinde mentör sebebini görüyor.** Kural
+DEĞİŞMEDİ: takım deposunda HERKESİN güncel rızası aranıyor, çünkü ortak repoda
+hangi satırı kimin yazdığı bilinmiyor. Eksik olan SESSİZLİKTİ — engelleme hiç
+kimseye söylenmiyordu (sayaç artıyordu ama o yalnızca teşhis).
+
+- **⚠️ ÖNCE MENTÖR YÜZEYİ, PR yorumu DEĞİL.** Durumu düzeltebilecek kişi rıza
+  vermemiş ÜYE, ama PR'ı zaten başkası açtı ve yorumu okuyacak kişi sorunu
+  ÇÖZEMEYECEK olan. Ayrıca BAGLA/LINKED depolarda yorum yazma yetkimiz yok (#366).
+- **⚠️ İSİMLER YALNIZ MENTÖR YÜZEYİNDE.** Üyeler arasında isim paylaşmak baskı
+  yaratır ve rızayı "özgür irade" olmaktan çıkarır (#352).
+- **⚠️ LINKED depoda RIZA DEĞİL DEPO sebebi gösterilir** — orada inceleme zaten
+  çalışmıyor; rıza durumunu göstermek yanlış sebebi işaret ederdi.
+- Kural da açıklanır ("hangi satırı kimin yazdığı bilinmediği için"), yoksa mentör
+  kuralı hata sanar — denetimde tam olarak bu olmuştu.
+
+### Küçük ama ölçülmüş düzeltmeler (#407, #408, #409)
+
+- **#407 — adım kartında yorum sayısı.** ⚠️ "YENİ" DEĞİL, TOPLAM: `StepComment`'ta
+  okunma izi YOK; okunma izi olmadan "yeni" demek uydurma olurdu. Sayı liste
+  sorgusundan (`_count`) — adım başına istek N+1 üretirdi (canlı ölçüldü: 0 ek istek).
+- **#408 — öneri formunda karakter sayacı** + ölçülmüş bir açık: şema
+  `.min(30).transform(trim)` sırasındaydı, yani **35 BOŞLUK `min(30)`'u geçiyor ve
+  BOŞ STRING kaydediliyordu**. `.trim().min(30)` sırasına alındı. Eşikler
+  `ONERI_SINIRLARI`'nda tek kaynakta. Düğmenin pasif olması KOLAYLIK, güvenlik
+  değil — sunucu aynı kuralları doğruluyor.
+- **#409 — admin menüsü etiketleri kısaltıldı** (821px → 651px; 1024px'te 149px
+  görünmezken artık **0**). ⚠️ AÇILIR MENÜ YAPILMADI: `UnreadBadge` ve
+  `BekleyenTalepRozeti` bağlantıların İÇİNDE; taşınan bir öğenin rozeti görünmez
+  olurdu ve kaybedilen şey bir özellik değil BİLDİRİM olurdu (#349).
+  ⚠️ "İstekler" (#147) ile "Öneriler" (#366) FARKLI şeyler — kısa adlar
+  karışmamalı.
 
 ### Gerçek Zamanlı Mesajlaşma (#329)
 `GET /api/messages/stream` (SSE) + `features/messaging/server/canli-akis.ts`.
@@ -681,8 +895,8 @@ docker compose up -d  # db (+app) — uploads kalıcı volume'da
 
 ---
 
-*Son güncelleme: Ağustos 2026 — #308/#310 canlıya çıkış hazırlığı: oturum çerezi
-bloker'ı, güvenilir istemci IP'si, e-posta doğrulamasının onaya bağlanması, üretim
-CSP'si, standalone Docker imajı ve yedekleme/rollback prosedürü*
-
-
+*Son güncelleme: Eylül 2026 — #404–#432 dalgası: yol haritası sıralama (#406) ve
+adım/yol haritası bağı açığı (#411), AI üretimine profil analizi + mentör
+yönlendirmesi + geçmiş iş (#410/#423), taslak görünürlüğü (#405), öğrenci panosu
+yoğunluğu (#415–#417/#420), mentör kapasitesi (#404), rıza engelinin görünürlüğü
+(#394), ilerleme takibi (#432)*
