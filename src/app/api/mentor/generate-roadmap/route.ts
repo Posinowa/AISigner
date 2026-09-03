@@ -5,6 +5,7 @@ import {
   mentoruMu,
 } from "@/features/teams/server/sahiplik";
 import { generateRoadmap } from "@/features/ai/server/generate-roadmap";
+import { getStoredProfileAnalysis } from "@/features/ai/server/profile-analysis-store";
 import { requireAuth } from "@/lib/auth/guard";
 import { generateRoadmapSchema } from "@/lib/validations/api";
 import { createRateLimiter } from "@/lib/rate-limit";
@@ -132,9 +133,33 @@ export async function POST(req: Request) {
     }
 
     // 4. Gemini AI'a verileri gönderip adımları (JSON dizisini) alıyoruz
+    /*
+     * #410: KAYITLI PROFİL ANALİZİ (#47) prompt'a giriyor.
+     *
+     * ⚠️ BU GİRDİ BUGÜNE KADAR HİÇ KULLANILMIYORDU. Platform her stajyer
+     * için `strengths`, `developmentAreas`, `recommendedPath` üretip
+     * saklıyordu ama yol haritası üretimi yalnız seviye + ilgi alanları +
+     * hedefleri görüyordu.
+     *
+     * ⚠️ ANALİZ YOKSA ÇÖKMÜYOR. Henüz üretilmemiş olabilir ya da rıza geri
+     * alınınca SİLİNMİŞ olabilir (#352); o durumda üretim eski davranışına
+     * düşüyor.
+     *
+     * Rıza kapısı yukarıda (#321): buraya gelindiğinde öğrenci zaten AI
+     * işlemesine rıza vermiş oluyor.
+     */
+    const analiz = await getStoredProfileAnalysis(assignedProject.studentProfile.id);
+
     const roadmapStepsData = await generateRoadmap(
       assignedProject.studentProfile,
-      assignedProject.projectTemplate
+      assignedProject.projectTemplate,
+      analiz
+        ? {
+            strengths: analiz.strengths,
+            developmentAreas: analiz.developmentAreas,
+            recommendedPath: analiz.recommendedPath,
+          }
+        : null,
     );
 
     // 5. 🚀 Prisma Nested Create: Ana Roadmap'i ve ona bağlı tüm adımları tek bir işlemde veritabanına kaydediyoruz
