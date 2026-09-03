@@ -24,16 +24,37 @@ const navByRole: Record<Role, { home: string; links: NavLink[] }> = {
     links: [
       { href: "/admin-dashboard", label: "Panel" },
       { href: "/admin-dashboard/projects", label: "Projeler" },
+      /*
+       * #409: ETİKETLER KISALTILDI, ÖĞE GİZLENMEDİ.
+       *
+       * Ölçüm: menü TAŞMIYOR — kapsayıcıda `overflow-x-auto`, bağlantılarda
+       * `whitespace-nowrap` var, yani düzen bozulmuyor, menü kendi içinde
+       * kayıyor. Sorun keşfedilebilirlik: kaydırma çubuğu belirgin olmadığı
+       * için sağdaki bağlantıların varlığı fark edilmeyebiliyor.
+       *
+       * ⚠️ AÇILIR MENÜ YAPILMADI. `UnreadBadge` ve `BekleyenTalepRozeti`
+       * bağlantıların İÇİNDE; açılır menüye taşınan bir öğenin rozeti
+       * görünmez olurdu ve o zaman kaybedilen şey bir özellik değil
+       * BİLDİRİM olurdu — #349'un rozeti tam da darboğazı görünür kılmak
+       * için konmuştu.
+       *
+       * Rozetler bağlamı zaten taşıdığı için kısa etiket yeterli.
+       */
       // #349: Mentör taleplerinin kuyruğu. Rozet olmadan kuyruk fark edilmez.
-      { href: "/admin-dashboard/workspace-requests", label: "Çalışma Alanı Talepleri" },
+      { href: "/admin-dashboard/workspace-requests", label: "Talepler" },
       // #366: Stajyerlerin kendi proje önerileri.
-      { href: "/admin-dashboard/proposals", label: "Proje Önerileri" },
+      { href: "/admin-dashboard/proposals", label: "Öneriler" },
       // #331: Darboğaz, yanıt süresi, gözden geçirilecek öğrenciler.
       { href: "/admin-dashboard/analytics", label: "Analitik" },
       // #332: Takım/Scrum projeleri.
       { href: "/admin-dashboard/teams", label: "Takımlar" },
       { href: "/admin-dashboard/messages", label: "Mesajlar" },
-      { href: "/admin-dashboard/suggestions", label: "Öneri & İstek" },
+      /*
+       * ⚠️ "İstekler" — "Öneriler"den AYRI bir şey: bu stajyerin admin'e
+       * yazdığı öneri/istek (#147), diğeri stajyerin kendi PROJE önerisi
+       * (#366). İki kısa ad birbirine karışmasın diye farklı sözcükler.
+       */
+      { href: "/admin-dashboard/suggestions", label: "İstekler" },
     ],
   },
   MENTOR: {
