@@ -17,6 +17,7 @@ import {
   aktifProjeSayisi,
   tamamlananProjeSayisi,
   benzersizProjeSayisi,
+  taslakYolHaritasiSayisi,
   type SayilabilirOgrenci,
 } from "./proje-sayaci";
 
@@ -106,5 +107,84 @@ describe("panel toplamları", () => {
 
   it("boş listede 0", () => {
     expect(benzersizProjeSayisi([], true)).toBe(0);
+  });
+});
+
+/**
+ * #405: Yayınlanmayı bekleyen yol haritaları.
+ *
+ * Panodaki uyarı bu sayıdan besleniyor; asıl körlük mentörün yol haritası
+ * sayfasından çıkınca hiçbir işaret görmemesiydi.
+ */
+describe("taslakYolHaritasiSayisi", () => {
+  const ogrenci = (projeler: unknown[]) =>
+    ({ studentProfile: { assignedProjects: projeler } }) as SayilabilirOgrenci;
+
+  it("taslak yoksa 0", () => {
+    expect(
+      taslakYolHaritasiSayisi([
+        ogrenci([{ id: "p1", status: "IN_PROGRESS", roadmap: { id: "r1", status: "PUBLISHED" } }]),
+      ]),
+    ).toBe(0);
+  });
+
+  it("taslak yol haritalarını sayar", () => {
+    expect(
+      taslakYolHaritasiSayisi([
+        ogrenci([
+          { id: "p1", status: "IN_PROGRESS", roadmap: { id: "r1", status: "DRAFT" } },
+          { id: "p2", status: "IN_PROGRESS", roadmap: { id: "r2", status: "DRAFT" } },
+        ]),
+      ]),
+    ).toBe(2);
+  });
+
+  it("yol haritası OLMAYAN proje sayılmaz — o ayrı bir durum", () => {
+    expect(
+      taslakYolHaritasiSayisi([ogrenci([{ id: "p1", status: "IN_PROGRESS", roadmap: null }])]),
+    ).toBe(0);
+  });
+
+  it("⚠️ TAKIM yol haritası bir kez sayılır, üye sayısı kadar değil", () => {
+    // #393'ün dersi: takım projesi üç üyenin de listesinden geliyor.
+    const takim = {
+      team: {
+        assignedProjects: [
+          { id: "tp1", status: "IN_PROGRESS", roadmap: { id: "tr1", status: "DRAFT" } },
+        ],
+      },
+    };
+    const uyeler = [
+      { studentProfile: { assignedProjects: [], teamMemberships: [takim] } },
+      { studentProfile: { assignedProjects: [], teamMemberships: [takim] } },
+      { studentProfile: { assignedProjects: [], teamMemberships: [takim] } },
+    ] as SayilabilirOgrenci[];
+
+    expect(taslakYolHaritasiSayisi(uyeler)).toBe(1);
+  });
+
+  it("bireysel ve takım taslakları birlikte sayılır", () => {
+    const ogr = {
+      studentProfile: {
+        assignedProjects: [
+          { id: "p1", status: "IN_PROGRESS", roadmap: { id: "r1", status: "DRAFT" } },
+        ],
+        teamMemberships: [
+          {
+            team: {
+              assignedProjects: [
+                { id: "tp1", status: "IN_PROGRESS", roadmap: { id: "tr1", status: "DRAFT" } },
+              ],
+            },
+          },
+        ],
+      },
+    } as SayilabilirOgrenci;
+
+    expect(taslakYolHaritasiSayisi([ogr])).toBe(2);
+  });
+
+  it("profili olmayan öğrenci sayımı düşürmez", () => {
+    expect(taslakYolHaritasiSayisi([{ studentProfile: null }])).toBe(0);
   });
 });

@@ -102,6 +102,11 @@ export async function getMentorStudents(mentorId: string): Promise<StudentWithPr
                     difficulty: true,
                   },
                 },
+                // #405: Taslak yol haritası panoda işaretlenebilsin. Takım
+                // projelerinde bu alan zaten seçiliydi, bireysel projelerde
+                // hiç çekilmiyordu — dolayısıyla mentör "yol haritası var mı,
+                // yayında mı" sorusunu panodan yanıtlayamıyordu.
+                roadmap: { select: { id: true, status: true } },
               },
               orderBy: {
                 createdAt: "desc",
