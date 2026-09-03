@@ -1,4 +1,5 @@
 import { getModel } from "@/lib/ai/gemini-client";
+import { guvenliMetin, guvenliListe, veriBlogu } from "@/lib/ai/prompt";
 import { cozVeDogrula } from "@/lib/ai/response";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
@@ -31,9 +32,19 @@ export async function generateRoadmap(
   try {
     const model = getModel();
 
-    const interestsText = Array.isArray(studentProfile.interests)
-      ? studentProfile.interests.join(", ")
-      : String(studentProfile.interests);
+    /*
+     * #390: Serbest metin alanları AYRAÇLI BLOĞA sarılıyor.
+     *
+     * Öncesi doğrudan `${...}` ile gömülüydü; stajyer `goals` alanına talimat
+     * yazarak üretilen yol haritasını yönlendirebilirdi. #320 bu korumayı
+     * kurmuştu ama bu dosyaya uygulanmamıştı.
+     *
+     * ⚠️ Proje başlığı/açıklaması da KULLANICI METNİ olabilir: #366'dan beri
+     * stajyerin kendi önerisinden türeyen şablonlar var (`fromProposal`).
+     */
+    const interests = Array.isArray(studentProfile.interests)
+      ? studentProfile.interests
+      : [String(studentProfile.interests)];
 
     const prompt = `
       Sen kıdemli bir teknik eğitmen ve yazılım mimarısın.
@@ -42,13 +53,13 @@ export async function generateRoadmap(
 
       ÖĞRENCİ PROFİLİ:
       - Seviye: ${experienceLevelLabel(studentProfile.experienceLevel)}
-      - İlgi Alanları: ${interestsText}
-      - Hedefler: ${studentProfile.goals || "Belirtilmemiş"}
+      ${veriBlogu("- İlgi Alanları", guvenliListe(interests))}
+      ${veriBlogu("- Hedefler", guvenliMetin(studentProfile.goals))}
 
       PROJE BİLGİLERİ:
-      - Proje Adı: ${projectTemplate.title}
-      - Açıklama: ${projectTemplate.description}
-      - Teknolojiler (Track): ${projectTemplate.track.join(", ")}
+      ${veriBlogu("- Proje Adı", guvenliMetin(projectTemplate.title, 200))}
+      ${veriBlogu("- Açıklama", guvenliMetin(projectTemplate.description))}
+      ${veriBlogu("- Teknolojiler (Track)", guvenliListe(projectTemplate.track))}
       - Zorluk: ${projectTemplate.difficulty}
 
       GÖREV:

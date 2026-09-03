@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { guvenliMetin, guvenliListe, veriBlogu } from "@/lib/ai/prompt";
 import { getModel } from "@/lib/ai/gemini-client";
 import { cozVeDogrula, AiCiktiGecersizError } from "@/lib/ai/response";
 import { sinirla, ALAN_SINIRI } from "@/lib/ai/truncate";
@@ -48,7 +49,11 @@ export async function generateStepIssues(params: {
   try {
     const model = getModel();
     const prompt = `
-Sen kıdemli biryazılım mimarısın. "${projectTitle}" projesindeki "${stepTitle}" (${stepDescription}) ana fazını, ${experienceLevel} seviyesindeki bir stajyer/öğrenci için 3 ile 4 arasında somut, uygulamaya dayalı GitHub Issue'larına bölmelisin.
+Sen kıdemli bir yazılım mimarısın. Aşağıdaki proje ve fazı, ${experienceLevel} seviyesindeki bir stajyer/öğrenci için 3 ile 4 arasında somut, uygulamaya dayalı GitHub Issue'larına bölmelisin.
+
+${veriBlogu("PROJE", guvenliMetin(projectTitle, 200))}
+${veriBlogu("FAZ BAŞLIĞI", guvenliMetin(stepTitle, 200))}
+${veriBlogu("FAZ AÇIKLAMASI", guvenliMetin(stepDescription))}
 
 Her Issue şunları içermelidir:
 1. "title": Aksiyon odaklı net başlık (örn: "[Auth] #1.1 - Argon2 Şifreleme ve Zod Şema Doğrulaması")
