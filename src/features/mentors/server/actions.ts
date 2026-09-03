@@ -33,6 +33,22 @@ export type StudentWithProfile = {
       };
       createdAt: Date;
     }[];
+    /**
+     * #367/#393: Öğrencinin AKTİF takım üyelikleri.
+     *
+     * ⚠️ Takım atamasında `AssignedProject.studentProfileId` NULL, sahiplik
+     * `teamId` üzerinde (#332). Proje sayaçları bu dalı da okumalı; yalnız
+     * `assignedProjects`'e bakan sürüm takımı olup bireysel projesi olmayan
+     * stajyer için "aktif projesi yok" diyordu.
+     */
+    teamMemberships: {
+      role: string;
+      team: {
+        id: string;
+        name: string;
+        assignedProjects: { id: string; status: string }[];
+      };
+    }[];
   } | null;
 };
 
@@ -115,6 +131,10 @@ export async function getMentorStudents(mentorId: string): Promise<StudentWithPr
                     assignedProjects: {
                       select: {
                         id: true,
+                        // #393: Pano sayaçları aktif/tamamlanmış ayrımı için
+                        // durumu okuyor; seçilmediği için takım projeleri
+                        // hiç sayılamıyordu.
+                        status: true,
                         githubRepoUrl: true,
                         githubStatus: true,
                         projectTemplate: { select: { id: true, title: true } },

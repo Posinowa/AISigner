@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import {
+  aktifProjeSayisi,
+  tamamlananProjeSayisi,
+  benzersizProjeSayisi,
+} from "@/features/mentors/proje-sayaci";
 import { Users, BookOpen, Clock, CheckCircle, AlertCircle, UserCircle2, ChevronRight, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
@@ -48,6 +53,8 @@ type StudentWithProfile = {
         }[];
         assignedProjects: {
           id: string;
+          // #393: Pano sayaçları aktif/tamamlanmış ayrımı için durumu okuyor.
+          status: string;
           githubRepoUrl: string | null;
           githubStatus: string;
           projectTemplate: { id: string; title: string };
@@ -116,11 +123,10 @@ export default function MentorDashboardPage() {
     return parts.map(p => p![0].toUpperCase()).join("") || "?";
   };
 
-  const getActiveProjects = (student: StudentWithProfile) =>
-    student.studentProfile?.assignedProjects?.filter(p => p.status !== "COMPLETED").length || 0;
-
-  const getCompletedProjects = (student: StudentWithProfile) =>
-    student.studentProfile?.assignedProjects?.filter(p => p.status === "COMPLETED").length || 0;
+  // #393: Sayım kuralları test edilebilir olsun diye saf fonksiyonlara
+  // çıkarıldı — hata tam da testsiz bir satırda duruyordu.
+  const getActiveProjects = aktifProjeSayisi;
+  const getCompletedProjects = tamamlananProjeSayisi;
 
   if (loading) {
     return (
@@ -151,8 +157,8 @@ export default function MentorDashboardPage() {
     );
   }
 
-  const totalActive = students.reduce((acc, s) => acc + getActiveProjects(s), 0);
-  const totalCompleted = students.reduce((acc, s) => acc + getCompletedProjects(s), 0);
+  const totalActive = benzersizProjeSayisi(students, true);
+  const totalCompleted = benzersizProjeSayisi(students, false);
   const missingProfile = students.filter(s => !s.studentProfile).length;
 
   // #290: Mentör de isimle karşılanıyor ve sıradaki işi görüyor.
