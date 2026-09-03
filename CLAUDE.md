@@ -195,12 +195,25 @@ bilinçli karar.
   `ATAMA_SAHIPLIK_SELECT` + saf yardımcılardan geçiyor. Fonksiyonlar veri ÇEKMİYOR.
 - **Ayrılmış üye sahip DEĞİL** ama satırı SİLİNMİYOR (`leftAt`) — katkı geçmişi sertifikanın
   dayanağı. Ayrılınca üstlendiği adımlar panoya geri düşer.
-- **Mentör TAKIMA atanır**; etkin mentörler = kendi mentörleri (#195) + takımınkiler.
-  ⚠️ **BU SATIR ŞU AN KODLA ÇELİŞİYOR — #434.** `mentoruMu()` takım atamasında
-  `atama.studentProfile`'a bakıyor, ama takım atamasında o alan NULL (#332), yani
-  kişisel mentör dalı HİÇ çalışmıyor: üyenin kişisel mentörü takım panosuna
-  erişemiyor. Hangisinin doğru olduğu (#434) karara bağlanana kadar bu cümleye
-  DAYANARAK kod yazmayın.
+- **Mentör TAKIMA atanır.** ⚠️ **TAKIM PANOSUNDA OKUMA VE YAZMA AYRI** (#434):
+  - **Yazma** (`mentoruMu`): yalnız TAKIMIN mentörleri. Ortak panoya yazılan her
+    şey (adım ekleme/silme, revizyon, çalışma alanı talebi, yol haritası üretimi)
+    TÜM TAKIMI etkiliyor; 4 kişilik bir takımda her üyenin 2 kişisel mentörü
+    varsa ortak panoya 8 kişi yazabilirdi.
+  - **Okuma** (`erisebilirMi`): üyenin KİŞİSEL mentörü de girer
+    (`uyeninKisiselMentoruMu`). Mentörün, öğrencisinin takımda yaptığı işe
+    (yorumlar, teslim dosyaları, üstlenme) bakamaması savunulamaz.
+
+  ⚠️ Bu ayrım bir HATADAN doğdu: docstring "üyelerin kişisel mentörleri de
+  yetkili sayılıyor" diyordu ama kod bunu YAPMIYORDU — takım atamasında
+  `studentProfile` NULL olduğu için (#332) ilgili dal hiç çalışmıyordu ve
+  `erisebilirMi` de `mentoruMu`ya dayandığı için kişisel mentör panoyu
+  OKUYAMIYORDU bile.
+
+  ⚠️ `SahiplikliAtama` tipinde `members[].studentProfile.mentorAssignments`
+  ZORUNLU: alanı `ATAMA_SAHIPLIK_SELECT`'ten çıkarmak DERLEME HATASI veriyor.
+  Opsiyonelken hiçbir test yakalayamıyordu — testler nesneyi elle kuruyor,
+  Prisma select'inden geçmiyor. Seçim ile kullanımı bağlayan şey tip.
 - **Adım kilitlenmez:** başkasının üstlendiği adım devralınabilir (havuzdan iş çekme).
   Adım yalnızca ATAMANIN ÖĞRENCİLERİNE atanabilir — yoksa mentör panoya kendini yazardı.
 - Takımda AI girdileri: seviye **EN DÜŞÜK** (pano ortak, en yeni üye de takip etmeli),

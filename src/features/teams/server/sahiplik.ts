@@ -42,7 +42,16 @@ export const ATAMA_SAHIPLIK_SELECT = {
         where: { leftAt: null },
         select: {
           role: true,
-          studentProfile: { select: { id: true, userId: true } },
+          studentProfile: {
+            select: {
+              id: true,
+              userId: true,
+              // #434: Üyenin KİŞİSEL mentörleri — OKUMA erişimi için.
+              // Öncesi çekilmiyordu, dolayısıyla "bu kullanıcı üyelerden birinin
+              // mentörü mü" sorusu CEVAPLANAMIYORDU.
+              mentorAssignments: { select: { mentorId: true } },
+            },
+          },
         },
       },
       mentors: { select: { mentorId: true } },
@@ -59,7 +68,23 @@ export type SahiplikliAtama = {
   team: {
     id: string;
     name: string;
-    members: { role: string; studentProfile: { id: string; userId: string } }[];
+    members: {
+      role: string;
+      studentProfile: {
+        id: string;
+        userId: string;
+        /**
+         * #434: Üyenin kişisel mentörleri — OKUMA erişimi için.
+         *
+         * ⚠️ ZORUNLU (opsiyonel değil) — bilinçli. Alanı
+         * `ATAMA_SAHIPLIK_SELECT`'ten çıkarmak böylece DERLEME HATASI oluyor.
+         * Opsiyonelken hiçbir test bunu yakalayamıyordu (mutasyon testinde
+         * ölçüldü): testler nesneyi elle kuruyor, Prisma select'inden
+         * geçmiyor. Seçim ile kullanımı bağlayan şey tip.
+         */
+        mentorAssignments: { mentorId: string }[];
+      };
+    }[];
     mentors: { mentorId: string }[];
   } | null;
 };
@@ -93,11 +118,24 @@ export function ogrencisiMi(atama: SahiplikliAtama, userId: string | null | unde
 }
 
 /**
- * Bu kullanıcı atamanın mentörü mü?
+ * Bu kullanıcı atamanın mentörü mü? — YAZMA yetkisi.
  *
- * ETKİN MENTÖRLER = öğrencinin kendi mentörleri (#195) + TAKIMIN mentörleri.
- * Takım atamasında üyelerin kişisel mentörleri de yetkili sayılıyor: üyenin
- * mentörünün, üyesinin çalıştığı panoyu görememesi anlamsız olurdu.
+ * Bireysel atamada öğrencinin kendi mentörleri (#195); TAKIM atamasında
+ * yalnız TAKIMIN mentörleri.
+ *
+ * ⚠️ ÜYENİN KİŞİSEL MENTÖRÜ BURAYA GİRMEZ — bilinçli (#434).
+ *
+ * Bu docstring eskiden "üyelerin kişisel mentörleri de yetkili sayılıyor"
+ * diyordu ama kod bunu YAPMIYORDU: takım atamasında `studentProfile` NULL
+ * (#332), yani ilk dal hiç çalışmıyordu. Çelişki #434'te çözüldü ve karar
+ * OKUMA/YAZMA AYRIMI oldu:
+ *
+ *   - Okuma (`erisebilirMi`): üyenin kişisel mentörü de girer — öğrencisinin
+ *     işine bakamaması savunulamaz.
+ *   - Yazma (bu fonksiyon): yalnız takım mentörleri. Ortak panoya yazılan her
+ *     şey (adım ekleme/silme, revizyon, çalışma alanı talebi) TÜM TAKIMI
+ *     etkiliyor; 4 kişilik bir takımda her üyenin 2 kişisel mentörü varsa
+ *     ortak panoya 8 kişi yazabilirdi.
  */
 export function mentoruMu(atama: SahiplikliAtama, userId: string | null | undefined): boolean {
   if (!userId) return false;
@@ -110,7 +148,39 @@ export function mentoruMu(atama: SahiplikliAtama, userId: string | null | undefi
 
 /** Öğrenci ya da mentör — çoğu uç için tek kapı. */
 export function erisebilirMi(atama: SahiplikliAtama, userId: string | null | undefined): boolean {
-  return ogrencisiMi(atama, userId) || mentoruMu(atama, userId);
+  return (
+    ogrencisiMi(atama, userId) ||
+    mentoruMu(atama, userId) ||
+    uyeninKisiselMentoruMu(atama, userId)
+  );
+}
+
+/**
+ * Bu kullanıcı, TAKIM üyelerinden birinin kişisel mentörü mü? (#434)
+ *
+ * ⚠️ YALNIZ OKUMA İÇİN. `mentoruMu` bunu KAPSAMAZ; ortak panoya yazma
+ * yetkisi takım mentörlerinde kalıyor (gerekçe `mentoruMu` docstring'inde).
+ *
+ * ⚠️ NEDEN GEREKLİ: `erisebilirMi` adım yorumlarını, teslim dosyalarını ve
+ * üstlenme bilgisini kapılıyor. Bu fonksiyon olmadan, bir stajyerin kişisel
+ * mentörü öğrencisinin takımda yaptığı işe BAKAMIYORDU bile — destek
+ * olması imkânsızdı.
+ *
+ * ⚠️ AYRILMIŞ ÜYE KAPSAM DIŞI: `ATAMA_SAHIPLIK_SELECT` üyeleri zaten
+ * `leftAt: null` ile sınırlıyor (#332).
+ */
+export function uyeninKisiselMentoruMu(
+  atama: SahiplikliAtama,
+  userId: string | null | undefined,
+): boolean {
+  // Boş/eksik kimlik kontrolü `isAssignedMentor`'da (o da null userId'yi
+  // reddediyor); burada tekrarlamak ölü mantık olurdu — mutasyon testinde
+  // ölçüldü, kaldıran sürümü hiçbir test öldüremiyordu.
+  return Boolean(
+    atama.team?.members.some((u) =>
+      isAssignedMentor(u.studentProfile.mentorAssignments, userId),
+    ),
+  );
 }
 
 /**

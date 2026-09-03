@@ -8,6 +8,7 @@ import {
   takimAtamasiMi,
   enDusukSeviye,
   mentorErisimiWhere,
+  uyeninKisiselMentoruMu,
   type SahiplikliAtama,
 } from "./sahiplik";
 
@@ -35,6 +36,8 @@ const bireysel = (userId = "ogr-1", mentorlar: string[] = ["men-1"]): Sahiplikli
 const takim = (
   uyeIdleri: string[] = ["ogr-1", "ogr-2"],
   mentorlar: string[] = ["men-t"],
+  /** #434: Üye başına KİŞİSEL mentörler — okuma erişimi testleri için. */
+  kisiselMentorler: Record<string, string[]> = {},
 ): SahiplikliAtama => ({
   studentProfile: null,
   team: {
@@ -44,7 +47,11 @@ const takim = (
     // ayrılmış üye burada HİÇ bulunmaz.
     members: uyeIdleri.map((u, i) => ({
       role: ["frontend", "backend", "qa"][i % 3],
-      studentProfile: { id: `sp-${u}`, userId: u },
+      studentProfile: {
+        id: `sp-${u}`,
+        userId: u,
+        mentorAssignments: (kisiselMentorler[u] ?? []).map((m) => ({ mentorId: m })),
+      },
     })),
     mentors: mentorlar.map((m) => ({ mentorId: m })),
   },
@@ -140,5 +147,69 @@ describe("enDusukSeviye", () => {
 
   it("boş listede BEGINNER'a düşer", () => {
     expect(enDusukSeviye([])).toBe("BEGINNER");
+  });
+});
+
+/**
+ * #434 — ÜYENİN KİŞİSEL MENTÖRÜ: OKUMA AÇIK, YAZMA KAPALI.
+ *
+ * `mentoruMu` docstring'i "üyelerin kişisel mentörleri de yetkili sayılıyor"
+ * diyordu ama kod bunu YAPMIYORDU: takım atamasında `studentProfile` NULL
+ * (#332), yani ilk dal hiç çalışmıyordu. Sonuç: stajyerin kişisel mentörü
+ * öğrencisinin takımda yaptığı işe BAKAMIYORDU bile (`erisebilirMi` da
+ * `mentoruMu`ya dayanıyor).
+ *
+ * Çözüm kuralı gevşetmek değil, AYRIMI DOĞRU YERE koymak oldu.
+ */
+describe("üyenin kişisel mentörü (#434)", () => {
+  const atama = takim(["ogr-1", "ogr-2"], ["men-t"], {
+    "ogr-1": ["kisisel-1"],
+  });
+
+  it("⚠️ OKUYABİLİR — öğrencisinin işine bakamaması savunulamaz", () => {
+    expect(erisebilirMi(atama, "kisisel-1")).toBe(true);
+  });
+
+  it("⚠️ YAZAMAZ — ortak panoya yazma takım mentörlerinde", () => {
+    expect(mentoruMu(atama, "kisisel-1")).toBe(false);
+  });
+
+  it("takım mentörü hem okur hem yazar", () => {
+    expect(erisebilirMi(atama, "men-t")).toBe(true);
+    expect(mentoruMu(atama, "men-t")).toBe(true);
+  });
+
+  it("ilgisiz mentör ne okur ne yazar", () => {
+    expect(erisebilirMi(atama, "yabanci")).toBe(false);
+    expect(mentoruMu(atama, "yabanci")).toBe(false);
+  });
+
+  it("üyelerden HERHANGİ BİRİNİN mentörü olmak yeter", () => {
+    const a = takim(["ogr-1", "ogr-2"], ["men-t"], { "ogr-2": ["kisisel-2"] });
+    expect(erisebilirMi(a, "kisisel-2")).toBe(true);
+  });
+
+  it("kimsenin kişisel mentörü yoksa kimse girmez", () => {
+    expect(uyeninKisiselMentoruMu(takim(), "kisisel-1")).toBe(false);
+  });
+
+  it("boş/geçersiz kullanıcı kimliği reddedilir", () => {
+    expect(uyeninKisiselMentoruMu(atama, null)).toBe(false);
+    expect(uyeninKisiselMentoruMu(atama, undefined)).toBe(false);
+    expect(uyeninKisiselMentoruMu(atama, "")).toBe(false);
+  });
+
+  /*
+   * ⚠️ BİREYSEL atamada davranış DEĞİŞMEMELİ: orada `mentoruMu` zaten
+   * öğrencinin kendi mentörlerini kapsıyor ve yazma da açık.
+   */
+  it("⚠️ BİREYSEL atamada kişisel mentör hem okur hem YAZAR", () => {
+    const b = bireysel("ogr-1", ["men-1"]);
+    expect(erisebilirMi(b, "men-1")).toBe(true);
+    expect(mentoruMu(b, "men-1")).toBe(true);
+  });
+
+  it("takımsız atamada fonksiyon false döner", () => {
+    expect(uyeninKisiselMentoruMu(bireysel(), "men-1")).toBe(false);
   });
 });

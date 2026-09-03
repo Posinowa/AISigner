@@ -128,7 +128,13 @@ describe("1. Takım Projelerinde Bireysel vs Takım Sahipliği", () => {
   });
 
   const takimAtamasi = (
-    activeMembers: Array<{ userId: string; profileId: string; role?: string }>,
+    activeMembers: Array<{
+      userId: string;
+      profileId: string;
+      role?: string;
+      /** #434: Üyenin KİŞİSEL mentörleri — okuma erişimini belirler. */
+      kisiselMentorler?: string[];
+    }>,
     teamMentorIds: string[] = ["mentor-team-1"]
   ): SahiplikliAtama => ({
     studentProfile: null,
@@ -137,7 +143,11 @@ describe("1. Takım Projelerinde Bireysel vs Takım Sahipliği", () => {
       name: "Alpha Takımı",
       members: activeMembers.map((m) => ({
         role: m.role || "developer",
-        studentProfile: { id: m.profileId, userId: m.userId },
+        studentProfile: {
+          id: m.profileId,
+          userId: m.userId,
+          mentorAssignments: (m.kisiselMentorler ?? []).map((id) => ({ mentorId: id })),
+        },
       })),
       mentors: teamMentorIds.map((id) => ({ mentorId: id })),
     },
@@ -198,17 +208,23 @@ describe("1. Takım Projelerinde Bireysel vs Takım Sahipliği", () => {
       expect(erisebilirMi(sahipsizAtama, "stu-1")).toBe(false);
     });
 
-    it("kod-dokümantasyon açığı: takım atamasında üyenin kişisel mentörü mentoruMu tarafından yetkilendirilmez", () => {
-      // sahiplik.ts docstring: "Takım atamasında üyelerin kişisel mentörleri de yetkili sayılıyor"
-      // Kod uygulaması: takım atamasında studentProfile null olduğundan isAssignedMentor çağrılmaz!
-      // Yalnızca team.mentors kontrol edilir.
+    /*
+     * ⚠️ Bu test bir AÇIK olarak yazılmıştı ("kod-dokümantasyon açığı") ve
+     * haklıydı: docstring "üyelerin kişisel mentörleri de yetkili sayılıyor"
+     * diyordu, kod bunu yapmıyordu. #434'te çözüldü — ama kodu değil,
+     * KARARI netleştirerek: OKUMA/YAZMA ayrımı.
+     *
+     * `mentoruMu` YAZMA kapısı ve takım mentörlerinde kalıyor; ortak panoya
+     * yazılan her şey tüm takımı etkiliyor. Kişisel mentörün erişimi
+     * `erisebilirMi` (okuma) üzerinden açıldı.
+     */
+    it("takım panosuna YAZMA yetkisi yalnız takım mentörlerinde (#434)", () => {
       const atama = takimAtamasi(
         [{ userId: "stu-1", profileId: "sp-1" }],
         ["team-mentor-1"]
       );
-      const studentPersonalMentor = "personal-mentor-1";
-      // Gerçek kod davranışı dokümantasyondaki iddiayı karşılamıyor:
-      expect(mentoruMu(atama, studentPersonalMentor)).toBe(false);
+      expect(mentoruMu(atama, "personal-mentor-1")).toBe(false);
+      expect(mentoruMu(atama, "team-mentor-1")).toBe(true);
     });
   });
 
