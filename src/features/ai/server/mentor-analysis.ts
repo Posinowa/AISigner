@@ -1,4 +1,5 @@
 import { getModel } from "@/lib/ai/gemini-client";
+import { guvenliMetin, guvenliListe, veriBlogu } from "@/lib/ai/prompt";
 import { logger } from "@/lib/logger";
 import { ilgiEtiketi, MENTOR_KIDEMLERI } from "@/features/student/models/secenekler";
 
@@ -76,19 +77,17 @@ export async function analyzeMentorProfile(
 
   const prompt = `Sen mentör-stajyer eşleştirmesi yapan bir uzmansın. Aşağıdaki MENTÖR başvurusunu değerlendir:
 
-Ünvan: ${input.title}${input.company ? ` (${input.company})` : ""}
+${veriBlogu("Ünvan", guvenliMetin(input.title, 200))}
 Toplam Deneyim: ${input.yearsExperience} yıl
 Kıdem: ${kidemEtiketi(input.seniority)}
 Öğretebileceği Alanlar: ${alanlar}
 Kapasite: aynı anda ${input.capacity} stajyer
 Haftalık Ayırabildiği Süre: ${input.weeklyHours} saat
-Şehir: ${input.city || "Belirtilmemiş"}
+${veriBlogu("Şehir", guvenliMetin(input.city, 100))}
 
-Mentörlük motivasyonu:
-"""${input.motivation}"""
+${veriBlogu("Mentörlük motivasyonu", guvenliMetin(input.motivation))}
 
-Mentörlük tarzı:
-"""${input.mentoringStyle}"""
+${veriBlogu("Mentörlük tarzı", guvenliMetin(input.mentoringStyle))}
 
 Lütfen aşağıdaki formatta SADECE JSON yanıtı ver (başka metin ekleme):
 {

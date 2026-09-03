@@ -245,6 +245,23 @@ bir atamaya dönüşür. `features/proposals/server/oneri.ts` tek doğru kaynak.
   az önce oluşturulan `AssignedProject` geri alınır — yetim atama kalmaz.
 - **Red gerekçesi zorunlu** ve stajyere gösterilir; yoksa aynı öneri tekrar açılır.
 
+#### ⚠️ HER KULLANICI METNİ `veriBlogu` İLE SARILIR (#390)
+#320 `guvenliMetin`/`guvenliListe`/`veriBlogu` korumasını kurmuştu ama yalnız **üç**
+modüle uygulanmıştı. Tarama **altı korumasız prompt kurucusu** buldu:
+`generate-roadmap`, `issue-generator`, `mentor-analysis`, `project-recommendations`,
+`ai-chat`, `ai-step`.
+
+- **En ciddisi `issue-generator`**: çıktısı **public bir GitHub deposuna** yazılıyor —
+  `prompt.ts` bunu zaten uyarı olarak yazmıştı.
+- **`prompt.ts`'in kendi açıklaması `motivation`/`mentoringStyle`'ı sayıyordu**, oysa
+  `mentor-analysis` onları ham gömüyordu.
+- **⚠️ PROJE ŞABLONU BAŞLIĞI/AÇIKLAMASI DA KULLANICI METNİ.** #366'dan beri stajyerin
+  kendi önerisinden türeyen şablonlar var (`fromProposal`); "admin yazdı" varsayımı artık
+  geçersiz.
+- Yeni bir prompt kurucusu yazan `veriBlogu`'ndan geçirmeli. Çıktı doğrulaması
+  (`cozVeDogrula`) **şekli** korur, **içeriği** değil: şemaya uyan ama saptırılmış bir
+  yanıt doğrulamadan geçer.
+
 #### ⚠️ HER AI ÇIKTISI `cozVeDogrula`'DAN GEÇER (#377)
 İki uç bu katmanı atlıyordu: `issue-generator.ts` ham `JSON.parse`, `ai-step` elle
 regex temizliği. Model — `responseMimeType` istense bile — çıktıyı ```json bloğuna

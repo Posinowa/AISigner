@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { guvenliMetin, guvenliListe, veriBlogu } from "@/lib/ai/prompt";
 import { profilSahibininRizasiVar } from "@/features/kvkk/riza";
 import { prisma } from "@/lib/db";
 import {
@@ -123,9 +124,11 @@ export async function POST(
       const model = getModel();
       const promptText = `
 Sen Posilog — AI Mentör asistanısın.
-Öğrenci: ${studentProfile.user.name || "Öğrenci"} (Seviye: ${experienceLevelLabel(studentProfile.experienceLevel)})
-Proje: ${projectTemplate.title} (${projectTemplate.description})
-Mevcut Fazlar/Adımlar: ${existingStepTitles || "Henüz adım yok"}
+Öğrenci Seviyesi: ${experienceLevelLabel(studentProfile.experienceLevel)}
+${veriBlogu("Öğrenci Adı", guvenliMetin(studentProfile.user.name, 100))}
+${veriBlogu("Proje", guvenliMetin(projectTemplate.title, 200))}
+${veriBlogu("Proje Açıklaması", guvenliMetin(projectTemplate.description))}
+${veriBlogu("Mevcut Fazlar/Adımlar", guvenliMetin(existingStepTitles || "Henüz adım yok"))}
 
 ${customPrompt ? `Mentörün Özel İsteği: "${customPrompt}"` : "GÖREV: Bu yol haritasına eklenecek sıradaki bir sonraki mantıklı ana fazı üret."}
 

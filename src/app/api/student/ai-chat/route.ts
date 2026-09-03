@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { guvenliMetin, guvenliListe, veriBlogu } from "@/lib/ai/prompt";
 import { requireAuth } from "@/lib/auth/guard";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { getTextModel } from "@/lib/ai/gemini-client";
@@ -142,8 +143,12 @@ export async function POST(req: Request) {
     if (profile) {
       context += `\n\nÖğrenci Bilgileri:`;
       context += `\n- Deneyim Seviyesi: ${experienceLevelLabel(profile.experienceLevel)}`;
-      context += `\n- İlgi Alanları: ${profile.interests.join(", ")}`;
-      if (profile.goals) context += `\n- Hedefler: ${profile.goals}`;
+      // #390: Serbest metin ayraçlı bloğa sarılıyor — stajyer `goals`
+      // alanına talimat yazarak Posilog'u yönlendirebilirdi.
+      context += `\n${veriBlogu("- İlgi Alanları", guvenliListe(profile.interests))}`;
+      if (profile.goals) {
+        context += `\n${veriBlogu("- Hedefler", guvenliMetin(profile.goals))}`;
+      }
 
       /*
        * #376: Bireysel + takim atamalari TEK listede.
@@ -162,7 +167,7 @@ export async function POST(req: Request) {
       if (projeler.length > 0) {
         context += `\n\nAktif Projeler:`;
         projeler.forEach(({ atama: ap, takim }) => {
-          context += `\n- ${ap.projectTemplate.title} (${ap.projectTemplate.difficulty}, ${ap.projectTemplate.track.join(", ")})`;
+          context += `\n- ${guvenliMetin(ap.projectTemplate.title, 200)} (${ap.projectTemplate.difficulty}, ${guvenliListe(ap.projectTemplate.track)})`;
           if (takim) context += ` [takım projesi: ${takim}]`;
           if (ap.roadmap?.steps) {
             const currentStep = ap.roadmap.steps.find(
@@ -173,7 +178,7 @@ export async function POST(req: Request) {
             ).length;
             context += ` - ${completedCount}/${ap.roadmap.steps.length} adım tamamlandı`;
             if (currentStep) {
-              context += `, Şu anki adım: "${currentStep.title}"`;
+              context += `, Şu anki adım: "${guvenliMetin(currentStep.title, 200)}"`;
             }
           }
         });
