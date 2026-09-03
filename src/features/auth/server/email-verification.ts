@@ -1,4 +1,5 @@
 import "server-only";
+import { uygulamaUrl } from "@/lib/app-url";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { sendMail } from "@/lib/mail";
@@ -13,7 +14,7 @@ import { createVerificationToken } from "@/lib/auth/verification-token";
  */
 
 function uygulamaAdresi(): string {
-  return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  return uygulamaUrl();
 }
 
 export function buildVerificationUrl(token: string): string {

@@ -1,4 +1,5 @@
 import "server-only";
+import { uygulamaUrl } from "@/lib/app-url";
 import { hash } from "@node-rs/argon2";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
@@ -18,7 +19,7 @@ import {
  */
 
 function uygulamaAdresi(): string {
-  return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  return uygulamaUrl();
 }
 
 export function buildResetUrl(token: string): string {
