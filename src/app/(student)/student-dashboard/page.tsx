@@ -2,9 +2,9 @@ import { DogrulanmisRozet } from "@/features/auth/ui/DogrulanmisRozet";
 import { AvatarUpload } from "@/features/profile/ui/AvatarUpload";
 import { RoadmapSteps } from "@/features/student/ui/RoadmapSteps";
 import { revizyonGerekceleri } from "@/features/roadmap/server/revizyon";
-import { ProjeOnerisi } from "@/features/proposals/ui/ProjeOnerisi";
 import { TakilmaBildirimiAyari } from "@/features/radar/ui/TakilmaBildirimiAyari";
-import { OfisSaatiOgrenci } from "@/features/ofis-saati/ui/OfisSaatiOgrenci";
+import { YaklasanGorusme } from "@/features/ofis-saati/ui/YaklasanGorusme";
+import { ogrencininGorebilecegiSlotlar } from "@/features/ofis-saati/server/ofis-saati";
 import { IdariBolum } from "@/features/dashboard/ui/IdariBolum";
 import { odaktakiAdimIndeksi } from "@/features/roadmap/odak";
 import { OdakKarti } from "@/features/roadmap/ui/OdakKarti";
@@ -244,6 +244,28 @@ export default async function StudentDashboardPage() {
     siradakiAdimKartta: Boolean(odak),
   });
 
+  /*
+   * #420: Yaklaşan mentör görüşmesi.
+   *
+   * ⚠️ Aynı sunucu fonksiyonundan geliyor (`ogrencininGorebilecegiSlotlar`);
+   * ikinci bir sorgu yazılsaydı "hangi slotları görebilir" kuralı iki yerde
+   * yaşardı. O fonksiyon bağlantıyı zaten YALNIZ rezerve edilmiş slotta
+   * döndürüyor (#398 — canlı testte bulunmuş bir sızıntıydı).
+   */
+  const gorulebilirSlotlar = await ogrencininGorebilecegiSlotlar(session.user.id);
+  const rezervasyon = gorulebilirSlotlar.find((x) => x.rezerveEdenId === session.user!.id);
+  const yaklasanGorusme = rezervasyon
+    ? {
+        id: rezervasyon.id,
+        baslangic: rezervasyon.baslangic,
+        bitis: rezervasyon.bitis,
+        mentorAdi:
+          [rezervasyon.mentor.name, rezervasyon.mentor.lastName].filter(Boolean).join(" ") ||
+          "Mentörün",
+        gorusmeLinki: rezervasyon.mentor.mentorProfile?.gorusmeLinki ?? null,
+      }
+    : null;
+
   // #265/#290: Fotoğrafın varlığı — arayüz depolama adına ihtiyaç duymuyor.
   // Bilgi oturumdan geliyor; JWT geri çağrısı her istekte kullanıcıyı zaten
   // DB'den okuduğu için burada AYRI bir sorgu atmak gereksizdi.
@@ -330,14 +352,11 @@ export default async function StudentDashboardPage() {
           ama yazma uçları kapalı. */}
       {odak && <OdakKarti odak={odak} saltOkunur={isGraduated} />}
 
-      {/* #398: Mentör görüşmesi. Mezun stajyere de AÇIK — #208 ayrımında
-          görüşme, mesajlaşma gibi *insan iletişimi* kanalı.
-
-          ⚠️ #415'te KATLANMADI: rezerve edilmiş bir görüşme zamana bağlı
-          bilgidir; bir tıkın arkasına saklanırsa kaçırılır. */}
-      <div className="mb-8">
-        <OfisSaatiOgrenci kullaniciId={session.user.id} />
-      </div>
+      {/* #420: Takvimin tamamı /student-dashboard/ofis-saati'ne taşındı.
+          Panoda YALNIZ rezervasyonu olan öğrenci kısa bir hatırlatma görüyor —
+          #398'deki "rezerve edilmiş görüşme zamana bağlı bilgidir, saklanırsa
+          kaçırılır" kararı korunuyor. */}
+      <YaklasanGorusme slot={yaklasanGorusme} />
 
       {/* #415: Her gün kullanılmayan idari araçlar tek katlanır bölümde.
           Ölçüldü: bu üç blok birlikte 1022px yer kaplıyordu ve çalışma
@@ -350,7 +369,6 @@ export default async function StudentDashboardPage() {
             ? []
             : [
                 `Takılma bildirimi: ${profile.takilmaBildirimi ? "açık" : "kapalı"}`,
-                "Kendi projeni öner",
               ]),
           "Profil fotoğrafı",
         ]}
@@ -361,10 +379,6 @@ export default async function StudentDashboardPage() {
         {/* #397: Takılma bildirimi tercihi. Ayarın ADI ve DURUMU katlanmış
             özette de yazıyor — opt-in'in fark edilmemesi bilinen bedeldi. */}
         {!isGraduated && <TakilmaBildirimiAyari baslangic={profile.takilmaBildirimi} />}
-
-        {/* #366: Kendi projeni öner. Mezun stajyer yeni proje öneremez —
-            #208'deki "sistem durumunu değiştiren uçlar kapalı" ilkesi. */}
-        {!isGraduated && <ProjeOnerisi />}
 
         {/* #290: Fotoğraf yönetimi. Üstteki şerit fotoğraf eksikken buraya
             bağ veriyor — çapa korunuyor. */}
