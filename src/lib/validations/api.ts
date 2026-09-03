@@ -160,6 +160,15 @@ export const updateStepSchema = z.object({
   githubIssueUrl: githubIssueUrlSchema,
 });
 
+// Mentor: Yol haritası adımını bir sıra taşıma (#406)
+//
+// Serbest bir `order` sayısı KABUL ETMİYORUZ: tabanı mentor değil sunucu
+// belirliyor. Aksi halde iki adım aynı sırada kalabilirdi.
+export const adimTasiSchema = z.object({
+  stepId: z.string().min(1, "Adım kimliği gerekli"),
+  yon: z.enum(["yukari", "asagi"]),
+});
+
 // Mentor: Proje kaldırma
 export const unassignProjectSchema = z.object({
   assignedProjectId: z.string().min(1, "Atanmış proje ID gerekli"),

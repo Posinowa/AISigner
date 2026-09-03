@@ -23,6 +23,8 @@ import { RotateCcw,
   Send,
   ChevronDown,
   ChevronUp,
+  ArrowUp,
+  ArrowDown,
   Github,
   Loader2,
 } from "lucide-react";
@@ -201,6 +203,33 @@ export default function RoadmapReviewPage() {
       console.error(error);
     } finally {
       setSaving(false);
+    }
+  }
+
+  /* ─── Adım sırasını değiştir (#406) ─── */
+  //
+  // Sıra numarasını istemci HESAPLAMIYOR: yalnız "hangi adım, hangi yön"
+  // gönderiyor. Tabanı sunucu belirliyor, aksi halde iki adım aynı sırada
+  // kalabilirdi.
+  const [tasinan, setTasinan] = useState<string | null>(null);
+
+  async function handleTasi(stepId: string, yon: "yukari" | "asagi") {
+    setTasinan(stepId);
+    try {
+      const res = await fetch(`/api/mentor/roadmap/${roadmapId}/steps/reorder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stepId, yon }),
+      });
+      if (!res.ok) {
+        toast.error(await extractErrorMessage(res, "Adım taşınamadı."));
+        return;
+      }
+      await loadRoadmap();
+    } catch {
+      toast.error("Adım taşınamadı. Bağlantınızı kontrol edin.");
+    } finally {
+      setTasinan(null);
     }
   }
 
@@ -552,8 +581,39 @@ export default function RoadmapReviewPage() {
                   }
                 }}
               >
+                {/* #406: Sıra değiştirme. Kartın tamamı akordeonu açıp kapattığı
+                    için düğmeler stopPropagation yapmak zorunda — aksi halde
+                    taşıma her seferinde adımı da açardı. */}
+                <div
+                  className="flex flex-col flex-shrink-0"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleTasi(step.id, "yukari")}
+                    disabled={index === 0 || tasinan !== null}
+                    aria-label={`${step.title} adımını yukarı taşı`}
+                    className="p-0.5 text-gray-400 hover:text-primary disabled:opacity-25 disabled:hover:text-gray-400"
+                  >
+                    <ArrowUp className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleTasi(step.id, "asagi")}
+                    disabled={index === roadmap.steps.length - 1 || tasinan !== null}
+                    aria-label={`${step.title} adımını aşağı taşı`}
+                    className="p-0.5 text-gray-400 hover:text-primary disabled:opacity-25 disabled:hover:text-gray-400"
+                  >
+                    <ArrowDown className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
                 <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary text-sm font-bold flex-shrink-0">
-                  {index + 1}
+                  {tasinan === step.id ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    index + 1
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-gray-900 truncate">{step.title}</h3>
