@@ -127,3 +127,25 @@ describe("şifre hash'i sızdırılmaz", () => {
     expect(cagri.select.studentProfile).toBeDefined();
   });
 });
+
+/**
+ * #393 — TAKIM PROJELERİNİN DURUMU ÇEKİLMİYORDU.
+ *
+ * `getMentorStudents` takım üyeliklerini #367'de getirmeye başladı ama
+ * `assignedProjects` seçiminde `status` YOKTU. Panodaki aktif/tamamlanmış
+ * sayaçları o alanı okuduğu için takım projeleri hiç sayılamıyordu.
+ */
+describe("takım projelerinin durumu (#393)", () => {
+  it("takım atamalarında `status` SEÇİLİR", async () => {
+    await getMentorStudents("men-1");
+
+    // `studentProfile` `include` ile geliyor (üst seviye `select` — #370'te
+    // şifre hash'i sızmasın diye çevrilmişti).
+    const secim = prismaMock.user.findMany.mock.calls[0][0].select;
+    const takimProjeleri =
+      secim.studentProfile.include.teamMemberships.select.team.select.assignedProjects.select;
+
+    expect(takimProjeleri.status).toBe(true);
+    expect(takimProjeleri.id).toBe(true);
+  });
+});

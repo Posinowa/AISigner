@@ -209,6 +209,14 @@ bilinçli karar.
   yetkisini + konuşma listesini + öğrenci DETAY ucunu düzeltti. Detay ucu özellikle
   sinsiydi: #367 listeyi düzelttikten sonra **liste doluyor ama tıklanan bağlantı 404
   veriyordu**. Yeni bir "bu öğrenci benim mi" kontrolü yazmayın, buradan geçirin.
+- ⚠️ **SAYAÇLAR DA İKİ YOLDAN SAYAR** (#393). Körlüğün dördüncü örneği ve ilki
+  sorguda değil **sayımda**: mentör panosu yalnız `assignedProjects`'e bakıyordu, takımı
+  olup bireysel projesi olmayan stajyer "0 aktif proje" sayılıyor ve mentöre yanlış
+  "aktif projesi yok" uyarısı gidiyordu. Kural `mentors/proje-sayaci.ts`'te saf
+  fonksiyonlarda — hata tam da **testsiz bir satırda** duruyordu.
+  **Panel toplamı PROJE başına, öğrenci başına DEĞİL**: bir takım projesi üç üyenin de
+  projesidir, öğrenci başına toplamak tek projeyi üç kez sayar. Öğrenci kartındaki sayı
+  ise 1 kalır — o proje gerçekten onun.
 - ⚠️ **Takımın öğrencileri İKİ YOLDAN gelir** (#367): liste sorguları hem bireysel
   `MentorAssignment` hem `TeamMentor`/`TeamMember` bağını sormalı. Aynı şekilde öğrenci
   panosu `studentProfile.assignedProjects` + `teamMemberships.team.assignedProjects`
