@@ -3,6 +3,8 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 const { prismaMock, durumDegistirMock } = vi.hoisted(() => ({
   prismaMock: {
     stepIssue: { findFirst: vi.fn(), update: vi.fn(), count: vi.fn() },
+    // #397: push olayı son commit zamanını yazıyor.
+    assignedProject: { updateMany: vi.fn() },
     roadmapStep: { findUnique: vi.fn() },
   },
   durumDegistirMock: vi.fn(),
@@ -15,7 +17,11 @@ vi.mock("@/features/roadmap/server/step-status", () => ({
   adimDurumunuDegistir: (...a: unknown[]) => durumDegistirMock(...a),
 }));
 
-import { issueKapandiginiIsle, issueYenidenAcildiginiIsle } from "./webhook-isle";
+import {
+  issueKapandiginiIsle,
+  issueYenidenAcildiginiIsle,
+  pushIsle,
+} from "./webhook-isle";
 
 const olay = (url = "https://github.com/o/r/issues/1") => ({
   action: "closed",
@@ -213,5 +219,63 @@ describe("issueYenidenAcildiginiIsle", () => {
     await issueYenidenAcildiginiIsle(acilma());
 
     expect(prismaMock.stepIssue.update).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * #397 — `push` olayı: takılma radarının commit sinyali.
+ *
+ * Radar "platform içi hareketsizlik" ile "GitHub'da çalışıyor" durumunu
+ * ayırt edebilmeli; öğrenci commit atıp platforma dokunmuyorsa "takıldı"
+ * demek yanlış olur.
+ */
+describe("pushIsle (#397)", () => {
+  const pushOlayi = (over: Record<string, unknown> = {}) => ({
+    repository: { html_url: "https://github.com/o/r" },
+    head_commit: { timestamp: "2026-09-01T10:00:00Z" },
+    ...over,
+  });
+
+  beforeEach(() => {
+    prismaMock.assignedProject.updateMany.mockResolvedValue({ count: 1 });
+  });
+
+  it("son commit zamanini DOGRU atamaya yazar", async () => {
+    const s = await pushIsle(pushOlayi());
+
+    expect(prismaMock.assignedProject.updateMany).toHaveBeenCalledWith({
+      where: { githubRepoUrl: "https://github.com/o/r" },
+      data: { sonCommitAt: new Date("2026-09-01T10:00:00Z") },
+    });
+    expect(s.islendi).toBe(true);
+  });
+
+  it("ESLESMEYEN depoda sessizce gecer", async () => {
+    prismaMock.assignedProject.updateMany.mockResolvedValue({ count: 0 });
+
+    const s = await pushIsle(pushOlayi());
+
+    expect(s.islendi).toBe(false);
+  });
+
+  it("repo url'i yoksa gecer", async () => {
+    const s = await pushIsle({ head_commit: { timestamp: "2026-09-01T10:00:00Z" } });
+
+    expect(s.islendi).toBe(false);
+    expect(prismaMock.assignedProject.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("dal silme push'u (head_commit: null) yazma YAPMAZ", async () => {
+    const s = await pushIsle(pushOlayi({ head_commit: null }));
+
+    expect(s.islendi).toBe(false);
+    expect(prismaMock.assignedProject.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("gecersiz zaman damgasi yazma YAPMAZ", async () => {
+    const s = await pushIsle(pushOlayi({ head_commit: { timestamp: "bozuk" } }));
+
+    expect(s.islendi).toBe(false);
+    expect(prismaMock.assignedProject.updateMany).not.toHaveBeenCalled();
   });
 });

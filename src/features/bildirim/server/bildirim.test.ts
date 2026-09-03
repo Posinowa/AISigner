@@ -64,6 +64,9 @@ describe("uygulama içi kayıt", () => {
         title: "Hesabınız onaylandı",
         body: "Artık panelinize erişebilirsiniz.",
         link: null,
+        // #397: Bildirimin bağlı olduğu kayıt (ör. adım kimliği). Tekrar
+        // bildirimi önlemek için; bu olayda yok.
+        refId: null,
       },
     });
   });

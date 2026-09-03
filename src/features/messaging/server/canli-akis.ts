@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { yazanlariGetir } from "./yaziyor";
+import { radarTaramasi } from "@/features/radar/server/radar";
 
 /**
  * Canlı akış merkezi (#329).
@@ -64,6 +65,15 @@ type Abone = {
 
 /** Tik aralığı. Gecikme ile veritabanı yükü arasındaki denge. */
 const TIK_MS = 2000;
+
+/**
+ * #397: Takılma radarı tarama aralığı.
+ *
+ * Takılma gün ölçeğinde bir olgu; saatte bir bakmak fazlasıyla yeterli.
+ * Tik başına taramak veritabanını boşuna yorardı.
+ */
+const RADAR_ARALIK_MS = 60 * 60 * 1000;
+let sonRadar = 0;
 
 /**
  * İmleç geriye çekme payı.
@@ -130,6 +140,7 @@ export function akisiSifirla(): void {
   aboneler.clear();
   sonOkunmamis.clear();
   sonYazanlar.clear();
+  sonRadar = 0;
   sonBildirim.clear();
   sonZaman = new Date();
 }
@@ -313,6 +324,23 @@ export async function tikAt(): Promise<void> {
       if (sonBildirim.get(userId) === sayi) continue;
       sonBildirim.set(userId, sayi);
       yayinla(userId, { tip: "bildirim", okunmamis: sayi });
+    }
+
+    /*
+     * 6) #397: Takılma radarı — SEYREK, tik başına DEĞİL.
+     *
+     * ⚠️ Projede zamanlanmış iş altyapısı YOK. Radar bir yerden tetiklenmeli
+     * ve mevcut tik tek düzenli nabız. Ama tarama tik aralığında (2 sn)
+     * koşarsa veritabanını boşuna yorar: takılma GÜN ölçeğinde bir olgu.
+     *
+     * ⚠️ BİLİNEN SINIR: tik yalnızca en az bir kullanıcı bağlıyken çalışıyor.
+     * Kimse çevrimiçi değilken tarama yapılmaz — bildirim, birileri bağlanınca
+     * gider. Alıcı mentör olduğu için bu kabul edilebilir bir gecikme; gerçek
+     * bir zamanlayıcı gerekirse arayüz korunarak değiştirilebilir.
+     */
+    if (Date.now() - sonRadar >= RADAR_ARALIK_MS) {
+      sonRadar = Date.now();
+      void radarTaramasi();
     }
 
     sonZaman = simdi;

@@ -26,6 +26,13 @@ export type BildirimGirdisi = {
   link?: string | null;
   /** E-posta gönderilecekse alıcı adresi. Yoksa yalnız uygulama içi kalır. */
   eposta?: string | null;
+  /**
+   * #397: Bildirimin bağlı olduğu kayıt (ör. adım kimliği).
+   *
+   * Tekrar bildirimi önlemek için: çağıran taraf "bu kişiye bu kayıt için
+   * daha önce bildirdik mi" diye sorabilsin.
+   */
+  refId?: string | null;
 };
 
 export async function bildirimGonder(girdi: BildirimGirdisi): Promise<void> {
@@ -37,6 +44,7 @@ export async function bildirimGonder(girdi: BildirimGirdisi): Promise<void> {
         title: girdi.baslik,
         body: girdi.govde,
         link: girdi.link ?? null,
+        refId: girdi.refId ?? null,
       },
     });
   } catch (error) {
