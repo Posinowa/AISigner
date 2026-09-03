@@ -29,11 +29,11 @@ import {
  * sayısıyla birlikte bağlantı havuzunu tıkardı (#313'teki N+1 dersi).
  */
 
-/** Bir adımın "takılmış" sayılması için geçmesi gereken gün. */
-export const TAKILMA_GUN = 7;
-
-/** Öğrencinin "sessiz" sayılması için geçmesi gereken gün. */
-export const SESSIZLIK_GUN = 10;
+// #432: Eşikler ../sabitler.ts dosyasına taşındı — bu dosya server-only ve
+// prisma çekiyor, ama aynı eşikler istemci tarafındaki ilerleme
+// göstergesinde de gerekiyor. Mevcut dışa aktarımlar korunuyor.
+export { TAKILMA_GUN, SESSIZLIK_GUN } from "../sabitler";
+import { TAKILMA_GUN, SESSIZLIK_GUN } from "../sabitler";
 
 export type DarbogazSatiri = {
   projeBasligi: string;

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth/guard";
+import { ilerlemeHesapla, duraklamaMetni } from "@/features/progress/ilerleme";
 
 export type StudentAssignmentProgress = {
   assignmentId: string;
@@ -24,6 +25,8 @@ export type StudentAssignmentProgress = {
   totalSteps: number;
   completedSteps: number;
   progressPercentage: number;
+  /** #432: Durakladıysa "10 gündür hareket yok", aksi halde null. */
+  duraklamaMetni: string | null;
   lastActivity: {
     title: string;
     updatedAt: Date;
@@ -141,9 +144,10 @@ export async function getStudentAssignmentsProgress(): Promise<StudentAssignment
         }));
 
     const steps = assignment.roadmap?.steps ?? [];
-    const totalSteps = steps.length;
-    const completedSteps = steps.filter((s) => s.status === "COMPLETED").length;
-    const progressPercentage = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
+    // #432: Hesap ortak modülde — mentör panosu da aynısını kullanıyor.
+    // Burada gömülü kaldığı sürece ikinci bir kopya kaçınılmazdı.
+    const { toplamAdim: totalSteps, tamamlanan: completedSteps, yuzde: progressPercentage } =
+      ilerlemeHesapla(steps);
 
     const lastUpdatedStep = steps[0]; // orderBy updatedAt desc
     const lastActivity = lastUpdatedStep
@@ -176,6 +180,8 @@ export async function getStudentAssignmentsProgress(): Promise<StudentAssignment
       totalSteps,
       completedSteps,
       progressPercentage,
+      // #432: "10 gündür hareket yok" — skor değil sinyal (#331/#397).
+      duraklamaMetni: duraklamaMetni(steps),
       lastActivity,
       roadmapId: assignment.roadmap?.id ?? null,
       roadmapStatus: assignment.roadmap?.status ?? null,
