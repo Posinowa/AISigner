@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { extractApiErrorMessage } from "@/lib/api-error-message";
 import { MentorBasvuruModal } from "@/features/mentors/ui/MentorBasvuruModal";
+import { kapasiteDurumu, kapasiteEtiketi } from "@/features/mentors/kapasite";
 import {
   Users,
   GraduationCap,
@@ -63,6 +64,9 @@ type Mentor = {
   name: string | null;
   lastName: string | null;
   email: string;
+  /** #404: Açılır listede yük görünsün diye. */
+  aktifOgrenci: number;
+  kapasite: number | null;
 };
 
 type FilterCategory =
@@ -879,11 +883,35 @@ export default function AdminDashboard() {
                                     (mentor) =>
                                       !user.studentProfile!.mentors.some((x) => x.id === mentor.id),
                                   )
-                                  .map((mentor) => (
-                                    <option key={mentor.id} value={mentor.id}>
-                                      {getDisplayName(mentor)} ({mentor.email})
-                                    </option>
-                                  ))}
+                                  .map((mentor) => {
+                                    /*
+                                     * #404: YÜK AÇILIR LİSTEDE. Admin önceden yalnız
+                                     * ad ve e-posta görüyor, kimin kaç stajyeri
+                                     * olduğunu bilmeden atama yapıyordu.
+                                     *
+                                     * ⚠️ DOLU/AŞKIN MENTÖR ENGELLENMİYOR — geçici
+                                     * devir ya da kısa süreli destek meşru olabilir;
+                                     * son söz admin'in. Sayı, kararı almasına
+                                     * yardım etsin diye orada.
+                                     *
+                                     * `<option>` içinde renk güvenilir değil
+                                     * (tarayıcılar farklı davranıyor), bu yüzden ayrım
+                                     * METİNLE yapılıyor.
+                                     */
+                                    const durum = kapasiteDurumu(
+                                      mentor.aktifOgrenci,
+                                      mentor.kapasite,
+                                    );
+                                    const isaret =
+                                      durum === "askin" ? " — KAPASİTE AŞKIN" : durum === "dolu" ? " — dolu" : "";
+                                    return (
+                                      <option key={mentor.id} value={mentor.id}>
+                                        {getDisplayName(mentor)} —{" "}
+                                        {kapasiteEtiketi(mentor.aktifOgrenci, mentor.kapasite)}
+                                        {isaret} ({mentor.email})
+                                      </option>
+                                    );
+                                  })}
                               </select>
                               {isUpdating && <Loader2 className="animate-spin w-3.5 h-3.5 text-blue-600" />}
                             </div>
