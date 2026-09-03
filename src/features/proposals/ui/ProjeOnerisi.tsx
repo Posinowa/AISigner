@@ -1,5 +1,7 @@
 "use client";
 
+import { ONERI_SINIRLARI } from "@/lib/validations/api";
+import { sayacDurumu, formGonderilebilir } from "@/features/proposals/sayac";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Lightbulb, Loader2, AlertTriangle, CheckCircle2, XCircle, Clock, Info } from "lucide-react";
@@ -193,7 +195,7 @@ export function ProjeOnerisi() {
         </p>
       ) : (
         <form onSubmit={gonder} className="mt-4 space-y-3">
-          <Alan etiket="Proje başlığı" htmlFor="oneri-baslik">
+          <Alan etiket="Proje başlığı" htmlFor="oneri-baslik" sayac={sayacDurumu(title, ONERI_SINIRLARI.baslik.enAz)}>
             <input
               id="oneri-baslik"
               value={title}
@@ -205,7 +207,7 @@ export function ProjeOnerisi() {
             />
           </Alan>
 
-          <Alan etiket="Ne yapacaksın?" htmlFor="oneri-aciklama">
+          <Alan etiket="Ne yapacaksın?" htmlFor="oneri-aciklama" sayac={sayacDurumu(description, ONERI_SINIRLARI.aciklama.enAz)}>
             <textarea
               id="oneri-aciklama"
               value={description}
@@ -218,7 +220,7 @@ export function ProjeOnerisi() {
             />
           </Alan>
 
-          <Alan etiket="Bu projeden ne öğrenmeyi hedefliyorsun?" htmlFor="oneri-hedef">
+          <Alan etiket="Bu projeden ne öğrenmeyi hedefliyorsun?" htmlFor="oneri-hedef" sayac={sayacDurumu(goals, ONERI_SINIRLARI.hedefler.enAz)}>
             <textarea
               id="oneri-hedef"
               value={goals}
@@ -288,7 +290,9 @@ export function ProjeOnerisi() {
 
           <button
             type="submit"
-            disabled={gonderiliyor}
+            /* #408: Asgariye ulaşılmadan gönderim kapalı. Bu bir KOLAYLIK,
+               güvenlik değil — sunucu aynı kuralları zaten doğrular. */
+            disabled={gonderiliyor || !formGonderilebilir({ title, description, goals })}
             className="w-full rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:bg-slate-300"
           >
             {gonderiliyor ? "Gönderiliyor…" : "Öneriyi gönder"}
@@ -302,17 +306,33 @@ export function ProjeOnerisi() {
 function Alan({
   etiket,
   htmlFor,
+  sayac,
   children,
 }: {
   etiket: string;
   htmlFor: string;
+  /** #408: Anlık karakter geri bildirimi — isteğe bağlı. */
+  sayac?: { uzunluk: number; enAz: number; yeterliMi: boolean; metin: string };
   children: React.ReactNode;
 }) {
   return (
     <div>
-      <label htmlFor={htmlFor} className="text-xs font-medium text-slate-700">
-        {etiket}
-      </label>
+      <div className="flex items-baseline justify-between gap-2">
+        <label htmlFor={htmlFor} className="text-xs font-medium text-slate-700">
+          {etiket}
+        </label>
+        {/* #408: Eşik ancak GÖNDERİNCE öğreniliyordu; form `maxLength`
+            uyguluyor ama asgariyi hiçbir yerde söylemiyordu. */}
+        {sayac && (
+          <span
+            className={`text-[11px] tabular-nums ${
+              sayac.yeterliMi ? "text-slate-400" : "text-amber-600"
+            }`}
+          >
+            {sayac.metin}
+          </span>
+        )}
+      </div>
       <div className="mt-1">{children}</div>
     </div>
   );
