@@ -51,6 +51,21 @@ export async function PUT(req: Request, { params }: { params: Promise<{ stepId: 
     return NextResponse.json({ error: "Adım bulunamadı." }, { status: 404 });
   }
 
+  /*
+   * #208: Mezun stajyerin portfolyosu SALT OKUNUR.
+   *
+   * Adım üstlenmek panonun durumunu değiştirir; #208'in ayrım ilkesine göre
+   * (sistem durumunu değiştiren uçlar kapalı, insan iletişimi açık) bu uç
+   * kapalı olmalıydı — adım/dosya/yorum uçlarında kontrol vardı, burada
+   * eksik kalmıştı. Mezun bir stajyer eski takımının havuzundan iş çekebiliyordu.
+   */
+  if (auth.session.user.role === "STUDENT" && auth.session.user.accountStatus === "GRADUATED") {
+    return NextResponse.json(
+      { error: "Mezun öğrenciler adım üstlenemez." },
+      { status: 403 },
+    );
+  }
+
   // #52 ile aynı kural: taslak yol haritasında öğrenci etkileşimi yok.
   if (ogrencisiMi(step.roadmap.assignedProject, userId) && step.roadmap.status !== "PUBLISHED") {
     return NextResponse.json(

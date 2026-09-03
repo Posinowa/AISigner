@@ -12,6 +12,7 @@ import { cozVeDogrula } from "@/lib/ai/response";
 import { logger } from "@/lib/logger";
 import { requireAuth } from "@/lib/auth/guard";
 import { experienceLevelLabel } from "@/lib/experience-level";
+import { createRateLimiter } from "@/lib/rate-limit";
 
 /**
  * #377: Model çıktısının ŞEKLİ doğrulanıyor.
@@ -27,6 +28,16 @@ const adimSemasi = z.object({
   resources: z.array(z.string()).optional(),
 });
 
+/*
+ * Gemini çağıran her uç gibi kısıtlı — `generate-roadmap` ile AYNI bütçe.
+ * Yetkili bir mentör gerekiyor ama üretim tek tıkla tekrarlanabiliyor; kapı
+ * yokken tek oturum faturayı sınırsız büyütebilirdi.
+ */
+const limiter = createRateLimiter("ai-step", {
+  maxRequests: 5,
+  windowSeconds: 60,
+});
+
 export async function POST(
   req: Request,
   context: { params: Promise<{ roadmapId: string }> }
@@ -34,19 +45,32 @@ export async function POST(
   const auth = await requireAuth("MENTOR");
   if (!auth.authorized) return auth.response;
 
+  const rl = await limiter.check(auth.session.user.id ?? "anonymous");
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Çok fazla istek. Lütfen biraz bekleyin." },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } },
+    );
+  }
+
   const { roadmapId } = await context.params;
 
   try {
     const body = await req.json().catch(() => ({}));
     // #191: Mentör serbest istem girer; sınırsız/serbest metin prompt'a gömülmesin.
     // - Uzunluk tavanı: kötüye kullanım ve gereksiz token maliyetini engeller.
-    // - Çift tırnaklar temizlenir: girdi `"..."` delimiter'ı içine konduğu için
-    //   bütünlüğü korunur (istem sınırından kaçış zorlaşır).
+    // - Sınırlandırma + ayraç kaçırma artık `guvenliMetin`/`veriBlogu`'nun işi
+    //   (#390); girdi tırnak deliminine değil, ayraçlı veri bloğuna giriyor.
     const MAX_PROMPT_LEN = 500;
     const rawPrompt = body.prompt ? String(body.prompt).trim() : "";
-    const customPrompt = rawPrompt
-      ? rawPrompt.replace(/["\r\n]+/g, " ").slice(0, MAX_PROMPT_LEN)
-      : null;
+    /*
+     * #390: Mentörün serbest metni de KULLANICI METNİ — aşağıda `veriBlogu`
+     * ile sarılıyor. Önceden burada elle tırnak/satırsonu temizliği vardı;
+     * #377'nin dersi tam olarak buydu: aynı işi yapan iki ayrı mantık, biri
+     * güncellenip diğeri unutulunca ayrışır. Kırpma ve kaçış artık tek
+     * yerde — `guvenliMetin`.
+     */
+    const customPrompt = rawPrompt ? guvenliMetin(rawPrompt, MAX_PROMPT_LEN) : null;
 
     const roadmap = await prisma.roadmap.findUnique({
       where: { id: roadmapId },
@@ -110,7 +134,9 @@ export async function POST(
     }
 
     const projectTemplate = roadmap.assignedProject.projectTemplate;
-    const existingStepTitles = roadmap.steps.map((s) => s.title).join(", ");
+    // Adım başlıkları KULLANICI METNİ ve bir LİSTE: `guvenliListe` öğe BAŞINA
+    // kırpar; birleştirilmiş tek metni kırpmak son adımları sessizce yutardı.
+    const existingStepTitles = guvenliListe(roadmap.steps.map((s) => s.title));
     const nextOrder = (roadmap.steps[roadmap.steps.length - 1]?.order ?? 0) + 1;
 
     let aiStepData = {
@@ -128,9 +154,9 @@ Sen Posilog — AI Mentör asistanısın.
 ${veriBlogu("Öğrenci Adı", guvenliMetin(studentProfile.user.name, 100))}
 ${veriBlogu("Proje", guvenliMetin(projectTemplate.title, 200))}
 ${veriBlogu("Proje Açıklaması", guvenliMetin(projectTemplate.description))}
-${veriBlogu("Mevcut Fazlar/Adımlar", guvenliMetin(existingStepTitles || "Henüz adım yok"))}
+${veriBlogu("Mevcut Fazlar/Adımlar", existingStepTitles)}
 
-${customPrompt ? `Mentörün Özel İsteği: "${customPrompt}"` : "GÖREV: Bu yol haritasına eklenecek sıradaki bir sonraki mantıklı ana fazı üret."}
+${customPrompt ? veriBlogu("Mentörün Özel İsteği", customPrompt) : "GÖREV: Bu yol haritasına eklenecek sıradaki bir sonraki mantıklı ana fazı üret."}
 
 JSON Formatı (Sadece geçerli bir JSON objesi döndür, başka hiçbir metin ekleme):
 {

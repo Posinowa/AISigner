@@ -33,6 +33,7 @@ vi.mock("@/lib/ai/gemini-client", () => ({
 import { generateRoadmap } from "./generate-roadmap";
 import { generateStepIssues } from "./issue-generator";
 import { analyzeMentorProfile } from "./mentor-analysis";
+import { recommendProjects } from "./project-recommendations";
 
 /** Saldırganın yazacağı tipik metin. */
 const ENJEKSIYON =
@@ -214,5 +215,75 @@ describe("mentor-analysis (#390)", () => {
     modelMock.mockResolvedValue({ text: "{}" });
     await yut(analyzeMentorProfile(basvuru({ mentoringStyle: ENJEKSIYON })));
     expect(sadeceAyracIcinde(gidenPrompt(), ENJEKSIYON)).toBe(true);
+  });
+});
+
+/*
+ * ---------------------------------------------------------------------------
+ * #390 taramasının KAÇIRDIĞI iki alan: `interests` ve `expertise`.
+ *
+ * İkisi de `ilgiEtiketi`'nden geçiyordu ve bu "enum → etiket" çevirisi
+ * güvenli SANILDI. Oysa `ilgiEtiketi` BİLİNMEYEN değeri olduğu gibi
+ * döndürüyor (`?? deger`) ve şemaların ikisi de serbest metne izin veriyor
+ * (`z.array(z.string().min(1))` — enum DEĞİL). Yani sözlükte olmayan her
+ * değer prompt'a çıplak giriyordu.
+ *
+ * `guvenliListe` tam bunun için import edilmişti; dört dosyada import edilip
+ * hiç kullanılmamıştı — lint uyarısı bunu söylüyordu.
+ * ---------------------------------------------------------------------------
+ */
+describe("mentor-analysis — uzmanlık alanları (#390 devamı)", () => {
+  it("⚠️ `expertise` içindeki SERBEST metin de sarılır", async () => {
+    modelMock.mockResolvedValue({ text: "{}" });
+    await yut(
+      analyzeMentorProfile({
+        title: "Yazılım Mimarı",
+        company: null,
+        yearsExperience: 8,
+        seniority: "SENIOR",
+        expertise: [ENJEKSIYON],
+        capacity: 2,
+        weeklyHours: 5,
+        city: "İstanbul",
+        motivation: "Öğretmeyi seviyorum",
+        mentoringStyle: "Sorularla yönlendiririm",
+      } as never),
+    );
+
+    expect(sadeceAyracIcinde(gidenPrompt(), ENJEKSIYON)).toBe(true);
+  });
+});
+
+describe("project-recommendations (#390 devamı)", () => {
+  const profil = (over: Record<string, unknown> = {}) =>
+    ({
+      experienceLevel: "BEGINNER",
+      interests: ["React"],
+      goals: "Backend öğrenmek",
+      gitLevel: null,
+      weeklyHours: null,
+      englishLevel: null,
+      ...over,
+    }) as never;
+
+  const sablonlar = [
+    { id: "p1", title: "Proje", description: "aciklama", track: ["Next.js"], difficulty: "EASY" },
+  ] as never[];
+
+  it("⚠️ öğrencinin `interests` alanı AYRAÇLI BLOKTA kalır", async () => {
+    await yut(recommendProjects(profil({ interests: [ENJEKSIYON] }), sablonlar));
+    expect(sadeceAyracIcinde(gidenPrompt(), ENJEKSIYON)).toBe(true);
+  });
+
+  it("⚠️ MENTÖRÜN `expertise` alanı da sarılır", async () => {
+    await yut(
+      recommendProjects(profil(), sablonlar, { expertise: [ENJEKSIYON] } as never),
+    );
+    expect(sadeceAyracIcinde(gidenPrompt(), ENJEKSIYON)).toBe(true);
+  });
+
+  it("normal girdide içerik KORUNUR — sıralama kalitesi düşmemeli", async () => {
+    await yut(recommendProjects(profil({ interests: ["Veri Bilimi"] }), sablonlar));
+    expect(gidenPrompt()).toContain("Veri Bilimi");
   });
 });

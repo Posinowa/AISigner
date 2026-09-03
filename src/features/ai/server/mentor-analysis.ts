@@ -73,14 +73,19 @@ export function mentorYedekAnalizi(girdi: MentorAnalysisInput): MentorAnalysisRe
 export async function analyzeMentorProfile(
   input: MentorAnalysisInput,
 ): Promise<MentorAnalysisResult> {
-  const alanlar = input.expertise.map(ilgiEtiketi).join(", ") || "Belirtilmemiş";
+  /*
+   * #390 devamı: UZMANLIK ALANLARI DA KULLANICI METNİ — şema serbest metin
+   * kabul ediyor (`basvuru.ts`: `z.array(z.string().min(1))`) ve
+   * `ilgiEtiketi` bilinmeyen değeri ham geçiriyor.
+   */
+  const alanlar = guvenliListe(input.expertise.map(ilgiEtiketi));
 
   const prompt = `Sen mentör-stajyer eşleştirmesi yapan bir uzmansın. Aşağıdaki MENTÖR başvurusunu değerlendir:
 
 ${veriBlogu("Ünvan", guvenliMetin(input.title, 200))}
 Toplam Deneyim: ${input.yearsExperience} yıl
 Kıdem: ${kidemEtiketi(input.seniority)}
-Öğretebileceği Alanlar: ${alanlar}
+${veriBlogu("Öğretebileceği Alanlar", alanlar)}
 Kapasite: aynı anda ${input.capacity} stajyer
 Haftalık Ayırabildiği Süre: ${input.weeklyHours} saat
 ${veriBlogu("Şehir", guvenliMetin(input.city, 100))}

@@ -183,3 +183,60 @@ describe("bireysel atama", () => {
     expect(res.status).toBe(200);
   });
 });
+
+describe("#208 mezun kapısı", () => {
+  /*
+   * Mezunun portfolyosu SALT OKUNUR. Adım üstlenmek panonun durumunu
+   * değiştirir, yani #208'in ayrımına göre ("sistem durumunu değiştiren uçlar
+   * kapalı, insan iletişimi açık") bu uç kapalı olmalıydı. Adım/dosya/yorum
+   * uçlarında kontrol vardı, BURADA eksikti — mezun bir stajyer eski takımının
+   * havuzundan iş çekmeye devam edebiliyordu.
+   */
+  it("GRADUATED öğrenci adım üstlenemez → 403", async () => {
+    requireAuthMock.mockResolvedValue({
+      authorized: true,
+      session: { user: { id: "ogr-1", role: "STUDENT", accountStatus: "GRADUATED" } },
+    });
+
+    const res = await PUT(istek({ assigneeId: "ogr-1" }), { params });
+
+    expect(res.status).toBe(403);
+    expect(ustlenMock).not.toHaveBeenCalled();
+  });
+
+  it("GRADUATED öğrenci başkasını da atayamaz", async () => {
+    requireAuthMock.mockResolvedValue({
+      authorized: true,
+      session: { user: { id: "ogr-1", role: "STUDENT", accountStatus: "GRADUATED" } },
+    });
+
+    const res = await PUT(istek({ assigneeId: "ogr-2" }), { params });
+
+    expect(res.status).toBe(403);
+    expect(ustlenMock).not.toHaveBeenCalled();
+  });
+
+  it("mezunun MENTÖRÜ hâlâ yazabilir — kapı ÖĞRENCİYE özel", async () => {
+    // Mentör mezun öğrencinin panosunu düzenleyebilmeli; kısıt salt-okunur
+    // PORTFOLYO sahibi içindir, mentörün yönetim yetkisi için değil.
+    requireAuthMock.mockResolvedValue({
+      authorized: true,
+      session: { user: { id: "men-1", role: "MENTOR", accountStatus: "APPROVED" } },
+    });
+
+    const res = await PUT(istek({ assigneeId: "ogr-1" }), { params });
+
+    expect(res.status).toBe(200);
+  });
+
+  it("APPROVED öğrenci etkilenmez", async () => {
+    requireAuthMock.mockResolvedValue({
+      authorized: true,
+      session: { user: { id: "ogr-1", role: "STUDENT", accountStatus: "APPROVED" } },
+    });
+
+    const res = await PUT(istek({ assigneeId: "ogr-1" }), { params });
+
+    expect(res.status).toBe(200);
+  });
+});
