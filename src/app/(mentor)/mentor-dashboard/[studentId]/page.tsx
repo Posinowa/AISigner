@@ -1,5 +1,6 @@
 "use client";
 
+import { taslakMi, TASLAK_ROZETI, TASLAK_SONUCU } from "@/features/roadmap/taslak";
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { ArrowLeft, User, Clock, BookOpen, Plus, CheckCircle, AlertCircle, Trash2, Sparkles, Map, Github, Loader2 } from "lucide-react";
@@ -541,17 +542,30 @@ export default function StudentDetailPage() {
                         {/* 🚀 SPRINT 3: YOL HARİTASI ALANI EKLENDİ */}
                         <div className="pt-4 border-t border-gray-100 flex items-center justify-between bg-gray-50/50 -mx-5 -mb-5 p-4 rounded-b-lg">
                           {project.roadmap ? (
-                            <div className="flex items-center justify-between w-full">
-                              <span className="text-sm font-medium text-gray-700 flex items-center">
-                                <Map className="w-4 h-4 mr-2 text-[#3e92cc]" />
-                                AI Rotası {project.roadmap.status === "PUBLISHED" ? "Yayında" : "Hazır"} ({project.roadmap.steps?.length || 0} Adım)
-                              </span>
-                              <Link
-                                href={`/mentor-dashboard/roadmap/${project.roadmap.id}`}
-                                className="text-sm font-semibold text-[#2f7cb0] hover:text-primary transition-colors"
-                              >
-                                İncele ve Onayla →
-                              </Link>
+                            <div className="w-full">
+                              <div className="flex items-center justify-between w-full">
+                                <span className="text-sm font-medium text-gray-700 flex items-center">
+                                  <Map className="w-4 h-4 mr-2 text-[#3e92cc]" />
+                                  {/* #405: Taslak rota önceden "Hazır" diye
+                                      etiketleniyordu — gerçeğin TERSİ. Stajyer
+                                      hiçbir adımı göremİyorken mentöre iş bitmiş
+                                      gibi görünüyordu. */}
+                                  AI Rotası{" "}
+                                  {taslakMi(project.roadmap.status) ? TASLAK_ROZETI : "Yayında"}{" "}
+                                  ({project.roadmap.steps?.length || 0} Adım)
+                                </span>
+                                <Link
+                                  href={`/mentor-dashboard/roadmap/${project.roadmap.id}`}
+                                  className="text-sm font-semibold text-[#2f7cb0] hover:text-primary transition-colors"
+                                >
+                                  İncele ve Onayla →
+                                </Link>
+                              </div>
+                              {taslakMi(project.roadmap.status) && (
+                                <p className="mt-1.5 text-xs leading-relaxed text-amber-700">
+                                  {TASLAK_SONUCU}
+                                </p>
+                              )}
                             </div>
                           ) : (
                             <div className="flex items-center justify-between w-full">

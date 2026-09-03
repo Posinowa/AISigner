@@ -23,11 +23,13 @@ import { RotateCcw,
   Send,
   ChevronDown,
   ChevronUp,
+  AlertTriangle,
   ArrowUp,
   ArrowDown,
   Github,
   Loader2,
 } from "lucide-react";
+import { TASLAK_SONUCU } from "@/features/roadmap/taslak";
 import { StepComments } from "@/features/messaging/ui/StepComments";
 import { StepFiles } from "@/features/files/ui/StepFiles";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
@@ -503,6 +505,28 @@ export default function RoadmapReviewPage() {
           </button>
         </div>
       </div>
+
+      {/* #405: Rozet durumu söylüyordu, SONUCUNU değil. Mentör "Taslak"ı
+          görüp stajyerin hiçbir adımı göremediğini fark etmiyordu.
+
+          ⚠️ Uyarı ENGELLEYİCİ DEĞİL: düzenleme sırasında taslağa geri almak
+          meşru bir işlem. Amaç durdurmak değil, unutulmasını önlemek. */}
+      {isDraft && (
+        <div
+          role="status"
+          className="mb-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4"
+        >
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-amber-900">
+              Bu yol haritası henüz taslak.
+            </p>
+            <p className="mt-0.5 text-sm leading-relaxed text-amber-800">
+              {TASLAK_SONUCU}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Proje Bilgisi + İstatistikler */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">

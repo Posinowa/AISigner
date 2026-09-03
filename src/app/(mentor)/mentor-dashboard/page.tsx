@@ -5,6 +5,7 @@ import {
   aktifProjeSayisi,
   tamamlananProjeSayisi,
   benzersizProjeSayisi,
+  taslakYolHaritasiSayisi,
 } from "@/features/mentors/proje-sayaci";
 import { Users, BookOpen, Clock, CheckCircle, AlertCircle, UserCircle2, ChevronRight, Loader2 } from "lucide-react";
 import Link from "next/link";
@@ -14,6 +15,7 @@ import { PanelKarsilama } from "@/features/dashboard/ui/PanelKarsilama";
 import { ProfilTamamlaSeridi } from "@/features/dashboard/ui/ProfilTamamlaSeridi";
 import { mentorDurumu } from "@/features/dashboard/models/mentorDurumu";
 import { experienceLevelLabel } from "@/lib/experience-level";
+import { taslakMi, taslakUyarisi, TASLAK_ROZETI } from "@/features/roadmap/taslak";
 import { OfisSaatiMentor } from "@/features/ofis-saati/ui/OfisSaatiMentor";
 
 type StudentWithProfile = {
@@ -36,6 +38,8 @@ type StudentWithProfile = {
         title: string;
         difficulty: string;
       };
+      // #405: Taslak yol haritası panoda işaretlenebilsin.
+      roadmap?: { id: string; status: string } | null;
       createdAt: Date;
     }[];
     // #367: Aktif takım üyelikleri — mentör "bu stajyer hangi takımda"
@@ -161,6 +165,9 @@ export default function MentorDashboardPage() {
   const totalActive = benzersizProjeSayisi(students, true);
   const totalCompleted = benzersizProjeSayisi(students, false);
   const missingProfile = students.filter(s => !s.studentProfile).length;
+  // #405: Yayınlanmayı bekleyen yol haritaları — asıl körlük buradaydı,
+  // mentör yol haritası sayfasından çıkınca hiçbir işaret kalmıyordu.
+  const taslakUyariMetni = taslakUyarisi(taslakYolHaritasiSayisi(students));
 
   // #290: Mentör de isimle karşılanıyor ve sıradaki işi görüyor.
   const mentorAdi = session?.user?.name?.split(" ")[0] ?? "Mentör";
@@ -208,6 +215,20 @@ export default function MentorDashboardPage() {
             fotografCapasi="/profile-setup"
           />
         </div>
+
+        {/* #405: Yayınlanmamış yol haritası uyarısı.
+
+            ⚠️ ENGELLEYİCİ DEĞİL: taslağa geri almak düzenleme sırasında meşru
+            bir işlem. Amaç mentörü durdurmak değil, unutmasını önlemek. */}
+        {taslakUyariMetni && (
+          <div
+            role="status"
+            className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4"
+          >
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+            <p className="text-sm leading-relaxed text-amber-900">{taslakUyariMetni}</p>
+          </div>
+        )}
 
         {/* Stats */}
         {/* #290: "Profil Eksik" buradan çıkarıldı — o bir ölçü değil, üzerine
@@ -336,12 +357,22 @@ export default function MentorDashboardPage() {
                                 {ap.projectTemplate.title}
                               </span>
                               {ap.roadmap ? (
-                                <Link
-                                  href={`/mentor-dashboard/roadmap/${ap.roadmap.id}`}
-                                  className="text-[11px] font-semibold text-indigo-700 hover:underline"
-                                >
-                                  Ortak panoyu aç →
-                                </Link>
+                                <>
+                                  {/* #405: `status` buraya kadar geliyordu ama
+                                      hiç kullanılmıyordu — takım panosu taslakken
+                                      de "Ortak panoyu aç" diyordu. */}
+                                  {taslakMi(ap.roadmap.status) && (
+                                    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
+                                      {TASLAK_ROZETI}
+                                    </span>
+                                  )}
+                                  <Link
+                                    href={`/mentor-dashboard/roadmap/${ap.roadmap.id}`}
+                                    className="text-[11px] font-semibold text-indigo-700 hover:underline"
+                                  >
+                                    Ortak panoyu aç →
+                                  </Link>
+                                </>
                               ) : (
                                 <span className="text-[11px] text-indigo-700/70">
                                   Yol haritası yok
@@ -378,6 +409,13 @@ export default function MentorDashboardPage() {
                                 {project.projectTemplate.title}
                               </span>
                               <div className="flex gap-1.5 shrink-0">
+                                {/* #405: Taslak rozeti ÖNCE — en önemli bilgi bu:
+                                    stajyer adımları göremİyor. */}
+                                {taslakMi(project.roadmap?.status) && (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800">
+                                    {TASLAK_ROZETI}
+                                  </span>
+                                )}
                                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${statusInfo.color}`}>
                                   {statusInfo.label}
                                 </span>
