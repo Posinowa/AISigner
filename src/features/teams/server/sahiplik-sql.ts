@@ -55,18 +55,37 @@ export function mentorunAtamasiSql(mentorUserId: string | null) {
 export function mentorunOgrencisiSql(mentorUserId: string | null) {
   return Prisma.sql`(
     ${mentorUserId}::text IS NULL
+    OR ${ogrenciMentoreBagliSql(Prisma.sql`${mentorUserId}::text`)}
+  )`;
+}
+
+/**
+ * "Bu öğrenci şu mentöre bağlı mı" — bağın KENDİSİ.
+ *
+ * `mentorunOgrencisiSql` bunu tek bir mentör kimliğiyle kullanıyor; mentör
+ * BAŞINA sayan sorgular ise sütun ifadesiyle (ör. `m.id`) çağırıyor.
+ *
+ * ⚠️ Bağ İKİ YOLDAN kurulur: bireysel `MentorAssignment` VEYA takım
+ * üzerinden `TeamMentor` (#332). Yalnız ilkine bakan bir sorgu, takımı olup
+ * bireysel bağı olmayan stajyerleri sessizce düşürür — bu hata sınıfı bu
+ * kod tabanında dört kez yaşandı (#367/#370/#376/#393).
+ *
+ * `StudentProfile` takma adı `sp` olarak varsayılıyor.
+ */
+export function ogrenciMentoreBagliSql(mentorIfadesi: Prisma.Sql) {
+  return Prisma.sql`(
+    EXISTS (
+      SELECT 1 FROM "MentorAssignment" ma
+      WHERE ma."studentProfileId" = sp.id
+        AND ma."mentorId" = ${mentorIfadesi}
+    )
     OR EXISTS (
-         SELECT 1 FROM "MentorAssignment" ma
-         WHERE ma."studentProfileId" = sp.id
-           AND ma."mentorId" = ${mentorUserId}::text
-       )
-    OR EXISTS (
-         SELECT 1 FROM "TeamMember" tmb
-         JOIN "TeamMentor" tm ON tm."teamId" = tmb."teamId"
-         WHERE tmb."studentProfileId" = sp.id
-           AND tmb."leftAt" IS NULL
-           AND tm."mentorId" = ${mentorUserId}::text
-       )
+      SELECT 1 FROM "TeamMember" tmb
+      JOIN "TeamMentor" tm ON tm."teamId" = tmb."teamId"
+      WHERE tmb."studentProfileId" = sp.id
+        AND tmb."leftAt" IS NULL
+        AND tm."mentorId" = ${mentorIfadesi}
+    )
   )`;
 }
 

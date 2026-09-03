@@ -1,3 +1,5 @@
+import { Prisma } from "@prisma/client";
+import { ogrenciMentoreBagliSql } from "@/features/teams/server/sahiplik-sql";
 import { prisma } from "@/lib/db";
 import { bildirimGonder, topluBildirimGonder } from "@/features/bildirim/server/bildirim";
 import { BILDIRIM_TURLERI } from "@/features/bildirim/turler";
@@ -75,11 +77,72 @@ export async function getAllUsers(): Promise<UserWithProfile[]> {
 
 // ------------------------------------
 // Sadece mentorları getir
-export async function getMentors(): Promise<{id: string; name: string | null; lastName: string | null; email: string;}[]> {
-  return prisma.user.findMany({
-    where: { role: "MENTOR" },
-    select: { id: true, name: true, lastName: true, email: true },
-  });
+export type MentorOzeti = {
+  id: string;
+  name: string | null;
+  lastName: string | null;
+  email: string;
+  /** Şu an gözettiği stajyer sayısı. */
+  aktifOgrenci: number;
+  /**
+   * Mentörün kendi beyan ettiği eşzamanlı stajyer sınırı.
+   *
+   * `MentorProfile` yalnız başvuru akışında (#287) oluştuğu için seed veya
+   * admin eliyle açılan mentörde YOK — o durumda `null`. Uydurma bir payda
+   * üretmiyoruz; arayüz oran yerine yalnız sayı gösteriyor.
+   */
+  kapasite: number | null;
+};
+
+/**
+ * Mentör listesi + ANLIK YÜK (#404).
+ *
+ * Admin bir stajyere mentör atarken açılır listede yalnız ad ve e-posta
+ * görüyordu; kimin kaç stajyeri olduğu görünmediği için yük dağılımı
+ * körlemesine yapılıyordu.
+ *
+ * ⚠️ TEK SORGU. Mentör başına ayrı bir sayım N+1 üretirdi.
+ *
+ * ⚠️ SAYIM İKİ YOLDAN BAĞI DA SORAR (`ogrenciMentoreBagliSql`, #376):
+ * bireysel `MentorAssignment` VEYA takım üzerinden `TeamMentor`. Yalnız
+ * ilkine bakan bir sayaç, takımı olup bireysel bağı olmayan stajyerleri
+ * sessizce düşürürdü — #393'te tam olarak bu yaşandı.
+ *
+ * ⚠️ MEZUN VE REDDEDİLEN STAJYERLER SAYILMAZ. Kapasite EŞZAMANLI yükü
+ * anlatıyor; mezun bir stajyer mentörün zamanını artık tüketmiyor. Sayarsak
+ * eski mentörler kalıcı olarak "dolu" görünür ve yeni atama alamazdı.
+ */
+export async function getMentors(): Promise<MentorOzeti[]> {
+  const satirlar = await prisma.$queryRaw<
+    Array<{
+      id: string;
+      name: string | null;
+      lastName: string | null;
+      email: string;
+      aktifOgrenci: number;
+      kapasite: number | null;
+    }>
+  >`
+    SELECT
+      m.id,
+      m.name,
+      m."lastName",
+      m.email,
+      mp.capacity AS "kapasite",
+      (
+        SELECT COUNT(DISTINCT sp.id)::int
+        FROM "StudentProfile" sp
+        JOIN "User" su ON su.id = sp."userId"
+        WHERE su."accountStatus" NOT IN ('GRADUATED', 'REJECTED')
+          AND ${ogrenciMentoreBagliSql(Prisma.sql`m.id`)}
+      ) AS "aktifOgrenci"
+    FROM "User" m
+    LEFT JOIN "MentorProfile" mp ON mp."userId" = m.id
+    WHERE m.role = 'MENTOR'
+    ORDER BY m."createdAt" ASC
+  `;
+
+  return satirlar;
 }
 
 // ------------------------------------
