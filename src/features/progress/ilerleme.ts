@@ -10,9 +10,37 @@ import { SESSIZLIK_GUN } from "@/features/analytics/sabitler";
  * diğeri unutulunca sessizce ayrışır.
  *
  * Saf modül: veri ÇEKMİYOR.
+ *
+ * ⚠️ KURAL ÖZET ÜZERİNDE TANIMLI, DİZİ ÜZERİNDE DEĞİL (#452).
+ *
+ * Öncesinde her fonksiyon adım DİZİSİ alıyordu; bu, çağıranı adımları
+ * çekmeye MECBUR bırakıyordu. Ölçüldü: `/api/admin/assignments` istek
+ * başına 14.241 satır hidratlayıp bundan yalnız 1406 özet üretiyordu ve
+ * adımlar yanıtta dönmüyordu bile — sırf sayı hesaplamak için çekiliyorlardı.
+ * Sürenin %97'si veritabanında değil, Prisma'nın o satırları JS nesnesine
+ * çevirmesindeydi.
+ *
+ * Çözüm, kuralı KOPYALAMAK değil taşımak oldu: hesap artık
+ * `IlerlemeOzeti` üzerinde tanımlı (SQL'in `COUNT`/`MAX` ile doğrudan
+ * üretebildiği üç sayı). Diziyle çalışan sürümler `ozetle()`'den geçen
+ * ince sarmalayıcılar — yani yüzde formülü, %100 istisnası ve
+ * `SESSIZLIK_GUN` eşiği hâlâ TEK yerde yazılı. SQL tarafı için ikinci bir
+ * tanım açsaydık #376'daki "kural iki dilde yaşıyor" borcunu gereksiz yere
+ * bir kez daha almış olurduk.
  */
 
 export type IlerlemeAdimi = { status: string; updatedAt: Date | string };
+
+/**
+ * İlerlemenin dayandığı ÜÇ sayı. SQL'de tek satırda üretilebilir:
+ * `COUNT(*)`, `COUNT(*) FILTER (WHERE status = 'COMPLETED')`, `MAX(updatedAt)`.
+ */
+export type IlerlemeOzeti = {
+  toplamAdim: number;
+  tamamlanan: number;
+  /** En son hareket eden adımın zamanı. Hiç adım yoksa null. */
+  sonHareketAt: Date | null;
+};
 
 export type Ilerleme = {
   toplamAdim: number;
@@ -20,15 +48,27 @@ export type Ilerleme = {
   yuzde: number;
 };
 
+/** Adım dizisinden özet üretir — SQL toplaması olmayan çağıranlar için. */
+export function ozetle(adimlar: IlerlemeAdimi[]): IlerlemeOzeti {
+  return {
+    toplamAdim: adimlar.length,
+    tamamlanan: adimlar.filter((a) => a.status === "COMPLETED").length,
+    sonHareketAt: sonHareket(adimlar),
+  };
+}
+
 /** Yol haritası yoksa/boşsa %0 — "adım yok" ile "hiç ilerlemedi" ayrımı çağıranda. */
-export function ilerlemeHesapla(adimlar: IlerlemeAdimi[]): Ilerleme {
-  const toplamAdim = adimlar.length;
-  const tamamlanan = adimlar.filter((a) => a.status === "COMPLETED").length;
+export function ilerlemeOzetten(ozet: IlerlemeOzeti): Ilerleme {
+  const { toplamAdim, tamamlanan } = ozet;
   return {
     toplamAdim,
     tamamlanan,
     yuzde: toplamAdim > 0 ? Math.round((tamamlanan / toplamAdim) * 100) : 0,
   };
+}
+
+export function ilerlemeHesapla(adimlar: IlerlemeAdimi[]): Ilerleme {
+  return ilerlemeOzetten(ozetle(adimlar));
 }
 
 /** En son hareket eden adımın zamanı. Hiç adım yoksa null. */
@@ -43,10 +83,18 @@ export function sonHareket(adimlar: IlerlemeAdimi[]): Date | null {
 }
 
 /** Son hareketten bu yana geçen tam gün. Hiç hareket yoksa null. */
+export function sessizGunOzetten(
+  ozet: IlerlemeOzeti,
+  simdi: Date = new Date(),
+): number | null {
+  if (!ozet.sonHareketAt) return null;
+  const t = new Date(ozet.sonHareketAt).getTime();
+  if (Number.isNaN(t)) return null;
+  return Math.floor((simdi.getTime() - t) / 86_400_000);
+}
+
 export function sessizGun(adimlar: IlerlemeAdimi[], simdi: Date = new Date()): number | null {
-  const son = sonHareket(adimlar);
-  if (!son) return null;
-  return Math.floor((simdi.getTime() - son.getTime()) / 86_400_000);
+  return sessizGunOzetten(ozetle(adimlar), simdi);
 }
 
 /**
@@ -66,28 +114,40 @@ export function sessizGun(adimlar: IlerlemeAdimi[], simdi: Date = new Date()): n
  * ya da yayınlanmamış olması (#405) — farklı bir uyarı, arayüz onu ayrıca
  * yazıyor.
  *
- * ⚠️ O erken dönüş DAVRANIŞSAL OLARAK GEREKSİZ, bilerek duruyor: boş
- * listede `sessizGun` zaten `null` döndüğü için sonuç yine `false` olurdu.
- * Mutasyon testinde ölçüldü — satırı kaldıran sürümü hiçbir test
- * öldüremiyor, çünkü öldürülecek bir davranış yok. Niyeti okunur kıldığı
- * için korunuyor; bir koruma olduğu iddia EDİLMİYOR.
+ * ⚠️ O erken dönüş DAVRANIŞSAL OLARAK GEREKSİZ, bilerek duruyor: adımsız
+ * özette `sonHareketAt` zaten null olduğu için `sessizGunOzetten` null
+ * döner ve sonuç yine `false` olurdu. Mutasyon testinde ölçüldü — satırı
+ * kaldıran sürümü hiçbir test öldüremiyor, çünkü öldürülecek bir davranış
+ * yok. Niyeti okunur kıldığı için korunuyor; bir koruma olduğu iddia
+ * EDİLMİYOR.
  */
-export function durakladiMi(
-  adimlar: IlerlemeAdimi[],
+export function durakladiMiOzetten(
+  ozet: IlerlemeOzeti,
   simdi: Date = new Date(),
 ): boolean {
-  if (adimlar.length === 0) return false;
-  if (ilerlemeHesapla(adimlar).yuzde === 100) return false;
+  if (ozet.toplamAdim === 0) return false;
+  if (ilerlemeOzetten(ozet).yuzde === 100) return false;
 
-  const gun = sessizGun(adimlar, simdi);
+  const gun = sessizGunOzetten(ozet, simdi);
   return gun !== null && gun >= SESSIZLIK_GUN;
 }
 
+export function durakladiMi(adimlar: IlerlemeAdimi[], simdi: Date = new Date()): boolean {
+  return durakladiMiOzetten(ozetle(adimlar), simdi);
+}
+
 /** Arayüzde basılacak kısa metin. Duraklamamışsa null. */
+export function duraklamaMetniOzetten(
+  ozet: IlerlemeOzeti,
+  simdi: Date = new Date(),
+): string | null {
+  if (!durakladiMiOzetten(ozet, simdi)) return null;
+  return `${sessizGunOzetten(ozet, simdi)} gündür hareket yok`;
+}
+
 export function duraklamaMetni(
   adimlar: IlerlemeAdimi[],
   simdi: Date = new Date(),
 ): string | null {
-  if (!durakladiMi(adimlar, simdi)) return null;
-  return `${sessizGun(adimlar, simdi)} gündür hareket yok`;
+  return duraklamaMetniOzetten(ozetle(adimlar), simdi);
 }

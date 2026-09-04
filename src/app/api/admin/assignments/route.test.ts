@@ -29,6 +29,12 @@ function admin() {
 function forbidden() {
   requireAuthMock.mockResolvedValue({ authorized: false, response: new Response(JSON.stringify({ error: "x" }), { status: 403 }) });
 }
+/** #452: GET artık sorgu parametresi okuyor — istek nesnesi şart. */
+function getReq(qs = "") {
+  return new Request(`http://test/api/admin/assignments${qs}`);
+}
+const SAYFA = { atamalar: [], nextCursor: null, sayaclar: { toplam: 0, kurulu: 0, kurulmamis: 0, ortalamaIlerleme: 0 } };
+
 function postReq(body: unknown) {
   return new Request("http://test/api/admin/assignments", {
     method: "POST",
@@ -42,17 +48,63 @@ describe("admin/assignments route (#178-3)", () => {
 
   it("GET admin değil → 403, veri çekilmez", async () => {
     forbidden();
-    const res = await GET();
+    const res = await GET(getReq());
     expect(res.status).toBe(403);
     expect(progressMock).not.toHaveBeenCalled();
   });
 
   it("GET admin → 200 ve ilerleme verisi döner", async () => {
     admin();
-    progressMock.mockResolvedValue([{ id: "a1" }]);
-    const res = await GET();
+    progressMock.mockResolvedValue(SAYFA);
+    const res = await GET(getReq());
     expect(res.status).toBe(200);
     expect(progressMock).toHaveBeenCalled();
+  });
+
+  /**
+   * #452 — Süzme ve sayfalama SUNUCUDA.
+   *
+   * ⚠️ Bu testler bir sözleşme değişikliğini koruyor ve o değişikliği ne tip
+   * sistemi ne de mevcut testler yakalamıştı: rota `NextResponse.json(data)`
+   * dediği, sayfa da `res.json()`'u tipsiz aldığı için dönüş şekli diziden
+   * nesneye geçtiğinde HİÇBİR ŞEY uyarmadı. Parametrelerin gerçekten
+   * geçtiğini burada kilitliyoruz.
+   */
+  it("GET süzme ve sayfalama parametrelerini sunucuya geçirir", async () => {
+    admin();
+    progressMock.mockResolvedValue(SAYFA);
+    await GET(getReq("?durum=PROVISIONED&mentor=m1&cursor=c9&limit=25"));
+    expect(progressMock).toHaveBeenCalledWith({
+      githubDurum: "PROVISIONED",
+      mentorId: "m1",
+      cursor: "c9",
+      limit: 25,
+    });
+  });
+
+  it("⚠️ tanınmayan durum sessizce ALL'a düşer — yazım hatası listeyi boşaltmasın", async () => {
+    admin();
+    progressMock.mockResolvedValue(SAYFA);
+    await GET(getReq("?durum=SAÇMA"));
+    expect(progressMock.mock.calls[0][0].githubDurum).toBe("ALL");
+  });
+
+  it("parametre yoksa süzme uygulanmaz", async () => {
+    admin();
+    progressMock.mockResolvedValue(SAYFA);
+    await GET(getReq());
+    const arg = progressMock.mock.calls[0][0];
+    expect(arg.githubDurum).toBe("ALL");
+    expect(arg.mentorId).toBeNull();
+    expect(arg.cursor).toBeNull();
+    expect(arg.limit).toBeUndefined();
+  });
+
+  it("geçersiz limit yok sayılır — sunucudaki varsayılan korunur", async () => {
+    admin();
+    progressMock.mockResolvedValue(SAYFA);
+    await GET(getReq("?limit=abc"));
+    expect(progressMock.mock.calls[0][0].limit).toBeUndefined();
   });
 
   it("POST admin değil → 403, provisioning çağrılmaz", async () => {
