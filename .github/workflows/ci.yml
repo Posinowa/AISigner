@@ -81,6 +81,46 @@ jobs:
         run: echo "No build script found. Skipping."
 
   # ---------------------------------------------------------------------------
+  # Bağımlılık güvenlik taraması (#469).
+  #
+  # ⚠️ EŞİK BİLEREK İKİYE BÖLÜNDÜ. Tek bir `npm audit` çalıştırıp her
+  # bulguda CI'yı kırmak klasik bir tuzak: dev bağımlılıklarındaki geçişli
+  # uyarıların çoğu düzeltilemiyor (upstream'i bekliyor) ve kırmızı CI
+  # ilgisiz her işi bloke ediyor. Bir süre sonra ekip "audit'i yok say"
+  # alışkanlığı ediniyor — yani tarama hiç olmamasından daha kötü hale
+  # geliyor.
+  #
+  #   - BLOKE EDEN: yalnız ÜRETİM bağımlılıkları, yalnız high/critical.
+  #     Bunlar kullanıcıya giden artefaktta yaşıyor ve aksiyon alınabilir.
+  #   - BİLGİ AMAÇLI: dev dahil tam tarama, `continue-on-error` ile.
+  #     Görünür olur ama işi durdurmaz.
+  #
+  # Ölçüm (bu PR yazılırken): her iki tarama da 0 açık veriyordu, yani eşik
+  # bugün yeşil bir CI'yı kırmıyor.
+  # ---------------------------------------------------------------------------
+  guvenlik:
+    name: dependency audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # `npm audit` kurulum gerektirmiyor; lockfile'dan çalışıyor.
+      - name: Üretim bağımlılıkları — high/critical (BLOKE EDER)
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Tam tarama (dev dahil) — bilgi amaçlı
+        continue-on-error: true
+        run: npm audit
+
+  # ---------------------------------------------------------------------------
   # Deploy edilen ASIL artefakt: imaj.
   #
   # ⚠️ Bu iş bir HATADAN doğdu. CI yalnızca `npm run build` koşuyordu ve o
