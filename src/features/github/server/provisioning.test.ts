@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
+import { takilmaEsigi, KURULUM_TAKILMA_DK } from "@/features/github/kurulum-durumu";
 
 /**
  * #178 / #257 — çalışma alanı kurulumu ve güncellenmesi.
@@ -712,12 +713,38 @@ describe("baslatGitHubWorkspaceKurulumu — arka plana alma", () => {
     await baslatGitHubWorkspaceKurulumu("ap-1", false);
 
     // Koşul updateMany'nin WHERE'inde olmalı; ayrı bir okuma+yazma değil.
-    // #366: dışarıdan bağlanan depo (LINKED) da aynı WHERE ile eleniyor —
+    const cagri = prismaMock.assignedProject.updateMany.mock.calls[0][0];
+
+    expect(cagri.data).toEqual({ githubStatus: "PROVISIONING" });
+    expect(cagri.where.id).toBe("ap-1");
+
+    // #366: dışarıdan bağlanan depo (LINKED) HER KOŞULDA eleniyor —
     // stajyerin kendi deposuna milestone/issue açmak felaket olurdu.
-    expect(prismaMock.assignedProject.updateMany).toHaveBeenCalledWith({
-      where: { id: "ap-1", githubStatus: { notIn: ["PROVISIONING", "LINKED"] } },
-      data: { githubStatus: "PROVISIONING" },
-    });
+    // Takılmış olsa bile geri alınmıyor, bu yüzden OR'ın DIŞINDA.
+    expect(cagri.where.githubStatus).toEqual({ not: "LINKED" });
+
+    /*
+     * #483: PROVISIONING artık KOŞULLU eleniyor. Eskiden `notIn` ile
+     * koşulsuz dışlanıyordu ve süreç yeniden başladığında (deploy) atama
+     * sonsuza dek asılı kalıyordu: durumu ERROR'a çekecek kod da o süreçle
+     * ölüyor, kilit de "Tekrar Dene"yi reddediyordu.
+     */
+    expect(cagri.where.OR).toEqual([
+      { githubStatus: { not: "PROVISIONING" } },
+      { githubStatus: "PROVISIONING", updatedAt: { lt: expect.any(Date) } },
+    ]);
+  });
+
+  it("⚠️ TAKILMA EŞİĞİ geçmişte — canlı bir kurulum geri alınmaz", () => {
+    // Eşik "şimdi"ye eşit ya da gelecekte olsaydı, AZ ÖNCE başlamış bir
+    // kurulumun üstüne ikincisi başlatılabilirdi.
+    // Sabit "şimdi": `Date.now()` iki çağrı arasında ilerlediği için
+    // birebir eşitlik milisaniye kaymasıyla kırılıyordu.
+    const simdi = new Date("2026-09-04T12:00:00.000Z");
+    const esik = takilmaEsigi(simdi);
+
+    expect(esik.getTime()).toBeLessThan(simdi.getTime());
+    expect(simdi.getTime() - esik.getTime()).toBe(KURULUM_TAKILMA_DK * 60_000);
   });
 
   it("EŞZAMANLI iki başlatmadan yalnız biri geçer", async () => {

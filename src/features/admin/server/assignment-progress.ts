@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { kurulumTakildiMi } from "@/features/github/kurulum-durumu";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth/guard";
 import { mentorErisimiWhere } from "@/features/teams/server/sahiplik";
@@ -25,6 +26,16 @@ export type StudentAssignmentProgress = {
   githubRepoUrl: string | null;
   githubStatus: string;
   provisionedAt: Date | null;
+  /**
+   * #483: `PROVISIONING` ama artık koşmuyor — süreç yeniden başladığı için
+   * yarıda kalmış. Arayüz bunu dönen bir spinner yerine "Tekrar Dene" olarak
+   * göstermeli; aksi halde satır sonsuza dek "Kuruluyor..." kalıyor ve
+   * yoklama hiç durmuyordu.
+   *
+   * Eşik SUNUCUDA hesaplanıyor: arayüzde tekrar yazmak, kilitteki eşikle
+   * ayrışma riski demekti (kural tek kaynakta).
+   */
+  kurulumTakildi: boolean;
   totalSteps: number;
   completedSteps: number;
   progressPercentage: number;
@@ -291,6 +302,12 @@ export async function getStudentAssignmentsProgress(
       githubRepoUrl: assignment.githubRepoUrl,
       githubStatus: assignment.githubStatus,
       provisionedAt: assignment.provisionedAt,
+      // `updatedAt` PROVISIONING'e geçildiği an: `isiYurut` ara güncelleme
+      // yapmıyor, bu yüzden "kurulum ne zaman başladı"nın temiz göstergesi.
+      kurulumTakildi: kurulumTakildiMi(
+        assignment.githubStatus,
+        assignment.updatedAt,
+      ),
       totalSteps,
       completedSteps,
       progressPercentage,
