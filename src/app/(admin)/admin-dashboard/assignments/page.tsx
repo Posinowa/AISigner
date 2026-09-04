@@ -36,6 +36,15 @@ export type StudentAssignmentProgress = {
   githubRepoUrl: string | null;
   githubStatus: string;
   provisionedAt: Date | null;
+  /**
+   * #483: kurulum yarıda kalmış (süreç yeniden başlamış). Eşik SUNUCUDA
+   * hesaplanıyor — burada tekrar yazmak kilitteki eşikle ayrışırdı.
+   *
+   * ⚠️ Bu tip sunucudaki `StudentAssignmentProgress`in ELLE TUTULAN
+   * kopyası. Alanı orada ekleyip burada unutmak derleme hatası verdi;
+   * ikisini bir arada tutan tek şey şu an tsc.
+   */
+  kurulumTakildi: boolean;
   totalSteps: number;
   completedSteps: number;
   progressPercentage: number;
@@ -166,7 +175,12 @@ export default function AdminAssignmentsPage() {
   //
   // Sayfa yenilendiğinde de çalışır: sürmekte olan bir kurulum varsa yoklama
   // kendiliğinden başlar.
-  const kuruluyorVar = assignments.some((a) => a.githubStatus === "PROVISIONING");
+  // #483: TAKILI satır "kuruluyor" SAYILMAZ. Önceden yalnız duruma
+  // bakılıyordu; süreç yeniden başladığında satır sonsuza dek PROVISIONING
+  // kalıyor ve bu sayfa SONSUZA DEK yoklama isteği atıyordu.
+  const kuruluyorVar = assignments.some(
+    (a) => a.githubStatus === "PROVISIONING" && !a.kurulumTakildi,
+  );
 
   useEffect(() => {
     if (!kuruluyorVar) return;
@@ -567,7 +581,7 @@ export default function AdminAssignmentsPage() {
 
                     {/* GitHub Aksiyon */}
                     <td className="py-4 px-6 text-right">
-                      {item.githubStatus === "PROVISIONING" ? (
+                      {item.githubStatus === "PROVISIONING" && !item.kurulumTakildi ? (
                         // İş arka planda koşuyor. Buton YOK: ikinci bir kurulum
                         // tetiklemek aynı repoya paralel yazma demek olurdu
                         // (uç da bunu 400 ile reddediyor).
@@ -607,20 +621,24 @@ export default function AdminAssignmentsPage() {
                         <button
                           onClick={() => setSelectedAssignment(item)}
                           className={
-                            item.githubStatus === "ERROR"
+                            item.githubStatus === "ERROR" || item.kurulumTakildi
                               ? "inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 text-xs font-semibold transition"
                               : "inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold transition shadow-sm"
                           }
                           title={
-                            item.githubStatus === "ERROR"
-                              ? "Önceki kurulum tamamlanamadı. Tekrar denemek kopya oluşturmaz."
-                              : undefined
+                            item.kurulumTakildi
+                              ? "Kurulum yarıda kalmış (sunucu yeniden başlamış olabilir). Tekrar denemek kopya oluşturmaz."
+                              : item.githubStatus === "ERROR"
+                                ? "Önceki kurulum tamamlanamadı. Tekrar denemek kopya oluşturmaz."
+                                : undefined
                           }
                         >
-                          {item.githubStatus === "ERROR" ? (
+                          {item.githubStatus === "ERROR" || item.kurulumTakildi ? (
                             <>
                               <AlertCircle className="w-3.5 h-3.5" />
-                              Kurulum Başarısız — Tekrar Dene
+                              {item.kurulumTakildi
+                                ? "Kurulum Yarıda Kaldı — Tekrar Dene"
+                                : "Kurulum Başarısız — Tekrar Dene"}
                             </>
                           ) : (
                             <>

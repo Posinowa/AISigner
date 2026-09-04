@@ -1,4 +1,5 @@
 import { after } from "next/server";
+import { takilmaEsigi } from "@/features/github/kurulum-durumu";
 import { atamaninAiRizasiVar } from "@/features/kvkk/riza";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth/guard";
@@ -605,14 +606,32 @@ export async function baslatGitHubWorkspaceKurulumu(
   const kilit = await prisma.assignedProject.updateMany({
     where: {
       id: assignmentId,
-      githubStatus: {
-        // #366: DIŞ DEPOYA ASLA DOKUNMA.
-        //
-        // `LINKED`, stajyerin kendi deposunun bu atamaya bağlandığı anlamına
-        // geliyor (öneri akışında "var olan depomu bağla" / "devrettim").
-        // Kurulum çalışsaydı BAŞKASININ deposuna milestone ve issue açardı.
-        notIn: ["PROVISIONING", DIS_DEPO_DURUMU],
-      },
+      // #366: DIŞ DEPOYA ASLA DOKUNMA — her koşulda dışarıda.
+      //
+      // `LINKED`, stajyerin kendi deposunun bu atamaya bağlandığı anlamına
+      // geliyor (öneri akışında "var olan depomu bağla" / "devrettim").
+      // Kurulum çalışsaydı BAŞKASININ deposuna milestone ve issue açardı.
+      // Bu kayıt TAKILMIŞ olsa bile geri alınmaz.
+      githubStatus: { not: DIS_DEPO_DURUMU },
+      OR: [
+        // Normal yol: sürmekte olan bir kurulum yok.
+        { githubStatus: { not: "PROVISIONING" } },
+        /*
+         * ⚠️ TAKILMIŞ KURULUM GERİ ALINABİLİR (#483).
+         *
+         * Önceki koşul `PROVISIONING`'i koşulsuz dışlıyordu. Süreç yeniden
+         * başlarsa (deploy) iş yarıda kalıyor, durumu `ERROR`'a çekecek kod
+         * da o süreçle ölüyor ve atama `PROVISIONING`'de SONSUZA DEK asılı
+         * kalıyordu — bu kilit yüzünden "Tekrar Dene" de reddediliyordu.
+         * Docstring kurtarmanın admin panelinden yapıldığını söylüyordu ama
+         * o yol gerçekte yoktu.
+         *
+         * Eşik cömert: `isiYurut` ara güncelleme yapmadığı için canlı bir iş
+         * `updatedAt`'i tazelemiyor; kısa bir eşik ÇALIŞAN kurulumun üstüne
+         * ikincisini başlatırdı.
+         */
+        { githubStatus: "PROVISIONING", updatedAt: { lt: takilmaEsigi() } },
+      ],
     },
     data: { githubStatus: "PROVISIONING" },
   });
