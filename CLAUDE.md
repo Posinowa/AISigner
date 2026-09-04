@@ -243,6 +243,14 @@ bilinçli karar.
   **Panel toplamı PROJE başına, öğrenci başına DEĞİL**: bir takım projesi üç üyenin de
   projesidir, öğrenci başına toplamak tek projeyi üç kez sayar. Öğrenci kartındaki sayı
   ise 1 kalır — o proje gerçekten onun.
+- ⚠️ **ÜÇÜNCÜ YÜZEY: MENTÖRÜN ÖĞRENCİ DETAYI** (#442). Aynı hata sınıfı üç yerdeydi;
+  #367 ikisini düzeltmişti (mentör listesi, öğrenci panosu), `getStudentDetail`
+  atlanmıştı. **#370'ten daha sinsi**: orada mentör listede görüp detayda 404 alıyordu,
+  burada sayfa AÇILIYOR ama iş görünmüyor — sessiz olduğu için kimse fark etmiyor.
+  Canlı kanıt: `studentProfileId: NULL, teamId: t437_tm` olan atama için
+  `assignedProjects: 0 kayıt`. Takım satırı bireyselmiş gibi durmuyor (takım adı +
+  üyeler rozetli) ve takımda AI yol haritası üretimi kapalı olduğu için (#332) düğme
+  yerine SEBEBİ yazılı — yoksa mentör basıp 400 alırdı.
 - ⚠️ **Takımın öğrencileri İKİ YOLDAN gelir** (#367): liste sorguları hem bireysel
   `MentorAssignment` hem `TeamMentor`/`TeamMember` bağını sormalı. Aynı şekilde öğrenci
   panosu `studentProfile.assignedProjects` + `teamMemberships.team.assignedProjects`
@@ -361,6 +369,39 @@ webhook'ta yazılıyor (`pull_request` + `merged`), karar buna bakıyor.
 - **BAGLA/LINKED depolarda hiçbiri çalışmaz** (#366) — sessizce atlanıyor.
 - **GitHub hatası revizyonu geri almaz**: platform durumu tek doğru kaynak, senk `after()`
   ile arka planda. Tersi olsaydı GitHub erişilemezken mentör revizyon isteyemezdi.
+
+### Savunma Derinliği Dalgası (#437, #439)
+
+Denetimde bulunan, tek tek küçük ama sınıf olarak tekrarlayan boşluklar.
+
+- **⚠️ #208 MEZUN KAPISI İKİ UÇTA EKSİKTİ** (#437): `steps/[stepId]/assignee` (mezun,
+  eski takımının havuzundan iş çekmeye devam edebiliyordu) ve `student/proposals` POST
+  (onaylanınca `AssignedProject`'e dönüşen, yani sistem durumunu DEĞİŞTİREN bir uç).
+  Kapı ÖĞRENCİYE özel — mentör mezunun panosunu düzenlemeye devam eder; GET açık kalır.
+- **⚠️ `ai-step`'TE RATE LIMIT YOKTU** (#437): Gemini çağıran tek limitsiz uçtu, kardeşi
+  `generate-roadmap` 60 sn / 5 ile sınırlıydı. Aynı bütçe uygulandı.
+- **⚠️ #390 TARAMASI İKİ ALANI KAÇIRMIŞTI**: `interests` ve `expertise`. İkisi de
+  `ilgiEtiketi`'nden geçtiği için güvenli sanılmıştı — oysa `ilgiEtiketi` BİLİNMEYEN
+  değeri olduğu gibi döndürüyor (`?? deger`) ve şemalar serbest metin kabul ediyor
+  (`z.array(z.string())`, enum DEĞİL). Yani sözlükte olmayan her değer prompt'a çıplak
+  giriyordu. **`guvenliListe` dört dosyada import edilip hiç kullanılmamıştı** — lint
+  uyarısı bunu zaten söylüyordu.
+- **⚠️ `Prisma.raw` PARAMETRELEŞTİRMEZ** (#439): `atamaOgrencininSql` takma adı olduğu
+  gibi gömüyordu. Bugün yalnız kod içi sabitler geçiyor ("ap"/"ap2"), sömürülebilir yol
+  YOK — ama imza `string`'di ve bu, `Prisma.raw`'a giden tek doğrulanmamış girdiydi.
+- **⚠️ DEPOLAMA ADI YOL KAÇIŞINA AÇIKTI** (#439): `blob.ts` adı `path.join` ile
+  birleştiriyor, GCS tarafında öneke DÜZ METİN ekliyor (`steps/../gizli` aynı kaçışı
+  bucket içinde yapardı). Kapı çekirdeğe kondu — sözleşme "adı ver, nereye yazacağımı
+  ben bilirim". İkisi de **sessizce kırpmaz, FIRLATIR**: yanlış satırı eşlemektense /
+  yanlış dosyayı okuyup silmektense patlaması yeğdir.
+- **⚠️ ESKİYEN GEREKÇE: `saveOnboarding`** (#439). Dosyadaki yorum "requireAuth
+  KULLANILMAZ, akışı kırar" diyordu ve bu #143'ün `allowUnapprovedStudent` seçeneği
+  EKLENMEDEN ÖNCE doğruydu. Seçenek geldi, API uçlarına uygulandı, **bu çağrı yeri
+  taşınmadı**. Kaçan iki soru: (1) REJECTED stajyer — middleware yalnız SAYFAYI
+  kapatıyor, server action doğrudan çağrılabildiği için profil yazılmaya devam
+  ediyordu; (2) rol — MENTOR/ADMIN oturumu kendine `StudentProfile` üretip
+  `User.name/lastName/phone` alanlarını bu yoldan değiştirebiliyordu. #143 sözleşmesi
+  korunuyor: PENDING stajyer profilini tamamlayabiliyor.
 
 ### Analitik Panel (#331)
 `features/analytics/server/analiz.ts` (üç ham SQL) → `panel.ts` (önbellek) →
@@ -521,6 +562,18 @@ dilimlere böler, stajyer tek tıkla rezerve eder.
 - **Bilinen sınır:** bağlantı alanı `MentorProfile`'da, o da yalnız başvuru akışında
   (#287) oluşuyor. Seed/admin eliyle açılan mentör **slot açabilir ama bağlantı
   kaydedemez**; hata mesajı bunu açıkça söylüyor.
+- **⚠️ SLOT AÇMADA TAVAN VAR** (#443): uç satır ÜRETİYOR (tek çağrı `AZAMI_DILIM` = 24
+  satır). Asıl risk isteğin tekrarı DEĞİL — o zaten `@@unique` + `skipDuplicates` ile
+  0 satır ekliyor — **pencereyi kaydırarak ileri tarihlere sınırsız takvim açmak**.
+  Mentör güvenilen bir rol olduğu için tavan CÖMERT (60 sn / 20): amaç kötüye kullanımı
+  değil kaza eseri döngüyü kesmek.
+- **⚠️ TESTLER MODÜLDE VARDI, ROTALARDA YOKTU** (#443). `ofis-saati.ts` 33 testle
+  kapsanmıştı; boşluk HTTP katmanındaydı ve orada modülün göremeyeceği kararlar var:
+  `?tamamen=1` bayrağı İSTEMCİDEN gelir ve yalnız MENTOR'e açıktır (rol kontrolü olmasa
+  stajyer mentörün takvim satırını tamamen kaldırabilirdi), "slot-yok" → 404 ama
+  "dolu" → 409 (ikisi de 404 olsaydı istemci "silinmiş" ile "az önce kapıldı"yı ayırt
+  edemezdi), ve mezunun rezerve EDEBİLMESİ #208'in bilinçli istisnası olarak test
+  edilir — "eksik kapı" sanılıp kapatılmasın diye.
 
 ### Taslak Yol Haritası Görünürlüğü (#405)
 
@@ -675,6 +728,66 @@ kimseye söylenmiyordu (sayaç artıyordu ama o yalnızca teşhis).
   ⚠️ "İstekler" (#147) ile "Öneriler" (#366) FARKLI şeyler — kısa adlar
   karışmamalı.
 
+### Liste Sayfalama ve Sunucu Tarafı Süzme (#446/#448, #452)
+
+İki admin listesi de tüm tabloyu tek yanıtta döndürüyordu. Ölçüldü (üretim derlemesi,
+1406 atama / 9838 adım): `/api/admin/assignments` **1,04 MB**.
+
+- **⚠️ NAİF `take` ÜÇ ŞEYİ BİRDEN SESSİZCE BOZAR** (#448'in dersi): arama yalnız yüklü
+  sayfayı tarar (**admin var olan kaydı arayıp "sonuç yok" görür** — en sinsi yan
+  etki), sekme filtresi yalnız yüklü sayfayı süzer, sayaçlar "yüklenmiş kadarını"
+  gösterir. Bu yüzden arama, filtre ve sayaçların **üçü de sunucuya taşındı**.
+- **⚠️ SAYAÇLAR AYRI VE TOPLU SORGUDAN** — sayfadan bağımsız. Toplama veritabanında
+  (#313 dersi), sıfır satır JS'e çekiliyor.
+- **⚠️ #452'DE SAYAÇLAR DURUM SÜZGECİNİ ALMAZ, yalnız mentör süzgecini alır — bunu
+  "filtre sayaçlara uygulanmamış" sanıp düzeltmeyin.** Atama panosu üç sekmenin
+  ("Tümü" / "Repo Bekleyenler" / "Repo Açılmış") sayısını AYNI ANDA gösteriyor; açık
+  sekmenin süzgecini sayaçlara da uygulasaydık diğer ikisi sıfır görünürdü. Mentör
+  süzgeci ise sayaçlara DA uygulanır — kapsam daraldıysa sayı da daralmalı.
+- **⚠️ SIRALAMA İKİ ALANLI** (`createdAt desc, id desc`). Tek alanlı sıra, aynı saniyede
+  oluşmuş kayıtlarda (seed, toplu içe aktarma) imleçli sayfalamada satır **ATLATIR ya da
+  TEKRARLATIR**. Canlıda doğrulandı: 1406 kayıt imleçle gezildi, 1406 benzersiz, 0 tekrar.
+- **⚠️ KATEGORİ TANIMI TEK KAYNAKTA** (`admin/kategoriler.ts`, #448). Kategoriler
+  filtrede ve sayımda İKİ KEZ elle yazılıydı; ikisi tesadüfen uyuşuyordu çünkü ikisi de
+  aynı listeyi geziyordu. Liste ile sayaçlar artık AYRI sorgular — tanım ikiye ayrılırsa
+  "MENTOR" sekmesi 7 satır gösterip rozetinde 9 yazar ve **bu hata gibi görünmez**
+  (#393'ün aynısı). Modül prisma import ETMEZ: etiketler de aynı tanımı kullanıyor,
+  sunucu kodu istemci paketine sürüklenmemeli (#432).
+- **⚠️ ARAMA KELİMELERE BÖLÜNÜR**: istemci `${name} ${lastName}` BİRLEŞİK metninde
+  arıyordu; alanları ayrı arayan naif bir karşılık "Ayşe Yılmaz" aramasını sessizce kırar.
+- **`limit` TAVANLI (200)** — istemci dev bir limitle sayfalamayı atlayamasın.
+- **⚠️ İSTEMCİDE KALAN SÜZGEÇLER SAYFALAMAYLA BOZULUR**: `TakimYonetimi`
+  `role === "STUDENT"` süzgecini istemcide çalıştırıyordu ve sayfalamadan sonra yalnız
+  ilk sayfayı süzüp stajyerlerin çoğunu sessizce gizlerdi (#448'de sunucuya taşındı).
+  Aynı sebeple mentör açılır menüsü atamalardan türetilemez, kendi ucundan gelir (#452).
+- **⚠️ SÖZLEŞME DEĞİŞİKLİĞİNİ NE TİP SİSTEMİ NE TESTLER YAKALADI** (#452): rota
+  `NextResponse.json(data)` diyor, sayfa `res.json()`'u tipsiz alıyor. Dönüş şekli
+  diziden nesneye geçtiğinde hiçbir şey uyarmadı — şekil artık testlerle kilitli.
+
+### İlerleme Toplaması Veritabanında (#452)
+
+`/api/admin/assignments` her atamanın **bütün adımlarını** çekip ilerlemeyi JS'te
+hesaplıyordu: istek başına **14.241 satır** hidratlanıp yalnız 1406 özet üretiliyordu ve
+**adımlar yanıtta dönmüyordu bile**. Süre veritabanında değildi (5 istekte DB 91 ms, uç
+~300 ms) — maliyet Prisma'nın satırları JS nesnesine çevirmesindeydi.
+
+Kanıt aynı ölçümde: SQL'de toplayan `/api/admin/analytics` veri 5 katına çıkarken
+**sabit kaldı**; JS'te toplayanlar doğrusal büyüdü.
+
+- **⚠️ KURAL KOPYALANMADI, TAŞINDI.** Hesap artık `IlerlemeOzeti` üzerinde tanımlı
+  (SQL'in `COUNT`/`MAX` ile ürettiği üç sayı); dizi alan sürümler `ozetle()`'den geçen
+  ince sarmalayıcılar. Yüzde formülü, %100 istisnası ve `SESSIZLIK_GUN` eşiği hâlâ TEK
+  yerde (#432). SQL için ikinci bir tanım açmak #376'daki "kural iki dilde yaşıyor"
+  borcunu gereksizce tekrarlardı. **Aynı gerekçeyle ortalama ilerleme JS'te** hesaplanır:
+  atama başına iki tam sayı çekilip formül tek kaynaktan uygulanıyor.
+- **⚠️ EŞİTLİK BELİRLİ ÇÖZÜLÜR** (`updatedAt DESC, order DESC`). Eski sıralamada ikincil
+  anahtar yoktu: aynı anda güncellenmiş iki adımda "son hareket" veritabanının satır
+  sırasına kalıyordu. #406'daki kararın aynısı.
+- Sonuç: **271/296/339 ms → 61/62/63 ms**, **1,04 MB → 35,8 KB**, 14.241 → 4.470 satır.
+  Toplama düzeltmesi tek başına ~%25 kazandırdı; asıl kazanç sayfalamadan geldi.
+- ⚠️ Ölçüm dersi: **dev modunda ya da build çalışırken ölçmeyin.** Bir ölçümde 1150 ms
+  görüldü, gerçek değer ~300 ms'ti.
+
 ### Gerçek Zamanlı Mesajlaşma (#329)
 `GET /api/messages/stream` (SSE) + `features/messaging/server/canli-akis.ts`.
 Olaylar: `mesaj`, `okunmamis`, `adim-tamamlandi`.
@@ -682,8 +795,16 @@ Olaylar: `mesaj`, `okunmamis`, `adim-tamamlandi`.
 - **⚠️ "GERÇEK PUSH" DEĞİL — SUNUCU TARAFI TARAMA.** Süreç-yerel yayın listesi çok
   instance'ta SESSİZCE bozulurdu (A pod'una yazılan mesaj B'ye ulaşmaz; #322 zaten çok
   instance diyor). LISTEN/NOTIFY `pg` bağımlılığı + havuz dışı bağlantı + yine de yakalama
-  sorgusu isterdi. Seçilen: her pod TİK BAŞINA TEK sorgu — **kullanıcı sayısından bağımsız**.
-- Yük: ~800 istek/dk (50 kullanıcı) → pod başına ~30 sorgu/dk. Yoklama istemciden sunucuya taşındı.
+  sorgusu isterdi. Seçilen: her pod **TİK BAŞINA SABİT SAYIDA sorgu — kullanıcı
+  sayısından bağımsız**. Tasarımın asıl iddiası budur ve ölçümde doğrulandı.
+- **⚠️ SAYI "TEK" DEĞİL, BUGÜN ~5** (#458'de ölçüldü: tek SSE bağlantısı, 8 saniyede
+  21 sorgu → 2 sn'lik tik başına ~5). Olay türü başına bir sorgu var: `Message` ×2,
+  `Notification`, `TypingSignal`, `StepStatusHistory`. Belge "TEK sorgu" diyordu; #354
+  ve #380 yeni olay türleri eklerken rakam güncellenmemişti. **Kullanıcı sayısından
+  bağımsızlık bozulmadı**, yalnız sabit çarpan büyüdü — ama kapasite planlaması yapan
+  biri 5 kat yanılırdı. Yeni bir olay türü eklendiğinde bu rakam da güncellenmeli.
+- Yük: bir pod'da **en az bir bağlı kullanıcı varken sürekli ~2,5 sorgu/sn** taban yük
+  (tik başına ~5, 2 sn'de bir). Yoklama istemciden sunucuya taşındı.
 - **Yoklama KALDIRILMADI, koşullu.** `useCanliAkis` `bagli` döner; istemci yalnız kopukken
   yoklar. SSE'yi kesen bir vekilin arkasında mesajlaşma ölmemeli.
 - **İmleç çakışma payıyla geriye çekilir** (kayıp önleme), kopyalar bağlantı başına
@@ -839,6 +960,38 @@ yeni bir amaç, yani eski rıza metnini AŞIYOR. `RIZA_METIN_SURUMU` → `2026-0
 - Metnin kapsamını genişleten her değişiklikte sürüm artırılmalı ve ilgili özellik
   `guncelRizaVar`'a geçirilmeli.
 
+### KVKK Aydınlatma Metni (#450, #451)
+
+`/privacy` sayfasında beş TODO duruyordu (#321). İkiye ayrıldılar: **kanundan ya da
+KODDAN doğrulanabilen** kısım yazıldı, **uydurulamaz** olan yazılmadı.
+
+- Yazıldı: KVKK **m.11** haklarının dokuzu tam metniyle, **m.13** başvuru usulü (yazılı
+  ya da Kurulun belirlediği yöntem, en geç 30 gün, ücretsiz), **m.14** şikâyet yolu
+  (cevabı öğrenmeden 30, başvurudan 60 gün). Bunlar kanun metni — şirkete göre değişmez.
+- **⚠️ ÇEREZ BÖLÜMÜ KODDAN ÇIKARILDI, tahmin edilmedi.** Depo tarandı: yalnız NextAuth'un
+  oturum/CSRF/callback çerezleri var; analitik, izleme, üçüncü taraf betiği YOK,
+  `localStorage` hiç kullanılmıyor. **Test bunu paragrafın metnine bağlıyor** — biri
+  analitik eklerse metnin de güncellenmesi gerektiği görünür oluyor.
+- **⚠️ UYDURMA VERİ YERİNE EKSİKLİĞİ SÖYLEYEN UYARI.** Ticari unvan, adres, MERSİS,
+  resmî başvuru kanalı, saklama süreleri ve VERBİS yükümlülüğü YAZILMADI — bunlar
+  şirketin kendi verileri (VERBİS ayrıca çalışan/ciro eşiğine bağlı, bu depodan
+  bilinemez). Yanlış bir unvan/başvuru adresi eksik bilgiden **DAHA ZARARLI**: kullanıcı
+  ona güvenip başvurur ve başvurusu hiçbir yere ulaşmaz. Sayfa bunun yerine hangi
+  başlıkların yayımlanmadığını açıkça yazıp geçici yol gösteriyor.
+- **⚠️ DOLDURMAK TEK DOSYA**: `features/legal/kvkk.ts` içindeki iki `null` gerçek
+  değerlerle değiştirildiğinde bölümler otomatik yayımlanır ve uyarı kendiliğinden
+  kalkar — sayfa metnine dokunmaya gerek yok.
+- Testler iki durumu da kapsıyor (bilgiler girilmeden önce ve sonra); yalnız birini test
+  etmek, sayfanın diğer durumda ne gösterdiğini kimsenin bilmemesi olurdu — ve bu
+  herkese açık bir hukuki metin.
+- **⚠️ TEST METNİN VARLIĞINI ÖLÇER, OKUNABİLİRLİĞİNİ DEĞİL** (#455). İki hata
+  #450'nin testlerinden GEÇMİŞTİ ve ancak sayfa tarayıcıda okunurken görüldü: bir fiil
+  tekrarı ("ileterek iletebilirsiniz") ve `metadata.title`'ın h1 ile uyuşmaması — sayfa
+  artık bir aydınlatma metniydi ama sekme ve arama sonucu bunu söylemiyordu. Metin
+  testleri bu boşluğu kapatmaz; **public hukuki metinler gözle de okunmalı**.
+- **⚠️ Bu metin hukuki danışmanlık yerine geçmez**; şirkete özel kısım bir hukukçu
+  tarafından gözden geçirilmeli.
+
 ### Mezuniyet & Sertifika Doğrulama Sistemi (#208)
 - **Mezuniyet Durumu (`accountStatus: GRADUATED`)**: Portfolyo salt-okunur (Seçenek A). Öğrenci dashboard, yol haritası adımları, dosyaları, yorumları ve sertifikasını görüntüleyebilir; ancak adım durumu değiştirme, dosya yükleme/silme ve yorum ekleme/düzenleme/silme API'leri 403 ile engellenir.
 - **Sertifika Doğrulama**: `/verify-certificate/[certificateNumber]` public doğrulama sayfası (`middleware.ts` `publicPaths` içinde). QR kod veya link üzerinden herkes sertifikanın geçerliliğini teyit edebilir.
@@ -866,6 +1019,41 @@ yeni bir amaç, yani eski rıza metnini AŞIYOR. `RIZA_METIN_SURUMU` → `2026-0
 - **Public verify PII/enumeration**: rate-limit kontrolü `getVerification` **içinde** —
   Next.js `generateMetadata`'yı sayfadan önce çalıştırdığı için limit yalnız gövdede olsaydı
   `<title>` üzerinden ad + seri no sızardı. Tüm metadata `robots: noindex` (PII sayfası).
+
+#### ⚠️ Sertifika TAKIM işini gösterir — katkı BİREYSEL ölçülür (#449)
+
+`getStudentCertificate` ve `verifyCertificate` yalnız `assignedProjects` ve
+`mentorAssignments` okuyordu. Takım atamasında `studentProfileId` NULL (#332) ve takım
+mentörü `TeamMentor`'da — yani **tüm işini takımda yapmış bir mezunun belgesi
+"geçerlidir" deyip HİÇBİR iş göstermiyordu**. Canlıda üretildi: mentör yerine yedek
+metin ("Posinowa Mentorluk Ekibi"), proje bölümü hiç yok. Eksik değil, **yanıltıcı**.
+
+Takım körlüğünün **altıncı** örneği (#367/#370/#376/#393/#442). Niyet zaten bu dosyada
+yazılıydı (#332: "Katkı `assigneeId` + `StepStatusHistory.changedById` üzerinden
+ölçülür"), uygulama yoktu.
+
+- **Kural TEK modülde**: `certificate/server/katki.ts`. İki fonksiyon aynı belgeyi iki
+  kez derliyordu ve #449 tam olarak bu ikiliğin sonucuydu; ayrıca ikisinin FARKLI belge
+  göstermesi doğrulamanın anlamını yok ederdi.
+- **⚠️ TAKIMDA SAYI ÖĞRENCİNİN KENDİ KATKISI**, takımın toplamı değil. İki sinyal
+  birden: `assigneeId` (üstlenen) **VEYA** `changedById` (tamamlayan). Yalnız ilkine
+  bakmak üstlenmeden bitirilen işi, yalnız ikincisine bakmak geçmiş kaydı tutulmadan
+  önceki işi kaybederdi. **Bilinen bedel**: başkasının işini "tamamlandı" işaretleyene
+  de sayılır — panonun sözleşmesi işi yapanın kapatması, ve gerçekten çalışmış
+  stajyerin belgesini boşaltmak daha kötü bir hata olurdu.
+- **Takım projesi belgede İŞARETLİ** (`takimAdi`); bireysel işmiş gibi durmuyor.
+  **Katkısı SIFIR olan takım projesi listelenmez** — belge, öğrencinin hiç dokunmadığı
+  işi kendi projesi gibi göstermemeli. Bireysel projede böyle eleme YOK ("başlamamış"
+  da bir durum).
+- **⚠️ `ogrencininAtamalariWhere` BİLEREK KULLANILMADI — bunu "tek kaynağa
+  geçirilmemiş" sanıp düzeltmeyin.** O fonksiyon `leftAt: null` süzer ve bir YETKİ
+  sorusunu yanıtlar. Sertifika ise "bu kişi NE YAPTI" sorusudur ve #332 `leftAt`'in var
+  olma sebebini zaten "katkı geçmişi SERTİFİKANIN dayanağı" diye yazıyor. Yetki
+  kuralını buraya uygulamak, şemanın korumak için tasarlandığı durumu düşürürdü:
+  takımda çalışıp ayrılan stajyerin emeği belgesinde hiç görünmezdi. Canlıda
+  doğrulandı — üye "ayrıldı" işaretlendiğinde belge katkısını KORUYOR.
+- **Public yüzeyde PII sorguya girmez** (`epostaDahil: false`): #208'deki "yanıttan
+  ayıklama değil, baştan çekmeme" kararı korundu.
 
 ## Komutlar
 
@@ -908,8 +1096,9 @@ docker compose up -d  # db (+app) — uploads kalıcı volume'da
 
 ---
 
-*Son güncelleme: Eylül 2026 — #404–#432 dalgası: yol haritası sıralama (#406) ve
-adım/yol haritası bağı açığı (#411), AI üretimine profil analizi + mentör
-yönlendirmesi + geçmiş iş (#410/#423), taslak görünürlüğü (#405), öğrenci panosu
-yoğunluğu (#415–#417/#420), mentör kapasitesi (#404), rıza engelinin görünürlüğü
-(#394), ilerleme takibi (#432)*
+*Son güncelleme: Eylül 2026 — #437–#458 dalgası: savunma derinliği (#437/#439),
+mentörün öğrenci detayında takım projeleri (#442), ofis saati tavanı ve HTTP testleri
+(#443), admin listelerinin sayfalanması ve süzmenin sunucuya taşınması (#446/#448,
+#452), ilerleme toplamasının veritabanına taşınması (#452), KVKK aydınlatma metni
+(#450/#451), sertifikanın takım işini göstermesi (#449), SSE tik sayısının ölçümle
+düzeltilmesi (#458)*
