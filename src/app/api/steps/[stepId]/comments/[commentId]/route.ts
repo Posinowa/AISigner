@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { mezunYazmaKapisi } from "@/lib/auth/mezun-politikasi";
 import { prisma } from "@/lib/db";
 import {
   ATAMA_SAHIPLIK_SELECT,
@@ -19,12 +20,8 @@ export async function PUT(
   if (!auth.authorized) return auth.response;
 
   // #208: Mezun stajyerler için portfolyo salt-okunurdur (Seçenek A).
-  if (auth.session.user.role === "STUDENT" && auth.session.user.accountStatus === "GRADUATED") {
-    return NextResponse.json(
-      { error: "Mezun öğrenciler staj adımlarındaki yorumları düzenleyemez." },
-      { status: 403 }
-    );
-  }
+  const mezunKapisi = mezunYazmaKapisi(auth.session, "Mezun öğrenciler staj adımlarındaki yorumları düzenleyemez.");
+  if (mezunKapisi) return mezunKapisi;
 
   const { stepId, commentId } = await params;
   const userId = auth.session.user.id!;
@@ -92,12 +89,8 @@ export async function DELETE(
   if (!auth.authorized) return auth.response;
 
   // #208: Mezun stajyerler için portfolyo salt-okunurdur (Seçenek A).
-  if (auth.session.user.role === "STUDENT" && auth.session.user.accountStatus === "GRADUATED") {
-    return NextResponse.json(
-      { error: "Mezun öğrenciler staj adımlarındaki yorumları silemez." },
-      { status: 403 }
-    );
-  }
+  const mezunKapisi2 = mezunYazmaKapisi(auth.session, "Mezun öğrenciler staj adımlarındaki yorumları silemez.");
+  if (mezunKapisi2) return mezunKapisi2;
 
   const { stepId, commentId } = await params;
   const userId = auth.session.user.id!;

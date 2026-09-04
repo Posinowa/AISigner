@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { mezunYazmaKapisi } from "@/lib/auth/mezun-politikasi";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth/guard";
 import { claimStepSchema } from "@/lib/validations/api";
@@ -59,12 +60,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ stepId: 
    * kapalı olmalıydı — adım/dosya/yorum uçlarında kontrol vardı, burada
    * eksik kalmıştı. Mezun bir stajyer eski takımının havuzundan iş çekebiliyordu.
    */
-  if (auth.session.user.role === "STUDENT" && auth.session.user.accountStatus === "GRADUATED") {
-    return NextResponse.json(
-      { error: "Mezun öğrenciler adım üstlenemez." },
-      { status: 403 },
-    );
-  }
+  const mezunKapisi = mezunYazmaKapisi(auth.session, "Mezun öğrenciler adım üstlenemez.");
+  if (mezunKapisi) return mezunKapisi;
 
   // #52 ile aynı kural: taslak yol haritasında öğrenci etkileşimi yok.
   if (ogrencisiMi(step.roadmap.assignedProject, userId) && step.roadmap.status !== "PUBLISHED") {

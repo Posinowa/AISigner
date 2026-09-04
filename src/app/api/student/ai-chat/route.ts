@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { mezunYazmaKapisi } from "@/lib/auth/mezun-politikasi";
 import { guvenliMetin, guvenliListe, veriBlogu } from "@/lib/ai/prompt";
 import { requireAuth } from "@/lib/auth/guard";
 import { createRateLimiter } from "@/lib/rate-limit";
@@ -45,12 +46,8 @@ export async function POST(req: Request) {
   // mezunlara kapalıdır. Gerekçe: her mesaj bir Gemini çağrısı (maliyet) ve chat aktif
   // staj sürecine bağlı bir öğrenme aracı. Mezun geçmiş sohbetlerini görmeye devam eder.
   // (Öneri/istek uçları bilinçli olarak AÇIK bırakıldı — bkz. CLAUDE.md #208.)
-  if (auth.session.user.accountStatus === "GRADUATED") {
-    return NextResponse.json(
-      { error: "Staj süreciniz tamamlandığı için AI asistanı kullanıma kapalıdır." },
-      { status: 403 },
-    );
-  }
+  const mezunKapisi = mezunYazmaKapisi(auth.session, "Staj süreciniz tamamlandığı için AI asistanı kullanıma kapalıdır.");
+  if (mezunKapisi) return mezunKapisi;
 
   const userId = auth.session.user.id!;
 

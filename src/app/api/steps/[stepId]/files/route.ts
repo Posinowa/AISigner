@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { mezunYazmaKapisi } from "@/lib/auth/mezun-politikasi";
 import { prisma } from "@/lib/db";
 import {
   ATAMA_SAHIPLIK_SELECT,
@@ -129,12 +130,8 @@ export async function POST(
     }
 
     // #208: Mezun stajyerler için portfolyo salt-okunurdur (Seçenek A).
-    if (auth.session.user.role === "STUDENT" && auth.session.user.accountStatus === "GRADUATED") {
-      return NextResponse.json(
-        { error: "Mezun öğrenciler staj adımlarına dosya yükleyemez." },
-        { status: 403 }
-      );
-    }
+    const mezunKapisi = mezunYazmaKapisi(auth.session, "Mezun öğrenciler staj adımlarına dosya yükleyemez.");
+    if (mezunKapisi) return mezunKapisi;
 
     // #52: Öğrenci yalnızca PUBLISHED roadmap adımına dosya yükleyebilir.
     // Mentor, taslağı (DRAFT) inceleme/düzenleme için yükleyebilir.
