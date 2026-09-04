@@ -20,7 +20,19 @@ vi.mock("server-only", () => ({}));
 // yakalamak için Octokit YAPICISI mock'lanıyor.
 // Her çağrıda AYRI nesne: `getOctokit` önbelleğinin "token değişince yeni
 // istemci" davranışı test edilebilir kalmalı. Casuslar paylaşılıyor.
-vi.mock("@octokit/rest", () => ({ Octokit: vi.fn(() => ({ ...octokitMock })) }));
+// ⚠️ OK FONKSİYONU DEĞİL, NORMAL FONKSİYON (#479). `getOctokit` içeride
+// `new Octokit(...)` çağırıyor ve **ok fonksiyonları JavaScript'te `new` ile
+// çağrılamaz**. vitest 3 uygulamayı kendi sarmalayıcısına aldığı için hata
+// örtülüyordu; vitest 4 ok fonksiyonunun bu özelliğini koruyor ve
+// "() => ({ ...octokitMock }) is not a constructor" ile patlıyor.
+//
+// Yani bu bir vitest 4 kırılması DEĞİL: mock baştan beri yanlıştı, eski
+// sürüm sessizce düzeltiyordu. Normal fonksiyon her iki sürümde de çalışır.
+vi.mock("@octokit/rest", () => ({
+  Octokit: vi.fn(function () {
+    return { ...octokitMock };
+  }),
+}));
 vi.mock("@/lib/logger", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
