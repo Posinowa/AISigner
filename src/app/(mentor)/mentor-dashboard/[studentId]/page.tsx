@@ -5,7 +5,7 @@ import { KodIncelemesiDurumuRozeti } from "@/features/kvkk/ui/KodIncelemesiDurum
 import type { KodIncelemesiDurumu } from "@/features/kvkk/kod-incelemesi-durumu";
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { ArrowLeft, User, Clock, BookOpen, Plus, CheckCircle, AlertCircle, Trash2, Sparkles, Map, Github, Loader2 } from "lucide-react";
+import { ArrowLeft, User, Users, Clock, BookOpen, Plus, CheckCircle, AlertCircle, Trash2, Sparkles, Map, Github, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { experienceLevelLabel } from "@/lib/experience-level";
@@ -77,6 +77,23 @@ type StudentDetail = {
       githubStatus: string;
       githubRepoUrl: string | null;
       workspaceRequests?: CalismaAlaniTalebi[];
+      /**
+       * #442: Doluysa bu satır bir TAKIM projesidir.
+       *
+       * ⚠️ Öncesi takım projeleri bu listeye HİÇ girmiyordu (takımda
+       * `studentProfileId` NULL, #332) ve mentör takımda aktif çalışan bir
+       * stajyeri "projesi yok" olarak görüyordu.
+       */
+      takim?: {
+        id: string;
+        name: string;
+        members: {
+          role: string;
+          studentProfile: {
+            user: { id: string; name: string | null; lastName: string | null; email: string };
+          };
+        }[];
+      } | null;
     }[];
     // #48: Detaylı AI profil analizi (yoksa null — henüz üretilmemiş).
     profileAnalysis: ProfileAnalysisData | null;
@@ -517,6 +534,27 @@ export default function StudentDetailPage() {
                            <Trash2 className="w-4 h-4" />
                         </button>
                       
+                        {/* #442: Takım satırı BİREYSELMİŞ GİBİ durmamalı — pano
+                            ortak, yapılan iş tüm takımı etkiliyor. */}
+                        {project.takim && (
+                          <div className="mb-2 flex flex-wrap items-center gap-2 pr-8">
+                            <span className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700">
+                              <Users className="h-3 w-3" />
+                              Takım: {project.takim.name}
+                            </span>
+                            <span className="text-[11px] text-slate-500">
+                              {project.takim.members
+                                .map(
+                                  (m) =>
+                                    [m.studentProfile.user.name, m.studentProfile.user.lastName]
+                                      .filter(Boolean)
+                                      .join(" ") || m.studentProfile.user.email,
+                                )
+                                .join(" · ")}
+                            </span>
+                          </div>
+                        )}
+
                         <div className="flex justify-between items-start mb-2 pr-8">
                           <h3 className="font-semibold text-gray-900 text-lg">{project.projectTemplate.title}</h3>
                           <div className="flex gap-2">
@@ -589,6 +627,16 @@ export default function StudentDetailPage() {
                               )}
                             </div>
                           ) : (
+                            project.takim ? (
+                            /* ⚠️ #332: TAKIMDA AI YOL HARİTASI ÜRETİMİ KAPALI (açık 400).
+                               Düğmeyi göstermek mentörü hataya sürüklerdi; sebep
+                               yazılı (#442). */
+                            <p className="w-full text-sm text-gray-500">
+                              Takım projelerinde AI yol haritası üretilmiyor — üretilen
+                              içeriğin kime göre ayarlandığı belirsiz kalırdı. Adımları
+                              ortak panodan elle ekleyebilirsiniz.
+                            </p>
+                            ) : (
                             <div className="w-full">
                               {/* #423: Mentör yönlendirmesi — isteğe bağlı. */}
                               <label
@@ -636,6 +684,7 @@ export default function StudentDetailPage() {
                               </button>
                             </div>
                             </div>
+                            )
                           )}
                         </div>
 
