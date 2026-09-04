@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import path from "path";
+import { yenidenDene } from "./yeniden-dene";
 
 /**
  * Gemini istemcisi (#335).
@@ -69,12 +70,25 @@ function modelSarmalayici(modelName: string, jsonModu: boolean) {
     async generateContent(
       girdi: string | { contents: SohbetIcerigi[] },
     ): Promise<AiYanit> {
-      const yanit = await getIstemci().models.generateContent({
-        model: modelName,
-        contents: typeof girdi === "string" ? girdi : girdi.contents,
-        ...(config ? { config } : {}),
-      });
-      return { text: yanit.text ?? "" };
+      /*
+       * ⚠️ YENİDEN DENEME BURADA — çağrı yerlerinde DEĞİL (#471).
+       *
+       * SDK'yı çağıran tek yer burası; sekiz ayrı modül bu sarmalayıcıdan
+       * geçiyor. Retry'ı çağrı yerlerine dağıtmak, `veriBlogu`'nun (#390)
+       * ve rıza kontrolünün (#389) başına gelenin aynısını yapardı:
+       * kural bir yerde unutulur ve o uç sessizce korumasız kalır.
+       */
+      return yenidenDene(
+        async () => {
+          const yanit = await getIstemci().models.generateContent({
+            model: modelName,
+            contents: typeof girdi === "string" ? girdi : girdi.contents,
+            ...(config ? { config } : {}),
+          });
+          return { text: yanit.text ?? "" };
+        },
+        { kapsam: "generateContent" },
+      );
     },
 
     /** Sohbet oturumu (AI chat için). */
@@ -87,8 +101,13 @@ function modelSarmalayici(modelName: string, jsonModu: boolean) {
 
       return {
         async sendMessage(mesaj: string): Promise<AiYanit> {
-          const yanit = await sohbet.sendMessage({ message: mesaj });
-          return { text: yanit.text ?? "" };
+          return yenidenDene(
+            async () => {
+              const yanit = await sohbet.sendMessage({ message: mesaj });
+              return { text: yanit.text ?? "" };
+            },
+            { kapsam: "sendMessage" },
+          );
         },
       };
     },
