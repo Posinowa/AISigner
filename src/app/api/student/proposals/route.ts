@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { mezunYazmaKapisi } from "@/lib/auth/mezun-politikasi";
 import { requireAuth } from "@/lib/auth/guard";
 import { createProposalSchema } from "@/lib/validations/api";
 import {
@@ -47,12 +48,8 @@ export async function POST(req: Request) {
    * değiştiren bir uç. #208'in ayrımına göre bu kapalı, GET (kendi geçmişini
    * okuma) açık kalıyor.
    */
-  if (auth.session.user.accountStatus === "GRADUATED") {
-    return NextResponse.json(
-      { error: "Mezun öğrenciler yeni proje önerisi oluşturamaz." },
-      { status: 403 },
-    );
-  }
+  const mezunKapisi = mezunYazmaKapisi(auth.session, "Mezun öğrenciler yeni proje önerisi oluşturamaz.");
+  if (mezunKapisi) return mezunKapisi;
 
   const body = await req.json().catch(() => null);
   const parsed = createProposalSchema.safeParse(body);
