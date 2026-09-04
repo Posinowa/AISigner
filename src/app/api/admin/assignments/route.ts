@@ -6,12 +6,29 @@ import {
   KurulumZatenSuruyorError,
 } from "@/features/github/server/provisioning";
 
-export async function GET() {
+const GECERLI_DURUMLAR = ["ALL", "PROVISIONED", "NOT_PROVISIONED"] as const;
+
+export async function GET(req: Request) {
   const auth = await requireAuth("ADMIN");
   if (!auth.authorized) return auth.response;
 
   try {
-    const data = await getStudentAssignmentsProgress();
+    // #452: Süzme ve sayfalama sunucuda. Öncesinde uç TÜM atamaları
+    // döndürüyordu (1406 atamada 1.04 MB) ve filtreler istemcideydi.
+    const sp = new URL(req.url).searchParams;
+    const durum = sp.get("durum");
+    const limitHam = Number(sp.get("limit"));
+
+    const data = await getStudentAssignmentsProgress({
+      // Tanınmayan değer sessizce "ALL"a düşer — istemciden gelen bir
+      // yazım hatası listeyi boşaltmamalı.
+      githubDurum: GECERLI_DURUMLAR.includes(durum as (typeof GECERLI_DURUMLAR)[number])
+        ? (durum as (typeof GECERLI_DURUMLAR)[number])
+        : "ALL",
+      mentorId: sp.get("mentor") || null,
+      cursor: sp.get("cursor") || null,
+      ...(Number.isFinite(limitHam) && limitHam > 0 ? { limit: limitHam } : {}),
+    });
     return NextResponse.json(data);
   } catch (error) {
     console.error("GET /api/admin/assignments error:", error);

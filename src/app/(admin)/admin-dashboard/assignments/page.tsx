@@ -48,6 +48,15 @@ export type StudentAssignmentProgress = {
   roadmapStatus: string | null;
 };
 
+/** #452: Sunucudan gelen sayaçlar. Sunucu modülünü import etmiyoruz —
+    `assignment-progress.ts` prisma çekiyor ve istemci paketine sızardı. */
+type AtamaSayaclari = {
+  toplam: number;
+  kurulu: number;
+  kurulmamis: number;
+  ortalamaIlerleme: number;
+};
+
 export default function AdminAssignmentsPage() {
   const [assignments, setAssignments] = useState<StudentAssignmentProgress[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -63,32 +72,86 @@ export default function AdminAssignmentsPage() {
    */
   const [mentorFiltresi, setMentorFiltresi] = useState<string>("HEPSI");
 
+  /*
+   * #452: SÜZME VE SAYFALAMA SUNUCUDA.
+   *
+   * Öncesinde uç TÜM atamaları döndürüyor, süzme burada yapılıyordu.
+   * Ölçüldü (1406 atama, üretim derlemesi): tek istek 1.04 MB. Sayfa
+   * büyüdükçe her ziyaret o gövdeyi indirmek zorundaydı.
+   *
+   * ⚠️ SAYAÇLAR SUNUCUDAN GELİR, listeden sayılmaz — sayfalanan bir listede
+   * istemcide sayılan sayaç "yüklenmiş kadarını" gösterir ve panelin verdiği
+   * rakam sessizce yanlış olur (#448'de aynı karar).
+   */
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [dahaYukleniyor, setDahaYukleniyor] = useState(false);
+  const [sayaclar, setSayaclar] = useState<AtamaSayaclari>({
+    toplam: 0,
+    kurulu: 0,
+    kurulmamis: 0,
+    ortalamaIlerleme: 0,
+  });
+
+  /*
+   * #452: Mentör seçenekleri ARTIK ATAMALARDAN TÜRETİLMİYOR. Sayfalamayla
+   * birlikte liste yalnız ilk sayfayı içeriyor; oradan türetilen bir açılır
+   * menü mentörlerin çoğunu göstermezdi. Kendi ucundan geliyor (#404) — o
+   * yanıt 6 KB.
+   */
+  const [mentorler, setMentorler] = useState<{ id: string; name: string | null; lastName: string | null; email: string }[]>([]);
+
   // Modal State
   const [selectedAssignment, setSelectedAssignment] = useState<StudentAssignmentProgress | null>(null);
   const [isProvisioning, setIsProvisioning] = useState(false);
 
-  async function loadData() {
-    setIsLoading(true);
+  /**
+   * @param cursor  verilirse sonraki sayfa EKLENİR, verilmezse liste tazelenir
+   * @param koru    tazelemede o ana kadar yüklenmiş kayıt sayısını koru
+   *                (kurulum yoklaması listeyi ilk sayfaya düşürmesin)
+   */
+  async function loadData(opts?: { cursor?: string; koru?: number }) {
+    const ekle = Boolean(opts?.cursor);
+    if (ekle) setDahaYukleniyor(true);
+    else setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/assignments");
+      const qs = new URLSearchParams();
+      if (filterTab !== "ALL") qs.set("durum", filterTab);
+      if (mentorFiltresi !== "HEPSI") qs.set("mentor", mentorFiltresi);
+      if (opts?.cursor) qs.set("cursor", opts.cursor);
+      // Sunucu üst sınırı 200; tazelemede daha fazlası zaten sayfalanır.
+      if (opts?.koru && opts.koru > 0) qs.set("limit", String(Math.min(opts.koru, 200)));
+
+      const res = await fetch(`/api/admin/assignments?${qs.toString()}`);
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.error || "Veriler yüklenirken hata oluştu");
       }
       const data = await res.json();
-      setAssignments(data);
+      setAssignments((onceki) => (ekle ? [...onceki, ...data.atamalar] : data.atamalar));
+      setNextCursor(data.nextCursor ?? null);
+      setSayaclar(data.sayaclar);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Veriler yüklenirken hata oluştu";
       setError(msg);
       toast.error(msg);
     } finally {
       setIsLoading(false);
+      setDahaYukleniyor(false);
     }
   }
 
+  // Süzgeç değişince liste baştan yüklenir (imleç sıfırlanır).
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterTab, mentorFiltresi]);
+
+  useEffect(() => {
+    fetch("/api/admin/mentors")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d) => setMentorler(Array.isArray(d) ? d : []))
+      .catch(() => setMentorler([]));
   }, []);
 
   // #257: Kurulu bir çalışma alanı artık donuk değil; yol haritası değişince
@@ -109,10 +172,16 @@ export default function AdminAssignmentsPage() {
 
     const zamanlayici = setInterval(() => {
       // Sekme arka plandayken boşuna istek atma.
-      if (document.visibilityState === "visible") loadData();
+      // #452: Yüklenmiş sayfa sayısını koru — yoklama listeyi ilk sayfaya
+      // düşürüp adminin açtığı kayıtları kaybetmemeli.
+      if (document.visibilityState === "visible") loadData({ koru: assignments.length });
     }, 4000);
 
     return () => clearInterval(zamanlayici);
+    // `assignments.length` bilerek bağımlılık DEĞİL: her satır eklendiğinde
+    // zamanlayıcı yeniden kurulurdu. Yoklama yalnız kurulum sürerken çalışır
+    // ve o sırada güncel uzunluğu okuması yeterli.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kuruluyorVar]);
 
   // #218: Admin hangi modda olduğunu ÖNCEDEN bilmeli. Aksi halde
@@ -190,33 +259,18 @@ export default function AdminAssignmentsPage() {
     }
   }
 
-  const totalAssigned = assignments.length;
-  const provisionedCount = assignments.filter((a) => a.githubStatus === "PROVISIONED").length;
-  const avgProgress =
-    totalAssigned > 0
-      ? Math.round(assignments.reduce((acc, curr) => acc + curr.progressPercentage, 0) / totalAssigned)
-      : 0;
+  // #452: Üçü de SUNUCUDAN — filtreye uyan TÜM atamalardan hesaplanıyor,
+  // yüklenmiş sayfadan değil.
+  const totalAssigned = sayaclar.toplam;
+  const provisionedCount = sayaclar.kurulu;
+  const avgProgress = sayaclar.ortalamaIlerleme;
 
-  // #432: Mentör listesi atamalardan türetiliyor — ayrı bir istek gereksiz.
-  // Aynı mentör birden çok atamada geçtiği için kimliğe göre tekilleştiriliyor.
-  const mentorSecenekleri = [
-    ...new Map(
-      assignments.flatMap((a) => a.mentors.map((m) => [m.id, m] as const)),
-    ).values(),
-  ].sort((a, b) => a.name.localeCompare(b.name, "tr"));
+  const mentorSecenekleri = mentorler
+    .map((m) => ({ id: m.id, name: [m.name, m.lastName].filter(Boolean).join(" ") || m.email }))
+    .sort((a, b) => a.name.localeCompare(b.name, "tr"));
 
-  const filteredAssignments = assignments.filter((item) => {
-    if (filterTab === "NOT_PROVISIONED" && item.githubStatus === "PROVISIONED") return false;
-    if (filterTab === "PROVISIONED" && item.githubStatus !== "PROVISIONED") return false;
-
-    // ⚠️ "Mentörü yok" ayrı bir seçenek: mentörsüz atamalar tam da
-    // gözünden kaçmaması gereken satırlar, filtreyle gizlenmemeli.
-    if (mentorFiltresi === "MENTORSUZ") return item.mentors.length === 0;
-    if (mentorFiltresi !== "HEPSI") {
-      return item.mentors.some((m) => m.id === mentorFiltresi);
-    }
-    return true;
-  });
+  // #452: Süzme SUNUCUDA — liste zaten süzülmüş geliyor.
+  const filteredAssignments = assignments;
 
   return (
     <div className="min-h-screen bg-slate-50 p-6 md:p-10 space-y-8">
@@ -261,7 +315,7 @@ export default function AdminAssignmentsPage() {
         </div>
 
         <button
-          onClick={loadData}
+          onClick={() => loadData()}
           disabled={isLoading}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50 transition shadow-sm"
         >
@@ -280,7 +334,7 @@ export default function AdminAssignmentsPage() {
               : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
           }`}
         >
-          Tüm Atamalar ({assignments.length})
+          Tüm Atamalar ({sayaclar.toplam})
         </button>
         <button
           onClick={() => setFilterTab("NOT_PROVISIONED")}
@@ -290,7 +344,7 @@ export default function AdminAssignmentsPage() {
               : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
           }`}
         >
-          Repo Bekleyenler ({assignments.filter((a) => a.githubStatus !== "PROVISIONED").length})
+          Repo Bekleyenler ({sayaclar.kurulmamis})
         </button>
         <button
           onClick={() => setFilterTab("PROVISIONED")}
@@ -300,7 +354,7 @@ export default function AdminAssignmentsPage() {
               : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
           }`}
         >
-          Repo Açılmış Projeler ({assignments.filter((a) => a.githubStatus === "PROVISIONED").length})
+          Repo Açılmış Projeler ({sayaclar.kurulu})
         </button>
 
         {/* #432: MENTÖRE GÖRE FİLTRE — admin "şu mentörün öğrencileri ne
@@ -375,7 +429,7 @@ export default function AdminAssignmentsPage() {
             <AlertCircle className="w-8 h-8" />
             <p className="text-sm font-medium">{error}</p>
             <button
-              onClick={loadData}
+              onClick={() => loadData()}
               className="mt-2 text-xs text-indigo-600 hover:underline font-semibold"
             >
               Yeniden Dene
@@ -584,6 +638,32 @@ export default function AdminAssignmentsPage() {
                 ))}
               </tbody>
             </table>
+
+            {/*
+              #452: İmleçli sayfalama. Sayfa numarası YOK — atamalar
+              `createdAt desc, id desc` ile sıralanıyor ve araya yeni atama
+              girdiğinde numaralı sayfalar kayar (satır atlanır ya da
+              tekrarlanır). #448'de aynı tercih yapılmıştı.
+            */}
+            {nextCursor && (
+              <div className="flex justify-center border-t border-slate-100 py-4">
+                <button
+                  type="button"
+                  onClick={() => loadData({ cursor: nextCursor })}
+                  disabled={dahaYukleniyor}
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                >
+                  {dahaYukleniyor ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Yükleniyor...
+                    </>
+                  ) : (
+                    <>Daha fazla göster ({assignments.length} / {sayaclar.toplam})</>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
