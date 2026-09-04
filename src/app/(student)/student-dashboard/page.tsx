@@ -20,6 +20,7 @@ import { StudentCertificateTrigger } from "@/features/student/ui/StudentCertific
 import { PanelKarsilama } from "@/features/dashboard/ui/PanelKarsilama";
 import { ProfilTamamlaSeridi } from "@/features/dashboard/ui/ProfilTamamlaSeridi";
 import { stajyerDurumu, PROJELER_CAPASI } from "@/features/dashboard/models/stajyerDurumu";
+import { tarihBicimle } from "@/lib/tarih";
 
 /**
  * #416/#332: Adımı başkası üstlendiyse adını çözer, yoksa null.
@@ -451,7 +452,7 @@ export default async function StudentDashboardPage() {
                           )}
                           <span className="text-xs text-slate-500 flex items-center">
                             <Clock className="w-3.5 h-3.5 mr-1" />
-                            Atanma: {new Date(project.createdAt).toLocaleDateString("tr-TR")}
+                            Atanma: {tarihBicimle(project.createdAt)}
                           </span>
                         </div>
                         <h3 className="font-bold text-2xl text-slate-900 tracking-tight">

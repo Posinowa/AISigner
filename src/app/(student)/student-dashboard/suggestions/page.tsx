@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Loader2, AlertCircle, Send, Inbox, MessageSquareQuote } from "lucide-react";
 import { toast } from "sonner";
 import { extractApiErrorMessage } from "@/lib/api-error-message";
+import { tarihBicimle } from "@/lib/tarih";
 import {
   typeLabels,
   typeStyles,
@@ -231,7 +232,7 @@ export default function StudentSuggestionsPage() {
                     {statusLabels[item.status]}
                   </span>
                   <span className="text-xs text-slate-400 ml-auto">
-                    {new Date(item.createdAt).toLocaleDateString("tr-TR")}
+                    {tarihBicimle(item.createdAt)}
                   </span>
                 </div>
                 <h3 className="font-semibold text-slate-900">{item.title}</h3>

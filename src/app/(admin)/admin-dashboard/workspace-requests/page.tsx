@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Github, Loader2, Check, X, Inbox, AlertTriangle } from "lucide-react";
+import { tarihBicimle } from "@/lib/tarih";
 
 /**
  * Çalışma alanı talepleri onay kuyruğu (#349).
@@ -149,7 +150,7 @@ export default function WorkspaceRequestsPage() {
                       </h2>
                       <p className="mt-0.5 text-xs text-slate-500">
                         Talep eden: {t.requestedBy.name ?? t.requestedBy.email} ·{" "}
-                        {new Date(t.createdAt).toLocaleDateString("tr-TR")}
+                        {tarihBicimle(t.createdAt)}
                       </p>
 
                       {t.mentorNote && (

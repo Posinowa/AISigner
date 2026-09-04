@@ -16,6 +16,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { tarihSaatBicimle } from "@/lib/tarih";
 
 export type StudentAssignmentProgress = {
   assignmentId: string;
@@ -538,7 +539,7 @@ export default function AdminAssignmentsPage() {
                           </div>
                           <div className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
                             <Clock className="w-3 h-3" />
-                            {new Date(item.lastActivity.updatedAt).toLocaleDateString("tr-TR", {
+                            {tarihSaatBicimle(item.lastActivity.updatedAt, {
                               day: "numeric",
                               month: "short",
                               hour: "2-digit",

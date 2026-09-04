@@ -15,6 +15,7 @@ import {
   Eye,
 } from "lucide-react";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { tarihSaatBicimle } from "@/lib/tarih";
 
 type StepFile = {
   id: string;
@@ -76,8 +77,7 @@ export function StepFiles({ stepId, currentUserId, currentUserRole, isDraft, rea
   }
 
   function formatDate(dateStr: string) {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString("tr-TR", {
+    return tarihSaatBicimle(dateStr, {
       day: "numeric",
       month: "short",
       hour: "2-digit",

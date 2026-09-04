@@ -16,6 +16,7 @@ import {
   Briefcase,
 } from "lucide-react";
 import { verifyCertificate } from "@/features/certificate/server/certificate";
+import { tarihUzunBicimle } from "@/lib/tarih";
 
 type Props = {
   params: Promise<{ certificateNumber: string }>;
@@ -117,13 +118,12 @@ export default async function VerifyCertificatePage({ params }: Props) {
 
   const result = verification.result;
 
+  // #460: Sunucuda render ediliyor ve üretimde konteyner UTC — saat dilimi
+  // verilmediğinde gece yarısına yakın düzenlenen belgeler BİR GÜN GERİ
+  // görünüyordu. Bu tarih kalıcı ve işverene gösteriliyor.
   const formattedDate =
     result.isValid && result.certificate?.issuedAt
-      ? new Date(result.certificate.issuedAt).toLocaleDateString("tr-TR", {
-          day: "numeric",
-          month: "long",
-          year: "numeric",
-        })
+      ? tarihUzunBicimle(result.certificate.issuedAt)
       : null;
 
   return (

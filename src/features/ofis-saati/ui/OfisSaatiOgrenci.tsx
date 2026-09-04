@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { CalendarClock, Loader2, Video, X } from "lucide-react";
+import { tarihBicimle, saatBicimle } from "@/lib/tarih";
 
 /**
  * Stajyer ofis saati görünümü (#398).
@@ -25,11 +26,13 @@ type Slot = {
   };
 };
 
+// #460: Panodaki hatırlatma (`YaklasanGorusme`) SUNUCUDA render ediliyor;
+// aynı slot için iki yüzeyin aynı saati basması bu ortak biçimlendiriciye
+// bağlı. Öncesinde pano 11:00, bu sayfa 14:00 gösteriyordu.
 const gun = (s: string) =>
-  new Date(s).toLocaleDateString("tr-TR", { weekday: "long", day: "numeric", month: "long" });
+  tarihBicimle(s, { weekday: "long", day: "numeric", month: "long" });
 
-const saat = (s: string) =>
-  new Date(s).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+const saat = (s: string) => saatBicimle(s);
 
 export function OfisSaatiOgrenci({ kullaniciId }: { kullaniciId: string }) {
   const [slotlar, setSlotlar] = useState<Slot[]>([]);

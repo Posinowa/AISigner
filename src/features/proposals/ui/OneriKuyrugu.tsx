@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Loader2, AlertTriangle, Inbox, Github, RefreshCw, Check, X } from "lucide-react";
+import { tarihBicimle } from "@/lib/tarih";
 
 /**
  * Proje önerisi onay kuyruğu (#366).
@@ -154,7 +155,7 @@ export function OneriKuyrugu() {
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2 className="font-semibold text-slate-900">{o.title}</h2>
               <span className="text-xs text-slate-500">
-                {ad} · {new Date(o.createdAt).toLocaleDateString("tr-TR")}
+                {ad} · {tarihBicimle(o.createdAt)}
               </span>
             </div>
 

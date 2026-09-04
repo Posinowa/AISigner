@@ -31,6 +31,32 @@ describe("YaklasanGorusme", () => {
     expect(screen.getByText("Yaklaşan mentör görüşmen")).toBeInTheDocument();
   });
 
+  /**
+   * #460 — SAATİN DOĞRU OLDUĞU da doğrulanmalı.
+   *
+   * ⚠️ BU TEST OLMADIĞI İÇİN HATA HAYATTA KALDI. Üstteki test saatin
+   * GÖSTERİLDİĞİNİ ölçüyordu, DOĞRU olduğunu değil — #455'te KVKK metninde
+   * yaşanan aynı boşluk.
+   *
+   * Bu bileşen bir Server Component içinde render ediliyor ve üretimde
+   * konteyner UTC: saat dilimi verilmediğinde TR saatiyle 14:00'lik görüşme
+   * panoda 11:00 görünüyordu. Süreç dilimi bilerek UTC'ye çekiliyor; aksi
+   * halde geliştirme makinesi zaten UTC+3 olduğu için hatalı bir uygulama
+   * bu testten GEÇERDİ (#398'de aynı önlem alınmıştı).
+   */
+  it("⚠️ saat TR dilimindedir — UTC sunucuda da 14:00 basar", () => {
+    const asil = process.env.TZ;
+    process.env.TZ = "UTC";
+    try {
+      // 11:00Z = TR saatiyle 14:00
+      render(<YaklasanGorusme slot={slot()} />);
+      expect(screen.getByText(/14:00/)).toBeInTheDocument();
+      expect(screen.queryByText(/11:00/)).not.toBeInTheDocument();
+    } finally {
+      process.env.TZ = asil;
+    }
+  });
+
   it("bağlantı yoksa 'Katıl' düğmesi çıkmaz", () => {
     render(<YaklasanGorusme slot={slot()} />);
     // ⚠️ METNE bakılıyor, role değil: `href`siz bir <a> "link" rolünü

@@ -5,6 +5,7 @@ import { MessageSquare, Send, Loader2, Trash2, Pencil, X, User } from "lucide-re
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { toast } from "sonner";
 import { rolRozetiDolu } from "@/lib/ui/rol-renkleri";
+import { tarihSaatBicimle } from "@/lib/tarih";
 
 type Comment = {
   id: string;
@@ -148,8 +149,7 @@ export function StepComments({ stepId, currentUserId, currentUserRole, isDraft, 
   }
 
   function formatDate(dateStr: string) {
-    const d = new Date(dateStr);
-    return d.toLocaleDateString("tr-TR", {
+    return tarihSaatBicimle(dateStr, {
       day: "numeric",
       month: "short",
       hour: "2-digit",
