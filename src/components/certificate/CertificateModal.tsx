@@ -21,6 +21,7 @@ import type { CertificateData } from "@/features/certificate/server/certificate"
 import { POSINOWA_LOGO_DATA_URI } from "@/features/certificate/ui/posinowa-logo";
 import { SertifikaQr } from "@/features/certificate/ui/SertifikaQr";
 import { linkedInEkleUrl } from "@/features/certificate/paylasim";
+import { tarihUzunBicimle } from "@/lib/tarih";
 
 type CertificateModalProps = {
   certificate: CertificateData;
@@ -299,17 +300,11 @@ export function CertificateModal({
     }
   };
 
+  // #460: Public doğrulama sayfası (sunucu) ile AYNI biçimlendiriciden geçer;
+  // aksi halde aynı belge iki yüzeyde farklı tarih gösterebilirdi.
   const formattedDate = certificate.issuedAt
-    ? new Date(certificate.issuedAt).toLocaleDateString("tr-TR", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      })
-    : new Date().toLocaleDateString("tr-TR", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      });
+    ? tarihUzunBicimle(certificate.issuedAt)
+    : tarihUzunBicimle(new Date());
 
   return (
     <div

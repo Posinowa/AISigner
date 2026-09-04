@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Loader2, AlertCircle, Inbox, Save } from "lucide-react";
 import { toast } from "sonner";
 import { extractApiErrorMessage } from "@/lib/api-error-message";
+import { tarihBicimle } from "@/lib/tarih";
 import {
   authorDisplayName,
   statusLabels,
@@ -195,7 +196,7 @@ export default function AdminSuggestionsPage() {
                     {authorDisplayName(item.author)}
                   </span>
                   <span className="text-xs text-slate-400 ml-auto">
-                    {new Date(item.createdAt).toLocaleDateString("tr-TR")}
+                    {tarihBicimle(item.createdAt)}
                   </span>
                 </div>
 

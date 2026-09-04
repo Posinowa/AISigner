@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { CalendarClock, Loader2, Plus, Trash2, X } from "lucide-react";
+import { tarihSaatBicimle } from "@/lib/tarih";
 
 /**
  * Mentör ofis saati paneli (#398).
@@ -22,7 +23,7 @@ type Slot = {
 };
 
 const saat = (s: string) =>
-  new Date(s).toLocaleString("tr-TR", {
+  tarihSaatBicimle(s, {
     day: "2-digit",
     month: "2-digit",
     hour: "2-digit",

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { rolRozetiDolu } from "@/lib/ui/rol-renkleri";
 import { useCanliAkis } from "./useCanliAkis";
 import { useYaziyorGonder } from "./useYaziyorGonder";
+import { tarihBicimle, saatBicimle } from "@/lib/tarih";
 
 type Message = {
   id: string;
@@ -213,10 +214,9 @@ export function MessagingPanel({ currentUserId }: Props) {
     const now = new Date();
     const isToday = d.toDateString() === now.toDateString();
     if (isToday) {
-      return d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+      return saatBicimle(d);
     }
-    return d.toLocaleDateString("tr-TR", { day: "numeric", month: "short" }) +
-      " " + d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+    return tarihBicimle(d, { day: "numeric", month: "short" }) + " " + saatBicimle(d);
   }
 
   if (loading) {

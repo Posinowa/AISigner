@@ -13,6 +13,7 @@ import { ProfileAnalysisCard, type ProfileAnalysisData } from "@/features/ai/ui/
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { useModalA11y } from "@/components/ui/useModalA11y";
 import { stripMarkdown } from "@/lib/markdown-preview";
+import { tarihBicimle } from "@/lib/tarih";
 import {
   CalismaAlaniBolumu,
   type CalismaAlaniTalebi,
@@ -594,7 +595,7 @@ export default function StudentDetailPage() {
                             ))}
                           </div>
                           <span className="text-xs text-gray-400">
-                            {new Date(project.createdAt).toLocaleDateString("tr-TR")}
+                            {tarihBicimle(project.createdAt)}
                           </span>
                         </div>
 

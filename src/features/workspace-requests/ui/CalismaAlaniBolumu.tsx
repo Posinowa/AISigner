@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Github, Loader2, Clock, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { tarihBicimle } from "@/lib/tarih";
 
 /**
  * Mentör ekranındaki çalışma alanı bölümü (#349).
@@ -104,7 +105,7 @@ export function CalismaAlaniBolumu({
           Talebiniz yönetici onayında
         </span>
         <span className="text-xs text-slate-500">
-          {new Date(talep.createdAt).toLocaleDateString("tr-TR")}
+          {tarihBicimle(talep.createdAt)}
         </span>
       </Kutu>
     );

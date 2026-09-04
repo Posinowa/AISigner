@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, AlertTriangle, TrendingUp, Clock, Users, Info } from "lucide-react";
+import { saatBicimle } from "@/lib/tarih";
 
 /**
  * Analitik panel (#331).
@@ -197,7 +198,7 @@ export function AnalitikPanel({ kaynak }: { kaynak: string }) {
       <p className="flex items-center gap-1.5 text-xs text-slate-400">
         <Info className="h-3 w-3" />
         Veriler en fazla 5 dakikada bir tazelenir · son hesaplama{" "}
-        {new Date(veri.uretildi).toLocaleTimeString("tr-TR")}
+        {saatBicimle(veri.uretildi, { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
       </p>
     </div>
   );

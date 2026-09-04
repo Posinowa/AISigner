@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CalendarClock, Video } from "lucide-react";
+import { tarihSaatBicimle } from "@/lib/tarih";
 
 /**
  * Panodaki yaklaşan görüşme hatırlatması (#420).
@@ -24,8 +25,11 @@ export type YaklasanSlot = {
   gorusmeLinki: string | null;
 };
 
+// #460: Saat dilimi AÇIKÇA veriliyor. Bu bileşen bir Server Component
+// içinde render ediliyor ve üretimde konteyner UTC — öncesinde TR saatiyle
+// 14:00'lik bir görüşme panoda 11:00 görünüyordu.
 const saat = (d: Date) =>
-  d.toLocaleString("tr-TR", {
+  tarihSaatBicimle(d, {
     weekday: "long",
     day: "numeric",
     month: "long",

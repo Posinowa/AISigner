@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Bell, Loader2 } from "lucide-react";
 import { useCanliAkis } from "@/features/messaging/ui/useCanliAkis";
+import { tarihSaatBicimle } from "@/lib/tarih";
 
 /**
  * Bildirim zili (#380).
@@ -134,7 +135,7 @@ export function BildirimZili() {
                         {b.body}
                       </p>
                       <p className="mt-1 text-[11px] text-slate-400">
-                        {new Date(b.createdAt).toLocaleString("tr-TR", {
+                        {tarihSaatBicimle(b.createdAt, {
                           day: "2-digit",
                           month: "2-digit",
                           hour: "2-digit",

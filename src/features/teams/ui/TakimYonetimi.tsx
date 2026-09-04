@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Users, Plus, Loader2, X, AlertTriangle, Github, UserMinus } from "lucide-react";
+import { tarihBicimle } from "@/lib/tarih";
 
 /**
  * Takım yönetimi (#332 Faz 2).
@@ -287,7 +288,7 @@ function TakimKarti({
                 <X className="h-3.5 w-3.5" />
                 <span className="line-through">{ad(m.studentProfile.user)}</span>
                 <span className="text-[11px]">
-                  ayrıldı · {new Date(m.leftAt!).toLocaleDateString("tr-TR")}
+                  ayrıldı · {tarihBicimle(m.leftAt)}
                 </span>
               </li>
             ))}
