@@ -1,0 +1,60 @@
+# Bağımlılık güncellemeleri (#469).
+#
+# ⚠️ NEDEN GRUPLANIYOR: gruplanmamış Dependabot her bağımlılık için ayrı PR
+# açar. Bu depoda her PR bir CI koşusu + (yeni eklenen) bir Docker imajı
+# derlemesi demek; haftada 15–20 PR hem gürültü hem boşa yakılan CI süresi
+# olurdu. Daha kötüsü: PR Guard her PR'da `Closes #N` beklediği için
+# Dependabot PR'ları zaten kırmızı gelir, gürültü kırmızıyla birleşir.
+#
+# ⚠️ BİLİNEN TUZAK — LOCKFILE VE NPM SÜRÜMÜ (CLAUDE.md'de yazılı):
+# CI Node 20 / npm 10 kullanıyor. `package-lock.json` npm 11 ile üretilirse
+# CI'da `npm ci` EUSAGE hatası veriyor (esbuild/@emnapi girdileri uyumsuz
+# kalıyor). Dependabot lockfile'ı KENDİ araç zinciriyle yeniden üretiyor ve
+# hangi npm sürümünü kullandığını yapılandıramıyoruz.
+#
+# Bir Dependabot PR'ı `npm ci` üzerinde patlarsa sebebi büyük olasılıkla
+# budur. Çözüm: dalı yerelde çekip lockfile'ı yeniden üretmek —
+#
+#     npx -y npm@10 install
+#
+# ve commit etmek. Bu yüzden güncellemeler HAFTALIK ve gruplu: elle
+# müdahale gerekirse bunun haftada bir kez olması yeterli.
+
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    # Aynı anda açık PR sayısını sınırla — kuyruk birikmesin.
+    open-pull-requests-limit: 3
+    groups:
+      # Yama ve minor sürümler tek PR'da: bunlar genelde birlikte
+      # incelenebilir ve tek CI koşusu yeter.
+      uyumlu-guncellemeler:
+        update-types:
+          - minor
+          - patch
+    # Major sürümler AYRI kalsın: kırıcı değişiklik ihtimali var, tek tek
+    # incelenmeli. (Gruba dahil edilmediği için kendi PR'ını alır.)
+    commit-message:
+      prefix: "chore"
+    labels:
+      - dependencies
+
+  # GitHub Actions sürümleri de eskiyor ve güvenlik yaması alıyor.
+  # Aylık yeterli: eylem sürümleri npm paketlerinden çok daha yavaş değişiyor.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 2
+    groups:
+      eylemler:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "ci"
+    labels:
+      - dependencies
