@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import "@testing-library/jest-dom/vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { ConfirmDialogProvider } from "@/components/ui/ConfirmDialog";
 
 import AdminAssignmentsPage from "./page";
@@ -113,19 +113,36 @@ describe("takılı kurulumun görünürlüğü (#483)", () => {
   });
 
   it("⚠️ TAKILI satır YOKLAMAYI TETİKLEMEZ — sonsuz istek döngüsü olmasın", async () => {
-    stubla([atama({ kurulumTakildi: true })]);
+    /*
+     * ⚠️ HAM `setTimeout` UYKUSU KULLANMAYIN.
+     *
+     * İlk sürüm `await new Promise(r => setTimeout(r, 1200))` ile bekliyordu
+     * ve CI'da patladı: o uyku sırasında Next'in `use-intersection`'ı
+     * (`next/link` prefetch, `requestIdleCallback` üzerinden) act() DIŞINDA
+     * setState yapıyor. #325 act uyarılarını sert hataya çevirdiği için
+     * TESTLER GEÇTİĞİ HÂLDE süreç 1 ile çıkıyordu.
+     *
+     * Sahte zamanlayıcı hem bunu çözüyor hem de testi hızlandırıyor:
+     * gerçek 4 sn'lik yoklama aralığını beklemeden ileri sarıyoruz.
+     */
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      stubla([atama({ kurulumTakildi: true })]);
 
-    bas();
-    await screen.findByText(/Kurulum Yarıda Kaldı/);
+      bas();
+      await screen.findByText(/Kurulum Yarıda Kaldı/);
 
-    const fetchMock = globalThis.fetch as ReturnType<typeof vi.fn>;
-    const ilkSayi = fetchMock.mock.calls.length;
+      const fetchMock = globalThis.fetch as ReturnType<typeof vi.fn>;
+      const ilkSayi = fetchMock.mock.calls.length;
 
-    // Yoklama aralığı geçse bile yeni istek gelmemeli.
-    await new Promise((r) => setTimeout(r, 1200));
+      // Yoklama aralığı 4 sn; fazlasıyla ileri sarıyoruz.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(20_000);
+      });
 
-    await waitFor(() => {
       expect(fetchMock.mock.calls.length).toBe(ilkSayi);
-    });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
