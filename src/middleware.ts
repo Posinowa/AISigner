@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
+import { panoErisimineAcik, DURUM_EKRANI } from "@/lib/auth/hesap-durumu";
 
 // Korumalı route grupları ve gerektirdikleri roller
 const protectedRoutes: Record<string, string> = {
@@ -164,12 +165,9 @@ export async function middleware(request: NextRequest) {
   const accountStatus = token.accountStatus as string | undefined;
   const onayGerektirenRol = userRole === "STUDENT" || userRole === "MENTOR";
 
-  if (
-    onayGerektirenRol &&
-    accountStatus &&
-    accountStatus !== "APPROVED" &&
-    accountStatus !== "GRADUATED"
-  ) {
+  // #466: "Bu durum panoyu görebilir mi" sorusu tek kaynakta. Rota nüansları
+  // (aşağısı) burada kalıyor — kusur orada değildi.
+  if (onayGerektirenRol && !panoErisimineAcik(accountStatus)) {
     const isProfileCompletionRoute =
       pathname.startsWith("/student-onboarding") || pathname.startsWith("/profile-setup");
     const isStudentArea =
@@ -190,7 +188,7 @@ export async function middleware(request: NextRequest) {
           : isStudentArea && !isProfileCompletionRoute;
 
     if (blocked) {
-      return NextResponse.redirect(new URL("/account-status", request.url));
+      return NextResponse.redirect(new URL(DURUM_EKRANI, request.url));
     }
   }
 
