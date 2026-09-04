@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth/guard";
+import { createRateLimiter } from "@/lib/rate-limit";
 import { ofisSaatiAcSchema } from "@/lib/validations/api";
 import {
   slotlariAc,
@@ -39,9 +40,30 @@ const MESAJLAR: Record<string, string> = {
   dolu: "Bu slot az önce başkası tarafından alındı.",
 };
 
+/*
+ * Slot açma satır ÜRETEN bir uç: tek çağrı `AZAMI_DILIM` (24) kadar satır
+ * yazabiliyor. Tekrar eden AYNI aralık `@@unique([mentorId, baslangic])` +
+ * `skipDuplicates` sayesinde 0 satır ekliyor, yani asıl risk aynı isteğin
+ * tekrarı değil — pencereyi kaydırarak ileri tarihlere sınırsız takvim
+ * açmak. Mentör güvenilen bir rol, o yüzden tavan CÖMERT: amaç kötüye
+ * kullanımı değil kaza eseri döngüyü kesmek.
+ */
+const acmaLimiti = createRateLimiter("ofis-saati-ac", {
+  maxRequests: 20,
+  windowSeconds: 60,
+});
+
 export async function POST(req: Request) {
   const auth = await requireAuth("MENTOR");
   if (!auth.authorized) return auth.response;
+
+  const rl = await acmaLimiti.check(auth.session.user.id ?? "anonymous");
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Çok fazla istek. Lütfen biraz bekleyin." },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } },
+    );
+  }
 
   const govde = await req.json().catch(() => null);
   const parsed = ofisSaatiAcSchema.safeParse(govde);
