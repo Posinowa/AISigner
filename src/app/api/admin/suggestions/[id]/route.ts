@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { updateSuggestion } from "@/features/suggestions/server/suggestions";
 import { requireAuth } from "@/lib/auth/guard";
 import { updateSuggestionSchema } from "@/lib/validations/api";
+import { rotaHatasi } from "@/lib/api-hata";
 
 /**
  * PATCH /api/admin/suggestions/[id]
@@ -33,7 +34,7 @@ export async function PATCH(
 
     return NextResponse.json(updated);
   } catch (error) {
-    console.error("PATCH /api/admin/suggestions/[id] error:", error);
+    rotaHatasi("PATCH /api/admin/suggestions/[id] error:", error);
     return NextResponse.json(
       { error: "Kayıt güncellenirken hata oluştu." },
       { status: 500 },

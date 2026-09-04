@@ -7,6 +7,7 @@ import {
 import { requireAuth } from "@/lib/auth/guard";
 import { updateStepSchema } from "@/lib/validations/api";
 import { yenidenNumaralandir } from "@/features/roadmap/server/siralama";
+import { rotaHatasi } from "@/lib/api-hata";
 
 // PUT: Adımı güncelle
 export async function PUT(
@@ -99,7 +100,7 @@ export async function PUT(
     const step = await prisma.roadmapStep.findFirst({ where: { id: stepId, roadmapId } });
     return NextResponse.json(step);
   } catch (error) {
-    console.error("Step PUT Error:", error);
+    rotaHatasi("Step PUT Error:", error);
     return NextResponse.json(
       { error: "Adım güncellenirken hata oluştu." },
       { status: 500 }
@@ -192,7 +193,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Step DELETE Error:", error);
+    rotaHatasi("Step DELETE Error:", error);
     return NextResponse.json(
       { error: "Adım silinirken hata oluştu." },
       { status: 500 }

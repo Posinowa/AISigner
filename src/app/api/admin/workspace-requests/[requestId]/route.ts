@@ -1,3 +1,4 @@
+import { rotaHatasi } from "@/lib/api-hata";
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth/guard";
 import { decideWorkspaceRequestSchema } from "@/lib/validations/api";
@@ -66,7 +67,7 @@ export async function POST(
     // aynı sözleşme). Redde iş bitmiştir: 200.
     return NextResponse.json(sonuc, { status: sonuc.kurulumBaslatildi ? 202 : 200 });
   } catch (error) {
-    console.error("POST /api/admin/workspace-requests/[requestId] error:", error);
+    rotaHatasi("POST /api/admin/workspace-requests/[requestId] error:", error);
     return NextResponse.json({ error: "Talep işlenirken hata oluştu" }, { status: 500 });
   }
 }

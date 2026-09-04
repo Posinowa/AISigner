@@ -14,6 +14,7 @@ import { logger } from "@/lib/logger";
 import { incrementCounter } from "@/lib/metrics";
 import path from "path";
 import crypto from "crypto";
+import { rotaHatasi } from "@/lib/api-hata";
 
 const limiter = createRateLimiter("file-upload", {
   maxRequests: 10,
@@ -89,7 +90,7 @@ export async function GET(
 
     return NextResponse.json({ files });
   } catch (error) {
-    console.error("GET /api/steps/[stepId]/files error:", error);
+    rotaHatasi("GET /api/steps/[stepId]/files error:", error);
     return NextResponse.json(
       { error: "Dosyalar yüklenirken hata oluştu." },
       { status: 500 }
@@ -247,7 +248,7 @@ export async function POST(
 
     return NextResponse.json({ file: stepFile }, { status: 201 });
   } catch (error) {
-    console.error("POST /api/steps/[stepId]/files error:", error);
+    rotaHatasi("POST /api/steps/[stepId]/files error:", error);
     return NextResponse.json(
       { error: "Dosya yüklenirken hata oluştu." },
       { status: 500 }

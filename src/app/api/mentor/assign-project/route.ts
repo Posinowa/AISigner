@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { assignProjectToStudent, AssignmentConflictError } from "@/features/mentors/server/actions";
 import { requireAuth } from "@/lib/auth/guard";
 import { assignProjectSchema } from "@/lib/validations/api";
+import { rotaHatasi } from "@/lib/api-hata";
 
 export async function POST(req: Request) {
   const auth = await requireAuth("MENTOR");
@@ -30,7 +31,7 @@ export async function POST(req: Request) {
     if (error instanceof AssignmentConflictError) {
       return NextResponse.json({ error: error.message }, { status: 409 });
     }
-    console.error("Proje atama hatası:", error);
+    rotaHatasi("Proje atama hatası:", error);
     return NextResponse.json(
       { error: "Proje atanırken bir hata oluştu." },
       { status: 500 }

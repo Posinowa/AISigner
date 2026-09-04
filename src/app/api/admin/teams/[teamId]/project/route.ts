@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth/guard";
 import { assignTeamProjectSchema } from "@/lib/validations/api";
 import { takimaProjeAta, ASGARI_UYE, type TakimHatasi } from "@/features/teams/server/takim";
+import { rotaHatasi } from "@/lib/api-hata";
 
 /**
  * Takıma proje atar (#332 Faz 2).
@@ -44,7 +45,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ teamId:
     }
     return NextResponse.json(sonuc.veri, { status: 201 });
   } catch (error) {
-    console.error("POST /api/admin/teams/[teamId]/project error:", error);
+    rotaHatasi("POST /api/admin/teams/[teamId]/project error:", error);
     return NextResponse.json({ error: "Proje atanamadı." }, { status: 500 });
   }
 }

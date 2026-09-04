@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth/guard";
 import { getStudentDetail } from "@/features/mentors/server/actions";
+import { rotaHatasi } from "@/lib/api-hata";
 
 export async function GET(
   req: Request,
@@ -32,7 +33,7 @@ export async function GET(
 
     return NextResponse.json(student);
   } catch (error) {
-    console.error("GET /api/mentor/students/[studentId] error:", error);
+    rotaHatasi("GET /api/mentor/students/[studentId] error:", error);
     return NextResponse.json(
       { error: "Failed to fetch student detail" },
       { status: 500 }

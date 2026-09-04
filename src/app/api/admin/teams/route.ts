@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth/guard";
 import { createTeamSchema } from "@/lib/validations/api";
 import { takimlariGetir, takimOlustur } from "@/features/teams/server/takim";
+import { rotaHatasi } from "@/lib/api-hata";
 
 /**
  * Takım listesi ve oluşturma (#332 Faz 2).
@@ -16,7 +17,7 @@ export async function GET() {
   try {
     return NextResponse.json({ takimlar: await takimlariGetir() });
   } catch (error) {
-    console.error("GET /api/admin/teams error:", error);
+    rotaHatasi("GET /api/admin/teams error:", error);
     return NextResponse.json({ error: "Takımlar yüklenemedi." }, { status: 500 });
   }
 }
@@ -35,7 +36,7 @@ export async function POST(req: Request) {
     const sonuc = await takimOlustur(parsed.data.name);
     return NextResponse.json(sonuc.ok ? sonuc.veri : {}, { status: sonuc.ok ? 201 : 400 });
   } catch (error) {
-    console.error("POST /api/admin/teams error:", error);
+    rotaHatasi("POST /api/admin/teams error:", error);
     return NextResponse.json({ error: "Takım oluşturulamadı." }, { status: 500 });
   }
 }

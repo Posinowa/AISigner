@@ -12,6 +12,7 @@ import { requireAuth } from "@/lib/auth/guard";
 import { generateRoadmapSchema } from "@/lib/validations/api";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { profilSahibininRizasiVar } from "@/features/kvkk/riza";
+import { rotaHatasi } from "@/lib/api-hata";
 
 const limiter = createRateLimiter("generate-roadmap", {
   maxRequests: 5,
@@ -204,7 +205,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ roadmap: newRoadmap }, { status: 200 });
 
   } catch (error) {
-    console.error("Yol haritası API Hatası:", error);
+    rotaHatasi("Yol haritası API Hatası:", error);
     return NextResponse.json(
       { error: "Yol haritası oluşturulurken bir hata meydana geldi." }, 
       { status: 500 }

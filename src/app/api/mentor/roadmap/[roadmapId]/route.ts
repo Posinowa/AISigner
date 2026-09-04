@@ -6,6 +6,7 @@ import {
 } from "@/features/teams/server/sahiplik";
 import { requireAuth } from "@/lib/auth/guard";
 import { updateRoadmapSchema } from "@/lib/validations/api";
+import { rotaHatasi } from "@/lib/api-hata";
 
 // GET: Roadmap detayını getir
 export async function GET(
@@ -59,7 +60,7 @@ export async function GET(
 
     return NextResponse.json(roadmap);
   } catch (error) {
-    console.error("Roadmap GET Error:", error);
+    rotaHatasi("Roadmap GET Error:", error);
     return NextResponse.json(
       { error: "Yol haritası getirilirken hata oluştu." },
       { status: 500 }
@@ -126,7 +127,7 @@ export async function PUT(
 
     return NextResponse.json(roadmap);
   } catch (error) {
-    console.error("Roadmap PUT Error:", error);
+    rotaHatasi("Roadmap PUT Error:", error);
     return NextResponse.json(
       { error: "Yol haritası güncellenirken hata oluştu." },
       { status: 500 }

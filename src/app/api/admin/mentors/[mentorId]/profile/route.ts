@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth/guard";
+import { rotaHatasi } from "@/lib/api-hata";
 
 /**
  * GET /api/admin/mentors/[mentorId]/profile
@@ -83,7 +84,7 @@ export async function GET(
       aiRizasiVar: Boolean(kullanici.aiConsentAt),
     });
   } catch (error) {
-    console.error("GET /api/admin/mentors/[mentorId]/profile error:", error);
+    rotaHatasi("GET /api/admin/mentors/[mentorId]/profile error:", error);
     return NextResponse.json(
       { error: "Başvuru yüklenirken hata oluştu." },
       { status: 500 },

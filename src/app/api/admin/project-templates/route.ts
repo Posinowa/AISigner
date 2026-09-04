@@ -4,6 +4,7 @@ import { listTemplates, createTemplate } from "@/features/projects/server/templa
 import { requireAuth } from "@/lib/auth/guard";
 import { createTemplateSchema } from "@/lib/validations/api";
 import { sablonOlusturabilir } from "@/features/projects/yetki";
+import { rotaHatasi } from "@/lib/api-hata";
 
 export async function GET() {
   const auth = await requireAuth(["ADMIN", "MENTOR"]);
@@ -13,7 +14,7 @@ export async function GET() {
     const templates = await listTemplates();
     return NextResponse.json(templates);
   } catch (error) {
-    console.error("GET /api/admin/project-templates error:", error);
+    rotaHatasi("GET /api/admin/project-templates error:", error);
     return NextResponse.json(
       { error: "Failed to fetch templates" },
       { status: 500 }
@@ -59,7 +60,7 @@ export async function POST(req: Request) {
         { status: 409 }
       );
     }
-    console.error("POST /api/admin/project-templates error:", error);
+    rotaHatasi("POST /api/admin/project-templates error:", error);
     return NextResponse.json(
       { error: "Failed to create template" },
       { status: 500 }

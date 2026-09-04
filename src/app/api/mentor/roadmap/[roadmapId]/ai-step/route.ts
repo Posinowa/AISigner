@@ -13,6 +13,7 @@ import { logger } from "@/lib/logger";
 import { requireAuth } from "@/lib/auth/guard";
 import { experienceLevelLabel } from "@/lib/experience-level";
 import { createRateLimiter } from "@/lib/rate-limit";
+import { rotaHatasi } from "@/lib/api-hata";
 
 /**
  * #377: Model çıktısının ŞEKLİ doğrulanıyor.
@@ -213,7 +214,7 @@ JSON Formatı (Sadece geçerli bir JSON objesi döndür, başka hiçbir metin ek
 
     return NextResponse.json({ step: newStep, message: "Posilog tarafından yeni adım başarıyla üretildi!" });
   } catch (error) {
-    console.error("POST /api/mentor/roadmap/[roadmapId]/ai-step error:", error);
+    rotaHatasi("POST /api/mentor/roadmap/[roadmapId]/ai-step error:", error);
     return NextResponse.json({ error: "AI adımı üretilirken bir hata oluştu" }, { status: 500 });
   }
 }

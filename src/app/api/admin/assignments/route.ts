@@ -1,3 +1,4 @@
+import { rotaHatasi } from "@/lib/api-hata";
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth/guard";
 import { getStudentAssignmentsProgress } from "@/features/admin/server/assignment-progress";
@@ -31,7 +32,7 @@ export async function GET(req: Request) {
     });
     return NextResponse.json(data);
   } catch (error) {
-    console.error("GET /api/admin/assignments error:", error);
+    rotaHatasi("GET /api/admin/assignments error:", error);
     return NextResponse.json(
       { error: "Öğrenci ilerleme verileri yüklenirken hata oluştu" },
       { status: 500 }
@@ -74,7 +75,7 @@ export async function POST(req: Request) {
     if (error instanceof KurulumZatenSuruyorError) {
       return NextResponse.json({ error: error.message }, { status: 409 });
     }
-    console.error("POST /api/admin/assignments error:", error);
+    rotaHatasi("POST /api/admin/assignments error:", error);
     const message = error instanceof Error ? error.message : "GitHub workspace oluşturulurken hata oluştu";
     return NextResponse.json({ error: message }, { status: 500 });
   }

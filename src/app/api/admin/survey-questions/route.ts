@@ -5,6 +5,7 @@ import {
 } from "@/features/survey/server/survey";
 import { requireAuth } from "@/lib/auth/guard";
 import { createSurveyQuestionSchema } from "@/lib/validations/api";
+import { rotaHatasi } from "@/lib/api-hata";
 
 /**
  * GET /api/admin/survey-questions
@@ -18,7 +19,7 @@ export async function GET() {
     const questions = await listSurveyQuestions();
     return NextResponse.json(questions);
   } catch (error) {
-    console.error("GET /api/admin/survey-questions error:", error);
+    rotaHatasi("GET /api/admin/survey-questions error:", error);
     return NextResponse.json(
       { error: "Anket soruları yüklenirken hata oluştu." },
       { status: 500 },
@@ -47,7 +48,7 @@ export async function POST(req: Request) {
     const created = await createSurveyQuestion(parsed.data);
     return NextResponse.json(created, { status: 201 });
   } catch (error) {
-    console.error("POST /api/admin/survey-questions error:", error);
+    rotaHatasi("POST /api/admin/survey-questions error:", error);
     return NextResponse.json(
       { error: "Anket sorusu oluşturulurken hata oluştu." },
       { status: 500 },

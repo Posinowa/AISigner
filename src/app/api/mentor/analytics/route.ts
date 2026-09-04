@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth/guard";
 import { panelVerisiGetir } from "@/features/analytics/server/panel";
+import { rotaHatasi } from "@/lib/api-hata";
 
 /**
  * Mentörün kendi analitiği (#331).
@@ -16,7 +17,7 @@ export async function GET() {
   try {
     return NextResponse.json(await panelVerisiGetir(auth.session.user.id!));
   } catch (error) {
-    console.error("GET /api/mentor/analytics error:", error);
+    rotaHatasi("GET /api/mentor/analytics error:", error);
     return NextResponse.json({ error: "Analitik veriler yüklenemedi." }, { status: 500 });
   }
 }

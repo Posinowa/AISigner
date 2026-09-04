@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth/guard";
+import { rotaHatasi } from "@/lib/api-hata";
 
 /**
  * GET /api/messages/conversations
@@ -195,7 +196,7 @@ export async function GET() {
 
     return NextResponse.json({ conversations });
   } catch (error) {
-    console.error("GET /api/messages/conversations error:", error);
+    rotaHatasi("GET /api/messages/conversations error:", error);
     return NextResponse.json(
       { error: "Konuşmalar yüklenirken hata oluştu." },
       { status: 500 }

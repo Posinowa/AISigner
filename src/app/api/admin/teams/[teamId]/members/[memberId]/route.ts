@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth/guard";
 import { uyeAyir } from "@/features/teams/server/takim";
+import { rotaHatasi } from "@/lib/api-hata";
 
 /**
  * Üyeyi takımdan ayırır (#332 Faz 2).
@@ -24,7 +25,7 @@ export async function DELETE(
     }
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("DELETE /api/admin/teams/[teamId]/members/[memberId] error:", error);
+    rotaHatasi("DELETE /api/admin/teams/[teamId]/members/[memberId] error:", error);
     return NextResponse.json({ error: "Üye ayrılamadı." }, { status: 500 });
   }
 }

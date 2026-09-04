@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth/guard";
 import { addTeamMemberSchema } from "@/lib/validations/api";
 import { uyeEkle, type TakimHatasi } from "@/features/teams/server/takim";
+import { rotaHatasi } from "@/lib/api-hata";
 
 /** Takıma üye ekler (#332 Faz 2). */
 const DURUM: Partial<Record<TakimHatasi, number>> = {
@@ -41,7 +42,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ teamId:
     }
     return NextResponse.json({ ok: true }, { status: 201 });
   } catch (error) {
-    console.error("POST /api/admin/teams/[teamId]/members error:", error);
+    rotaHatasi("POST /api/admin/teams/[teamId]/members error:", error);
     return NextResponse.json({ error: "Üye eklenemedi." }, { status: 500 });
   }
 }

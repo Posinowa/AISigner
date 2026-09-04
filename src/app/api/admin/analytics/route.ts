@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth/guard";
 import { panelVerisiGetir } from "@/features/analytics/server/panel";
+import { rotaHatasi } from "@/lib/api-hata";
 
 /**
  * Platform geneli analitik (#331).
@@ -15,7 +16,7 @@ export async function GET() {
   try {
     return NextResponse.json(await panelVerisiGetir());
   } catch (error) {
-    console.error("GET /api/admin/analytics error:", error);
+    rotaHatasi("GET /api/admin/analytics error:", error);
     return NextResponse.json({ error: "Analitik veriler yüklenemedi." }, { status: 500 });
   }
 }

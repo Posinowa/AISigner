@@ -7,6 +7,7 @@ import {
   updateCertificateDetails,
 } from "@/features/certificate/server/certificate";
 import { updateCertificateSchema } from "@/lib/validations/api";
+import { rotaHatasi } from "@/lib/api-hata";
 
 export async function GET(
   _request: Request,
@@ -51,7 +52,7 @@ export async function GET(
     }
     return NextResponse.json({ success: true, certificate });
   } catch (error) {
-    console.error("Error loading student certificate:", error);
+    rotaHatasi("Error loading student certificate:", error);
     return NextResponse.json(
       { error: "Sertifika bilgisi alınamadı." },
       { status: 500 },
@@ -103,7 +104,7 @@ export async function POST(
       updated,
     });
   } catch (error) {
-    console.error("Error updating certificate:", error);
+    rotaHatasi("Error updating certificate:", error);
     return NextResponse.json(
       { error: "Sertifika güncellenemedi." },
       { status: 500 },
