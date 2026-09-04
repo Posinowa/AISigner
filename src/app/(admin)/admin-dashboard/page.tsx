@@ -1,7 +1,11 @@
 // 🧭 Admin paneli — kullanıcı/rol yönetimi, staj yaşam döngüsü, mezuniyet ve güvenli hesap silme
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import {
+  BOS_SAYILAR,
+  type KullaniciSayilari,
+} from "@/features/admin/kategoriler";
 import { extractApiErrorMessage } from "@/lib/api-error-message";
 import { MentorBasvuruModal } from "@/features/mentors/ui/MentorBasvuruModal";
 import { kapasiteDurumu, kapasiteEtiketi } from "@/features/mentors/kapasite";
@@ -32,10 +36,7 @@ import {
   type ProfileAnalysisData,
 } from "@/features/ai/ui/ProfileAnalysisCard";
 import { CertificateModal } from "@/components/certificate/CertificateModal";
-import {
-  DogrulanmisRozet,
-  dogrulandiMi,
-} from "@/features/auth/ui/DogrulanmisRozet";
+import { DogrulanmisRozet } from "@/features/auth/ui/DogrulanmisRozet";
 import { Avatar } from "@/features/profile/ui/Avatar";
 import type { CertificateData } from "@/features/certificate/server/certificate";
 import { ROL_ROZETI, DURUM_ROZETI } from "@/lib/ui/rol-renkleri";
@@ -131,6 +132,23 @@ export default function AdminDashboard() {
   const [updating, setUpdating] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [filterCategory, setFilterCategory] = useState<FilterCategory>("ALL");
+  /*
+   * Sayfalama durumu.
+   *
+   * ⚠️ ARAMA VE FİLTRE ARTIK SUNUCUDA. İstemcide süzmek, yalnız YÜKLÜ
+   * SAYFAYI tarardı: admin var olan bir kaydı arayıp "sonuç yok" görürdü.
+   * `search` bu yüzden geciktirilerek (debounce) sunucuya gidiyor.
+   */
+  const [aramaGecikmeli, setAramaGecikmeli] = useState("");
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [dahaYukleniyor, setDahaYukleniyor] = useState(false);
+  /*
+   * ⚠️ SAYAÇLAR SUNUCUDAN. Önceden yüklü listeden `.filter().length` ile
+   * hesaplanıyordu; sayfalamayla o yaklaşım "ilk 50 kayıttaki mentör
+   * sayısı"nı gösterirdi ve bu HATA OLARAK GÖRÜNMEZDİ, yalnız sayılar
+   * düşük çıkardı.
+   */
+  const [sayilar, setSayilar] = useState<KullaniciSayilari | null>(null);
 
   // Analiz modal'ı — hangi öğrenci için açık, veri/loading/error durumu (lazy fetch).
   const [analysisModalUser, setAnalysisModalUser] = useState<User | null>(null);
@@ -205,12 +223,23 @@ export default function AdminDashboard() {
   // Modal a11y: Escape ile kapat + açılışta panele odak.
   const analysisModalRef = useModalA11y(!!analysisModalUser, closeAnalysisModal);
 
+  /** Liste sorgusunun adres parçası — tek yerde kurulsun. */
+  const listeSorgusu = useCallback(
+    (imlec?: string | null) => {
+      const p = new URLSearchParams({ kategori: filterCategory });
+      if (aramaGecikmeli.trim()) p.set("q", aramaGecikmeli.trim());
+      if (imlec) p.set("cursor", imlec);
+      return `/api/admin/users?${p.toString()}`;
+    },
+    [filterCategory, aramaGecikmeli],
+  );
+
   const loadData = useCallback(async () => {
     setLoading(true);
     setLoadError(false);
     try {
       const [usersRes, mentorsRes] = await Promise.all([
-        fetch("/api/admin/users"),
+        fetch(listeSorgusu()),
         fetch("/api/admin/mentors"),
       ]);
       if (!usersRes.ok || !mentorsRes.ok) {
@@ -219,7 +248,10 @@ export default function AdminDashboard() {
       }
       const usersData = await usersRes.json();
       const mentorsData = await mentorsRes.json();
-      setUsers(usersData);
+      setUsers(usersData.users ?? []);
+      setNextCursor(usersData.nextCursor ?? null);
+      // Sayaçlar yalnız imleçsiz (ilk) istekte dönüyor.
+      if (usersData.sayilar) setSayilar(usersData.sayilar);
       setMentors(mentorsData);
     } catch (err) {
       console.error("Fetch error:", err);
@@ -227,8 +259,56 @@ export default function AdminDashboard() {
     } finally {
       setLoading(false);
     }
+  }, [listeSorgusu]);
+
+  /** "Daha fazla yükle" — mevcut listenin ÜSTÜNE ekler, sıfırlamaz. */
+  const dahaYukle = useCallback(async () => {
+    if (!nextCursor || dahaYukleniyor) return;
+    setDahaYukleniyor(true);
+    try {
+      const res = await fetch(listeSorgusu(nextCursor));
+      if (!res.ok) return;
+      const veri = await res.json();
+      setUsers((prev) => [...prev, ...(veri.users ?? [])]);
+      setNextCursor(veri.nextCursor ?? null);
+    } catch (err) {
+      console.error("Fetch error:", err);
+    } finally {
+      setDahaYukleniyor(false);
+    }
+  }, [nextCursor, dahaYukleniyor, listeSorgusu]);
+
+  /*
+   * Sayaçları tazele.
+   *
+   * Rol/durum değişikliği ve silme satırı YERİNDE güncelliyor (anında geri
+   * bildirim, yüklenmiş sayfalar korunuyor) — ama o satırın hangi sayaca
+   * ait olduğu değişmiş olabiliyor. Tüm listeyi yeniden çekmek yüklü
+   * sayfaları sıfırlardı; `limit=1` ile yalnız sayaç bloğu alınıyor.
+   */
+  const sayaclariTazele = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/users?limit=1");
+      if (!res.ok) return;
+      const veri = await res.json();
+      if (veri.sayilar) setSayilar(veri.sayilar);
+    } catch {
+      // Sayaç tazeleme sessiz: asıl işlem başarılı oldu, kullanıcıya
+      // ikinci bir hata göstermek yanıltıcı olurdu.
+    }
   }, []);
 
+  /*
+   * Arama girdisini geciktir — her tuş vuruşu bir sorgu açmasın.
+   * 300 ms: yazarken beklemeyi hissettirmeyen, sorguyu da katlamayan aralık.
+   */
+  useEffect(() => {
+    const t = setTimeout(() => setAramaGecikmeli(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // Filtre ya da (geciktirilmiş) arama değişince liste BAŞTAN yüklenir:
+  // imleç eski sorguya ait, taşımak karışık sayfa üretirdi.
   useEffect(() => {
     loadData();
   }, [loadData]);
@@ -257,6 +337,9 @@ export default function AdminDashboard() {
         setUsers((prev) =>
           prev.map((u) => (u.id === user.id ? { ...u, role: newRole } : u)),
         );
+        // Satır YERİNDE güncellendi (anında geri bildirim, yüklü sayfalar
+        // korunuyor) ama satırın ait olduğu sayaç değişmiş olabilir.
+        sayaclariTazele();
         toast.success("Rol başarıyla güncellendi.");
       } else {
         const data = await response.json().catch(() => null);
@@ -292,6 +375,8 @@ export default function AdminDashboard() {
               : u,
           ),
         );
+        // `studentsWithoutMentor` sayacı bu işlemle değişiyor.
+        sayaclariTazele();
         toast.success("Mentor atamaları güncellendi.");
       } else {
         const data = await response.json().catch(() => null);
@@ -343,6 +428,10 @@ export default function AdminDashboard() {
         setUsers((prev) =>
           prev.map((u) => (u.id === user.id ? { ...u, accountStatus } : u)),
         );
+        // Satır YERİNDE güncellendi (anında geri bildirim, yüklü sayfalar
+        // korunuyor) ama satırın ait olduğu sayaç değişmiş olabilir.
+        sayaclariTazele();
+
         toast.success(
           accountStatus === "GRADUATED"
             ? "Staj başarıyla tamamlandı ve öğrenci mezun edildi."
@@ -382,6 +471,9 @@ export default function AdminDashboard() {
       });
       if (response.ok) {
         setUsers((prev) => prev.filter((u) => u.id !== user.id));
+        // Satır YERİNDE güncellendi (anında geri bildirim, yüklü sayfalar
+        // korunuyor) ama satırın ait olduğu sayaç değişmiş olabilir.
+        sayaclariTazele();
         toast.success("Kullanıcı hesabı ve ilişkili tüm veriler kalıcı olarak silindi.");
       } else {
         const data = await response.json().catch(() => null);
@@ -395,74 +487,22 @@ export default function AdminDashboard() {
     }
   }
 
-  const filteredUsers = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return users.filter((u) => {
-      // Kategori filtresi
-      if (filterCategory === "PENDING" && (u.role !== "STUDENT" || u.accountStatus !== "PENDING")) return false;
-      if (filterCategory === "APPROVED" && (u.role !== "STUDENT" || u.accountStatus !== "APPROVED")) return false;
-      if (filterCategory === "GRADUATED" && (u.role !== "STUDENT" || u.accountStatus !== "GRADUATED")) return false;
-      if (filterCategory === "REJECTED" && (u.role !== "STUDENT" || u.accountStatus !== "REJECTED")) return false;
-      if (filterCategory === "MENTOR" && (u.role !== "MENTOR" || u.accountStatus === "PENDING")) return false;
-      if (filterCategory === "MENTOR_BASVURU" && (u.role !== "MENTOR" || u.accountStatus !== "PENDING")) return false;
-      if (filterCategory === "ADMIN" && u.role !== "ADMIN") return false;
-      if (filterCategory === "DOGRULANMAMIS" && dogrulandiMi(u.emailVerified)) return false;
+  /*
+   * ⚠️ İSTEMCİ FİLTRESİ KALDIRILDI — sunucu zaten süzülmüş liste dönüyor.
+   *
+   * Burada ikinci bir kez süzmek, sayfalamayla birlikte SESSİZ bir hataya
+   * dönerdi: sunucu doğru sayfayı gönderir, istemci onu bir daha eleyip
+   * eksik gösterirdi. Kategori tanımı artık `features/admin/kategoriler.ts`
+   * içinde TEK kaynakta ve sayaçlar da oradan türüyor.
+   */
+  const filteredUsers = users;
 
-      if (!q) return true;
-      const fullName = `${u.name ?? ""} ${u.lastName ?? ""}`.toLowerCase();
-      return u.email.toLowerCase().includes(q) || fullName.includes(q);
-    });
-  }, [users, search, filterCategory]);
-
-  const stats = useMemo(() => {
-    const total = users.length;
-    const studentCount = users.filter((u) => u.role === "STUDENT").length;
-    const activeStudents = users.filter(
-      (u) => u.role === "STUDENT" && u.accountStatus === "APPROVED",
-    ).length;
-    const graduatedCount = users.filter(
-      (u) => u.role === "STUDENT" && u.accountStatus === "GRADUATED",
-    ).length;
-    const pendingCount = users.filter(
-      (u) => u.role === "STUDENT" && u.accountStatus === "PENDING",
-    ).length;
-    const rejectedCount = users.filter(
-      (u) => u.role === "STUDENT" && u.accountStatus === "REJECTED",
-    ).length;
-    // #250: Onay bekleyen başvuru henüz "mentör" değil — sayıdan ayrılıyor.
-    const mentorCount = users.filter(
-      (u) => u.role === "MENTOR" && u.accountStatus !== "PENDING",
-    ).length;
-    const mentorBasvuruCount = users.filter(
-      (u) => u.role === "MENTOR" && u.accountStatus === "PENDING",
-    ).length;
-    const adminCount = users.filter((u) => u.role === "ADMIN").length;
-    const dogrulanmamisCount = users.filter(
-      (u) => !dogrulandiMi(u.emailVerified),
-    ).length;
-    const studentsWithoutMentor = users.filter(
-      // #195: M:N — onaylı ama hiç mentoru olmayan öğrenciler.
-      (u) =>
-        u.role === "STUDENT" &&
-        u.accountStatus === "APPROVED" &&
-        u.studentProfile &&
-        u.studentProfile.mentors.length === 0,
-    ).length;
-
-    return {
-      total,
-      studentCount,
-      activeStudents,
-      graduatedCount,
-      pendingCount,
-      rejectedCount,
-      mentorCount,
-      mentorBasvuruCount,
-      adminCount,
-      dogrulanmamisCount,
-      studentsWithoutMentor,
-    };
-  }, [users]);
+  /*
+   * Sayaçlar SUNUCUDAN (`kullaniciSayilari`) — toplama veritabanında
+   * (#313 dersi). İlk yükleme bitene kadar sıfır gösteriliyor; boş kart
+   * yerine yanlış bir sayı göstermek daha kötü olurdu.
+   */
+  const stats = sayilar ?? BOS_SAYILAR;
 
   const getDisplayName = (u: { name: string | null; lastName: string | null; email?: string }) => {
     const full = `${u.name ?? ""} ${u.lastName ?? ""}`.trim();
@@ -1094,6 +1134,27 @@ Onaylandığında mentör paneline erişebilecek.`,
                   </div>
                 );
               })}
+
+              {/*
+                Sayfalama — "daha fazla yükle".
+                Sonsuz kaydırma YAPILMADI: tablo satırları eylem düğmeleri
+                taşıyor ve admin çoğu zaman ARIYOR, listeyi gezmiyor. Açık
+                bir düğme kaç kaydın yüklü olduğunu da görünür kılıyor.
+              */}
+              {nextCursor && (
+                <div className="px-6 py-4 flex items-center justify-center gap-3 bg-slate-50/50">
+                  <span className="text-xs text-slate-500">
+                    {filteredUsers.length} kayıt yüklendi
+                  </span>
+                  <button
+                    onClick={dahaYukle}
+                    disabled={dahaYukleniyor}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 shadow-sm disabled:opacity-50 transition-colors"
+                  >
+                    {dahaYukleniyor ? "Yükleniyor…" : "Daha fazla yükle"}
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

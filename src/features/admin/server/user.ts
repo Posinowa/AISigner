@@ -6,6 +6,14 @@ import { BILDIRIM_TURLERI } from "@/features/bildirim/turler";
 import { deleteStepFile } from "@/lib/storage/step-files";
 import { ensureCertificateIssued } from "@/features/certificate/server/certificate";
 import { logger } from "@/lib/logger";
+import {
+  kategoriKosulu,
+  aramaKosulu,
+  type KullaniciKategorisi,
+  type KullaniciSayilari,
+} from "@/features/admin/kategoriler";
+
+export type { KullaniciSayilari };
 
 // Type export
 export type UserWithProfile = {
@@ -30,49 +38,163 @@ export type UserWithProfile = {
 };
 
 // ------------------------------------
-// Tüm kullanıcıları getir
-// NOT: Explicit select kullanılır — password hash gibi hassas alanlar
-// hiçbir zaman API response'una sızmamalı (include tüm scalar alanları döndürürdü).
-export async function getAllUsers(): Promise<UserWithProfile[]> {
-  const users = await prisma.user.findMany({
+// Kullanıcı listesi — SAYFALI, sunucuda filtreli/aranan
+//
+// Önceden `getAllUsers()` TÜM kullanıcıları tek seferde çekiyordu ve
+// arayüz aramayı, sekme filtresini ve 11 sayaç değerini o listeden
+// hesaplıyordu. Kullanıcı sayısı büyüdükçe hem yanıt hem DOM (tablo
+// sanallaştırılmıyor) doğrusal büyüyordu.
+//
+// ⚠️ SAYFALAMA TEK BAŞINA YETMEZDİ. Naif bir `take` üç şeyi birden sessizce
+// bozardı: arama yalnız yüklü sayfayı tarardı, sekme filtresi yalnız yüklü
+// sayfayı süzerdi ve panelin sayaçları "yüklenmiş kadarını" gösterirdi.
+// Bu yüzden üçü de sunucuya taşındı; sayaçlar AYRI ve TOPLU sorgudan
+// geliyor, yani sayfadan bağımsız DOĞRU.
+
+/** Sayfa başına varsayılan kayıt. */
+export const SAYFA_BOYUTU = 50;
+
+export type KullaniciListesi = {
+  users: UserWithProfile[];
+  /** Sonraki sayfanın imleci; yoksa liste bitti. */
+  nextCursor: string | null;
+};
+
+const LISTE_SELECT = {
+  id: true,
+  email: true,
+  name: true,
+  lastName: true,
+  role: true,
+  accountStatus: true,
+  emailVerified: true,
+  avatarFile: true,
+  studentProfile: {
     select: {
       id: true,
-      email: true,
-      name: true,
-      lastName: true,
-      role: true,
-      accountStatus: true,
-      emailVerified: true,
-      avatarFile: true,
-      studentProfile: {
+      experienceLevel: true,
+      interests: true,
+      // #195: M:N — atanmış mentorların özet bilgisi (hash sızmaz).
+      mentorAssignments: {
         select: {
-          id: true,
-          experienceLevel: true,
-          interests: true,
-          // #195: M:N — atanmış mentorların özet bilgisi (hash sızmaz, sadece seçili alanlar).
-          mentorAssignments: {
-            select: {
-              mentor: { select: { id: true, name: true, lastName: true } },
-            },
-          },
+          mentor: { select: { id: true, name: true, lastName: true } },
         },
       },
     },
-    orderBy: { createdAt: "desc" },
+  },
+} satisfies Prisma.UserSelect;
+
+/**
+ * Kullanıcıları sayfalı getirir.
+ *
+ * NOT: Explicit select kullanılır — password hash gibi hassas alanlar
+ * hiçbir zaman API response'una sızmamalı (include tüm scalar alanları
+ * döndürürdü).
+ *
+ * ⚠️ SIRALAMA İKİ ALANLI: `createdAt desc, id desc`. Yalnız `createdAt`
+ * ile sıralamak aynı saniyede oluşmuş kayıtlarda (seed, toplu içe aktarma)
+ * kararsız sıra üretir ve imleçli sayfalamada satır ATLANMASINA ya da
+ * TEKRARLANMASINA yol açar. `id` ikincil anahtar sırayı toplam hale
+ * getiriyor.
+ */
+export async function getAllUsers(params?: {
+  kategori?: KullaniciKategorisi;
+  q?: string;
+  cursor?: string | null;
+  limit?: number;
+}): Promise<KullaniciListesi> {
+  const limit = Math.min(Math.max(params?.limit ?? SAYFA_BOYUTU, 1), 200);
+  const arama = aramaKosulu(params?.q ?? "");
+
+  const where = {
+    ...(kategoriKosulu(params?.kategori ?? "ALL") as Prisma.UserWhereInput),
+    ...((arama ?? {}) as Prisma.UserWhereInput),
+  };
+
+  const satirlar = await prisma.user.findMany({
+    where,
+    select: LISTE_SELECT,
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    // `limit + 1` hilesi: "daha var mı" sorusu fazladan sorgu atmadan
+    // yanıtlanıyor (`suggestions.ts` ile aynı desen).
+    take: limit + 1,
+    ...(params?.cursor ? { cursor: { id: params.cursor }, skip: 1 } : {}),
   });
 
-  // mentorAssignments[] → düz mentors[] listesine indir (UI'ın beklediği şekil).
-  return users.map((u) => ({
-    ...u,
-    studentProfile: u.studentProfile
-      ? {
-          id: u.studentProfile.id,
-          experienceLevel: u.studentProfile.experienceLevel,
-          interests: u.studentProfile.interests,
-          mentors: u.studentProfile.mentorAssignments.map((a) => a.mentor),
-        }
-      : u.studentProfile,
-  }));
+  const dahaVar = satirlar.length > limit;
+  const sayfa = dahaVar ? satirlar.slice(0, limit) : satirlar;
+
+  return {
+    // mentorAssignments[] → düz mentors[] listesine indir (UI'ın beklediği şekil).
+    users: sayfa.map((u) => ({
+      ...u,
+      studentProfile: u.studentProfile
+        ? {
+            id: u.studentProfile.id,
+            experienceLevel: u.studentProfile.experienceLevel,
+            interests: u.studentProfile.interests,
+            mentors: u.studentProfile.mentorAssignments.map((a) => a.mentor),
+          }
+        : u.studentProfile,
+    })) as UserWithProfile[],
+    nextCursor: dahaVar ? (sayfa[sayfa.length - 1]?.id ?? null) : null,
+  };
+}
+
+
+
+/**
+ * Panelin sayaçları — TOPLAMA VERİTABANINDA (#313 dersi).
+ *
+ * ⚠️ SAYAÇLAR SAYFADAN BAĞIMSIZ. Arayüz bunları önceden yüklü listeden
+ * `.filter().length` ile hesaplıyordu; sayfalamayla o yaklaşım "ilk 50
+ * kayıttaki mentör sayısı"nı gösterirdi ve bu HATA OLARAK GÖRÜNMEZDİ —
+ * yalnız sayılar düşük çıkardı.
+ *
+ * ⚠️ ÜÇ SORGU, ÜÇÜ DE TOPLAMA. Satır çekilmiyor. Dokuz değer tek
+ * `groupBy`'dan türüyor; kalan ikisi ayrı çünkü biri HESAPLANMIŞ bir koşul
+ * (`emailVerified IS NULL`), diğeri İLİŞKİ üzerinden (`mentorAssignments`
+ * boş). Kullanıcı başına sorgu N+1 üretirdi.
+ */
+export async function kullaniciSayilari(): Promise<KullaniciSayilari> {
+  const [gruplar, dogrulanmamisCount, studentsWithoutMentor] = await Promise.all([
+    prisma.user.groupBy({
+      by: ["role", "accountStatus"],
+      _count: { _all: true },
+    }),
+    prisma.user.count({ where: { emailVerified: null } }),
+    prisma.user.count({
+      where: {
+        role: "STUDENT",
+        accountStatus: "APPROVED",
+        // #195: M:N — onaylı ama HİÇ mentörü olmayan öğrenciler.
+        studentProfile: { mentorAssignments: { none: {} } },
+      },
+    }),
+  ]);
+
+  const say = (
+    rol: string,
+    kosul?: (durum: string) => boolean,
+  ) =>
+    gruplar
+      .filter((g) => g.role === rol && (!kosul || kosul(g.accountStatus)))
+      .reduce((t, g) => t + g._count._all, 0);
+
+  return {
+    total: gruplar.reduce((t, g) => t + g._count._all, 0),
+    studentCount: say("STUDENT"),
+    activeStudents: say("STUDENT", (d) => d === "APPROVED"),
+    graduatedCount: say("STUDENT", (d) => d === "GRADUATED"),
+    pendingCount: say("STUDENT", (d) => d === "PENDING"),
+    rejectedCount: say("STUDENT", (d) => d === "REJECTED"),
+    // #250: Onay bekleyen başvuru henüz "mentör" değil — sayıdan ayrılıyor.
+    mentorCount: say("MENTOR", (d) => d !== "PENDING"),
+    mentorBasvuruCount: say("MENTOR", (d) => d === "PENDING"),
+    adminCount: say("ADMIN"),
+    dogrulanmamisCount,
+    studentsWithoutMentor,
+  };
 }
 
 // ------------------------------------

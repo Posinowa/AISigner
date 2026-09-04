@@ -9,6 +9,88 @@ import { ConfirmDialogProvider } from "@/components/ui/ConfirmDialog";
 
 import AdminDashboard from "./page";
 
+type SahteKullanici = {
+  id: string;
+  role: "ADMIN" | "MENTOR" | "STUDENT";
+  accountStatus: "PENDING" | "APPROVED" | "REJECTED" | "GRADUATED";
+  emailVerified?: string | null;
+  studentProfile?: unknown;
+};
+
+/**
+ * Sahte sunucu.
+ *
+ * ⚠️ ARAMA VE FİLTRE ARTIK SUNUCUDA — testin de öyle davranması gerekiyor.
+ * Önceden stub tüm listeyi dönüyordu ve sayfa kendi içinde süzüyordu; o
+ * dünyada "filtre yalnız bekleyenleri gösterir" testi istemci mantığını
+ * ölçüyordu. Artık ölçtüğü şey doğru olan: sayfa SUNUCUDAN DOĞRU KATEGORİYİ
+ * İSTİYOR ve gelen listeyi bir daha elemeden gösteriyor.
+ *
+ * Sayaçlar TAM listeden hesaplanıyor — sayfadan bağımsız oldukları iddiası
+ * burada da korunuyor.
+ */
+function kategoriSuz<T extends SahteKullanici>(users: T[], kategori: string): T[] {
+  switch (kategori) {
+    case "PENDING":
+    case "APPROVED":
+    case "GRADUATED":
+    case "REJECTED":
+      return users.filter((u) => u.role === "STUDENT" && u.accountStatus === kategori);
+    case "MENTOR":
+      return users.filter((u) => u.role === "MENTOR" && u.accountStatus !== "PENDING");
+    case "MENTOR_BASVURU":
+      return users.filter((u) => u.role === "MENTOR" && u.accountStatus === "PENDING");
+    case "ADMIN":
+      return users.filter((u) => u.role === "ADMIN");
+    case "DOGRULANMAMIS":
+      return users.filter((u) => !u.emailVerified);
+    case "STUDENT":
+      return users.filter((u) => u.role === "STUDENT");
+    default:
+      return users;
+  }
+}
+
+function sahteSayilar(users: SahteKullanici[]) {
+  const say = (f: (u: SahteKullanici) => boolean) => users.filter(f).length;
+  return {
+    total: users.length,
+    studentCount: say((u) => u.role === "STUDENT"),
+    activeStudents: say((u) => u.role === "STUDENT" && u.accountStatus === "APPROVED"),
+    graduatedCount: say((u) => u.role === "STUDENT" && u.accountStatus === "GRADUATED"),
+    pendingCount: say((u) => u.role === "STUDENT" && u.accountStatus === "PENDING"),
+    rejectedCount: say((u) => u.role === "STUDENT" && u.accountStatus === "REJECTED"),
+    mentorCount: say((u) => u.role === "MENTOR" && u.accountStatus !== "PENDING"),
+    mentorBasvuruCount: say((u) => u.role === "MENTOR" && u.accountStatus === "PENDING"),
+    adminCount: say((u) => u.role === "ADMIN"),
+    dogrulanmamisCount: say((u) => !u.emailVerified),
+    studentsWithoutMentor: 0,
+  };
+}
+
+function sahteSunucu<T extends SahteKullanici>(users: T[]) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockImplementation((url: string) => {
+      const adres = String(url);
+      if (adres.includes("/api/admin/mentors")) {
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] });
+      }
+      const kategori =
+        new URL(adres, "http://t").searchParams.get("kategori") ?? "ALL";
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          users: kategoriSuz(users, kategori),
+          nextCursor: null,
+          sayilar: sahteSayilar(users),
+        }),
+      });
+    }),
+  );
+}
+
 function renderPage() {
   return render(
     <ConfirmDialogProvider>
@@ -98,13 +180,7 @@ describe("Admin dashboard — mentör başvuruları (#250)", () => {
   });
 
   function stubla(users: TestUser[]) {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockImplementation((url: string) => {
-        const veri = String(url).includes("/api/admin/mentors") ? [] : users;
-        return Promise.resolve({ ok: true, status: 200, json: async () => veri });
-      }),
-    );
+    sahteSunucu(users);
   }
 
   beforeEach(() => vi.unstubAllGlobals());
@@ -233,13 +309,7 @@ describe("Admin dashboard — doğrulanmış hesap ibaresi (#259)", () => {
   });
 
   function stubla(users: DogrulamaliUser[]) {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockImplementation((url: string) => {
-        const veri = String(url).includes("/api/admin/mentors") ? [] : users;
-        return Promise.resolve({ ok: true, status: 200, json: async () => veri });
-      }),
-    );
+    sahteSunucu(users);
   }
 
   beforeEach(() => vi.unstubAllGlobals());
@@ -299,5 +369,123 @@ describe("Admin dashboard — doğrulanmış hesap ibaresi (#259)", () => {
 
     const sekme = await screen.findByRole("button", { name: /Doğrulanmamış/ });
     expect(sekme.textContent).toBe("Doğrulanmamış");
+  });
+});
+
+/**
+ * Sayfalama — arama/filtre sunucuya taşındı, liste imleçle uzuyor.
+ *
+ * Bu davranışın en sinsi kırılma biçimi SESSİZ: sayfa doğru sayfayı alıp
+ * onu bir daha eleyebilir, ya da arama yalnız yüklü sayfayı tarayabilir.
+ * İkisi de hata vermez, sadece "kayıt yok" gösterir.
+ */
+describe("Admin dashboard — sayfalama ve sunucu araması", () => {
+  // ⚠️ Ad ile e-posta AYRI: `name: id` iken "id" hem satır adında hem
+  // e-postada geçiyor ve `findByText` çoklu eşleşmeden patlıyordu.
+  const ku = (id: string) => ({
+    id,
+    email: "hesap-" + id + "@ornek.com",
+    name: "Kisi" + id,
+    lastName: "Test",
+    role: "STUDENT" as const,
+    accountStatus: "APPROVED" as const,
+    emailVerified: "2026-08-21T10:00:00.000Z",
+    studentProfile: null,
+  });
+
+  /** İmleçli sahte sunucu: ilk sayfa + "daha var" bilgisi. */
+  function sayfaliSunucu(sayfalar: ReturnType<typeof ku>[][]) {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      const adres = String(url);
+      if (adres.includes("/api/admin/mentors")) {
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] });
+      }
+      const imlec = new URL(adres, "http://t").searchParams.get("cursor");
+      const indeks = imlec ? Number(imlec) : 0;
+      const sayfa = sayfalar[indeks] ?? [];
+      const sonMu = indeks >= sayfalar.length - 1;
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          users: sayfa,
+          nextCursor: sonMu ? null : String(indeks + 1),
+          // Sayaçlar yalnız ilk (imleçsiz) istekte döner.
+          ...(imlec ? {} : { sayilar: sahteSayilar(sayfalar.flat()) }),
+        }),
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  beforeEach(() => vi.unstubAllGlobals());
+
+  it("son sayfada 'daha fazla yükle' GÖSTERİLMEZ", async () => {
+    sayfaliSunucu([[ku("tek")]]);
+
+    renderPage();
+
+    await screen.findByText("Kisitek Test");
+    expect(screen.queryByRole("button", { name: /daha fazla yükle/i })).toBeNull();
+  });
+
+  it("⚠️ 'daha fazla yükle' listeyi UZATIR, sıfırlamaz", async () => {
+    // Yeni sayfayı mevcut listenin yerine koymak, admin'in az önce
+    // gördüğü satırları kaybettirirdi.
+    sayfaliSunucu([[ku("birinci")], [ku("ikinci")]]);
+
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: /daha fazla yükle/i }));
+
+    expect(await screen.findByText("Kisiikinci Test")).toBeInTheDocument();
+    expect(screen.getByText("Kisibirinci Test")).toBeInTheDocument();
+  });
+
+  it("⚠️ SAYAÇLAR SAYFAYA GÖRE DEĞİŞMEZ — ilk sayfada da toplam doğru", async () => {
+    // İlk sayfada 2 kayıt var ama toplam 5. Sayaçlar yüklü listeden
+    // hesaplansaydı kart 2 gösterirdi.
+    sayfaliSunucu([[ku("a"), ku("b")], [ku("c"), ku("d")], [ku("e")]]);
+
+    renderPage();
+
+    await screen.findByText("Kisia Test");
+    expect(await screen.findAllByText("5")).not.toHaveLength(0);
+  });
+
+  it("⚠️ ARAMA SUNUCUYA GİDER — istemcide süzülmez", async () => {
+    const fetchMock = sayfaliSunucu([[ku("ayse")]]);
+
+    renderPage();
+    await screen.findByText("Kisiayse Test");
+
+    const kutu = screen.getByPlaceholderText(/ara/i);
+    fireEvent.change(kutu, { target: { value: "mehmet" } });
+
+    await waitFor(
+      () => {
+        const gitti = fetchMock.mock.calls.some((c) =>
+          String(c[0]).includes("q=mehmet"),
+        );
+        expect(gitti).toBe(true);
+      },
+      { timeout: 2000 },
+    );
+  });
+
+  it("kategori sekmesi sunucuya kategori olarak gider", async () => {
+    const fetchMock = sayfaliSunucu([[ku("a")]]);
+
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: /Doğrulanmamış/ }));
+
+    await waitFor(() => {
+      const gitti = fetchMock.mock.calls.some((c) =>
+        String(c[0]).includes("kategori=DOGRULANMAMIS"),
+      );
+      expect(gitti).toBe(true);
+    });
   });
 });
