@@ -21,6 +21,8 @@ import { PanelKarsilama } from "@/features/dashboard/ui/PanelKarsilama";
 import { ProfilTamamlaSeridi } from "@/features/dashboard/ui/ProfilTamamlaSeridi";
 import { stajyerDurumu, PROJELER_CAPASI } from "@/features/dashboard/models/stajyerDurumu";
 import { tarihBicimle } from "@/lib/tarih";
+import { panoErisimineAcik, DURUM_EKRANI } from "@/lib/auth/hesap-durumu";
+import { redirect } from "next/navigation";
 
 /**
  * #416/#332: Adımı başkası üstlendiyse adını çözer, yoksa null.
@@ -49,31 +51,19 @@ export default async function StudentDashboardPage() {
 
   // #38: Onaylanmamış stajyer (PENDING/REJECTED) panele erişemez.
   // GRADUATED stajyerler projelerini ve adımlarını incelemeye devam edebilir.
+  //
+  // #466: BURASI ARTIK KENDİ EKRANINI BASMIYOR, kanonik ekrana yönlendiriyor.
+  // Öncesinde 28 satırlık bir kopya vardı ve o kopyada #143'ün "profilini
+  // tamamla" eylemi YOKTU — oraya düşen PENDING stajyer, ilerleyebileceğini
+  // öğrenemeden çıkışsız bir ekranda kalıyordu.
+  //
+  // Bu yol normalde HİÇ çalışmaz (middleware zaten yönlendiriyor); bir yedek
+  // kat olarak duruyor. Yedek katın kanonik ekrandan farklı davranması
+  // korumanın kendisinden zararlıydı.
   const accountStatus = session.user.accountStatus;
   const isGraduated = accountStatus === "GRADUATED";
-  if (accountStatus && accountStatus !== "APPROVED" && !isGraduated) {
-    const rejected = accountStatus === "REJECTED";
-    return (
-      <div className="min-h-[80vh] flex flex-col items-center justify-center p-6 text-center">
-        <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-10 max-w-lg w-full space-y-4">
-          <div
-            className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto ${
-              rejected ? "bg-red-50" : "bg-amber-50"
-            }`}
-          >
-            <Clock className={`w-8 h-8 ${rejected ? "text-red-600 " : "text-amber-600 "}`} />
-          </div>
-          <h1 className="text-2xl font-bold text-slate-900">
-            {rejected ? "Başvurunuz reddedildi" : "Hesabınız onay bekliyor"}
-          </h1>
-          <p className="text-slate-600 leading-relaxed">
-            {rejected
-              ? "Hesabınız bir yönetici tarafından reddedildi. Sorunuz varsa lütfen ekiple iletişime geçin."
-              : "Kaydınız alındı. Bir yönetici hesabınızı onayladıktan sonra panele erişebilirsiniz."}
-          </p>
-        </div>
-      </div>
-    );
+  if (!panoErisimineAcik(accountStatus)) {
+    redirect(DURUM_EKRANI);
   }
 
   const profile = await prisma.studentProfile.findUnique({
