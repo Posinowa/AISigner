@@ -244,6 +244,60 @@ export async function getStudentDetail(studentId: string, mentorId: string) {
                 createdAt: "desc",
               },
             },
+            /*
+             * #442: TAKIM PROJELERİ DE GELİYOR.
+             *
+             * ⚠️ Takım atamasında `studentProfileId` NULL (#332), dolayısıyla
+             * üstteki `assignedProjects` takım projesini HİÇ getirmiyordu:
+             * mentör, takımda aktif çalışan bir stajyeri "projesi yok" olarak
+             * görüyordu. Canlı doğrulandı (`assignedProjects: 0 kayıt`).
+             *
+             * ⚠️ #367 AYNI HATAYI ÜÇ YÜZEYDE düzeltmişti ama BURASI atlanmıştı:
+             * mentör listesi ve öğrenci panosu takım bağını soruyor, mentörün
+             * öğrenci DETAYI sormuyordu.
+             *
+             * Seçim bireysel dalla AYNI şekilde — iki liste birleştirilecek.
+             */
+            teamMemberships: {
+              where: { leftAt: null },
+              select: {
+                team: {
+                  select: {
+                    id: true,
+                    name: true,
+                    members: {
+                      where: { leftAt: null },
+                      select: {
+                        role: true,
+                        studentProfile: {
+                          select: {
+                            user: { select: { id: true, name: true, lastName: true, email: true } },
+                          },
+                        },
+                      },
+                    },
+                    assignedProjects: {
+                      include: {
+                        projectTemplate: true,
+                        roadmap: { include: { steps: { orderBy: { order: "asc" } } } },
+                        workspaceRequests: {
+                          orderBy: { createdAt: "desc" },
+                          take: 1,
+                          select: {
+                            id: true,
+                            status: true,
+                            adminNote: true,
+                            createdAt: true,
+                            decidedAt: true,
+                          },
+                        },
+                      },
+                      orderBy: { createdAt: "desc" },
+                    },
+                  },
+                },
+              },
+            },
             // #48: Detaylı AI profil analizi (varsa) — mentor kendi öğrencisininkini görür.
             profileAnalysis: true,
           },
@@ -264,14 +318,41 @@ export async function getStudentDetail(studentId: string, mentorId: string) {
      * ⚠️ Atama başına TEK sorgu; öğrencinin birkaç projesi olabilir ama
      * sayı küçük ve durum atamaya özgü (takım üyeleri farklı olabilir).
      */
-    const atamalar = student.studentProfile?.assignedProjects ?? [];
+    /*
+     * #442: BİREYSEL + TAKIM atamaları TEK listede.
+     *
+     * Arayüz `assignedProjects`'i okuyor; birleştirmeyi burada yapmak, sayfanın
+     * iki ayrı liste yönetmesinden iyi. Her satıra `takim` işareti konuyor:
+     *
+     * ⚠️ Takım satırı BİREYSELMİŞ GİBİ durmamalı — pano ortak, yapılan iş
+     * tüm takımı etkiliyor.
+     * ⚠️ Takımda AI yol haritası üretimi KAPALI (#332, açık 400); arayüz o
+     * düğmeyi takım satırında sunmamalı.
+     */
+    const takimlar = (student.studentProfile?.teamMemberships ?? []).map((u) => u.team);
+    const tumAtamalar = [
+      ...(student.studentProfile?.assignedProjects ?? []).map((p) => ({
+        ...p,
+        takim: null as (typeof takimlar)[number] | null,
+      })),
+      ...takimlar.flatMap((t) => t.assignedProjects.map((p) => ({ ...p, takim: t }))),
+    ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+    const atamalar = tumAtamalar;
     const kodIncelemesi = Object.fromEntries(
       await Promise.all(
         atamalar.map(async (a) => [a.id, await kodIncelemesiDurumu(a.id)] as const),
       ),
     );
 
-    return { ...student, kodIncelemesi };
+    return {
+      ...student,
+      // #442: Arayüz tek liste okuyor; takım projeleri de burada.
+      studentProfile: student.studentProfile
+        ? { ...student.studentProfile, assignedProjects: tumAtamalar }
+        : student.studentProfile,
+      kodIncelemesi,
+    };
   } catch (error) {
     // "Bulunamadı" durumunu findFirst zaten null ile döner (exception atmaz);
     // buraya yalnızca gerçek DB hatasında düşülür → yutmak yerine rethrow.
