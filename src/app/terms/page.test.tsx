@@ -23,7 +23,10 @@ describe("Yasal sayfalar (#171)", () => {
     render(<PrivacyPage />);
 
     expect(
-      screen.getByRole("heading", { level: 1, name: "Gizlilik Politikası" }),
+      // #449: Başlık "… ve KVKK Aydınlatma Metni" ile uzatıldı — sayfa artık
+      // yalnız gizlilik açıklaması değil, KVKK m.10 aydınlatma metni de.
+      // İddia ADIN TAMAMINA değil, sayfanın kimliğine ait.
+      screen.getByRole("heading", { level: 1, name: /^Gizlilik Politikası/ }),
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Kullanım Koşulları/ })).toHaveAttribute(
       "href",
