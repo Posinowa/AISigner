@@ -604,7 +604,16 @@ export function CertificateModal({
                       key={p.id}
                       className="p-2 rounded-lg bg-white border border-slate-200/70 font-medium flex items-center justify-between"
                     >
-                      <span className="truncate text-slate-800 text-xs">{p.title}</span>
+                      <span className="min-w-0 truncate text-slate-800 text-xs">
+                        {p.title}
+                        {/* #449: Takım projesi olarak işaretli; sayı bu
+                            stajyerin KENDİ katkısı (takımın toplamı değil). */}
+                        {p.takimAdi && (
+                          <span className="text-slate-500">
+                            {" "}· {p.takimAdi} · {p.completedStepsCount} adım
+                          </span>
+                        )}
+                      </span>
                       <span className="shrink-0 px-2 py-0.5 rounded text-[10px] font-bold bg-accent text-accent-foreground">
                         {p.difficulty}
                       </span>

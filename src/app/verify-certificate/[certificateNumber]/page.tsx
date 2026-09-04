@@ -225,8 +225,16 @@ export default async function VerifyCertificatePage({ params }: Props) {
                           key={p.id}
                           className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200/60 text-xs font-medium"
                         >
-                          <span className="text-slate-900 font-semibold truncate">
+                          <span className="min-w-0 text-slate-900 font-semibold truncate">
                             {p.title}
+                            {/* #449: TAKIM projesi bireysel işmiş gibi
+                                durmamalı. Katkı bireysel ölçüldüğü için
+                                sayı da bu stajyerin kendi adımlarıdır. */}
+                            {p.takimAdi && (
+                              <span className="ml-1.5 font-normal text-slate-500">
+                                · {p.takimAdi} · {p.completedStepsCount} adım katkı
+                              </span>
+                            )}
                           </span>
                           <span className="shrink-0 px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-800">
                             {p.difficulty}

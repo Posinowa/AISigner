@@ -8,6 +8,16 @@ const { prismaMock } = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 
+/**
+ * #449: Projeler ve mentörler artık `katki.ts`'ten geliyor (takım yolu dahil).
+ * Buradaki testler BELGENİN DERLENMESİNİ kapsıyor; kapsamın kendisi
+ * `katki.test.ts`'te gerçek kurallarla test ediliyor.
+ */
+const { kapsamMock } = vi.hoisted(() => ({ kapsamMock: vi.fn() }));
+vi.mock("./katki", () => ({
+  sertifikaKapsaminiGetir: (...a: unknown[]) => kapsamMock(...a),
+}));
+
 import {
   generateCertificateNumber,
   getCertificateVerificationUrl,
@@ -20,6 +30,7 @@ import {
 describe("Certificate Service — Staj Başarı Sertifikası", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    kapsamMock.mockResolvedValue({ projeler: [], mentorler: [] });
   });
 
   it("generateCertificateNumber — POS-YYYY-XXXX formatında seri no üretir", () => {
@@ -72,34 +83,22 @@ describe("Certificate Service — Staj Başarı Sertifikası", () => {
         completionGrade: "Üstün Başarı",
         mentorNote: "Tebrikler, harika bir staj dönemiydi.",
         issuedAt: new Date("2026-08-08"),
-        mentorAssignments: [
-          {
-            mentor: {
-              id: "m-1",
-              name: "Can",
-              lastName: "Demir",
-              email: "mentor@posinowa.com",
-            },
-          },
-        ],
-        assignedProjects: [
-          {
-            id: "ap-1",
-            projectTemplate: {
-              title: "Next.js Fullstack Portal",
-              description: "Modern web uygulaması",
-              difficulty: "MEDIUM",
-              track: ["Frontend", "Fullstack"],
-            },
-            roadmap: {
-              steps: [
-                { id: "step-1", status: "COMPLETED" },
-                { id: "step-2", status: "COMPLETED" },
-              ],
-            },
-          },
-        ],
       },
+    });
+    kapsamMock.mockResolvedValue({
+      mentorler: [{ id: "m-1", name: "Can", lastName: "Demir", email: "mentor@posinowa.com" }],
+      projeler: [
+        {
+          id: "ap-1",
+          title: "Next.js Fullstack Portal",
+          description: "Modern web uygulaması",
+          difficulty: "MEDIUM",
+          track: ["Frontend", "Fullstack"],
+          completedStepsCount: 2,
+          totalStepsCount: 2,
+          takimAdi: null,
+        },
+      ],
     });
 
     const cert = await getStudentCertificate("u-1");
@@ -110,6 +109,20 @@ describe("Certificate Service — Staj Başarı Sertifikası", () => {
     expect(cert?.completionGrade).toBe("Üstün Başarı");
     expect(cert?.completedProjects).toHaveLength(1);
     expect(cert?.completedProjects[0].completedStepsCount).toBe(2);
+    expect(cert?.mentorEmail).toBe("mentor@posinowa.com");
+  });
+
+  it("#449 — öğrenci görünümü kapsamı e-posta İLE ister (mentör e-postası gösteriliyor)", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: "u-1",
+      email: "o@x.com",
+      name: "Ali",
+      studentProfile: { id: "sp-1", certificateNumber: "POS-2026-1", issuedAt: null },
+    });
+
+    await getStudentCertificate("u-1");
+
+    expect(kapsamMock).toHaveBeenCalledWith("sp-1", "u-1", { epostaDahil: true });
   });
 
   it("updateCertificateDetails — sertifika detaylarını ve referans notunu günceller", async () => {
@@ -174,9 +187,11 @@ describe("Certificate Service — Staj Başarı Sertifikası", () => {
         certificateNumber: "POS-2026-1234",
         issuedAt: new Date("2026-08-09"),
         completionGrade: "Onur Derecesi",
-        user: { id: "u-1", name: "Ayşe", lastName: "Yılmaz", email: "ayse@test.com", accountStatus: "GRADUATED" },
-        mentorAssignments: [{ mentor: { name: "Mehmet", lastName: "Öz", email: "mehmet@test.com" } }],
-        assignedProjects: [],
+        user: { id: "u-1", name: "Ayşe", lastName: "Yılmaz", accountStatus: "GRADUATED" },
+      });
+      kapsamMock.mockResolvedValue({
+        mentorler: [{ id: "m-1", name: "Mehmet", lastName: "Öz", email: null }],
+        projeler: [],
       });
 
       const res = await verifyCertificate("POS-2026-1234");
@@ -184,6 +199,61 @@ describe("Certificate Service — Staj Başarı Sertifikası", () => {
       expect(res.certificate?.studentName).toBe("Ayşe Yılmaz");
       expect(res.certificate?.completionGrade).toBe("Onur Derecesi");
       expect(res.certificate?.mentorName).toBe("Mehmet Öz");
+    });
+
+    /**
+     * #449 — TAKIM İŞİ BELGEDE GÖRÜNÜR.
+     *
+     * Bu tam olarak canlıda bulunan hataydı: tüm işini takımda yapmış bir
+     * mezunun belgesi "geçerlidir" diyor ama ne mentörünü ne projesini
+     * gösteriyordu.
+     */
+    it("#449 — takım projesi ve takım mentörü belgede görünür", async () => {
+      prismaMock.studentProfile.findFirst.mockResolvedValue({
+        id: "sp-1",
+        certificateNumber: "AIS-T446-TEST",
+        issuedAt: new Date("2026-08-09"),
+        completionGrade: null,
+        user: { id: "u-1", name: "Ayşe", lastName: "Yılmaz", accountStatus: "GRADUATED" },
+      });
+      kapsamMock.mockResolvedValue({
+        mentorler: [{ id: "m-9", name: "Takım", lastName: "Mentörü", email: null }],
+        projeler: [
+          {
+            id: "ap-t1",
+            title: "Scrum Panosu",
+            description: "",
+            difficulty: "MEDIUM",
+            track: [],
+            completedStepsCount: 2,
+            totalStepsCount: 10,
+            takimAdi: "Takım A",
+          },
+        ],
+      });
+
+      const res = await verifyCertificate("AIS-T446-TEST");
+
+      expect(res.certificate?.mentorName).toBe("Takım Mentörü");
+      expect(res.certificate?.completedProjects).toHaveLength(1);
+      // ⚠️ Takım işareti taşınmalı — belge bunu bireysel iş gibi göstermemeli.
+      expect(res.certificate?.completedProjects[0].takimAdi).toBe("Takım A");
+      // ⚠️ Sayı ÖĞRENCİNİN KENDİ katkısı; takımın 10 adımı değil.
+      expect(res.certificate?.completedProjects[0].completedStepsCount).toBe(2);
+    });
+
+    it("⚠️ #449 — public yüzey kapsamı e-posta OLMADAN ister (#208 PII kararı)", async () => {
+      prismaMock.studentProfile.findFirst.mockResolvedValue({
+        id: "sp-1",
+        certificateNumber: "POS-2026-1234",
+        issuedAt: new Date("2026-08-09"),
+        completionGrade: null,
+        user: { id: "u-1", name: "A", lastName: "B", accountStatus: "GRADUATED" },
+      });
+
+      await verifyCertificate("POS-2026-1234");
+
+      expect(kapsamMock).toHaveBeenCalledWith("sp-1", "u-1", { epostaDahil: false });
     });
   });
 
