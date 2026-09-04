@@ -156,3 +156,15 @@ describe("kanunda SABİT olan kısım — her durumda yayımlanır", () => {
     expect(screen.getByText(/türev analizleriniz/)).toBeInTheDocument();
   });
 });
+
+describe("canlı testte bulunan kusurlar (#453)", () => {
+  it("⚠️ uyarı metninde FİİL TEKRARI yok", async () => {
+    // "yöneticinize ileterek iletebilirsiniz" — tarayıcıda okununca görüldü.
+    // Testler metnin VARLIĞINI ölçüyordu, OKUNABİLİRLİĞİNİ değil.
+    await sayfayiBas();
+
+    expect(screen.getByText(/Aşağıdaki başlıklarda/).textContent).not.toMatch(
+      /ileterek iletebilirsiniz/,
+    );
+  });
+});
