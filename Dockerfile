@@ -1,11 +1,15 @@
-FROM node:20-bookworm-slim AS base
+FROM node:22-bookworm-slim AS base
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 # --- Bağımlılıklar -----------------------------------------------------------
 FROM base AS deps
 WORKDIR /app
-COPY package.json package-lock.json ./
+# ⚠️ `.npmrc` DE KOPYALANIR (#483): içinde `engine-strict=true` var ve o
+# olmadan bu aşamadaki `npm ci` uyumsuz `engines.node` alanlarını yalnızca
+# UYARI olarak geçer — tam da #480'de olan şey. Dosya yalnız bu ayarı
+# taşıyor; **asla kimlik bilgisi/token konmamalı**, imaja giriyor.
+COPY package.json package-lock.json .npmrc ./
 COPY prisma ./prisma
 # `npm ci` (öncesi `npm install`): lockfile'ı AYNEN kurar ve onu değiştirmez.
 # `npm install` lockfile'ı yok sayıp sürümleri yeniden çözebiliyordu — yani
