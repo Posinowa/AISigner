@@ -36,6 +36,7 @@ const sertifika: CertificateData = {
       track: ["backend"],
       completedStepsCount: 5,
       totalStepsCount: 5,
+      takimAdi: null,
     },
   ],
   verificationUrl: "https://aisigner.com/verify-certificate/AIS-2026-0001",

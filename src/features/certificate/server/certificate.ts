@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { uygulamaUrl } from "@/lib/app-url";
 import { logger } from "@/lib/logger";
+import { sertifikaKapsaminiGetir } from "./katki";
 
 export type CertificateData = {
   id: string;
@@ -18,8 +19,11 @@ export type CertificateData = {
     description: string;
     difficulty: string;
     track: string[];
+    /** #449: TAKIM projesinde bu sayı ÖĞRENCİNİN KENDİ katkısıdır. */
     completedStepsCount: number;
     totalStepsCount: number;
+    /** #449: Doluysa TAKIM projesi — belgede bireysel işmiş gibi durmamalı. */
+    takimAdi: string | null;
   }[];
   verificationUrl: string;
   /**
@@ -43,8 +47,11 @@ export type PublicCertificateVerification = {
       title: string;
       difficulty: string;
       track: string[];
+      /** #449: TAKIM projesinde bu sayı ÖĞRENCİNİN KENDİ katkısıdır. */
       completedStepsCount: number;
       totalStepsCount: number;
+      /** #449: Doluysa TAKIM projesi. */
+      takimAdi: string | null;
     }[];
   };
   message?: string;
@@ -90,33 +97,11 @@ export function getCertificateVerificationUrl(certNumber: string): string {
 export async function getStudentCertificate(userId: string): Promise<CertificateData | null> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    include: {
-      studentProfile: {
-        include: {
-          // #195: M:N — öğrencinin mentorları join tablosu üzerinden.
-          mentorAssignments: {
-            include: {
-              mentor: {
-                select: { id: true, name: true, lastName: true, email: true },
-              },
-            },
-          },
-          assignedProjects: {
-            include: {
-              projectTemplate: true,
-              roadmap: {
-                include: {
-                  steps: {
-                    select: { id: true, status: true },
-                  },
-                },
-              },
-            },
-            orderBy: { createdAt: "desc" },
-          },
-        },
-      },
-    },
+    // #449: Projeler ve mentörler ARTIK BURADAN GELMİYOR. İkisi de takım
+    // yolunu atlıyordu (takım atamasında `studentProfileId` NULL, takım
+    // mentörü `TeamMentor`'da) ve aynı körlük `verifyCertificate`'te de
+    // vardı. Tek kaynak: `katki.ts`.
+    include: { studentProfile: true },
   });
 
   if (!user || !user.studentProfile) {
@@ -131,30 +116,20 @@ export async function getStudentCertificate(userId: string): Promise<Certificate
     [user.name, user.lastName].filter(Boolean).join(" ") || user.email.split("@")[0];
 
   // #195: M:N — sertifikada tüm atanmış mentorlar gösterilir.
-  const mentorsList = profile.mentorAssignments.map((a) => a.mentor);
+  // #449: Takım mentörleri de dahil (tek kaynak: `katki.ts`).
+  const { projeler, mentorler } = await sertifikaKapsaminiGetir(profile.id, user.id, {
+    epostaDahil: true,
+  });
+
   const mentorName =
-    mentorsList.length > 0
-      ? mentorsList
-          .map((m) => [m.name, m.lastName].filter(Boolean).join(" ") || m.email)
+    mentorler.length > 0
+      ? mentorler
+          .map((m) => [m.name, m.lastName].filter(Boolean).join(" ") || m.email || "Mentör")
           .join(", ")
       : null;
-  const mentorEmail = mentorsList[0]?.email ?? null;
+  const mentorEmail = mentorler[0]?.email ?? null;
 
-  const completedProjects = profile.assignedProjects.map((p) => {
-    const steps = p.roadmap?.steps || [];
-    const totalStepsCount = steps.length;
-    const completedStepsCount = steps.filter((s) => s.status === "COMPLETED").length;
-
-    return {
-      id: p.id,
-      title: p.projectTemplate.title,
-      description: p.projectTemplate.description,
-      difficulty: p.projectTemplate.difficulty,
-      track: p.projectTemplate.track,
-      completedStepsCount,
-      totalStepsCount,
-    };
-  });
+  const completedProjects = projeler;
 
   const issuedDate = profile.issuedAt
     ? profile.issuedAt.toISOString()
@@ -283,26 +258,8 @@ export async function verifyCertificate(
           accountStatus: true,
         },
       },
-      mentorAssignments: {
-        include: {
-          mentor: {
-            select: { name: true, lastName: true },
-          },
-        },
-      },
-      assignedProjects: {
-        include: {
-          projectTemplate: true,
-          roadmap: {
-            include: {
-              steps: {
-                select: { id: true, status: true },
-              },
-            },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-      },
+      // #449: Projeler ve mentörler `katki.ts`'ten — takım yolu buradan
+      // atlanıyordu ve belge boş çıkıyordu.
     },
   });
 
@@ -329,28 +286,29 @@ export async function verifyCertificate(
     [profile.user.name, profile.user.lastName].filter(Boolean).join(" ") ||
     "İsimsiz Stajyer";
 
-  const mentorsList = profile.mentorAssignments.map((a) => a.mentor);
+  // #449: Takım mentörleri ve takım projeleri de dahil.
+  // ⚠️ `epostaDahil: false` — #208'de public yüzeyde PII'nin sorguya HİÇ
+  // girmemesi kararlaştırılmıştı (yanıttan ayıklamak değil, çekmemek).
+  const { projeler, mentorler } = await sertifikaKapsaminiGetir(profile.id, profile.user.id, {
+    epostaDahil: false,
+  });
+
   const mentorName =
-    mentorsList.length > 0
-      ? mentorsList
+    mentorler.length > 0
+      ? mentorler
           .map((m) => [m.name, m.lastName].filter(Boolean).join(" ") || "Mentör")
           .join(", ")
       : null;
 
-  const completedProjects = profile.assignedProjects.map((p) => {
-    const steps = p.roadmap?.steps || [];
-    const totalStepsCount = steps.length;
-    const completedStepsCount = steps.filter((s) => s.status === "COMPLETED").length;
-
-    return {
-      id: p.id,
-      title: p.projectTemplate.title,
-      difficulty: p.projectTemplate.difficulty,
-      track: p.projectTemplate.track,
-      completedStepsCount,
-      totalStepsCount,
-    };
-  });
+  const completedProjects = projeler.map((p) => ({
+    id: p.id,
+    title: p.title,
+    difficulty: p.difficulty,
+    track: p.track,
+    completedStepsCount: p.completedStepsCount,
+    totalStepsCount: p.totalStepsCount,
+    takimAdi: p.takimAdi,
+  }));
 
   return {
     isValid: true,
