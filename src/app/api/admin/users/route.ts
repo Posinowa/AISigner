@@ -1,14 +1,45 @@
 import { NextResponse } from "next/server";
-import { getAllUsers, updateUserRole, setStudentMentors, AssignmentValidationError } from "@/features/admin/server/user";
+import {
+  getAllUsers,
+  kullaniciSayilari,
+  updateUserRole,
+  setStudentMentors,
+  AssignmentValidationError,
+} from "@/features/admin/server/user";
+import { gecerliKategori } from "@/features/admin/kategoriler";
 import { requireAuth } from "@/lib/auth/guard";
 import { updateRoleSchema, assignMentorSchema } from "@/lib/validations/api";
 
-export async function GET() {
+/**
+ * Kullanıcı listesi — sayfalı, sunucuda filtreli/aranan.
+ *
+ * ⚠️ YANIT ŞEKLİ DEĞİŞTİ: düz dizi yerine `{ users, nextCursor, sayilar }`.
+ * `TakimYonetimi` her iki şekli de karşılıyordu (`Array.isArray(veri) ? ...`),
+ * panel bu PR'da güncellendi.
+ *
+ * ⚠️ SAYAÇLAR HER SAYFADA DÖNMÜYOR. İlk istekte (imleçsiz) hesaplanıyor;
+ * "daha fazla yükle" isteklerinde `sayilar` YOK. Sayaçlar sayfaya göre
+ * değişmiyor, her sayfada üç toplama sorgusu daha koşturmak boşuna yük
+ * olurdu.
+ */
+export async function GET(req: Request) {
   const auth = await requireAuth("ADMIN");
   if (!auth.authorized) return auth.response;
 
-  const users = await getAllUsers();
-  return NextResponse.json(users);
+  const { searchParams } = new URL(req.url);
+  const cursor = searchParams.get("cursor");
+
+  const [liste, sayilar] = await Promise.all([
+    getAllUsers({
+      kategori: gecerliKategori(searchParams.get("kategori")),
+      q: searchParams.get("q") ?? "",
+      cursor,
+      limit: Number(searchParams.get("limit")) || undefined,
+    }),
+    cursor ? Promise.resolve(null) : kullaniciSayilari(),
+  ]);
+
+  return NextResponse.json({ ...liste, ...(sayilar ? { sayilar } : {}) });
 }
 
 export async function PATCH(req: Request) {

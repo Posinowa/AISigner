@@ -69,7 +69,16 @@ export function TakimYonetimi() {
     try {
       const [t, u, m, p] = await Promise.all([
         fetch("/api/admin/teams"),
-        fetch("/api/admin/users"),
+        /*
+         * ⚠️ KATEGORİ SUNUCUDA. Liste artık sayfalı; `role === "STUDENT"`
+         * süzgecini istemcide çalıştırmak yalnız İLK SAYFAYI süzer ve üye
+         * seçici stajyerlerin çoğunu sessizce göstermezdi.
+         *
+         * Seçici tüm stajyerleri bir arada istiyor (arama kutusu yok),
+         * bu yüzden tavan yüksek: `limit=200` sunucunun kabul ettiği azami
+         * değer. Bunun da yetmediği ölçekte seçicinin kendi araması olmalı.
+         */
+        fetch("/api/admin/users?kategori=STUDENT&limit=200"),
         fetch("/api/admin/mentors"),
         fetch("/api/admin/project-templates"),
       ]);
@@ -82,9 +91,8 @@ export function TakimYonetimi() {
       if (u.ok) {
         const veri = await u.json();
         const liste = Array.isArray(veri) ? veri : (veri.users ?? []);
-        setOgrenciler(
-          liste.filter((x: { role: string }) => x.role === "STUDENT"),
-        );
+        // Süzme sunucuda yapıldı; burada tekrar elemek gereksiz.
+        setOgrenciler(liste);
       }
       if (m.ok) setMentorler(await m.json());
       if (p.ok) {
