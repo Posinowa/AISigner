@@ -3,7 +3,7 @@ import { LegalPage } from "@/features/legal/LegalPage";
 import { VERI_SORUMLUSU, SAKLAMA_SURELERI, eksikAlanlar } from "@/features/legal/kvkk";
 
 export const metadata: Metadata = {
-  title: "Gizlilik Politikası — AISigner",
+  title: "Gizlilik Politikası ve KVKK Aydınlatma Metni — AISigner",
   description: "AISigner platformu gizlilik politikası ve KVKK aydınlatma metni.",
 };
 
@@ -57,7 +57,7 @@ export default function PrivacyPage() {
           <p className="mt-1 text-sm text-amber-800">
             Aşağıdaki başlıklarda yer alacak bilgiler henüz yayımlanmadı:{" "}
             {eksik.join(", ")}. Bu süre zarfında KVKK kapsamındaki taleplerinizi
-            platform üzerinden yöneticinize ileterek iletebilirsiniz; talebiniz
+            platform üzerinden yöneticinize iletebilirsiniz; talebiniz
             kayda alınır ve yasal süresi içinde yanıtlanır.
           </p>
         </div>
