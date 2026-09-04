@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth/guard";
-import { ilerlemeHesapla, duraklamaMetni } from "@/features/progress/ilerleme";
+import { ilerlemeOzetten, duraklamaMetniOzetten } from "@/features/progress/ilerleme";
+import { adimOzetleriniGetir, BOS_OZET, type AdimOzeti } from "./adim-ozeti";
 
 export type StudentAssignmentProgress = {
   assignmentId: string;
@@ -98,19 +99,14 @@ export async function getStudentAssignmentsProgress(): Promise<StudentAssignment
           difficulty: true,
         },
       },
+      // #452: Adımlar ARTIK ÇEKİLMİYOR. Buradan yalnız dört sayı üretiliyordu
+      // (toplam, tamamlanan, son hareket, son adımın başlığı) ve adımlar
+      // yanıtta hiç dönmüyordu; ölçümde istek başına 9.838 satır bu yüzden
+      // hidratlanıyordu. Toplama `adim-ozeti.ts`'te, veritabanında.
       roadmap: {
-        include: {
-          steps: {
-            orderBy: {
-              updatedAt: "desc",
-            },
-            select: {
-              id: true,
-              title: true,
-              status: true,
-              updatedAt: true,
-            },
-          },
+        select: {
+          id: true,
+          status: true,
         },
       },
     },
@@ -118,6 +114,12 @@ export async function getStudentAssignmentsProgress(): Promise<StudentAssignment
       createdAt: "desc",
     },
   });
+
+  // #452: Adım sayıları tek toplama sorgusuyla — atama başına değil,
+  // TÜM sayfa için bir kez. Yol haritası olmayan atama listeye girmez.
+  const ozetler = await adimOzetleriniGetir(
+    assignments.map((a) => a.roadmap?.id).filter((id): id is string => Boolean(id)),
+  );
 
   const ad = (u: { name: string | null; lastName: string | null; email: string }) =>
     [u.name, u.lastName].filter(Boolean).join(" ") || u.email;
@@ -143,19 +145,18 @@ export async function getStudentAssignmentsProgress(): Promise<StudentAssignment
           name: ad(a.mentor),
         }));
 
-    const steps = assignment.roadmap?.steps ?? [];
     // #432: Hesap ortak modülde — mentör panosu da aynısını kullanıyor.
     // Burada gömülü kaldığı sürece ikinci bir kopya kaçınılmazdı.
+    // #452: Girdi artık adım dizisi değil, veritabanında toplanmış özet.
+    const ozet: AdimOzeti =
+      (assignment.roadmap && ozetler.get(assignment.roadmap.id)) || BOS_OZET;
     const { toplamAdim: totalSteps, tamamlanan: completedSteps, yuzde: progressPercentage } =
-      ilerlemeHesapla(steps);
+      ilerlemeOzetten(ozet);
 
-    const lastUpdatedStep = steps[0]; // orderBy updatedAt desc
-    const lastActivity = lastUpdatedStep
-      ? {
-          title: lastUpdatedStep.title,
-          updatedAt: lastUpdatedStep.updatedAt,
-        }
-      : null;
+    const lastActivity =
+      ozet.sonBaslik && ozet.sonHareketAt
+        ? { title: ozet.sonBaslik, updatedAt: ozet.sonHareketAt }
+        : null;
 
     return {
       assignmentId: assignment.id,
@@ -181,7 +182,7 @@ export async function getStudentAssignmentsProgress(): Promise<StudentAssignment
       completedSteps,
       progressPercentage,
       // #432: "10 gündür hareket yok" — skor değil sinyal (#331/#397).
-      duraklamaMetni: duraklamaMetni(steps),
+      duraklamaMetni: duraklamaMetniOzetten(ozet),
       lastActivity,
       roadmapId: assignment.roadmap?.id ?? null,
       roadmapStatus: assignment.roadmap?.status ?? null,
