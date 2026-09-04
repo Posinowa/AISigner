@@ -8,6 +8,7 @@ import {
 import { requireAuth } from "@/lib/auth/guard";
 import { updateStepStatusSchema } from "@/lib/validations/api";
 import { adimDurumunuDegistir } from "@/features/roadmap/server/step-status";
+import { rotaHatasi } from "@/lib/api-hata";
 
 /**
  * PATCH /api/student/steps/[stepId]
@@ -166,7 +167,7 @@ export async function PATCH(
 
     return NextResponse.json({ step: updated });
   } catch (error) {
-    console.error("PATCH /api/student/steps/[stepId] error:", error);
+    rotaHatasi("PATCH /api/student/steps/[stepId] error:", error);
     return NextResponse.json(
       { error: "Adım durumu güncellenirken bir hata oluştu." },
       { status: 500 }

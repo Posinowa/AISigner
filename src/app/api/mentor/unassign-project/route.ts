@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { unassignProject } from "@/features/mentors/server/actions";
 import { requireAuth } from "@/lib/auth/guard";
 import { unassignProjectSchema } from "@/lib/validations/api";
+import { rotaHatasi } from "@/lib/api-hata";
 
 export async function DELETE(req: Request) {
   const auth = await requireAuth("MENTOR");
@@ -25,7 +26,7 @@ export async function DELETE(req: Request) {
         { status: 409 }
       );
     }
-    console.error("Unassign error:", error);
+    rotaHatasi("Unassign error:", error);
     return NextResponse.json({ error: "Silme işlemi başarısız" }, { status: 500 });
   }
 }

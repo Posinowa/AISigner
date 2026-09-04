@@ -9,6 +9,7 @@ import {
 import { requireAuth } from "@/lib/auth/guard";
 import { createStepCommentSchema } from "@/lib/validations/api";
 import { createRateLimiter } from "@/lib/rate-limit";
+import { rotaHatasi } from "@/lib/api-hata";
 
 const limiter = createRateLimiter("step-comments", {
   maxRequests: 20,
@@ -52,7 +53,7 @@ export async function GET(
 
     return NextResponse.json({ comments });
   } catch (error) {
-    console.error("GET /api/steps/[stepId]/comments error:", error);
+    rotaHatasi("GET /api/steps/[stepId]/comments error:", error);
     return NextResponse.json(
       { error: "Yorumlar yüklenirken hata oluştu." },
       { status: 500 }
@@ -131,7 +132,7 @@ export async function POST(
 
     return NextResponse.json({ comment }, { status: 201 });
   } catch (error) {
-    console.error("POST /api/steps/[stepId]/comments error:", error);
+    rotaHatasi("POST /api/steps/[stepId]/comments error:", error);
     return NextResponse.json(
       { error: "Yorum eklenirken hata oluştu." },
       { status: 500 }

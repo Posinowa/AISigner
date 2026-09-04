@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { updateAccountStatus, AssignmentValidationError } from "@/features/admin/server/user";
 import { requireAuth } from "@/lib/auth/guard";
 import { updateAccountStatusSchema } from "@/lib/validations/api";
+import { rotaHatasi } from "@/lib/api-hata";
 
 /**
  * POST /api/admin/users/approval
@@ -38,7 +39,7 @@ export async function POST(req: Request) {
     if (error instanceof AssignmentValidationError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
-    console.error("POST /api/admin/users/approval error:", error);
+    rotaHatasi("POST /api/admin/users/approval error:", error);
     return NextResponse.json(
       { error: "Hesap durumu güncellenirken bir hata oluştu." },
       { status: 500 },

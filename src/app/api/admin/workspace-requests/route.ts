@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth/guard";
 import { bekleyenTalepleriGetir } from "@/features/workspace-requests/server/talep";
+import { rotaHatasi } from "@/lib/api-hata";
 
 /**
  * Bekleyen çalışma alanı talepleri kuyruğu (#349).
@@ -16,7 +17,7 @@ export async function GET() {
   try {
     return NextResponse.json({ talepler: await bekleyenTalepleriGetir() });
   } catch (error) {
-    console.error("GET /api/admin/workspace-requests error:", error);
+    rotaHatasi("GET /api/admin/workspace-requests error:", error);
     return NextResponse.json(
       { error: "Talepler yüklenirken hata oluştu" },
       { status: 500 },

@@ -7,6 +7,7 @@ import {
 } from "@/features/teams/server/sahiplik";
 import { requireAuth } from "@/lib/auth/guard";
 import { updateStepCommentSchema } from "@/lib/validations/api";
+import { rotaHatasi } from "@/lib/api-hata";
 
 /**
  * PUT /api/steps/[stepId]/comments/[commentId]
@@ -69,7 +70,7 @@ export async function PUT(
 
     return NextResponse.json({ comment: updated });
   } catch (error) {
-    console.error("PUT /api/steps/[stepId]/comments/[commentId] error:", error);
+    rotaHatasi("PUT /api/steps/[stepId]/comments/[commentId] error:", error);
     return NextResponse.json(
       { error: "Yorum güncellenirken hata oluştu." },
       { status: 500 }
@@ -140,7 +141,7 @@ export async function DELETE(
       { status: 403 }
     );
   } catch (error) {
-    console.error("DELETE /api/steps/[stepId]/comments/[commentId] error:", error);
+    rotaHatasi("DELETE /api/steps/[stepId]/comments/[commentId] error:", error);
     return NextResponse.json(
       { error: "Yorum silinirken hata oluştu." },
       { status: 500 }

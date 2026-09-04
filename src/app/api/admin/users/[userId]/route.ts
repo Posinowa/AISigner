@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { deleteUser, AssignmentValidationError } from "@/features/admin/server/user";
 import { requireAuth } from "@/lib/auth/guard";
+import { rotaHatasi } from "@/lib/api-hata";
 
 interface RouteParams {
   params: Promise<{ userId: string }>;
@@ -31,7 +32,7 @@ export async function DELETE(_req: Request, { params }: RouteParams) {
     if (error instanceof AssignmentValidationError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
-    console.error("DELETE /api/admin/users/[userId] error:", error);
+    rotaHatasi("DELETE /api/admin/users/[userId] error:", error);
     return NextResponse.json(
       { error: "Kullanıcı silinirken bir hata oluştu." },
       { status: 500 },

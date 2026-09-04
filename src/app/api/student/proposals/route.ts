@@ -1,3 +1,4 @@
+import { rotaHatasi } from "@/lib/api-hata";
 import { NextResponse } from "next/server";
 import { mezunYazmaKapisi } from "@/lib/auth/mezun-politikasi";
 import { requireAuth } from "@/lib/auth/guard";
@@ -32,7 +33,7 @@ export async function GET() {
   try {
     return NextResponse.json({ oneriler: await ogrencininOnerileri(auth.session.user.id!) });
   } catch (error) {
-    console.error("GET /api/student/proposals error:", error);
+    rotaHatasi("GET /api/student/proposals error:", error);
     return NextResponse.json({ error: "Öneriler yüklenemedi." }, { status: 500 });
   }
 }
@@ -70,7 +71,7 @@ export async function POST(req: Request) {
     }
     return NextResponse.json(sonuc.veri, { status: 201 });
   } catch (error) {
-    console.error("POST /api/student/proposals error:", error);
+    rotaHatasi("POST /api/student/proposals error:", error);
     return NextResponse.json({ error: "Öneri oluşturulamadı." }, { status: 500 });
   }
 }

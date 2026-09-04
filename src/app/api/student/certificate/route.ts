@@ -1,3 +1,4 @@
+import { rotaHatasi } from "@/lib/api-hata";
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth/guard";
 import {
@@ -46,7 +47,7 @@ export async function GET() {
 
     return NextResponse.json({ success: true, certificate });
   } catch (error) {
-    console.error("Error loading certificate:", error);
+    rotaHatasi("Error loading certificate:", error);
     return NextResponse.json(
       { error: "Sertifika yüklenirken bir hata oluştu." },
       { status: 500 },

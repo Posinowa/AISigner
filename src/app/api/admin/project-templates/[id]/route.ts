@@ -8,6 +8,7 @@ import {
 import { requireAuth } from "@/lib/auth/guard";
 import { updateTemplateSchema } from "@/lib/validations/api";
 import { sablonuYonetebilir } from "@/features/projects/yetki";
+import { rotaHatasi } from "@/lib/api-hata";
 
 
 /**
@@ -72,7 +73,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         { status: 409 }
       );
     }
-    console.error("PATCH /api/admin/project-templates/[id] error:", error);
+    rotaHatasi("PATCH /api/admin/project-templates/[id] error:", error);
     return NextResponse.json({ error: "Failed to update template" }, { status: 500 });
   }
 }
@@ -90,7 +91,7 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
     await deleteTemplate(id);
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("DELETE /api/admin/project-templates/[id] error:", error);
+    rotaHatasi("DELETE /api/admin/project-templates/[id] error:", error);
     return NextResponse.json({ error: "Failed to delete template" }, { status: 500 });
   }
 }

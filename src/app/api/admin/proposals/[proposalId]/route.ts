@@ -7,6 +7,7 @@ import {
   type OneriHatasi,
 } from "@/features/proposals/server/oneri";
 import { prisma } from "@/lib/db";
+import { rotaHatasi } from "@/lib/api-hata";
 
 /**
  * Öneriyi karara bağlar (#366).
@@ -65,7 +66,7 @@ export async function POST(
     }
     return NextResponse.json(sonuc, { status: 200 });
   } catch (error) {
-    console.error("POST /api/admin/proposals/[proposalId] error:", error);
+    rotaHatasi("POST /api/admin/proposals/[proposalId] error:", error);
     return NextResponse.json({ error: "Öneri işlenemedi." }, { status: 500 });
   }
 }

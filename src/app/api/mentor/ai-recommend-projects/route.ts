@@ -6,6 +6,7 @@ import { recommendProjectsSchema } from "@/lib/validations/api";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { profilSahibininRizasiVar } from "@/features/kvkk/riza";
 import { mentorunOgrencisiWhere } from "@/features/teams/server/sahiplik";
+import { rotaHatasi } from "@/lib/api-hata";
 
 const limiter = createRateLimiter("ai-recommend-projects", {
   maxRequests: 10,
@@ -106,7 +107,7 @@ export async function POST(req: Request) {
     // #295: Ham hata metni İSTEMCİYE DÖNMÜYOR. Eskiden `rootCause` doğrudan
     // gövdeye yazılıyordu; iç hata metni (prompt parçaları dahil olabilir)
     // istemciye sızıyordu. Ayrıntı sunucu kaydında kalıyor.
-    console.error("AI Öneri API Hatası:", error);
+    rotaHatasi("AI Öneri API Hatası:", error);
     return NextResponse.json(
       { error: "Öneriler hazırlanamadı. Lütfen tekrar deneyin." },
       { status: 500 },

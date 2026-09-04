@@ -5,6 +5,7 @@ import { sendMessageSchema, getMessagesSchema } from "@/lib/validations/api";
 import { createRateLimiter } from "@/lib/rate-limit";
 // #354: Erişim kuralı ortak modülde — "yazıyor..." sinyali aynısını kullanıyor.
 import { verifyConversationAccess } from "@/features/messaging/server/erisim";
+import { rotaHatasi } from "@/lib/api-hata";
 
 const limiter = createRateLimiter("messages", {
   maxRequests: 30,
@@ -88,7 +89,7 @@ export async function GET(req: Request) {
       hasMore,
     });
   } catch (error) {
-    console.error("GET /api/messages error:", error);
+    rotaHatasi("GET /api/messages error:", error);
     return NextResponse.json(
       { error: "Mesajlar yüklenirken hata oluştu." },
       { status: 500 }
@@ -159,7 +160,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ message }, { status: 201 });
   } catch (error) {
-    console.error("POST /api/messages error:", error);
+    rotaHatasi("POST /api/messages error:", error);
     return NextResponse.json(
       { error: "Mesaj gönderilirken hata oluştu." },
       { status: 500 }

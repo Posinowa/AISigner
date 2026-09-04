@@ -10,6 +10,7 @@ import { requireAuth } from "@/lib/auth/guard";
 import { readStepFile, deleteStepFile } from "@/lib/storage/step-files";
 import { logger } from "@/lib/logger";
 import { incrementCounter } from "@/lib/metrics";
+import { rotaHatasi } from "@/lib/api-hata";
 
 /**
  * GET /api/steps/[stepId]/files/[fileId]
@@ -87,7 +88,7 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error("GET /api/steps/[stepId]/files/[fileId] error:", error);
+    rotaHatasi("GET /api/steps/[stepId]/files/[fileId] error:", error);
     return NextResponse.json(
       { error: "Dosya indirilirken hata oluştu." },
       { status: 500 }
@@ -170,7 +171,7 @@ export async function DELETE(
 
     return NextResponse.json({ message: "Dosya başarıyla silindi." });
   } catch (error) {
-    console.error("DELETE /api/steps/[stepId]/files/[fileId] error:", error);
+    rotaHatasi("DELETE /api/steps/[stepId]/files/[fileId] error:", error);
     return NextResponse.json(
       { error: "Dosya silinirken hata oluştu." },
       { status: 500 }

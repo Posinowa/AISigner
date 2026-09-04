@@ -9,6 +9,7 @@ import {
 import { gecerliKategori } from "@/features/admin/kategoriler";
 import { requireAuth } from "@/lib/auth/guard";
 import { updateRoleSchema, assignMentorSchema } from "@/lib/validations/api";
+import { rotaHatasi } from "@/lib/api-hata";
 
 /**
  * Kullanıcı listesi — sayfalı, sunucuda filtreli/aranan.
@@ -82,7 +83,7 @@ export async function POST(req: Request) {
     if (error instanceof AssignmentValidationError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
-    console.error("POST /api/admin/users assignMentor error:", error);
+    rotaHatasi("POST /api/admin/users assignMentor error:", error);
     return NextResponse.json(
       { error: "Mentor atama sırasında bir hata oluştu." },
       { status: 500 },

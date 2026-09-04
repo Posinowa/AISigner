@@ -6,6 +6,7 @@ import {
 } from "@/features/teams/server/sahiplik";
 import { requireAuth } from "@/lib/auth/guard";
 import { createStepSchema } from "@/lib/validations/api";
+import { rotaHatasi } from "@/lib/api-hata";
 
 // POST: Roadmap'e yeni adım ekle
 export async function POST(
@@ -71,7 +72,7 @@ export async function POST(
 
     return NextResponse.json(step, { status: 201 });
   } catch (error) {
-    console.error("Step POST Error:", error);
+    rotaHatasi("Step POST Error:", error);
     return NextResponse.json(
       { error: "Adım eklenirken hata oluştu." },
       { status: 500 }
