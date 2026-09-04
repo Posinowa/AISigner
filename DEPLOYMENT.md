@@ -133,10 +133,23 @@ hangi modda olduğunuzu üstte gösterir (önizleme / gerçek).
 
 ---
 
-> **`NEXT_PUBLIC_APP_URL` build-time notu:** Next.js `NEXT_PUBLIC_*` değişkenlerini **build sırasında**
-> bundle'a gömer. Out Plane GitHub-connect ile build ederken servis değişkenlerini build'e de
-> enjekte ediyorsa değeri girmen yeterlidir. Değilse (ör. saf `docker build`), Dockerfile'ın builder
-> aşamasına build-arg olarak geçmen gerekir. Verilmezse robots/sitemap `https://aisigner.com`'a işaret eder.
+> **`NEXT_PUBLIC_APP_URL` build-time notu:** Next.js `NEXT_PUBLIC_*` değişkenlerini
+> **build sırasında** bundle'a gömer, yani **çalışma anı env'i yetmez** ve imaj ortama
+> özel olur. Out Plane GitHub-connect ile build ederken servis değişkenlerini build'e de
+> enjekte ediyorsa değeri girmen yeterlidir. Saf `docker build` kullanıyorsan **zorunlu
+> build-arg**:
+>
+> ```bash
+> docker build --build-arg NEXT_PUBLIC_APP_URL=https://<alan-adi> >              --build-arg APP_VERSION=$(git rev-parse HEAD) -t aisigner:<sha> .
+> ```
+>
+> ⚠️ **Verilmezse imaj BUILD OLMAZ** — ve bu bilinçli. Bu not eskiden "verilmezse
+> robots/sitemap `https://aisigner.com`'a işaret eder" diyordu; o davranış **#392'de
+> kaldırıldı** (`app-url.ts` artık üretimde fırlatıyor: yanlış alan adı taşıyan bir
+> sertifika QR'ı basıldıktan sonra geri alınamaz). Ama Dockerfile arg'ı hiç kabul
+> etmiyordu, yani **imaj #400'den beri hiç build olmuyordu**; CI `docker build`
+> koşmadığı için de görünmedi. İkisi de düzeltildi: arg zorunlu ve eksikse build
+> saniyeler içinde açık bir mesajla durur, CI da artık imajı derliyor.
 
 ---
 
@@ -250,20 +263,51 @@ Rate-limit anahtarı istemci IP'sidir ve IP `X-Forwarded-For` zincirinden **sağ
 herkesi tek kovaya toplar (meşru kullanıcılar birbirini kilitler) ya da istemcinin
 uydurduğu değere düşer (**limit tamamen atlatılır**).
 
-Deploy sonrası tek seferlik doğrulama:
+> ⚠️ **İSTEK SAYISI LİMİTİ AŞMALI.** Bu bölümün önceki hâli 7 istek attırıyordu,
+> oysa `/api/auth/reset-password` IP limiti **10/300 sn**. 7 istek limite hiç
+> ulaşmadığı için test **her koşulda "hepsi 200"** veriyordu — yani doğru
+> yapılandırılmış bir kurulumda bile "limit atlatılabilir" sinyali üretiyor ve
+> operatörü `TRUSTED_PROXY_HOPS`'u boş yere değiştirmeye itiyordu. Yerelde ölçüldü.
+>
+> Limit değeri değişirse buradaki sayı da değişmeli: **istek sayısı > `maxRequests`**.
+
+### A) Kontrol testi — limit gerçekten çalışıyor mu?
+
+Önce mekanizmanın ayakta olduğunu görün. **Aynı** `X-Forwarded-For` ile 13 istek:
 
 ```bash
-for i in 1 2 3 4 5 6 7; do
-  curl -s -o /dev/null -w "%{http_code}
-"     -X POST https://<alan-adi>/api/auth/reset-password     -H "Content-Type: application/json"     -H "X-Forwarded-For: 9.9.9.$i"     -d '{"email":"yok@example.com"}'
-done
+for i in $(seq 1 13); do
+  curl -s -o /dev/null -w "%{http_code} "     -X POST https://<alan-adi>/api/auth/reset-password     -H "Content-Type: application/json"     -H "X-Forwarded-For: 7.7.7.7"     -d '{"email":"yok@example.com"}'
+done; echo
 ```
 
-- [ ] Son istekler **429** dönüyor → doğru. Uydurma `X-Forwarded-For` limiti atlatamıyor.
-- [ ] Hepsi **200** dönüyor → `TRUSTED_PROXY_HOPS` yanlış. Platformun uygulamaya ulaştırdığı
-      ham `X-Forwarded-For` zincirini loglayıp kaç girdi geldiğini sayın ve değeri düzeltin.
+- [ ] Son istekler **429** → limitleyici ayakta ve anahtar IP'den türüyor.
+- [ ] Hepsi **200** → limit hiç çalışmıyor. `RateLimit` tablosuna yazılabildiğini
+      kontrol edin: DB'ye ulaşılamazsa `rate-limit.ts` bilerek **fail-open** davranır
+      (#322) ve bu durumda sorun vekil ayarı değil, veritabanı erişimidir.
 
----
+### B) Asıl test — uydurma `X-Forwarded-For` limiti atlatabiliyor mu?
+
+Şimdi **her istekte farklı** bir sahte IP gönderin:
+
+```bash
+for i in $(seq 20 32); do
+  curl -s -o /dev/null -w "%{http_code} "     -X POST https://<alan-adi>/api/auth/reset-password     -H "Content-Type: application/json"     -H "X-Forwarded-For: 8.8.8.$i"     -d '{"email":"yok@example.com"}'
+done; echo
+```
+
+- [ ] Son istekler **429** dönüyor → **doğru.** Vekil gerçek istemci IP'sini zincire
+      ekliyor, uygulama sağdan onu okuyor ve uydurma değer anahtarı değiştiremiyor.
+- [ ] Hepsi **200** dönüyor → `TRUSTED_PROXY_HOPS` yanlış. Uygulamaya ulaşan **ham**
+      `X-Forwarded-For` zincirini loglayıp kaç girdi geldiğini sayın ve değeri düzeltin.
+
+> **A geçip B kalıyorsa** tablo nettir: limitleyici çalışıyor ama anahtar istemcinin
+> kontrolünde. **A da kalıyorsa** önce veritabanı/limitleyici sorununu çözün; B'nin
+> sonucu o zamana kadar anlamsızdır.
+>
+> ℹ️ Bu testi **yerelde** (vekil olmadan) çalıştırırsanız B'nin "hepsi 200" vermesi
+> BEKLENEN sonuçtur: önünde zinciri uzatan bir vekil yokken sahte değer tek girdidir
+> ve doğru okunur. B ancak gerçek vekilin arkasında anlamlıdır.
 
 ## 8. 💾 Yedekleme ve geri dönüş (backup & rollback)
 
@@ -348,6 +392,12 @@ curl -s https://<alan-adi>/api/health
 - [ ] `version` **beklenen commit** — eski değer görünüyorsa yeni sürüm yayına çıkmamıştır.
       `"bilinmiyor"` görüyorsanız sürüm damgası hiç ayarlanmamış demektir: `GIT_COMMIT_SHA`
       çalışma-anı değişkenini girin ya da imajı `--build-arg APP_VERSION=<sha>` ile kurun.
+- [ ] ⚠️ **`"0.1.0"` gibi bir PAKET SÜRÜMÜ görüyorsanız damga YOK demektir.** `surum()`
+      son çare olarak `npm_package_version`'a düşüyor; bu değer `package.json`'dan gelir,
+      her deploy'da aynıdır ve **hiçbir şey kanıtlamaz**. "bilinmiyor" yalnızca standalone
+      Docker imajında görünür (orada `npm` yoktur); imaj dışında çalıştırıyorsanız eksik
+      damga kendini paket sürümü kılığında gösterir. Ölçüldü: `GIT_COMMIT_SHA` boşken
+      `npm start` ile `version: "0.1.0"` döndü.
       Damga olmadan bu kontrol hiçbir şey doğrulamaz.
 - [ ] `uptimeSeconds` küçük (yeniden başlatıldığını doğrular)
 

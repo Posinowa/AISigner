@@ -43,8 +43,35 @@ COPY . .
 # YER TUTUCU değerler yalnızca bu RUN komutu süresince tanımlıdır — imaja/ENV'e
 # yazılmaz, runner stage'e taşınmaz. Runtime'da gerçek değerler kullanılır.
 # (AUTH_SECRET NEXT_PUBLIC_ değildir; client bundle'a da gömülmez.)
-RUN DATABASE_URL="postgresql://build:build@localhost:5432/build?schema=public" \
+#
+# ⚠️ NEXT_PUBLIC_APP_URL YER TUTUCU OLAMAZ — imaja GÖMÜLÜR.
+#
+# #392'den beri `app-url.ts` bu değişken üretimde yoksa bilerek FIRLATIYOR:
+# sertifika QR'ı basılıp paylaşıldıktan sonra geri alınamaz, yanlış alan adı
+# taşıyan belgeler dolaşımda kalır. Ama Dockerfile onu hiç geçirmiyordu, yani
+# İMAJ #400'DEN BERİ HİÇ BUILD OLMUYORDU. CI bunu yakalamadı: CI `npm run
+# build` koşuyor ve değişkeni env olarak veriyor, `docker build` ise hiç
+# çalıştırılmıyordu (bu PR ile CI'ya eklendi).
+#
+# Değer `NEXT_PUBLIC_` olduğu için client bundle'a inline ediliyor: çalışma
+# anında değiştirilemez, dolayısıyla İMAJ ORTAMA ÖZELDİR. Yer tutucu koymak
+# #392'nin düzelttiği hatayı geri getirirdi — bu yüzden varsayılan YOK.
+ARG NEXT_PUBLIC_APP_URL
+RUN if [ -z "$NEXT_PUBLIC_APP_URL" ]; then \
+      echo "" >&2; \
+      echo "HATA: --build-arg NEXT_PUBLIC_APP_URL=https://<alan-adi> zorunlu." >&2; \
+      echo "" >&2; \
+      echo "Bu değer client bundle-a GÖMÜLÜR; sertifika doğrulama, e-posta" >&2; \
+      echo "doğrulama ve şifre sıfırlama bağlantıları buna dayanır. Yer tutucu" >&2; \
+      echo "kabul edilmiyor: yanlış alan adı taşıyan sertifikalar geri alınamaz." >&2; \
+      echo "" >&2; \
+      echo "  docker build --build-arg NEXT_PUBLIC_APP_URL=https://ornek.com ." >&2; \
+      echo "" >&2; \
+      exit 1; \
+    fi; \
+    DATABASE_URL="postgresql://build:build@localhost:5432/build?schema=public" \
     AUTH_SECRET="build-time-placeholder-not-used-at-runtime" \
+    NEXT_PUBLIC_APP_URL="$NEXT_PUBLIC_APP_URL" \
     npm run build -- --no-lint
 
 # --- Çalıştırma --------------------------------------------------------------

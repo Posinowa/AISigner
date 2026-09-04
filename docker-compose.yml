@@ -33,7 +33,13 @@ services:
   # metrik sayaçları Redis'e, dosya depolama GCS/S3'e taşınmalı.
   # Detaylar: DEPLOYMENT.md
   app:
-    build: .
+    build:
+      context: .
+      args:
+        # Client bundle'a GÖMÜLÜR (#392/#400): Dockerfile bu arg olmadan build
+        # olmuyor. Yerelde varsayılan localhost; .env'de NEXT_PUBLIC_APP_URL
+        # tanımlıysa o kullanılır.
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
     container_name: aisigner_app
     restart: always
     depends_on:

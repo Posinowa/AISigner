@@ -79,3 +79,41 @@ jobs:
       - name: Skip build
         if: env.HAS_BUILD != 'true'
         run: echo "No build script found. Skipping."
+
+  # ---------------------------------------------------------------------------
+  # Deploy edilen ASIL artefakt: imaj.
+  #
+  # ⚠️ Bu iş bir HATADAN doğdu. CI yalnızca `npm run build` koşuyordu ve o
+  # geçiyordu; ama `docker build` #400'den beri KIRIKTI ve kimse fark etmedi.
+  # Sebep: `NEXT_PUBLIC_APP_URL` CI'da env olarak tanımlı, Dockerfile'da ise
+  # hiç geçirilmiyordu. Yani yeşil bir CI, deploy edilemeyen bir imajla
+  # birlikte yaşayabiliyordu.
+  #
+  # Ayrı bir iş: ana CI'yı yavaşlatmıyor, paralel koşuyor. Yalnızca BUILD
+  # ediyor, hiçbir yere push etmiyor — amaç imajın üretilebildiğini kanıtlamak.
+  # ---------------------------------------------------------------------------
+  docker:
+    name: docker image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          # Değer client bundle'a gömüldüğü için build-arg ZORUNLU; burada
+          # yalnızca imajın üretilebildiğini kanıtlıyoruz, bu yüzden CI'ya özel
+          # bir yer tutucu yeterli. Gerçek deploy'da alan adı geçilmeli
+          # (DEPLOYMENT.md §5).
+          build-args: |
+            NEXT_PUBLIC_APP_URL=https://ci.example.invalid
+            APP_VERSION=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
