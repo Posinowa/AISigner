@@ -5,7 +5,7 @@ import { requireAuth } from "@/lib/auth/guard";
 import { recommendProjectsSchema } from "@/lib/validations/api";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { profilSahibininRizasiVar } from "@/features/kvkk/riza";
-import { mentorunOgrencisiWhere } from "@/features/teams/server/sahiplik";
+import { mentorunOgrencisiWhere, ogrencininAtamalariWhere } from "@/features/teams/server/sahiplik";
 import { rotaHatasi } from "@/lib/api-hata";
 
 const limiter = createRateLimiter("ai-recommend-projects", {
@@ -43,8 +43,6 @@ export async function POST(req: Request) {
         // #370: bireysel VEYA takım bağı.
         ...mentorunOgrencisiWhere(auth.session.user.id!),
       },
-      // #295: Zaten atanmış projeler aday kümesinden çıkarılacak.
-      include: { assignedProjects: { select: { projectTemplateId: true } } },
     });
 
     if (!studentProfile) {
@@ -70,7 +68,23 @@ export async function POST(req: Request) {
     // #295: Zaten atanmış projeler aday kümesinden ÇIKARILIYOR. Eskiden
     // AI bunlara da slot harcıyordu; arayüz onları gizlediği için mentör
     // 3 yerine 1-2 kullanılabilir öneri görüyordu.
-    const atanmisIdler = studentProfile.assignedProjects.map((a) => a.projectTemplateId);
+    //
+    // ⚠️ ATAMALAR `sahiplik.ts`'TEN SORULUR (#498). Burada
+    // `studentProfile.assignedProjects` okunuyordu ve takım atamasında
+    // `studentProfileId` NULL olduğu için (#332) takımın projesi süzgece HİÇ
+    // girmiyordu: AI, öğrencinin takımıyla hâlihazırda çalıştığı projeyi
+    // öneriyordu — canlıda listenin başında, %95 eşleşmeyle görüldü.
+    //
+    // ⚠️ AYRILMIŞ TAKIM KAPSAM DIŞI (`leftAt: null`). Ayrıldığı takımın
+    // projesini bireysel olarak yeniden önermek meşru — öğrenci artık o işi
+    // tek başına yapabilir. Sertifikadaki karar (#449) bunun TERSİydi ve
+    // gerekçesi farklıydı: orada soru "bu kişi ne yaptı", burada "şu an neyle
+    // meşgul".
+    const atanmisAtamalar = await prisma.assignedProject.findMany({
+      where: ogrencininAtamalariWhere(studentProfileId),
+      select: { projectTemplateId: true },
+    });
+    const atanmisIdler = atanmisAtamalar.map((a) => a.projectTemplateId);
 
     const availableProjects = await prisma.projectTemplate.findMany({
       where: {
