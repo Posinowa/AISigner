@@ -1,5 +1,7 @@
 import { getModel } from "@/lib/ai/gemini-client";
 import { cozVeDogrula } from "@/lib/ai/response";
+import { VARSAYILAN_MODEL } from "@/lib/ai/model-adi";
+import { uretimKokeni, type UretimKokeni } from "@/lib/ai/uretim-kokeni";
 import { guvenliMetin, guvenliListe, veriBlogu } from "@/lib/ai/prompt";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
@@ -31,6 +33,14 @@ export type ProfileAnalysisResult = {
   developmentAreas: string[]; // #47: gelişim alanları
   recommendedPath: string;    // #47: önerilen yol
   recommendations: string[];
+  /**
+   * #494: Bu sonuç GERÇEK AI çıktısı mı, yedek (mock) mu?
+   *
+   * ⚠️ OPSİYONEL ve bilerek: eski çağrı yerleri ve testler nesneyi elle
+   * kuruyor. Zorunlu yapmak onların hepsini kırardı ve alanın DEĞERİ
+   * "kim üretti" bilgisini KAYDETMEKTE, tip zorlamasında değil.
+   */
+  koken?: UretimKokeni | null;
 };
 
 /**
@@ -120,12 +130,24 @@ Lütfen aşağıdaki formatta SADECE JSON yanıtı ver (başka metin ekleme):
     // varsayılan atama. Zod şeması şekli garanti ettiği için o varsayılanlar
     // gereksiz; şema tutmazsa catch bloğu mock'a düşürüyor VE bu artık
     // sayaç + uyarı logu ile görünür oluyor.
-    return cozVeDogrula(result, profilAnaliziSemasi, "profile-analysis");
+    return {
+      ...cozVeDogrula(result, profilAnaliziSemasi, "profile-analysis"),
+      koken: uretimKokeni(VARSAYILAN_MODEL),
+    };
 
   } catch (error) {
     logger.error('Profil analizi hatası', error);
 
+    /*
+     * ⚠️ YEDEK ÇIKTIDA KÖKEN `null` — "gerçek AI" diye kaydedilmemeli.
+     *
+     * #377 kullanıcının mock'u gerçek çıktıdan ayırt EDEMEDİĞİNİ
+     * belgelemişti; burada aynı çıktı VERİTABANINA kalıcı yazılıyor.
+     * Prompt sürümü yazsaydık kayıt, hiç kurulmamış bir AI çağrısını
+     * olmuş gibi gösterirdi.
+     */
     return {
+      koken: null,
       level: 'Orta',
       tracks: input.interests.slice(0, 3),
       summary: `${experienceLevelLabel(input.experienceLevel)} seviyesinde bir öğrenci. ${input.interests.join(', ')} alanlarında ilgi gösteriyor.`,

@@ -37,6 +37,10 @@ export async function generateAndPersistProfileAnalysis(
       technicalTracks: result.tracks,
       recommendedPath: sinirla(result.recommendedPath ?? "", ALAN_SINIRI.analizMetni),
       recommendations: result.recommendations,
+      // #494: Köken. Yedek (mock) çıktıda `null` — gerçek AI diye
+      // kaydedilmemeli; kayıt kalıcı ve sonradan ayırt edilemez olurdu.
+      uretimSurumu: result?.koken?.uretimSurumu ?? null,
+      uretimModeli: result?.koken?.uretimModeli ?? null,
     },
     create: {
       studentProfileId,
@@ -47,6 +51,10 @@ export async function generateAndPersistProfileAnalysis(
       technicalTracks: result.tracks,
       recommendedPath: sinirla(result.recommendedPath ?? "", ALAN_SINIRI.analizMetni),
       recommendations: result.recommendations,
+      // #494: Köken. Yedek (mock) çıktıda `null` — gerçek AI diye
+      // kaydedilmemeli; kayıt kalıcı ve sonradan ayırt edilemez olurdu.
+      uretimSurumu: result?.koken?.uretimSurumu ?? null,
+      uretimModeli: result?.koken?.uretimModeli ?? null,
     },
   });
 

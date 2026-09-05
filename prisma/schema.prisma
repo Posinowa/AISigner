@@ -513,6 +513,13 @@ model ProfileAnalysis {
   technicalTracks  String[]
   recommendedPath  String   @db.VarChar(2000)
   recommendations  String[]
+  /// #494: Üretim kökeni — hangi prompt sürümü, hangi model.
+  /// NULLABLE ve bilerek: alanlar eklenmeden ÖNCE üretilmiş kayıtlar var ve
+  /// onların kökeni gerçekten BİLİNMİYOR. Uydurma bir sürüm yazmak, güncel
+  /// olabilecek analizleri "eski" gösterip gereksiz (ücretli) yeniden
+  /// üretime yol açardı.
+  uretimSurumu     String?
+  uretimModeli     String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -859,6 +866,13 @@ model MentorAnalysis {
   idealStudentProfile String   @db.VarChar(2000)
   /// Admin'e eşleştirme ipuçları.
   matchingNotes       String[]
+  /// #494: Üretim kökeni — hangi prompt sürümü, hangi model.
+  /// NULLABLE ve bilerek: alanlar eklenmeden ÖNCE üretilmiş kayıtlar var ve
+  /// onların kökeni gerçekten BİLİNMİYOR. Uydurma bir sürüm yazmak, güncel
+  /// olabilecek analizleri "eski" gösterip gereksiz (ücretli) yeniden
+  /// üretime yol açardı.
+  uretimSurumu     String?
+  uretimModeli     String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

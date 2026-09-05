@@ -1,5 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
 import path from "path";
+import { VARSAYILAN_MODEL } from "./model-adi";
+
+export { VARSAYILAN_MODEL };
 import { yenidenDene } from "./yeniden-dene";
 
 /**
@@ -20,7 +23,7 @@ import { yenidenDene } from "./yeniden-dene";
 const LOCATION = process.env.GOOGLE_CLOUD_LOCATION || "us-central1";
 const CREDENTIALS_PATH =
   process.env.GOOGLE_APPLICATION_CREDENTIALS || "gcp-credentials.json";
-const VARSAYILAN_MODEL = "gemini-2.5-flash";
+
 
 /** Çağrı yerlerinin gördüğü normalize yanıt. SDK şekli buraya sızmaz. */
 export type AiYanit = { text: string };

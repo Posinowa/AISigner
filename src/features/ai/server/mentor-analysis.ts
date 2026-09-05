@@ -1,5 +1,7 @@
 import { getModel } from "@/lib/ai/gemini-client";
 import { guvenliMetin, guvenliListe, veriBlogu } from "@/lib/ai/prompt";
+import { VARSAYILAN_MODEL } from "@/lib/ai/model-adi";
+import { uretimKokeni, type UretimKokeni } from "@/lib/ai/uretim-kokeni";
 import { logger } from "@/lib/logger";
 import { ilgiEtiketi, MENTOR_KIDEMLERI } from "@/features/student/models/secenekler";
 
@@ -35,6 +37,11 @@ export type MentorAnalysisResult = {
   technicalTracks: string[];
   idealStudentProfile: string;
   matchingNotes: string[];
+  /**
+   * #494: Gerçek AI çıktısı mı, yedek (mock) mu? `null` = yedek.
+   * Opsiyonel: mevcut çağrı yerleri ve testler nesneyi elle kuruyor.
+   */
+  koken?: UretimKokeni | null;
 };
 
 const GECERLI_SEVIYELER: MentorAnalysisResult["level"][] = ["Başlangıç", "Orta", "İleri"];
@@ -52,6 +59,9 @@ export function mentorYedekAnalizi(girdi: MentorAnalysisInput): MentorAnalysisRe
     girdi.yearsExperience >= 6 ? "İleri" : girdi.yearsExperience >= 3 ? "Orta" : "Başlangıç";
 
   return {
+    // ⚠️ YEDEK: köken YOK. Prompt sürümü yazsaydık kayıt, hiç kurulmamış
+    // bir AI çağrısını olmuş gibi gösterirdi (#377'nin kalıcı hâli).
+    koken: null,
     level: seviye,
     summary: `${girdi.title}${girdi.company ? ` (${girdi.company})` : ""}, ${girdi.yearsExperience} yıllık deneyimle ${alanlar.join(", ") || "belirtilmemiş alanlarda"} mentörlük yapmak istiyor. Haftada ${girdi.weeklyHours} saat ve aynı anda ${girdi.capacity} stajyer kapasitesi beyan etti.`,
     strengths: [
@@ -139,6 +149,7 @@ Lütfen aşağıdaki formatta SADECE JSON yanıtı ver (başka metin ekleme):
     // Şekil her zaman TAM olsun; eksik alan downstream persist/gösterimi bozardı.
     const yedek = mentorYedekAnalizi(input);
     return {
+      koken: uretimKokeni(VARSAYILAN_MODEL),
       level: GECERLI_SEVIYELER.includes(cozulen.level) ? cozulen.level : yedek.level,
       summary: cozulen.summary,
       strengths: Array.isArray(cozulen.strengths) ? cozulen.strengths : yedek.strengths,
