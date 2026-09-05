@@ -14,6 +14,7 @@ import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { useModalA11y } from "@/components/ui/useModalA11y";
 import { stripMarkdown } from "@/lib/markdown-preview";
 import { tarihBicimle } from "@/lib/tarih";
+import { yukEtiketi } from "@/features/projects/yuk-etiketi";
 import {
   CalismaAlaniBolumu,
   type CalismaAlaniTalebi,
@@ -26,6 +27,8 @@ type ProjectTemplate = {
   difficulty: "EASY" | "MEDIUM" | "HARD";
   track: string[];
   githubRepoUrl?: string | null;
+  /** #499: Şu an bu projede çalışan stajyer sayısı. */
+  calisanSayisi?: number;
 };
 
 type AIRecommendation = {
@@ -846,12 +849,31 @@ export default function StudentDetailPage() {
                             {stripMarkdown(template.description)}
                           </p>
                           
-                          <div className="flex flex-wrap gap-1.5 mb-5">
+                          <div className="flex flex-wrap gap-1.5 mb-3">
                             {template.track.slice(0, 3).map((tag, index) => (
                               <span key={index} className="px-2 py-1 text-[11px] font-semibold bg-gray-100 text-gray-600 rounded-md">
                                 {tag}
                               </span>
                             ))}
+                          </div>
+
+                          {/* #499: Bu projede şu an kaç stajyer çalışıyor.
+                              ⚠️ ATAMAYI ENGELLEMİYOR — aynı projeyi birden çok
+                              stajyerin yapması meşru (farklı dönem, farklı
+                              seviye). Sayı yalnız kararı bilgilendiriyor;
+                              #404'te mentör kapasitesi için verilen kararın
+                              aynısı. */}
+                          <div className="mb-5 flex items-center gap-1.5 text-[11px] font-medium">
+                            <Users className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                            <span
+                              className={
+                                (template.calisanSayisi ?? 0) === 0
+                                  ? "text-emerald-700"
+                                  : "text-slate-500"
+                              }
+                            >
+                              {yukEtiketi(template.calisanSayisi ?? 0)}
+                            </span>
                           </div>
                           
                           <button

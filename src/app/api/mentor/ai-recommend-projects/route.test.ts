@@ -7,6 +7,8 @@ const { requireAuthMock, prismaMock, recommendMock } = vi.hoisted(() => ({
     // #498: Atanmış projeler artık `sahiplik.ts` üzerinden AYRI sorguyla
     // geliyor — profilin içinden değil.
     assignedProject: { findMany: vi.fn() },
+    // #499: Şablon yükü ham SQL ile toplanıyor (kimse çalışmıyorsa boş dizi).
+    $queryRaw: vi.fn(),
     mentorProfile: { findUnique: vi.fn() },
     projectTemplate: { findMany: vi.fn() },
   },
@@ -44,6 +46,7 @@ function req(body: unknown) {
 describe("ai-recommend-projects (#189)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    prismaMock.$queryRaw.mockResolvedValue([]);
     recommendMock.mockResolvedValue([]);
     // Sistemde değerlendirilecek şablon var (boşsa route 404 döner).
     prismaMock.projectTemplate.findMany.mockResolvedValue([{ id: "t1" }]);

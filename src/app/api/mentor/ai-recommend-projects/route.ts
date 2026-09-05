@@ -5,6 +5,7 @@ import { requireAuth } from "@/lib/auth/guard";
 import { recommendProjectsSchema } from "@/lib/validations/api";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { profilSahibininRizasiVar } from "@/features/kvkk/riza";
+import { projeYukleriniGetir } from "@/features/projects/server/yuk";
 import { mentorunOgrencisiWhere, ogrencininAtamalariWhere } from "@/features/teams/server/sahiplik";
 import { rotaHatasi } from "@/lib/api-hata";
 
@@ -86,13 +87,22 @@ export async function POST(req: Request) {
     });
     const atanmisIdler = atanmisAtamalar.map((a) => a.projectTemplateId);
 
-    const availableProjects = await prisma.projectTemplate.findMany({
-      where: {
-        // #366: Öneriden türeyen şablonlar başka öğrencilere ÖNERİLMEZ.
-        fromProposal: false,
-        ...(atanmisIdler.length ? { id: { notIn: atanmisIdler } } : {}),
-      },
-    });
+    const [havuz, yukler] = await Promise.all([
+      prisma.projectTemplate.findMany({
+        where: {
+          // #366: Öneriden türeyen şablonlar başka öğrencilere ÖNERİLMEZ.
+          fromProposal: false,
+          ...(atanmisIdler.length ? { id: { notIn: atanmisIdler } } : {}),
+        },
+      }),
+      // #499: Şablon başına kaç stajyerin çalıştığı — AI aynı uygunluktaki
+      // projelerden az çalışılanı tercih etsin diye prompt'a giriyor.
+      projeYukleriniGetir(),
+    ]);
+    const availableProjects = havuz.map((p) => ({
+      ...p,
+      calisanSayisi: yukler.get(p.id) ?? 0,
+    }));
 
     if (!availableProjects || availableProjects.length === 0) {
       return NextResponse.json(
