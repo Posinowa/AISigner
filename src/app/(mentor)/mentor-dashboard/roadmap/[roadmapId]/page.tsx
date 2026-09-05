@@ -34,6 +34,8 @@ import { TASLAK_SONUCU } from "@/features/roadmap/taslak";
 import { StepComments } from "@/features/messaging/ui/StepComments";
 import { StepFiles } from "@/features/files/ui/StepFiles";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { kaynakEkle, kaynakKaldir, kaynakGuncelle } from "@/features/roadmap/kaynaklar";
+import { KaynakListesi } from "@/features/roadmap/ui/KaynakListesi";
 
 /* ─── Tipler ─── */
 type RoadmapStep = {
@@ -366,41 +368,26 @@ export default function RoadmapReviewPage() {
     }
   }
 
-  /* ─── Kaynak Yönetimi (edit) ─── */
-  function addEditResource() {
-    setEditForm((f) => ({ ...f, resources: [...f.resources, ""] }));
-  }
-  function removeEditResource(index: number) {
-    setEditForm((f) => ({
-      ...f,
-      resources: f.resources.filter((_, i) => i !== index),
-    }));
-  }
-  function updateEditResource(index: number, value: string) {
-    setEditForm((f) => {
-      const resources = [...f.resources];
-      resources[index] = value;
-      return { ...f, resources };
-    });
-  }
-
-  /* ─── Kaynak Yönetimi (new) ─── */
-  function addNewResource() {
-    setNewStepForm((f) => ({ ...f, resources: [...f.resources, ""] }));
-  }
-  function removeNewResource(index: number) {
-    setNewStepForm((f) => ({
-      ...f,
-      resources: f.resources.filter((_, i) => i !== index),
-    }));
-  }
-  function updateNewResource(index: number, value: string) {
-    setNewStepForm((f) => {
-      const resources = [...f.resources];
-      resources[index] = value;
-      return { ...f, resources };
-    });
-  }
+  /* ─── Kaynak Yönetimi ───
+   *
+   * #494: Bu üç işlem İKİ KEZ yazılıydı (düzenleme formu + yeni adım formu)
+   * ve gövdeleri birbirinin aynısıydı. Mantık artık `roadmap/kaynaklar.ts`'te;
+   * buradaki sarmalayıcılar yalnız hangi state'e yazılacağını söylüyor.
+   */
+  const editKaynak = {
+    ekle: () => setEditForm((f) => ({ ...f, resources: kaynakEkle(f.resources) })),
+    kaldir: (i: number) =>
+      setEditForm((f) => ({ ...f, resources: kaynakKaldir(f.resources, i) })),
+    guncelle: (i: number, v: string) =>
+      setEditForm((f) => ({ ...f, resources: kaynakGuncelle(f.resources, i, v) })),
+  };
+  const yeniKaynak = {
+    ekle: () => setNewStepForm((f) => ({ ...f, resources: kaynakEkle(f.resources) })),
+    kaldir: (i: number) =>
+      setNewStepForm((f) => ({ ...f, resources: kaynakKaldir(f.resources, i) })),
+    guncelle: (i: number, v: string) =>
+      setNewStepForm((f) => ({ ...f, resources: kaynakGuncelle(f.resources, i, v) })),
+  };
 
   /* ─── Toplam Saat ─── */
   const totalHours = roadmap?.steps.reduce((sum, s) => sum + (s.estimatedHours ?? 0), 0) ?? 0;
@@ -726,31 +713,12 @@ export default function RoadmapReviewPage() {
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Kaynaklar</label>
-                        <div className="space-y-2">
-                          {editForm.resources.map((res, i) => (
-                            <div key={i} className="flex items-center gap-2">
-                              <input
-                                type="text"
-                                value={res}
-                                onChange={(e) => updateEditResource(i, e.target.value)}
-                                placeholder="https://... veya kaynak adı"
-                                className="flex-1 border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#3e92cc] focus:border-[#3e92cc] outline-none"
-                              />
-                              <button
-                                onClick={() => removeEditResource(i)}
-                                className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            </div>
-                          ))}
-                          <button
-                            onClick={addEditResource}
-                            className="text-xs text-primary hover:text-[#3e92cc] font-medium"
-                          >
-                            + Kaynak Ekle
-                          </button>
-                        </div>
+                        <KaynakListesi
+                          kaynaklar={editForm.resources}
+                          onGuncelle={editKaynak.guncelle}
+                          onKaldir={editKaynak.kaldir}
+                          onEkle={editKaynak.ekle}
+                        />
                       </div>
                       <div className="flex items-center gap-2 pt-2">
                         <button
@@ -919,31 +887,12 @@ export default function RoadmapReviewPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Kaynaklar</label>
-                <div className="space-y-2">
-                  {newStepForm.resources.map((res, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={res}
-                        onChange={(e) => updateNewResource(i, e.target.value)}
-                        placeholder="https://... veya kaynak adı"
-                        className="flex-1 border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#3e92cc] focus:border-[#3e92cc] outline-none"
-                      />
-                      <button
-                        onClick={() => removeNewResource(i)}
-                        className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                  <button
-                    onClick={addNewResource}
-                    className="text-xs text-primary hover:text-[#3e92cc] font-medium"
-                  >
-                    + Kaynak Ekle
-                  </button>
-                </div>
+                <KaynakListesi
+                  kaynaklar={newStepForm.resources}
+                  onGuncelle={yeniKaynak.guncelle}
+                  onKaldir={yeniKaynak.kaldir}
+                  onEkle={yeniKaynak.ekle}
+                />
               </div>
               <div className="flex items-center gap-2 pt-2">
                 <button
