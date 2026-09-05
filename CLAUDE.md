@@ -26,9 +26,15 @@ Kaynak dosyaları baştan taramak yerine önce burayı okuyun.
 - Detay: `CONTRIBUTING.md`. Merge sonrası: `docs/SMOKE-CHECKLIST.md`.
 
 ### ⚠️ CI tuzakları (yaşanmış)
-- CI **Node 20 / npm 10** kullanır. `package-lock.json`'a dokunacak işlemleri
+- CI **Node 22 / npm 10** kullanır (#483 ile 20'den yükseltildi; Node 20'nin
+  desteği **2026-04-30'da bitti**). `package-lock.json`'a dokunacak işlemleri
   **`npx -y npm@10 install ...`** ile yapın — npm 11 lockfile'ı CI'da `npm ci`
   EUSAGE hatasına yol açar (esbuild/@emnapi girdileri uyumsuz kalır).
+  `node:22-bookworm-slim` npm 10 ile geliyor, yani bu kural DEĞİŞMEDİ.
+- **⚠️ `engine-strict=true` (`.npmrc`)**: uyumsuz `engines.node` artık
+  kurulumu KIRAR. Öncesinde npm yalnız uyarıyordu ve #480'de `node >=22`
+  isteyen bir paket Node 20'ye sessizce kuruldu, PR yeşil geçti. Bir
+  bağımlılık yükseltmesi `npm ci`'da patlıyorsa önce `engines` uyumuna bakın.
 - Native binding'li dev bağımlılıklarında (ör. rolldown tabanlı araçlar) Linux
   binary'lerinin lockfile'da çözüldüğünden emin olun.
 
