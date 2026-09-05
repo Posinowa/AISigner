@@ -5,16 +5,17 @@ import { useCallback, useEffect, useState } from "react";
 import {
   BOS_SAYILAR,
   type KullaniciSayilari,
+  type PanelKategorisi,
 } from "@/features/admin/kategoriler";
+import { IstatistikKartlari } from "@/features/admin/ui/IstatistikKartlari";
+import { AramaVeKategoriler } from "@/features/admin/ui/AramaVeKategoriler";
+import { MentorAtamaHucresi } from "@/features/admin/ui/MentorAtamaHucresi";
 import { extractApiErrorMessage } from "@/lib/api-error-message";
 import { MentorBasvuruModal } from "@/features/mentors/ui/MentorBasvuruModal";
-import { kapasiteDurumu, kapasiteEtiketi } from "@/features/mentors/kapasite";
 import {
   Users,
   GraduationCap,
-  ShieldCheck,
   UserCog,
-  Search,
   AlertCircle,
   Loader2,
   CheckCircle2,
@@ -40,7 +41,6 @@ import { DogrulanmisRozet } from "@/features/auth/ui/DogrulanmisRozet";
 import { Avatar } from "@/features/profile/ui/Avatar";
 import type { CertificateData } from "@/features/certificate/server/certificate";
 import { ROL_ROZETI, DURUM_ROZETI } from "@/lib/ui/rol-renkleri";
-import { MentorOnerisiPaneli } from "@/features/matching/ui/MentorOnerisiPaneli";
 
 type User = {
   id: string;
@@ -70,19 +70,10 @@ type Mentor = {
   kapasite: number | null;
 };
 
-type FilterCategory =
-  | "ALL"
-  | "PENDING"
-  | "APPROVED"
-  | "GRADUATED"
-  | "REJECTED"
-  | "MENTOR"
-  // #250: Onay bekleyen mentör başvuruları. "MENTOR" kategorisinden ayrı
-  // tutuluyor; aksi halde başvuru mevcut mentörlerin arasında kaybolurdu.
-  | "MENTOR_BASVURU"
-  // #259: E-postasını henüz doğrulamamış hesaplar.
-  | "DOGRULANMAMIS"
-  | "ADMIN";
+// #489: Kategori listesi TEK KAYNAKTA (`admin/kategoriler.ts`). Burada elle
+// sayılıyordu; `PanelKategorisi` onu `"STUDENT"` hariç türetiyor, yani yeni
+// bir kategori eklendiğinde panel otomatik haberdar oluyor.
+type FilterCategory = PanelKategorisi;
 
 const roleConfig: Record<User["role"], { label: string; color: string }> = {
   // #338: Renkler merkezi kaynaktan — DebugNavbar ve mesajlaşma ile aynı
@@ -595,73 +586,12 @@ export default function AdminDashboard() {
           </button>
         )}
 
-        {/* İstatistik Kartları */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5 mb-8">
-          {[
-            {
-              icon: Users,
-              color: "text-blue-600 bg-blue-50",
-              label: "Toplam Kullanıcı",
-              value: stats.total,
-              filter: "ALL" as FilterCategory,
-            },
-            {
-              icon: Clock,
-              color: "text-amber-600 bg-amber-50",
-              label: "Onay Bekleyen",
-              value: stats.pendingCount,
-              filter: "PENDING" as FilterCategory,
-            },
-            {
-              icon: CheckCircle2,
-              color: "text-emerald-600 bg-emerald-50",
-              label: "Aktif Stajyer",
-              value: stats.activeStudents,
-              filter: "APPROVED" as FilterCategory,
-            },
-            {
-              icon: GraduationCap,
-              color: "text-primary bg-primary/10",
-              label: "Mezun / Biten",
-              value: stats.graduatedCount,
-              filter: "GRADUATED" as FilterCategory,
-            },
-            {
-              icon: UserCog,
-              color: "text-indigo-600 bg-indigo-50",
-              label: "Mentör",
-              value: stats.mentorCount,
-              filter: "MENTOR" as FilterCategory,
-            },
-            {
-              icon: ShieldCheck,
-              color: "text-rose-600 bg-rose-50",
-              label: "Yönetici",
-              value: stats.adminCount,
-              filter: "ADMIN" as FilterCategory,
-            },
-          ].map(({ icon: Icon, color, label, value, filter }) => (
-            <button
-              key={label}
-              onClick={() => setFilterCategory(filter)}
-              className={`text-left rounded-2xl border p-4 shadow-sm transition-all ${
-                filterCategory === filter
-                  ? "bg-white ring-2 ring-ring border-blue-500 shadow-md"
-                  : "bg-white border-slate-200/80 hover:border-slate-300"
-              }`}
-            >
-              <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${color} mb-2.5 shrink-0`}>
-                <Icon className="w-4.5 h-4.5" />
-              </div>
-              <p className="text-xs font-medium text-slate-500 truncate leading-tight">
-                {label}
-              </p>
-              <p className="text-xl font-extrabold text-slate-900 mt-0.5">
-                {value}
-              </p>
-            </button>
-          ))}
-        </div>
+        {/* İstatistik Kartları — #489: sunum `IstatistikKartlari`'ne taşındı. */}
+        <IstatistikKartlari
+          sayilar={stats}
+          aktifKategori={filterCategory}
+          onKategori={setFilterCategory}
+        />
 
         {/* Onay bekleyen stajyerler bildirim kartı */}
         {stats.pendingCount > 0 && filterCategory === "ALL" && (
@@ -693,50 +623,14 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Arama & Kategori Filtreleri */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 mb-5 flex flex-wrap gap-3 items-center justify-between">
-          <div className="relative flex-1 min-w-[240px]">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="İsim veya e-posta ile ara..."
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-blue-500 focus:ring-3 focus:ring-ring outline-none transition"
-            />
-          </div>
-          <div className="flex gap-1.5 flex-wrap">
-            {[
-              { id: "ALL" as FilterCategory, label: "Tümü" },
-              { id: "PENDING" as FilterCategory, label: "Onay Bekleyenler" },
-              { id: "APPROVED" as FilterCategory, label: "Aktif Stajyerler" },
-              { id: "GRADUATED" as FilterCategory, label: "Mezunlar 🎓" },
-              { id: "REJECTED" as FilterCategory, label: "Reddedilenler" },
-              { id: "MENTOR" as FilterCategory, label: "Mentörler" },
-              {
-                id: "MENTOR_BASVURU" as FilterCategory,
-                label: `Mentör Başvuruları${stats.mentorBasvuruCount > 0 ? ` (${stats.mentorBasvuruCount})` : ""}`,
-              },
-              {
-                id: "DOGRULANMAMIS" as FilterCategory,
-                label: `Doğrulanmamış${stats.dogrulanmamisCount > 0 ? ` (${stats.dogrulanmamisCount})` : ""}`,
-              },
-              { id: "ADMIN" as FilterCategory, label: "Yöneticiler" },
-            ].map(({ id, label }) => (
-              <button
-                key={id}
-                onClick={() => setFilterCategory(id)}
-                className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
-                  filterCategory === id
-                    ? "bg-slate-900 text-white shadow-sm"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* Arama & Kategori Filtreleri — #489: `AramaVeKategoriler`. */}
+        <AramaVeKategoriler
+          arama={search}
+          onArama={setSearch}
+          sayilar={stats}
+          aktifKategori={filterCategory}
+          onKategori={setFilterCategory}
+        />
 
         {/* Kullanıcı Tablosu / Listesi */}
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
@@ -861,127 +755,14 @@ export default function AdminDashboard() {
                       </select>
                     </div>
 
-                    {/* Staj Durumu & Mentor Ataması */}
-                    <div className="lg:col-span-3 flex items-center">
-                      {user.role === "STUDENT" ? (
-                        user.accountStatus === "GRADUATED" ? (
-                          <div className="flex items-center gap-2 text-xs text-primary bg-primary/5 border border-primary/20 rounded-xl px-3 py-2 w-full">
-                            <GraduationCap className="w-4 h-4 shrink-0" />
-                            <span className="font-semibold truncate">
-                              Staj tamamlandı & mezun edildi
-                            </span>
-                          </div>
-                        ) : user.studentProfile ? (
-                          <div className="flex flex-col gap-2 w-full">
-                            {/* #195: Atanmış mentorlar — chip + kaldır (x) */}
-                            {user.studentProfile.mentors.length > 0 && (
-                              <div className="flex flex-wrap gap-1.5">
-                                {user.studentProfile.mentors.map((m) => (
-                                  <span
-                                    key={m.id}
-                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200"
-                                  >
-                                    {getDisplayName(m)}
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        handleSetMentors(
-                                          user.id,
-                                          user.studentProfile!.mentors
-                                            .filter((x) => x.id !== m.id)
-                                            .map((x) => x.id),
-                                        )
-                                      }
-                                      disabled={isUpdating}
-                                      aria-label={`${getDisplayName(m)} mentörünü kaldır`}
-                                      className="hover:text-red-600 disabled:opacity-60"
-                                    >
-                                      <XCircle className="w-3 h-3" />
-                                    </button>
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                            {/* Mentor ekle — yalnız henüz atanmamış mentorları göster */}
-                            <div className="flex items-center gap-2 w-full">
-                              <select
-                                value=""
-                                onChange={(e) => {
-                                  if (e.target.value) {
-                                    handleSetMentors(user.id, [
-                                      ...user.studentProfile!.mentors.map((x) => x.id),
-                                      e.target.value,
-                                    ]);
-                                  }
-                                }}
-                                disabled={isUpdating}
-                                className="flex-1 border border-slate-200 rounded-xl px-3 py-2 bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-ring focus:border-blue-500 disabled:opacity-60"
-                              >
-                                <option value="">+ Mentor ekle…</option>
-                                {mentors
-                                  .filter(
-                                    (mentor) =>
-                                      !user.studentProfile!.mentors.some((x) => x.id === mentor.id),
-                                  )
-                                  .map((mentor) => {
-                                    /*
-                                     * #404: YÜK AÇILIR LİSTEDE. Admin önceden yalnız
-                                     * ad ve e-posta görüyor, kimin kaç stajyeri
-                                     * olduğunu bilmeden atama yapıyordu.
-                                     *
-                                     * ⚠️ DOLU/AŞKIN MENTÖR ENGELLENMİYOR — geçici
-                                     * devir ya da kısa süreli destek meşru olabilir;
-                                     * son söz admin'in. Sayı, kararı almasına
-                                     * yardım etsin diye orada.
-                                     *
-                                     * `<option>` içinde renk güvenilir değil
-                                     * (tarayıcılar farklı davranıyor), bu yüzden ayrım
-                                     * METİNLE yapılıyor.
-                                     */
-                                    const durum = kapasiteDurumu(
-                                      mentor.aktifOgrenci,
-                                      mentor.kapasite,
-                                    );
-                                    const isaret =
-                                      durum === "askin" ? " — KAPASİTE AŞKIN" : durum === "dolu" ? " — dolu" : "";
-                                    return (
-                                      <option key={mentor.id} value={mentor.id}>
-                                        {getDisplayName(mentor)} —{" "}
-                                        {kapasiteEtiketi(mentor.aktifOgrenci, mentor.kapasite)}
-                                        {isaret} ({mentor.email})
-                                      </option>
-                                    );
-                                  })}
-                              </select>
-                              {isUpdating && <Loader2 className="animate-spin w-3.5 h-3.5 text-blue-600" />}
-                            </div>
-
-                            {/* #328: AI mentör önerisi. Panel ATAMA YAPMAZ —
-                                "Ata" düğmesi mevcut atama akışını çağırır. */}
-                            <MentorOnerisiPaneli
-                              studentId={user.id}
-                              ogrenciAdi={getDisplayName(user)}
-                              atamaSuruyor={isUpdating}
-                              onAta={(mentorId) =>
-                                handleSetMentors(user.id, [
-                                  ...user.studentProfile!.mentors.map((x) => x.id),
-                                  mentorId,
-                                ])
-                              }
-                            />
-                          </div>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 rounded-xl">
-                            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                            Profil kurulumu bekleniyor
-                          </span>
-                        )
-                      ) : (
-                        <span className="text-slate-400 text-xs italic">
-                          —
-                        </span>
-                      )}
-                    </div>
+                    {/* Staj Durumu & Mentor Ataması — #489: `MentorAtamaHucresi`. */}
+                    <MentorAtamaHucresi
+                      user={user}
+                      mentors={mentors}
+                      isUpdating={isUpdating}
+                      gorunenAd={getDisplayName}
+                      onMentorlariAyarla={handleSetMentors}
+                    />
 
                     {/* Hızlı Aksiyonlar & Güvenli Silme Butonu */}
                     <div className="lg:col-span-3 flex items-center justify-start lg:justify-end gap-2 flex-wrap">
