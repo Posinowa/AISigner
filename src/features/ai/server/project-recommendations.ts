@@ -6,7 +6,7 @@ import { logger } from "@/lib/logger";
 import { experienceLevelLabel } from "@/lib/experience-level";
 import { ilgiEtiketi } from "@/features/student/models/secenekler";
 import { StudentProfile, ProjectTemplate } from "@prisma/client";
-import { yukBandi } from "@/features/projects/yuk-etiketi";
+import { yukBandiSablona } from "@/features/projects/yuk-etiketi";
 
 /**
  * #295: Öğrenciye proje önerisi.
@@ -149,7 +149,8 @@ ${JSON.stringify(
     // tarafından üretilmiş bir skor değil — bant da veriliyor ki modelin
     // ham rakamı kendi ölçeğinde yorumlaması gerekmesin.
     calisanSayisi: p.calisanSayisi ?? 0,
-    yogunluk: yukBandi(p.calisanSayisi ?? 0),
+    // #503: Tekrarlanabilir şablonda yoğunluk uyarı değil.
+    yogunluk: yukBandiSablona(p.calisanSayisi ?? 0, p.tekrarlanabilir ?? false),
   })),
   null,
   2,

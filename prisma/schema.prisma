@@ -155,6 +155,18 @@ model MentorAssignment {
 
 model ProjectTemplate {
   id            String     @id @default(cuid())
+  /// #503: Bu şablon AYNI stajyere birden çok kez atanabilir mi?
+  ///
+  /// Bazı işler doğası gereği tekrarlanır: herkesin yapması beklenen kişisel
+  /// portfolyo sitesi, ya da birden çok kez verilebilen araştırma ödevleri.
+  ///
+  /// ⚠️ VARSAYILAN `false` — tekrar edilebilirlik İSTİSNA, kural değil.
+  /// #58'in yarış koruması (aynı projeyi iki kez atama) varsayılan olarak
+  /// yerinde kalıyor; yalnız bu bayrak açıkken gevşiyor.
+  ///
+  /// ⚠️ Bayrak ŞABLONDA, atamada değil: tekrar edilebilirlik projenin bir
+  /// özelliği. Admin bir kez işaretler, sonra tüm mentörler için geçerli olur.
+  tekrarlanabilir Boolean  @default(false)
   // #112: Seed idempotency title lookup'ına dayanır; DB seviyesinde de benzersiz olmalı.
   title         String     @unique
   description   String
@@ -217,11 +229,25 @@ model AssignedProject {
   /// yok" ile "veri yok" karışır.
   sonCommitAt       DateTime?
 
-  // #58: Aynı öğrenciye aynı proje şablonu yalnızca bir kez atanabilir (yarış koşulu koruması).
-  // Postgres çoklu NULL'a izin verdiği için takım satırları bu kısıtta çakışmaz.
-  @@unique([studentProfileId, projectTemplateId])
-  // #332: Aynı korumanın takım karşılığı.
-  @@unique([teamId, projectTemplateId])
+  /// #503: TEKİLLİK ARTIK KOŞULLU — bu kolon üzerinden.
+  ///
+  /// Öncesi iki sabit kısıttı: `@@unique([studentProfileId, projectTemplateId])`
+  /// (#58 yarış koruması) ve `@@unique([teamId, projectTemplateId])` (#332).
+  /// İkisi de "aynı proje aynı sahibe bir kez" diyordu ve bu, tekrarlanabilir
+  /// şablonları (portfolyo, araştırma ödevi) imkânsız kılıyordu.
+  ///
+  /// ⚠️ KISMİ BENZERSİZ İNDEKS PRISMA'DA İFADE EDİLEMİYOR; bu yüzden deponun
+  /// koşullu tekillik için zaten kullandığı desen uygulandı (`pendingKey` —
+  /// #345/#349/#366): Postgres çoklu NULL'a izin verdiğinden
+  ///
+  ///   tekrarlanamaz şablon → dolu  (`sp:<profil>:<şablon>` / `tm:<takım>:<şablon>`)
+  ///                          → #58 koruması AYNEN sürer
+  ///   tekrarlanabilir      → NULL  → istenildiği kadar atanabilir
+  ///
+  /// ⚠️ Değer YAZMA ANINDA hesaplanır (`atamaTekilKey`); şablonun bayrağı
+  /// sonradan değişirse mevcut satırlar OLDUĞU GİBİ kalır — geçmiş atamaları
+  /// yeniden yorumlamak, kısıtı geriye dönük uygulamak olurdu.
+  tekilKey String? @unique
 }
 
 model Roadmap {

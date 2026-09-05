@@ -4,6 +4,7 @@ import { BILDIRIM_TURLERI } from "@/features/bildirim/turler";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { readGitHubConfig, getOctokit } from "@/features/github/server/client";
+import { bireyselTekilKey } from "@/features/projects/tekil-anahtar";
 
 /**
  * Stajyerin kendi proje önerisi (#366).
@@ -304,6 +305,9 @@ export async function oneriyiKararaBagla(params: {
       githubRepoUrl: repoUrl,
       // LINKED/devredilmiş depoya provisioning DOKUNMAMALI.
       githubStatus: repoUrl ? DIS_DEPO_DURUMU : "NOT_PROVISIONED",
+      // #503: Öneriden türeyen şablon `fromProposal: true` ve tek stajyere
+      // özel (#366) — tekrarlanabilir DEĞİL, yani anahtar her zaman dolu.
+      tekilKey: bireyselTekilKey(oneri.studentProfile.id, sablon.id),
     },
     select: { id: true },
   });

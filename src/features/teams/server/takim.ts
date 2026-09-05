@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { atamaTekilKey } from "@/features/projects/tekil-anahtar";
 
 /**
  * Takım yönetimi (#332 Faz 2).
@@ -242,7 +243,7 @@ export async function takimaProjeAta(params: {
 
   const sablon = await prisma.projectTemplate.findUnique({
     where: { id: params.projectTemplateId },
-    select: { id: true },
+    select: { id: true, tekrarlanabilir: true },
   });
   if (!sablon) return { ok: false, neden: "sablon-yok" };
 
@@ -250,13 +251,25 @@ export async function takimaProjeAta(params: {
     const atama = await prisma.assignedProject.create({
       // studentProfileId BİLEREK verilmiyor: CHECK kısıtı sahibin tam biri
       // olmasını şart koşuyor (#332 Faz 1).
-      data: { teamId: params.teamId, projectTemplateId: params.projectTemplateId },
+      data: {
+        teamId: params.teamId,
+        projectTemplateId: params.projectTemplateId,
+        // #503: Koşullu tekillik. Tekrarlanamaz şablonda anahtar dolu →
+        // "aynı proje aynı takıma iki kez" koruması sürer (#332);
+        // tekrarlanabilirde NULL.
+        tekilKey: atamaTekilKey({
+          projectTemplateId: params.projectTemplateId,
+          tekrarlanabilir: sablon.tekrarlanabilir,
+          teamId: params.teamId,
+        }),
+      },
       select: { id: true },
     });
     logger.info("Takıma proje atandı", { teamId: params.teamId, assignedProjectId: atama.id });
     return { ok: true, veri: { assignedProjectId: atama.id } };
   } catch {
-    // Tek beklenen ihlal @@unique([teamId, projectTemplateId]).
+    // #503: Tek beklenen ihlal artık `tekilKey` benzersizliği (eski
+    // @@unique([teamId, projectTemplateId]) onun yerine geçti).
     return { ok: false, neden: "zaten-atanmis" };
   }
 }

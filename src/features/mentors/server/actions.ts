@@ -3,6 +3,7 @@ import { mentorunOgrencisiWhere } from "@/features/teams/server/sahiplik";
 import { Prisma } from "@prisma/client";
 import { logger } from "@/lib/logger";
 import { kodIncelemesiDurumu } from "@/features/kvkk/kod-incelemesi-durumu";
+import { atamaTekilKey } from "@/features/projects/tekil-anahtar";
 
 // #58: Aynı proje aynı öğrenciye iki kez atanmaya çalışılırsa — route bunu 409'a çevirir.
 export class AssignmentConflictError extends Error {
@@ -381,16 +382,33 @@ export async function assignProjectToStudent(
       throw new Error("Bu öğrenci size atanmamış");
     }
 
-    // Aynı projeyi daha önce atanmış mı kontrol et (hızlı yol — kullanıcı dostu)
-    const existingAssignment = await prisma.assignedProject.findFirst({
-      where: {
-        studentProfileId,
-        projectTemplateId,
-      },
+    // #503: Şablon TEKRARLANABİLİR mi? Portfolyo sitesi gibi herkesin yapması
+    // beklenen işler ve araştırma ödevleri aynı stajyere birden çok kez
+    // atanabilmeli.
+    const sablon = await prisma.projectTemplate.findUnique({
+      where: { id: projectTemplateId },
+      select: { tekrarlanabilir: true },
     });
-
-    if (existingAssignment) {
+    if (!sablon) {
       throw new AssignmentConflictError();
+    }
+
+    // Aynı projeyi daha önce atanmış mı kontrol et (hızlı yol — kullanıcı dostu)
+    //
+    // ⚠️ TEKRARLANABİLİR ŞABLONDA BU KONTROL ATLANIR (#503). Kontrolün amacı
+    // #58'in "aynı proje aynı öğrenciye iki kez" korumasıydı; tekrarlanabilir
+    // şablonlarda o davranış İSTENEN şey.
+    if (!sablon.tekrarlanabilir) {
+      const existingAssignment = await prisma.assignedProject.findFirst({
+        where: {
+          studentProfileId,
+          projectTemplateId,
+        },
+      });
+
+      if (existingAssignment) {
+        throw new AssignmentConflictError();
+      }
     }
 
     // Projeyi ata
@@ -399,6 +417,13 @@ export async function assignProjectToStudent(
         studentProfileId,
         projectTemplateId,
         status: "PENDING",
+        // #503: Koşullu tekillik. Tekrarlanamaz şablonda anahtar dolu →
+        // yarış koruması (P2002) aynen sürer; tekrarlanabilirde NULL.
+        tekilKey: atamaTekilKey({
+          projectTemplateId,
+          tekrarlanabilir: sablon.tekrarlanabilir,
+          studentProfileId,
+        }),
       },
       include: {
         projectTemplate: true,
