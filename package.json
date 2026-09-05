@@ -18,7 +18,8 @@
     "check:migrations": "node scripts/check-migrations.mjs",
     "seed": "tsx --env-file-if-exists=.env scripts/seed.ts",
     "create:admin": "tsx --env-file-if-exists=.env scripts/create-admin.ts",
-    "test:ai": "tsx --env-file=.env scripts/test-ai.ts"
+    "test:ai": "tsx --env-file=.env scripts/test-ai.ts",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@google-cloud/storage": "^8.0.1",
@@ -47,6 +48,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",

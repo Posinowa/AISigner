@@ -57,3 +57,9 @@ tmpclaude-*
 
 # Uploaded files
 /uploads
+
+# Playwright (#505) — rapor ve iz dosyaları üretilen artefakt
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

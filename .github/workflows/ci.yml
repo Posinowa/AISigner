@@ -157,3 +157,94 @@ jobs:
             APP_VERSION=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # ---------------------------------------------------------------------------
+  # Uçtan uca testler (#505).
+  #
+  # ⚠️ Bu iş de bir HATADAN doğdu — aslında İKİ hatadan, ikisi de canlıya
+  # çıktı ve ikisi de 2400'den fazla birim testinin hepsinden geçmişti:
+  #
+  #   - #308: oturum çerezinin adı elle sabitlenmişti. NextAuth adı
+  #     `NEXTAUTH_URL`'e göre seçtiği için HTTPS'te giriş yapan HERKES
+  #     `/signin`'e geri atılıyordu; lokalde (http) hiç görünmüyordu.
+  #   - #375: oturumsuz kullanıcıyı yönlendiren blok `/api/` kontrolünden
+  #     ÖNCE çalışıyordu; her API isteği 307 ile HTML login sayfasına
+  #     gidiyordu ve arayüz bunu "veri yüklenemedi" diye gösteriyordu.
+  #
+  # İkisi de modüllerin İÇİNDE değil ARASINDA yaşıyordu; mock'lanmış birim
+  # testleri middleware + NextAuth + tarayıcı çerezi birleşimini görmüyor.
+  #
+  # ⚠️ ÜRETİM DERLEMESİ üzerinde koşar (`next start`), `next dev` değil:
+  # StrictMode'un çift efekti ve dev'e özgü önbellek davranışı gerçek
+  # davranışı gizler.
+  # ---------------------------------------------------------------------------
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: aisigner_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      AUTH_SECRET: e2e-placeholder-secret
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/aisigner_e2e?schema=public
+      # ⚠️ PORT HER YERDE AYNI OLMALI. `NEXT_PUBLIC_APP_URL` derleme anında
+      # client bundle'a GÖMÜLÜYOR (#400'ün docker imajını kıran sebebi);
+      # build ile çalıştırma farklı porta bakarsa test, ürün hatası olmayan
+      # bir kırmızı üretir.
+      E2E_PORT: 3100
+      NEXT_PUBLIC_APP_URL: http://127.0.0.1:3100
+      NEXTAUTH_URL: http://127.0.0.1:3100
+      # Seed'in demo hesaplarına yazacağı şifre. Atılabilir bir CI
+      # veritabanına ekiliyor; gerçek bir sır değil.
+      DEMO_PASSWORD: e2e-demo-parolasi
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Yalnız chromium: tarayıcı çeşitliliği bu testlerin amacı değil,
+      # oturum/middleware sözleşmesi tarayıcıdan bağımsız.
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Apply migrations
+        run: npx prisma migrate deploy
+
+      - name: Seed demo accounts
+        run: npm run seed
+
+      - name: Build
+        run: npm run build
+
+      - name: Run E2E
+        run: npm run test:e2e
+
+      - name: Upload report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
