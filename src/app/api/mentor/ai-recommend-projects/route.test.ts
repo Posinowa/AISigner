@@ -4,6 +4,9 @@ const { requireAuthMock, prismaMock, recommendMock } = vi.hoisted(() => ({
   requireAuthMock: vi.fn(),
   prismaMock: {
     studentProfile: { findFirst: vi.fn() },
+    // #498: Atanmış projeler artık `sahiplik.ts` üzerinden AYRI sorguyla
+    // geliyor — profilin içinden değil.
+    assignedProject: { findMany: vi.fn() },
     mentorProfile: { findUnique: vi.fn() },
     projectTemplate: { findMany: vi.fn() },
   },
@@ -87,13 +90,11 @@ describe("ai-recommend-projects (#189)", () => {
 
   it("kendi öğrencisi → 200, öneri döner", async () => {
     mentor("mentor-1");
-    // #295: Rota, zaten atanmış projeleri aday kümesinden çıkarmak için
-    // `assignedProjects`i de okuyor.
     prismaMock.studentProfile.findFirst.mockResolvedValue({
       id: "sp-1",
       mentorId: "mentor-1",
-      assignedProjects: [],
     });
+    prismaMock.assignedProject.findMany.mockResolvedValue([]);
     const res = await POST(req({ studentProfileId: "sp-1" }));
     expect(res.status).toBe(200);
     expect(recommendMock).toHaveBeenCalled();
@@ -103,10 +104,8 @@ describe("ai-recommend-projects (#189)", () => {
     // Eskiden AI bunlara da slot harcıyordu; arayüz onları gizlediği için
     // mentör 3 yerine 1-2 kullanılabilir öneri görüyordu.
     mentor("mentor-1");
-    prismaMock.studentProfile.findFirst.mockResolvedValue({
-      id: "sp-1",
-      assignedProjects: [{ projectTemplateId: "t9" }],
-    });
+    prismaMock.studentProfile.findFirst.mockResolvedValue({ id: "sp-1" });
+    prismaMock.assignedProject.findMany.mockResolvedValue([{ projectTemplateId: "t9" }]);
 
     await POST(req({ studentProfileId: "sp-1" }));
 
@@ -119,10 +118,41 @@ describe("ai-recommend-projects (#189)", () => {
     );
   });
 
+  /**
+   * #498 — TAKIM PROJESİ DE ELENİR.
+   *
+   * ⚠️ BU TESTİN OLMAMASI HATAYI YAŞATTI. Rota atanmış projeleri
+   * `studentProfile.assignedProjects` üzerinden okuyordu ve takım atamasında
+   * `studentProfileId` NULL olduğu için (#332) takımın projesi süzgece HİÇ
+   * girmiyordu. Canlıda AI, öğrencinin takımıyla çalıştığı projeyi listenin
+   * BAŞINDA %95 eşleşmeyle önerdi.
+   */
+  it("⚠️ #498: atanmış projeler `sahiplik.ts`'ten sorulur — takım ataması da elenir", async () => {
+    mentor("mentor-1");
+    prismaMock.studentProfile.findFirst.mockResolvedValue({ id: "sp-1" });
+    prismaMock.assignedProject.findMany.mockResolvedValue([
+      { projectTemplateId: "takim-projesi" },
+    ]);
+
+    await POST(req({ studentProfileId: "sp-1" }));
+
+    // Sorgu profilin içinden değil, sahiplik koşuluyla AYRI çalışmalı.
+    const kosul = JSON.stringify(prismaMock.assignedProject.findMany.mock.calls[0][0].where);
+    expect(kosul).toContain("studentProfileId");
+    expect(kosul).toContain("team");
+
+    expect(prismaMock.projectTemplate.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: { notIn: ["takim-projesi"] }, fromProposal: false },
+      }),
+    );
+  });
+
   it("#295: mentörün UZMANLIĞI öneriye geçirilir", async () => {
     // Mentör süpervize edemeyeceği projeye yol haritası çizemez.
     mentor("mentor-1");
-    prismaMock.studentProfile.findFirst.mockResolvedValue({ id: "sp-1", assignedProjects: [] });
+    prismaMock.studentProfile.findFirst.mockResolvedValue({ id: "sp-1" });
+    prismaMock.assignedProject.findMany.mockResolvedValue([]);
     prismaMock.mentorProfile.findUnique.mockResolvedValue({
       expertise: ["Backend"],
       seniority: "senior",
