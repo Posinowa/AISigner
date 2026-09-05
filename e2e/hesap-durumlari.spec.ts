@@ -93,6 +93,33 @@ test.describe("REJECTED stajyer (#143)", () => {
       await expect(page).toHaveURL(/\/account-status/);
     });
   }
+
+  /*
+   * ⚠️ İSTİSNA REJECTED'A UZANMAZ — ve bu kapı SAYFADA DEĞİL, `guard.ts`'te.
+   *
+   * Yukarıdaki üç test yalnız middleware'in yönlendirmesini ölçüyor;
+   * `allowUnapprovedStudent` ise bambaşka bir dalda yaşıyor ve durumu
+   * açıkça `PENDING`'e karşılaştırıyor. O karşılaştırma "onaysız" diye
+   * gevşetilirse (`!== "APPROVED"` gibi) sayfa testleri YEŞİL kalır ama
+   * reddedilmiş bir hesap profilini doldurmaya devam eder.
+   *
+   * #439'da tam bu sınıftan bir kaçak bulunmuştu: `saveOnboarding`
+   * middleware yalnız SAYFAYI kapattığı için, server action doğrudan
+   * çağrılabildiğinden REJECTED stajyerin profili yazılmaya devam
+   * ediyordu.
+   */
+  test("⚠️ profil-tamamlama ucu REJECTED'ı GEÇİRMEZ — istisna yalnız PENDING'e ait", async ({
+    page,
+  }) => {
+    const yanit = await page.request.post("/api/student/survey-answers", {
+      data: { answers: [] },
+      maxRedirects: 0,
+    });
+
+    // ⚠️ PENDING'de aynı uç 403 DÖNMÜYOR (yukarıda kilitli). İkisi yan yana
+    // durduğu için "istisna" ile "kapı" birbirine karışamaz.
+    expect(yanit.status()).toBe(403);
+  });
 });
 
 /**
