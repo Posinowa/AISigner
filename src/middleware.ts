@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
+import { ISTEK_KIMLIGI_BASLIGI, istekKimligiCoz } from "@/lib/istek-kimligi";
 import { panoErisimineAcik, DURUM_EKRANI } from "@/lib/auth/hesap-durumu";
 
 // Korumalı route grupları ve gerektirdikleri roller
@@ -44,7 +45,44 @@ const publicPaths = [
 const STATIK_UZANTI =
   /\.(?:ico|png|jpg|jpeg|gif|svg|webp|avif|css|js|map|txt|xml|json|webmanifest|woff|woff2|ttf|otf|eot|mp4|webm|pdf)$/i;
 
-export async function middleware(request: NextRequest) {
+/**
+ * İstek kimliğini isteğe DE taşıyan `next()`.
+ *
+ * ⚠️ Düz `devam(request, istekKimligi)` yalnız yanıtı geçirir; rota handler'ı
+ * başlığı GÖREMEZ. Kimliğin handler'a ulaşması için isteğin başlıkları
+ * yeniden verilmek zorunda — bu yüzden `next()` çağrıları buradan geçiyor.
+ */
+function devam(request: NextRequest, kimlik: string): NextResponse {
+  const basliklar = new Headers(request.headers);
+  basliklar.set(ISTEK_KIMLIGI_BASLIGI, kimlik);
+  return NextResponse.next({ request: { headers: basliklar } });
+}
+
+/**
+ * #491: İstek kimliği (correlation ID) tüm yanıtlara damgalanıyor.
+ *
+ * ⚠️ SARMALAYICI KULLANILDI, 15 DÖNÜŞ NOKTASI TEK TEK DÜZENLENMEDİ.
+ * `middleware.ts` on beş ayrı yerde yanıt döndürüyor (yönlendirmeler, 401
+ * JSON'u, `next()`'ler). Her birine damgayı elle eklemek, ileride eklenen
+ * on altıncı dönüşün onu sessizce KAÇIRMASI demekti — bu dosyanın #375'te
+ * tam olarak böyle bir sıra hatasıyla canlıyı kırdığı yazılı.
+ *
+ * Dışarıdan gelen geçerli bir kimlik KORUNUYOR: aksi halde aynı istek
+ * vekilin logunda başka, bizde başka kimlikle görünürdü.
+ */
+export async function middleware(request: NextRequest): Promise<NextResponse> {
+  const kimlik = istekKimligiCoz(request.headers.get(ISTEK_KIMLIGI_BASLIGI));
+  const yanit = await yonlendirmeKarari(request, kimlik);
+
+  // Yanıt başlığı: istemci/destek ekibi bu kimliği raporlayabilsin.
+  yanit.headers.set(ISTEK_KIMLIGI_BASLIGI, kimlik);
+  return yanit;
+}
+
+async function yonlendirmeKarari(
+  request: NextRequest,
+  istekKimligi: string,
+): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
 
   // Public path'ler — ama oturum açıksa signin/signup'a gitmeye gerek yok
@@ -61,7 +99,7 @@ export async function middleware(request: NextRequest) {
       if (role === "MENTOR") return NextResponse.redirect(new URL("/mentor-dashboard", request.url));
       if (role === "STUDENT") return NextResponse.redirect(new URL("/student-dashboard", request.url));
     }
-    return NextResponse.next();
+    return devam(request, istekKimligi);
   }
 
   // Statik dosyalar ve Next.js internal path'leri atla.
@@ -87,7 +125,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/favicon") ||
     STATIK_UZANTI.test(pathname)
   ) {
-    return NextResponse.next();
+    return devam(request, istekKimligi);
   }
 
   // JWT token'ı kontrol et
@@ -123,7 +161,7 @@ export async function middleware(request: NextRequest) {
 
     // Ana sayfa hariç (landing page olabilir)
     if (pathname === "/") {
-      return NextResponse.next();
+      return devam(request, istekKimligi);
     }
 
     const signinUrl = new URL("/signin", request.url);
@@ -146,7 +184,7 @@ export async function middleware(request: NextRequest) {
    * durum kapısı genişlediğinde kural kendiliğinden korunur.
    */
   if (apiIstegi) {
-    return NextResponse.next();
+    return devam(request, istekKimligi);
   }
 
   // Rol bazlı erişim kontrolü
@@ -212,7 +250,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  return NextResponse.next();
+  return devam(request, istekKimligi);
 }
 
 export const config = {

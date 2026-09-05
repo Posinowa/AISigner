@@ -346,3 +346,95 @@ describe("API yanıt sözleşmesi (#375)", () => {
     });
   });
 });
+
+/**
+ * #491 — İstek kimliği HER yanıta damgalanıyor.
+ *
+ * ⚠️ ASIL İDDİA BU: `middleware.ts` on beş ayrı yerde yanıt döndürüyor
+ * (yönlendirmeler, 401 JSON'u, `next()`'ler). Damgayı her dönüşe elle
+ * eklemek, ileride eklenen on altıncı dönüşün onu sessizce kaçırması
+ * demekti — bu dosya #375'te tam olarak böyle bir sıra hatasıyla canlıyı
+ * kırmıştı. Bu yüzden damga bir SARMALAYICIDA ve test onu kilitliyor.
+ */
+import { ISTEK_KIMLIGI_BASLIGI, kimlikNormalize } from "@/lib/istek-kimligi";
+
+const istekKimlikli = (yol: string, kimlik?: string) => {
+  const r = new NextRequest(`http://localhost:3000${yol}`);
+  if (kimlik) r.headers.set(ISTEK_KIMLIGI_BASLIGI, kimlik);
+  return r;
+};
+
+describe("istek kimliği damgası (#491)", () => {
+  /** Middleware'in farklı dallarını temsil eden yollar. */
+  const YOLLAR: [string, string][] = [
+    ["/", "oturumsuz kök — next()"],
+    ["/signin", "public yol"],
+    ["/api/admin/users", "API — 401 JSON"],
+    ["/admin-dashboard", "korumalı sayfa — yönlendirme"],
+    ["/favicon.ico", "statik atlama"],
+  ];
+
+  it("⚠️ HER dal kimlik başlığı döndürür — biri bile atlanmamalı", async () => {
+    getTokenMock.mockResolvedValue(null);
+
+    for (const [yol, aciklama] of YOLLAR) {
+      const yanit = await middleware(istekKimlikli(yol));
+      const kimlik = yanit.headers.get(ISTEK_KIMLIGI_BASLIGI);
+
+      expect(kimlik, `${yol} (${aciklama})`).toBeTruthy();
+      expect(kimlikNormalize(kimlik), `${yol} geçerli kimlik`).not.toBeNull();
+    }
+  });
+
+  it("oturumlu yönlendirmelerde de damga var", async () => {
+    // Rol yönlendirmeleri ayrı bir dönüş kümesi; onlar da kapsanmalı.
+    getTokenMock.mockResolvedValue({ role: "STUDENT", accountStatus: "APPROVED" });
+
+    const yanit = await middleware(istekKimlikli("/admin-dashboard"));
+
+    expect(yanit.headers.get(ISTEK_KIMLIGI_BASLIGI)).toBeTruthy();
+  });
+
+  it("⚠️ GELEN geçerli kimlik KORUNUR — vekille aynı kimlik kalmalı", async () => {
+    getTokenMock.mockResolvedValue(null);
+    const gelen = "vekil-trace-0001";
+
+    const yanit = await middleware(istekKimlikli("/", gelen));
+
+    expect(yanit.headers.get(ISTEK_KIMLIGI_BASLIGI)).toBe(gelen);
+  });
+
+  it("⚠️ GEÇERSİZ gelen kimlik KULLANILMAZ, yenisi üretilir", async () => {
+    /*
+     * ⚠️ SATIR SONU BURADA DENENEMİYOR — ve bu iyi haber: `Headers.set`
+     * satır sonu içeren değeri REDDEDİYOR, yani newline enjeksiyonu gerçek
+     * bir HTTP başlığıyla zaten taşınamıyor. (İlk sürümde denedim, testin
+     * KENDİSİ TypeError ile patladı.)
+     *
+     * Başlığa KONABİLEN geçersiz değerler yine de var — boşluklu metin,
+     * çok uzun değer, JSON — ve `kimlikNormalize` onlar için duruyor.
+     * Satır sonu davranışı fonksiyon düzeyinde `istek-kimligi.test.ts`'te
+     * ayrıca kilitli.
+     */
+    getTokenMock.mockResolvedValue(null);
+
+    for (const kotu of ["kotu deger", "a".repeat(200), '{"x":1}']) {
+      const yanit = await middleware(istekKimlikli("/", kotu));
+      const kimlik = yanit.headers.get(ISTEK_KIMLIGI_BASLIGI);
+
+      expect(kimlik, kotu).not.toBe(kotu);
+      expect(kimlikNormalize(kimlik), kotu).not.toBeNull();
+    }
+  });
+
+  it("her istek FARKLI kimlik alır — gruplama anlamlı olsun", async () => {
+    getTokenMock.mockResolvedValue(null);
+
+    const a = await middleware(istekKimlikli("/"));
+    const b = await middleware(istekKimlikli("/"));
+
+    expect(a.headers.get(ISTEK_KIMLIGI_BASLIGI)).not.toBe(
+      b.headers.get(ISTEK_KIMLIGI_BASLIGI),
+    );
+  });
+});

@@ -19,7 +19,16 @@
  * desen — koşulu dışarı almak (erken `return` ile) yetmez, import yine paketlenir.
  */
 
-type IstekBilgisi = { path?: string; method?: string };
+type IstekBilgisi = {
+  path?: string;
+  method?: string;
+  /**
+   * #491: Next bu kancaya istek başlıklarını da veriyor. İstek kimliği
+   * buradan okunuyor — yakalanmayan hatalar da aynı kimlikle bildirilsin,
+   * yoksa correlation yalnız YAKALANAN hatalarda çalışırdı.
+   */
+  headers?: Record<string, string | string[] | undefined>;
+};
 type HataBaglami = { routePath?: string };
 
 export async function onRequestError(
@@ -32,7 +41,15 @@ export async function onRequestError(
     // yüklensin, her soğuk başlangıçta değil.
     const { bildirSunucuHatasi } = await import("@/lib/error-alerts");
 
+    const { ISTEK_KIMLIGI_BASLIGI, kimlikNormalize } = await import(
+      "@/lib/istek-kimligi"
+    );
+    const ham = request.headers?.[ISTEK_KIMLIGI_BASLIGI];
+    const istekKimligi =
+      kimlikNormalize(Array.isArray(ham) ? ham[0] : ham) ?? undefined;
+
     await bildirSunucuHatasi(err, {
+      istekKimligi,
       // Sorgu dizesi BİLEREK dışarıda: PII sorgu parametrelerinde taşınabiliyor
       // (ör. arama terimi, e-posta). Rota deseni teşhis için zaten yeterli.
       path: request.path?.split("?")[0],
