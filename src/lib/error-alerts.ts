@@ -43,6 +43,15 @@ export type HataBaglami = {
   method?: string;
   /** Next'in route tanımı, ör. /api/admin/users/[userId]. */
   routePath?: string;
+  /**
+   * #491: İstek kimliği (correlation ID).
+   *
+   * Bildirimi alan kişi, aynı kimlikle loglarda o isteğin TÜM satırlarını
+   * bulabilsin diye taşınıyor. İmzaya GİRMİYOR (`imzaUret`): her istek
+   * benzersiz olduğu için imzaya katılsaydı susturma tamamen işlevsiz
+   * kalır ve aynı hata her seferinde yeniden bildirilirdi.
+   */
+  istekKimligi?: string;
 };
 
 /**
@@ -74,6 +83,9 @@ function govdeUret(
     `Sürüm   : ${process.env.APP_VERSION ?? process.env.GIT_COMMIT_SHA ?? "bilinmiyor"}`,
     `Yol     : ${baglam.method ?? "-"} ${baglam.path ?? "-"}`,
     `Route   : ${baglam.routePath ?? "-"}`,
+    // #491: Bildirimi alan kişi bu kimlikle loglarda aynı isteğin tüm
+    // satırlarını bulabiliyor — e-postada olmasa taşınmasının anlamı kalmazdı.
+    `İstek   : ${baglam.istekKimligi ?? "-"}`,
     "",
     `Hata    : ${hata instanceof Error ? `${hata.name}: ${hata.message}` : String(hata)}`,
   ];

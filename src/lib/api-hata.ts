@@ -1,6 +1,7 @@
 import { after } from "next/server";
 import { logger } from "@/lib/logger";
 import { bildirSunucuHatasi, type HataBaglami } from "@/lib/error-alerts";
+import { ISTEK_KIMLIGI_BASLIGI } from "@/lib/istek-kimligi";
 
 /**
  * API rotalarının `catch` bloğu için TEK giriş noktası.
@@ -36,17 +37,67 @@ export function rotaHatasi(
   hata: unknown,
   baglam: HataBaglami = {},
 ): void {
-  logger.error(kapsam, {
+  const alanlar = {
     // `Error` JSON.stringify ile boş nesneye dönüşür; alanları elle açıyoruz.
     ad: hata instanceof Error ? hata.name : typeof hata,
     mesaj: hata instanceof Error ? hata.message : String(hata),
     stack: hata instanceof Error ? hata.stack : undefined,
-  });
+  };
 
-  const bildir = () =>
-    bildirSunucuHatasi(hata, { routePath: kapsam, ...baglam }).catch(() => {
+  /*
+   * #491: İSTEK KİMLİĞİ log satırına giriyor.
+   *
+   * ⚠️ `headers()` Next 15'te ASENKRON, bu yüzden satır bir mikro-görev
+   * sonra yazılıyor. `after()` KULLANILMADI: o, logu yanıt akıtıldıktan
+   * SONRAYA ertelerdi ve süreç hemen çökerse hata satırı tamamen
+   * kaybolurdu. Mikro-görev, kimliği kazandırırken bu riski almıyor.
+   *
+   * ⚠️ KİMLİK OKUNAMAZSA SATIR YİNE YAZILIYOR. İstek bağlamı dışında
+   * (arka plan işleri, testler) `headers()` fırlatır; korelasyon
+   * kaybolabilir ama HATA LOGU kaybolamaz.
+   */
+  /*
+   * #491: İstek kimliği BİR KEZ okunuyor ve iki tüketici (log + bildirim)
+   * aynı sözü paylaşıyor.
+   *
+   * ⚠️ İlk sürümde her iki yol `headers()`'ı AYRI AYRI okuyordu ve
+   * bildirim yolunda kimlik boş çıkıyordu — log satırında dolu olmasına
+   * rağmen. İki okuma yerine tek söz hem bu farkı ortadan kaldırıyor hem
+   * de istek başına yapılan işi yarıya indiriyor.
+   *
+   * ⚠️ `headers()` Next 15'te ASENKRON, bu yüzden log satırı bir mikro-görev
+   * sonra yazılıyor. `after()` KULLANILMADI: o, logu yanıt akıtıldıktan
+   * SONRAYA ertelerdi ve süreç hemen çökerse hata satırı tamamen kaybolurdu.
+   */
+  const kimlikSozu: Promise<string | undefined> = (async () => {
+    try {
+      const { headers } = await import("next/headers");
+      return (await headers()).get(ISTEK_KIMLIGI_BASLIGI) ?? undefined;
+    } catch {
+      // İstek bağlamı yok (arka plan işi, test) — korelasyon olmadan devam.
+      return undefined;
+    }
+  })();
+
+  /*
+   * ⚠️ KİMLİK OKUNAMAZSA SATIR YİNE YAZILIYOR. Korelasyon kaybolabilir
+   * ama HATA LOGU kaybolamaz.
+   */
+  void (async () => {
+    const istekKimligi = await kimlikSozu;
+    logger.error(kapsam, istekKimligi ? { ...alanlar, istekKimligi } : alanlar);
+  })();
+
+  const bildir = async () => {
+    const istekKimligi = await kimlikSozu;
+    return bildirSunucuHatasi(hata, {
+      routePath: kapsam,
+      ...baglam,
+      ...(istekKimligi ? { istekKimligi } : {}),
+    }).catch(() => {
       // `bildirSunucuHatasi` zaten yutuyor; bu yalnız son kale.
     });
+  };
 
   /*
    * ⚠️ YANIT BEKLETİLMİYOR. Bildirim e-posta gönderiyor; `await` etmek 500
