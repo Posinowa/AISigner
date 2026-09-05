@@ -37,6 +37,18 @@ export const KULLANICI_KATEGORILERI = [
 
 export type KullaniciKategorisi = (typeof KULLANICI_KATEGORILERI)[number];
 
+/**
+ * Panelde SEKMESİ OLAN kategoriler (#489).
+ *
+ * ⚠️ `"STUDENT"` DIŞARIDA: yukarıda yazdığı gibi onun bir sekmesi yok, yalnız
+ * takım üyesi seçicisi (#332) için var. Panel bu tipi kendi içinde elle
+ * sayıyordu; `Exclude` ile bağlamak, yeni bir kategori eklendiğinde panelin
+ * de otomatik haberdar olmasını sağlıyor — iki listeyi elle eşit tutmaya
+ * çalışmak bu kod tabanında tekrar eden hata sınıfı (#448'de aynısı
+ * kategori tanımında yaşandı).
+ */
+export type PanelKategorisi = Exclude<KullaniciKategorisi, "STUDENT">;
+
 export function gecerliKategori(deger: unknown): KullaniciKategorisi {
   return KULLANICI_KATEGORILERI.includes(deger as KullaniciKategorisi)
     ? (deger as KullaniciKategorisi)
