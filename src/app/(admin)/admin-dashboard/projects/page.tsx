@@ -16,6 +16,8 @@ type ProjectTemplate = {
   difficulty: "EASY" | "MEDIUM" | "HARD";
   track: string[];
   githubRepoUrl?: string | null;
+  /** #503: Aynı stajyere birden çok kez atanabilir mi? */
+  tekrarlanabilir?: boolean;
 };
 
 type FormData = {
@@ -24,6 +26,7 @@ type FormData = {
   difficulty: "EASY" | "MEDIUM" | "HARD";
   track: string;
   githubRepoUrl: string;
+  tekrarlanabilir: boolean;
 };
 
 const difficultyColors = {
@@ -43,6 +46,7 @@ export default function ProjectsPage() {
     difficulty: "EASY",
     track: "",
     githubRepoUrl: "",
+    tekrarlanabilir: false,
   });
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(true); // Sayfa yükleniyor durumu
@@ -75,7 +79,14 @@ export default function ProjectsPage() {
   }, [loadTemplates]);
 
   function resetForm() {
-    setForm({ title: "", description: "", difficulty: "EASY", track: "", githubRepoUrl: "" });
+    setForm({
+      title: "",
+      description: "",
+      difficulty: "EASY",
+      track: "",
+      githubRepoUrl: "",
+      tekrarlanabilir: false,
+    });
     setIsFormOpen(false);
     setEditingId(null);
   }
@@ -90,6 +101,9 @@ export default function ProjectsPage() {
       difficulty: template.difficulty,
       track: template.track.join(", "),
       githubRepoUrl: template.githubRepoUrl ?? "",
+      // #508: Düzenlemede mevcut değer yüklenmezse form her açılışta bayrağı
+      // sıfırlar ve admin farkında olmadan KAPATIR.
+      tekrarlanabilir: template.tekrarlanabilir ?? false,
     });
     setEditingId(template.id);
     setIsFormOpen(true);
@@ -302,6 +316,38 @@ export default function ProjectsPage() {
                 />
               </div>
 
+              {/* #508: #503'ün bayrağı arayüzde YOKTU — özellik yalnız
+                  doğrudan veritabanı güncellemesiyle açılabiliyordu. */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.tekrarlanabilir}
+                    onChange={e => setForm(f => ({ ...f, tekrarlanabilir: e.target.checked }))}
+                    className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-2 focus:ring-ring"
+                  />
+                  <span className="text-sm">
+                    <span className="font-medium text-slate-800">
+                      Aynı stajyere birden çok kez atanabilsin
+                    </span>
+                    {/* ⚠️ METİN SONUCU SÖYLÜYOR, DURUMU DEĞİL (#405 dersi):
+                        "tekrarlanabilir" tek başına ne anlama geldiğini
+                        söylemiyor. */}
+                    <span className="mt-1 block text-xs leading-relaxed text-slate-500">
+                      Portfolyo sitesi gibi herkesin yapması beklenen işler ve
+                      araştırma ödevleri için. Kapalıyken bir proje aynı
+                      stajyere yalnızca bir kez atanabilir.
+                    </span>
+                    {form.tekrarlanabilir && (
+                      <span className="mt-1.5 block text-xs leading-relaxed text-amber-700">
+                        ⚠️ Bu ayarı sonradan kapatmak, daha önce yapılmış
+                        tekrarlı atamaları geri almaz.
+                      </span>
+                    )}
+                  </span>
+                </label>
+              </div>
+
               <div className="flex justify-end gap-3 pt-4 border-t">
                 <button
                   type="button"
@@ -369,10 +415,23 @@ export default function ProjectsPage() {
                       <h3 className="text-lg font-semibold text-slate-900 line-clamp-2">
                         {template.title}
                       </h3>
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${difficultyColors[template.difficulty]}`}>
-                        {template.difficulty === "EASY" ? "Kolay" : 
-                         template.difficulty === "MEDIUM" ? "Orta" : "Zor"}
-                      </span>
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        {/* #508: İşaretli şablonlar tek bakışta görünsün —
+                            admin hangilerinin herkese açık olduğunu bilmeden
+                            havuzu yönetemez. */}
+                        {template.tekrarlanabilir && (
+                          <span
+                            title="Aynı stajyere birden çok kez atanabilir"
+                            className="px-2 py-1 text-xs font-medium rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200"
+                          >
+                            Tekrarlanabilir
+                          </span>
+                        )}
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${difficultyColors[template.difficulty]}`}>
+                          {template.difficulty === "EASY" ? "Kolay" :
+                           template.difficulty === "MEDIUM" ? "Orta" : "Zor"}
+                        </span>
+                      </div>
                     </div>
 
                     {/* #91: Markdown soyulmuş, kelime sınırında ve koşullu ellipsis'li önizleme. */}
