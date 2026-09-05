@@ -1,5 +1,18 @@
 import { defineConfig, devices } from "@playwright/test";
 
+/*
+ * ⚠️ `.env` ELLE YÜKLENİYOR (#510). Next.js kendi süreci için `.env`'i
+ * otomatik okuyor, ama `globalSetup` Playwright'ın Node bağlamında
+ * koşuyor ve orayı kimse yüklemiyor: veri kurulumu `DATABASE_URL`
+ * olmadan "Can't reach database server" ile patlıyordu. CI'da değişkenler
+ * iş ortamından geliyor, bu yüzden dosya yoksa sessizce geçilir.
+ */
+try {
+  process.loadEnvFile(".env");
+} catch {
+  // .env yok (CI) — ortam değişkenleri zaten tanımlı.
+}
+
 /**
  * Uçtan uca testler (#505).
  *
@@ -31,6 +44,13 @@ const BASE_URL = `http://127.0.0.1:${PORT}`;
 
 export default defineConfig({
   testDir: "./e2e",
+
+  /*
+   * #510: Hesap DURUMLARINI kuran veri adımı. Seed yalnız APPROVED demo
+   * hesapları üretiyor; PENDING/REJECTED/GRADUATED sözleşmeleri test
+   * edilebilmek için var olmak zorunda.
+   */
+  globalSetup: "./e2e/veri/kur.ts",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
 
@@ -53,7 +73,26 @@ export default defineConfig({
      */
   },
 
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  /*
+   * ⚠️ İKİ PROJE: önce oturumları kuran "kurulum", sonra testler.
+   * Her testin kendi girişini yapması toplu koşuda giriş RATE-LIMIT'ine
+   * takılıyordu — testler tek tek yeşil, birlikte kırmızıydı. Oturum bir
+   * kez kurulup paylaşılıyor; girişin KENDİSİ `giris.spec.ts`'te ayrıca
+   * ve gerçek akışla test ediliyor.
+   */
+  projects: [
+    {
+      name: "kurulum",
+      testMatch: /veri\/oturum\.setup\.ts/,
+      use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"] },
+      dependencies: ["kurulum"],
+      testIgnore: /veri\//,
+    },
+  ],
 
   webServer: {
     command: `npm run start -- --port ${PORT}`,

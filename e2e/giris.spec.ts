@@ -1,5 +1,7 @@
 import { test, expect } from "@playwright/test";
 
+import { OTURUM_DOSYASI } from "./veri/hesaplar";
+
 /**
  * GERÇEK GİRİŞ AKIŞI (#308, #505).
  *
@@ -50,10 +52,30 @@ test.describe("giriş", () => {
     await expect(page).toHaveURL(/\/student-dashboard/);
   });
 
-  test("⚠️ aynı oturumla API isteği 200 JSON döner (#375'in diğer yüzü)", async ({ page }) => {
-    await girisYap(page);
-    await expect(page).toHaveURL(/\/student-dashboard/, { timeout: 20_000 });
+  test("yanlış şifre girişi geçirmez", async ({ page }) => {
+    await page.goto("/signin");
+    await page.locator("#signin-email").fill(HESAP.email);
+    await page.locator("#signin-password").fill("kesinlikle-yanlis-sifre");
+    await page.getByRole("button", { name: /giriş/i }).click();
 
+    await expect(page).toHaveURL(/\/signin/);
+    await expect(page.locator("body")).toContainText(/hatal|geçersiz|yanlış/i);
+  });
+});
+
+/**
+ * Oturum AÇIKKEN geçerli sözleşmeler.
+ *
+ * ⚠️ BU TESTLER YENİDEN GİRİŞ YAPMAZ — kurulumda açılmış oturumu
+ * paylaşıyorlar. Ölçüldü: her testin kendi girişini yapması eşzamanlı
+ * koşuda 20 sn sınırına dayanıyordu (argon2 doğrulaması CPU-bağımlı).
+ * Giriş AKIŞI yukarıda iki testle kapsanıyor; buradakilerin konusu
+ * oturumun DAVRANIŞI.
+ */
+test.describe("açık oturum", () => {
+  test.use({ storageState: OTURUM_DOSYASI("ogrenci") });
+
+  test("⚠️ aynı oturumla API isteği 200 JSON döner (#375'in diğer yüzü)", async ({ page }) => {
     const yanit = await page.request.get("/api/student/proposals", { maxRedirects: 0 });
 
     expect(yanit.status()).toBe(200);
@@ -61,9 +83,6 @@ test.describe("giriş", () => {
   });
 
   test("oturum açıkken /signin panele yönlendirir", async ({ page }) => {
-    await girisYap(page);
-    await expect(page).toHaveURL(/\/student-dashboard/, { timeout: 20_000 });
-
     await page.goto("/signin");
 
     await expect(page).toHaveURL(/\/student-dashboard/);
@@ -76,21 +95,8 @@ test.describe("giriş", () => {
    * davranıyor; ikisini ayrı ayrı kilitlemezsek biri sessizce bozulur.
    */
   test("⚠️ oturum açıkken kök yol açılış sayfası DEĞİL, panodur", async ({ page }) => {
-    await girisYap(page);
-    await expect(page).toHaveURL(/\/student-dashboard/, { timeout: 20_000 });
-
     await page.goto("/");
 
     await expect(page).toHaveURL(/\/student-dashboard/);
-  });
-
-  test("yanlış şifre girişi geçirmez", async ({ page }) => {
-    await page.goto("/signin");
-    await page.locator("#signin-email").fill(HESAP.email);
-    await page.locator("#signin-password").fill("kesinlikle-yanlis-sifre");
-    await page.getByRole("button", { name: /giriş/i }).click();
-
-    await expect(page).toHaveURL(/\/signin/);
-    await expect(page.locator("body")).toContainText(/hatal|geçersiz|yanlış/i);
   });
 });

@@ -63,7 +63,15 @@ test.describe("oturumsuz istek", () => {
 
     expect(yanit?.status()).toBe(200);
     await expect(page).not.toHaveURL(/\/signin/);
-    await expect(page.locator(".landing")).toBeVisible();
+    /*
+     * ⚠️ `.first()` GEREKLİ ve sebebi ölçüldü: React akışlı (streaming)
+     * render sırasında içerik önce `<div hidden id="S:1">` içinde geliyor,
+     * sonra yerine taşınıyor. O pencerede `.landing` İKİ öğeye çözülüyor
+     * ve Playwright'ın strict modu hata veriyor — ürün hatası değil,
+     * zamanlamaya bağlı bir test kusuru. Testin iddiası "açılış sayfası
+     * render edildi"; hangi kopyanın görüldüğü bunun parçası değil.
+     */
+    await expect(page.locator(".landing").first()).toBeVisible();
   });
 });
 
