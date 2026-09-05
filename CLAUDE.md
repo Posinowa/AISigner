@@ -717,6 +717,46 @@ kimseye söylenmiyordu (sayaç artıyordu ama o yalnızca teşhis).
 - Kural da açıklanır ("hangi satırı kimin yazdığı bilinmediği için"), yoksa mentör
   kuralı hata sanar — denetimde tam olarak bu olmuştu.
 
+### Küçük ama ölçülmüş düzeltmeler — ikinci dalga (#466, #476, #481, #489, #494)
+
+- **#466 — DURUM EKRANI TEK KAYNAKTAN.** Öğrenci panosu kendi 28 satırlık
+  "onay bekliyor / reddedildi" ekranını basıyordu ve o kopyada #143'ün
+  "profilini tamamla" eylemi YOKTU. ⚠️ Kopya normal akışta ERİŞİLEMEZ
+  (middleware zaten yönlendiriyor, beş durum da ölçüldü) — düzeltilen şey
+  ayrışmış bir YEDEK KATIN kanonik ekrandan farklı davranması. Kural da iki
+  yerde iki yazımdaydı; artık `lib/auth/hesap-durumu.ts`.
+  ⚠️ Middleware'in rota nüansları (mentör/stajyer, REJECTED/PENDING, profil
+  rotaları — #143/#249/#287) YERİNDE bırakıldı: kusur orada değildi.
+- **#469 — BAĞIMLILIK GÜVENLİK TARAMASI + DEPENDABOT.** CI'a `dependency audit`
+  adımı ve haftalık gruplu güncellemeler eklendi. ⚠️ Gruplama bilinçli:
+  gruplanmamış Dependabot her paket için ayrı PR açar ve bu depoda her PR bir
+  CI koşusu + Docker imajı derlemesi demek. Major sürümler AYRI kalır —
+  kırıcı değişiklik tek tek incelenmeli.
+- **#476 — DEPENDABOT PR'LARI pr-guard'DAN GEÇEMİYORDU** ve hiçbiri merge
+  edilemiyordu. Dal adı ve `Closes #N` Dependabot'ta yapılandırılamaz.
+  ⚠️ **MUAFİYET YALNIZ SÖZLEŞME ADIMINA**: ikinci adımdaki **yasak dosya
+  denetimi** (`.env`, `.pem`, credentials) Dependabot dahil herkeste çalışıyor.
+  "Dependabot ise pr-guard'ı atla" demek o kapıyı da kapatırdı.
+  ⚠️ Koşul `github.actor` DEĞİL, PR YAZARI: `actor` bir insan kontrolü
+  yeniden çalıştırdığında ona dönüşür ve denetim yeniden kırmızı olurdu.
+- **#481 — OK FONKSİYONU `new` İLE ÇAĞRILAMAZ.** `client.test.ts` Octokit'i
+  ok fonksiyonuyla mock'luyordu; `getOctokit` `new Octokit(...)` çağırıyor.
+  vitest 3 sarmalayıp örtüyordu, vitest 4 örtmüyor. **Bir vitest kırılması
+  DEĞİL** — mock baştan beri yanlıştı. Vitest 4 geçişini engelleyen tek şey
+  buydu (ölçüldü: düzeltmeyle 209 dosya/2371 test geçiyor).
+- **#489 — ADMİN PANELİ 1224 → 1005 satır**, üç sunum bileşeni ayrıldı. Veri
+  katmanı sayfada KALDI. ⚠️ Doğrulama: render edilen DOM **birebir aynı**
+  (428.946 B, hash `-352818363`) — bileşen sınırları DOM'a hiçbir şey eklemez.
+  ⚠️ Ölçüm tuzağı: tüm sayfa 250 bayt farklı çıkıyordu, sebep Next.js'in
+  `<script>` etiketlerindeki build'e özel chunk hash'leriydi.
+  `FilterCategory` de tek kaynaktan türüyor (`PanelKategorisi`).
+- **#494 — KAYNAK DÜZENLEME İKİ KEZ YAZILIYDI** (düzenleme + yeni adım
+  formu): altı fonksiyon üç işlem, ve JSX **karakteri karakterine** aynı.
+  Biri güncellenip diğeri unutulsaydı mentör iki formda farklı davranış
+  görürdü ve bu hata gibi GÖRÜNMEZDİ. ⚠️ Mutasyon testi bir davranış yakaladı:
+  `kaynakGuncelle`'ye `trim()` eklemek testlerden geçiyordu — kırpsaydı
+  yazarken boşluk yutulurdu; temizlik KAYDEDERKEN yapılıyor.
+
 ### Küçük ama ölçülmüş düzeltmeler (#407, #408, #409)
 
 - **#407 — adım kartında yorum sayısı.** ⚠️ "YENİ" DEĞİL, TOPLAM: `StepComment`'ta
@@ -733,6 +773,62 @@ kimseye söylenmiyordu (sayaç artıyordu ama o yalnızca teşhis).
   olurdu ve kaybedilen şey bir özellik değil BİLDİRİM olurdu (#349).
   ⚠️ "İstekler" (#147) ile "Öneriler" (#366) FARKLI şeyler — kısa adlar
   karışmamalı.
+
+### Tarih ve Saat Biçimlendirme (#460)
+
+`lib/tarih.ts` TEK KAYNAK. 23 çağrı yeri `toLocaleDateString("tr-TR")` gibi
+çağrılar yapıyordu ve **hiçbiri `timeZone` vermiyordu**; `Intl` o durumda
+çalıştığı ORTAMIN dilimini kullanır. Üretimde `TZ` ayarlı değil → konteyner
+UTC, kullanıcı UTC+3.
+
+- **⚠️ GÖRÜŞME SAATİ 3 SAAT YANLIŞTI.** TR saatiyle 14:00'lik bir ofis saati
+  (#398) panoda **11:00** görünüyordu; `YaklasanGorusme` bir Server Component
+  içinde render ediliyor. Öğrenci randevusunu kaçırırdı.
+- **⚠️ AYNI GÖRÜŞME İKİ EKRANDA İKİ FARKLI SAAT**: pano (sunucu) 11:00,
+  `/ofis-saati` (istemci, tarayıcı dilimi) 14:00. Hangisine inanılacağının
+  yolu yoktu.
+- **Tarihler bir gün geri kayıyordu**: TR saatiyle 21:00–24:00 arasında olan
+  her şey — sertifikanın düzenlenme tarihi dahil (public, kalıcı belge).
+- **⚠️ `timeZone` HER ÇAĞRIDA AÇIKÇA VERİLİR ve çağıran seçeneklerle EZEMEZ**
+  (test bunu kilitliyor). Böylece sunucu ve istemci aynı çıktıyı üretiyor;
+  hydration uyuşmazlığı da ortadan kalkıyor. Bunu "gereksiz tekrar" sanıp
+  sadeleştirmeyin.
+- **⚠️ BÖLGE SABİT, BİLEREK** (`Europe/Istanbul`). Server Component
+  kullanıcının dilimini bilemez; tarayıcıya bırakmak yukarıdaki tutarsızlığı
+  üretiyordu. Türkiye yaz saati uygulamıyor, yani yıl boyu +03:00 (dört
+  mevsim ölçüldü). Çok bölgeli kullanım hedeflenirse değişecek TEK yer orası.
+- **⚠️ HATA NEDEN HAYATTA KALDI**: `YaklasanGorusme` testi "saat gösterilir"
+  diyordu ama HANGİ saatin gösterildiğini doğrulamıyordu — #455'teki
+  boşluğun aynısı. **Testler sürecin dilimini değiştirir**, bu şart:
+  geliştirme makineleri UTC+3 olduğu için hatalı bir uygulama aksi halde
+  testten GEÇERDİ (#398'de aynı önlem alınmıştı).
+
+### Tekrarlanabilir Proje Şablonları (#503, #508)
+
+Bazı işler doğası gereği tekrarlanır: herkesin yapması beklenen portfolyo
+sitesi, birden çok kez verilebilen araştırma ödevleri. `@@unique([studentProfileId,
+projectTemplateId])` (#58 yarış koruması) bunu imkânsız kılıyordu.
+
+- **⚠️ KISIT TOPTAN KALDIRILMADI.** `ProjectTemplate.tekrarlanabilir`
+  (varsayılan `false`) + `AssignedProject.tekilKey String? @unique`:
+  tekrarlanamaz şablonda anahtar DOLU (#58 koruması aynen sürer),
+  tekrarlanabilirde NULL (Postgres çoklu NULL'a izin verir). Bu, deponun
+  koşullu tekillik için zaten kullandığı desen (`pendingKey` —
+  #345/#349/#366); kısmi benzersiz indeks Prisma'da ifade edilemiyor.
+- **⚠️ `tekilKey` YAZMA ANINDA HESAPLANIR.** Şablonun bayrağı sonradan
+  değişirse mevcut satırlar OLDUĞU GİBİ kalır — geçmiş atamaları yeniden
+  yorumlamak, kısıtı geriye dönük uygulamak olurdu. Bunu "tutarsız veri"
+  sanıp düzeltmeyin; arayüz de bu bedeli açıkça yazıyor.
+- **⚠️ TEKRARLANABİLİR ŞABLON AI ELEMESİNDEN MUAF** (#498'in tersi): portfolyo
+  projesi zaten atanmış olsa da önerilebilmeli, yoksa bayrak yarı çalışırdı.
+  #499'un yoğunluk uyarısı da orada okunmaz — portfolyoda 200 kişi olması
+  BEKLENEN durumdur.
+- **⚠️ #508: BAYRAK ÖNCE ARAYÜZSÜZ KALDI.** Şema, migration, Zod, atama
+  mantığı ve AI muafiyeti kurulmuştu ama admin panelinde kontrol YOKTU;
+  özellik yalnız doğrudan veritabanı güncellemesiyle açılabiliyordu. Doğru
+  tasarlanmış ama ULAŞILAMAYAN bir özellik. Düzenlemede mevcut değerin forma
+  yüklenmesi kritik: yüklenmezse admin başka bir alanı değiştirip
+  kaydettiğinde bayrağı FARKINDA OLMADAN kapatır.
 
 ### Liste Sayfalama ve Sunucu Tarafı Süzme (#446/#448, #452)
 
@@ -847,6 +943,39 @@ Olaylar: `mesaj`, `okunmamis`, `adim-tamamlandi`.
 - **Rate-limit SESSİZ geçer**: kozmetik sinyalde hata göstermek mesajlaşmayı bozulmuş
   gösterirdi.
 - **Gecikme dürüst rakam: ~2 sn** (tik aralığı). Ölçüldü.
+
+### AI Proje Önerisi ve Proje Yükü (#498, #499)
+
+- **⚠️ TAKIM KÖRLÜĞÜNÜN YEDİNCİ ÖRNEĞİ** (#498;
+  #367/#370/#376/#393/#442/#449'un ardından). Öneri ucu atanmış projeleri
+  aday kümesinden çıkarıyordu (#295) ama yalnız `assignedProjects`e bakıyordu;
+  takım atamasında `studentProfileId` NULL (#332) olduğu için **AI, öğrencinin
+  takımıyla HÂLİHAZIRDA çalıştığı projeyi listenin başında %95 eşleşmeyle
+  öneriyordu**. Atansaydı `@@unique` engellemezdi (takım `teamId` kullanıyor)
+  ve öğrenci kendi işinin ikinci kopyasını alırdı.
+  ⚠️ İlginç yanı: aynı dosya yetkiyi `mentorunOgrencisiWhere` ile DOĞRU
+  soruyordu — "bu öğrenci benim mi" tek kaynaktan geçmiş, "bu öğrencinin
+  projeleri neler" geçmemişti. Atamalar artık `ogrencininAtamalariWhere`'den.
+- **⚠️ AYRILMIŞ TAKIM KAPSAM DIŞI ve bu #449'un TERSİ.** Ayrıldığı takımın
+  projesi yeniden önerilebilir (öğrenci artık tek başına yapabilir);
+  sertifikada ise ayrılmış üyenin katkısı KORUNUR. Gerekçeler farklı:
+  sertifikada soru "bu kişi ne yaptı", öneride "şu an neyle meşgul".
+- **#499 — PROJE YÜKÜ.** Ölçüldü: dağılım çarpık (182/174/168/163 · 40/25).
+  Mentör atama ekranında "kaç kişi çalışıyor" görüyor, AI de aynı uygunluktaki
+  projelerden az çalışılanı tercih ediyor.
+  - **⚠️ ATAMA ENGELLENMEZ** — #404'ün mentör kapasitesi kararının aynısı.
+  - **⚠️ KİŞİ sayılır, atama değil**: takım ataması TEK satır ama üzerinde
+    birden çok stajyer çalışır; AKTİF üyeler tek tek sayılır (ayrılmış üye
+    sayılmaz). `PENDING` de sayılır (proje o stajyere ayrılmış durumda),
+    `COMPLETED` sayılmaz, **mezun ve reddedilen sayılmaz** (sayı EŞZAMANLI
+    yükü anlatır — #404 gerekçesi).
+  - **⚠️ KURAL PROMPT'TA AÇIKÇA İKİNCİL**: "aynı uygunluktakinden az
+    çalışılanı seç, AMA uymayan projeyi sırf boş diye önerme". Yoğunluk
+    yalnız beraberliği bozar.
+  - Saf etiketler `projects/yuk-etiketi.ts`'te (`server-only` DIŞINDA) —
+    atama ekranı bir istemci bileşeni; #432/#448 deseni. Eşikler orada, TEK
+    yerde: ayrı yazılsaydı mentörün "az" gördüğü proje AI için "yoğun"
+    olabilirdi.
 
 ### Akıllı Eşleştirme (#328)
 `POST /api/admin/match-mentors` — öğrencinin `ProfileAnalysis`'i ile mentörlerin
@@ -965,6 +1094,67 @@ yeni bir amaç, yani eski rıza metnini AŞIYOR. `RIZA_METIN_SURUMU` → `2026-0
   özellikler kullanır. Bugün tek kullanıcısı kod incelemesi.
 - Metnin kapsamını genişleten her değişiklikte sürüm artırılmalı ve ilgili özellik
   `guncelRizaVar`'a geçirilmeli.
+
+### AI Üretim Kökeni ve Yedek İçeriğin Elenmesi (#497, #501)
+
+`ProfileAnalysis`/`MentorAnalysis` kalıcı saklanıyor ama **hangi prompt'la
+üretildiği yazmıyordu** — oysa prompt'lar ölçülebilir biçimde değişti
+(#390/#410/#423). Daha ağırı: **AI hata verince dönen YEDEK (mock) çıktı da
+aynı tabloya yazılıyordu** ve hangisinin gerçek olduğu sonradan
+anlaşılamıyordu.
+
+- `lib/ai/uretim-kokeni.ts` tek kaynak (etiketler `features/ai/koken-etiketi.ts`) (prompt sürümü + model). Prisma import
+  ETMEZ — arayüzde de kullanılıyor (#432/#448 deseni).
+- **⚠️ YEDEK YOLDA KÖKEN `null`**: köken yazsaydık kayıt, hiç kurulmamış bir
+  AI çağrısını olmuş gibi gösterirdi. **`eskiSurumMu(null)` FALSE** —
+  "bilinmiyor" ile "eski" aynı şey değil; eski saymak güncel analizleri
+  gereksiz (ÜCRETLİ) yeniden üretime sokardı.
+- **Model adı da tutulur**: sürüm aynıyken model değişimi (2.5 → 3.0) çıktıyı
+  en az prompt kadar değiştirir.
+- **#501 — KAYDETMEK AMA SÖYLEMEMEK.** Köken yazılıyordu ama hiçbir yüzey
+  okumuyordu; #405'in tam olarak eleştirdiği durum. `ProfileAnalysisCard`
+  artık kökeni **içeriğin ÜSTÜNDE** gösteriyor — altta olsaydı okuyan kişi
+  metni önce değerlendirme olarak okurdu.
+- **⚠️ YEDEK KÖKENLİ ANALİZ EŞLEŞTİRMEYE GİRMİYOR** (#328). Dosyanın kendi
+  yorumu "yedek sıralamaya düşmüyoruz" diyordu ama kural bir katman yukarıda
+  uygulanıyordu; `idealStudentProfile` prompt'a gerçek analiz gibi giriyordu.
+  Eleme **sessiz değil**, sayısı dönüyor.
+- **⚠️ `null` KÖKEN ELENMEZ**: bugün veritabanındaki analizlerin çoğu öyle;
+  elemek özelliği kendi kendine kapatırdı.
+
+### İstek Kimliği ve Yapısal Loglama (#467, #493)
+
+Bir isteğin ürettiği log satırları birbirine bağlı değildi; eş zamanlı
+isteklerin logları iç içe geçiyordu.
+
+- **⚠️ SARMALAYICI KULLANILDI, 15 DÖNÜŞ NOKTASI ELLE DÜZENLENMEDİ.**
+  `middleware.ts` on beş ayrı yerde yanıt döndürüyor; damgayı her dönüşe elle
+  eklemek, ileride eklenen on altıncının onu sessizce KAÇIRMASI demekti — bu
+  dosya #375'te tam olarak böyle bir sıra hatasıyla canlıyı kırmıştı.
+- **⚠️ `next()` çağrıları da sarmalayıcıdan geçer**: düz `NextResponse.next()`
+  isteğin başlıklarını değiştirmiyor, kimlik rota handler'ına ulaşmaz.
+- **⚠️ DIŞARIDAN GELEN KİMLİK DOĞRULANIR**: başlık istemci tarafından
+  uydurulabiliyor ve doğrudan log satırına yazılıyor — serbest metin log
+  enjeksiyonuna kapı açardı. Geçerli kimlik KORUNUR, yoksa aynı istek vekilin
+  logunda başka, bizde başka görünürdü.
+- **⚠️ KİMLİK BİLDİRİM İMZASINA GİRMEZ**: her istek benzersiz olduğu için
+  imzaya katılsaydı 15 dakikalık susturma işlevsiz kalırdı. E-posta
+  GÖVDESİNE giriyor.
+
+### Uçtan Uca Testler (#505)
+
+2400'den fazla birim testi vardı ve **aynı sınıftan iki hata yine de canlıya
+çıktı** — ikisi de modüllerin İÇİNDE değil ARASINDA yaşıyordu (#308 oturum
+çerezi adı, #375 middleware sıra hatası). Playwright + CI işi (Postgres,
+migrate, seed, ÜRETİM derlemesi); iki dosyada oturum sözleşmesi ve gerçek giriş
+akışı.
+
+- **⚠️ ÇEREZİN ADI İDDİA EDİLMİYOR** — adı sabitlemek #308'in ta kendisiydi;
+  adı kilitleyen bir test hatayı betonlardı. Kilitlenen şey DAVRANIŞ.
+- **⚠️ TEKRAR DENEME YOK**: kararsız bir E2E'yi yeniden denemek, tam da bu
+  testlerin yakalaması gereken yarış durumlarını gizler.
+- `/` oturumsuzken girişe atmıyor, bilerek açılış sayfası basıyor; oturum
+  açıkken aynı yolun panoya götürdüğü ayrıca kilitli.
 
 ### KVKK Aydınlatma Metni (#450, #451)
 
@@ -1102,9 +1292,10 @@ docker compose up -d  # db (+app) — uploads kalıcı volume'da
 
 ---
 
-*Son güncelleme: Eylül 2026 — #437–#458 dalgası: savunma derinliği (#437/#439),
-mentörün öğrenci detayında takım projeleri (#442), ofis saati tavanı ve HTTP testleri
-(#443), admin listelerinin sayfalanması ve süzmenin sunucuya taşınması (#446/#448,
-#452), ilerleme toplamasının veritabanına taşınması (#452), KVKK aydınlatma metni
-(#450/#451), sertifikanın takım işini göstermesi (#449), SSE tik sayısının ölçümle
-düzeltilmesi (#458)*
+*Son güncelleme: Eylül 2026 — #460–#509 dalgası: tarih/saat tek kaynaktan ve
+saat dilimi açıkça (#460), durum ekranı tekilleştirme (#466), Dependabot ile
+pr-guard uyumu (#476), Octokit mock'u ve vitest 4 (#481), Node 22 + engine-strict
+(#483), admin panelinin bölünmesi (#489), istek kimliği (#493), kaynak düzenleme
+tekrarı (#494), AI üretim kökeni ve yedek içeriğin elenmesi (#497/#501), AI
+önerisinde takım körlüğü (#498), proje yükü (#499), tekrarlanabilir şablonlar
+(#503/#508), uçtan uca testler (#505)*
