@@ -16,6 +16,8 @@ vi.mock("@/lib/ai/gemini-client", () => ({
 }));
 
 import { analyzeMentorProfile, mentorYedekAnalizi } from "./mentor-analysis";
+import { PROMPT_SURUMU } from "@/lib/ai/uretim-kokeni";
+import { VARSAYILAN_MODEL } from "@/lib/ai/model-adi";
 
 const girdi = {
   title: "Senior Backend Developer",
@@ -140,5 +142,43 @@ describe("mentorYedekAnalizi — beyandan türetilen değerlendirme", () => {
     const sonuc = mentorYedekAnalizi(girdi);
     expect(sonuc.matchingNotes.join(" ")).toContain("6");
     expect(sonuc.matchingNotes.join(" ")).toContain("3");
+  });
+});
+
+describe("üretim kökeni (#494)", () => {
+  /**
+   * ⚠️ EN KRİTİK İDDİA: yedek (mock) çıktı köken TAŞIMAMALI.
+   *
+   * Bu sonuç `MentorAnalysis` tablosuna KALICI yazılıyor. Köken yazsaydık
+   * kayıt, hiç kurulmamış bir AI çağrısını olmuş gibi gösterirdi ve
+   * sonradan ayırt etmenin yolu kalmazdı — #377'nin belgelediği "kullanıcı
+   * mock'u gerçek çıktıdan ayırt edemiyor" sorununun kalıcı hâli.
+   */
+  it("⚠️ AI başarısız olunca köken NULL — mock 'gerçek' diye kaydedilmesin", async () => {
+    modelMock.mockRejectedValue(new Error("AI çöktü"));
+
+    const sonuc = await analyzeMentorProfile(girdi);
+
+    expect(sonuc.koken).toBeNull();
+  });
+
+  it("AI başarılı olunca köken DOLU — sürüm ve model kayda geçer", async () => {
+    modelMock.mockResolvedValue({
+      text: JSON.stringify({
+        level: "İleri",
+        summary: "ozet",
+        strengths: ["a"],
+        technicalTracks: ["b"],
+        idealStudentProfile: "profil",
+        matchingNotes: ["not"],
+      }),
+    });
+
+    const sonuc = await analyzeMentorProfile(girdi);
+
+    expect(sonuc.koken).toEqual({
+      uretimSurumu: PROMPT_SURUMU,
+      uretimModeli: VARSAYILAN_MODEL,
+    });
   });
 });
