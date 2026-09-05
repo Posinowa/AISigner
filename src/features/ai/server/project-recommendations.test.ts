@@ -187,3 +187,56 @@ describe("yedekSiralama — deterministik sıralama", () => {
     expect(yedekSiralama(ogrenci, alakasiz)).toHaveLength(1);
   });
 });
+
+/**
+ * #499 — Proje yükü prompt'a giriyor mu.
+ *
+ * ⚠️ YANITTAN ANLAŞILMAZ: model ne döndürürse döndürsün, yükün prompt'a
+ * girip girmediğini dışarıdan göremeyiz. Bu yüzden gönderilen METİN
+ * doğrulanıyor — aksi halde alan sessizce düşse kimse fark etmezdi.
+ */
+describe("#499 — proje yükü prompt'a girer", () => {
+  const yuklu = [
+    { ...proje("p1", ["Backend"], "MEDIUM"), calisanSayisi: 0 },
+    { ...proje("p2", ["Frontend"], "EASY"), calisanSayisi: 12 },
+  ];
+
+  it("calisanSayisi ve yogunluk bandı gönderilir", async () => {
+    modelMock.mockResolvedValue(
+      yanit(JSON.stringify([{ projectId: "p1", matchScore: 90, reason: "x" }])),
+    );
+
+    await recommendProjects(ogrenci, yuklu);
+
+    const gonderilen = modelMock.mock.calls[0][0].contents[0].parts[0].text;
+    expect(gonderilen).toContain("calisanSayisi");
+    expect(gonderilen).toContain("yogunluk");
+    // Boş proje "bos", 12 kişilik "yogun" bandına düşmeli.
+    expect(gonderilen).toContain('"yogunluk": "bos"');
+    expect(gonderilen).toContain('"yogunluk": "yogun"');
+  });
+
+  it("⚠️ kural YAZILI: yoğunluk İKİNCİL, uygunluk önce gelir", async () => {
+    modelMock.mockResolvedValue(
+      yanit(JSON.stringify([{ projectId: "p1", matchScore: 90, reason: "x" }])),
+    );
+
+    await recommendProjects(ogrenci, yuklu);
+
+    const gonderilen = modelMock.mock.calls[0][0].contents[0].parts[0].text;
+    // Sıralama kuralı olmadan model ham sayıyı kendi ölçeğinde yorumlardı.
+    expect(gonderilen).toContain("İKİNCİL");
+    expect(gonderilen).toMatch(/Uygunluk her zaman önce gelir/);
+  });
+
+  it("yük verilmezse 0 sayılır — eski çağıranlar kırılmaz", async () => {
+    modelMock.mockResolvedValue(
+      yanit(JSON.stringify([{ projectId: "p1", matchScore: 90, reason: "x" }])),
+    );
+
+    await recommendProjects(ogrenci, adaylar);
+
+    const gonderilen = modelMock.mock.calls[0][0].contents[0].parts[0].text;
+    expect(gonderilen).toContain('"calisanSayisi": 0');
+  });
+});

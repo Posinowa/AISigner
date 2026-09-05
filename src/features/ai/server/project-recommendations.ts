@@ -6,6 +6,7 @@ import { logger } from "@/lib/logger";
 import { experienceLevelLabel } from "@/lib/experience-level";
 import { ilgiEtiketi } from "@/features/student/models/secenekler";
 import { StudentProfile, ProjectTemplate } from "@prisma/client";
+import { yukBandi } from "@/features/projects/yuk-etiketi";
 
 /**
  * #295: Öğrenciye proje önerisi.
@@ -98,7 +99,8 @@ export function yedekSiralama(
 
 export async function recommendProjects(
   studentProfile: StudentProfile,
-  availableProjects: ProjectTemplate[],
+  // #499: Yük alanı opsiyonel — çağıran vermezse 0 sayılır.
+  availableProjects: (ProjectTemplate & { calisanSayisi?: number })[],
   mentor?: MentorBaglami,
 ): Promise<RankedProject[]> {
   if (availableProjects.length === 0) return [];
@@ -143,6 +145,11 @@ ${JSON.stringify(
     description: guvenliMetin(p.description),
     track: p.track,
     difficulty: p.difficulty,
+    // #499: Şu an kaç stajyerin çalıştığı. Bu ÖLÇÜLMÜŞ bir sayı, model
+    // tarafından üretilmiş bir skor değil — bant da veriliyor ki modelin
+    // ham rakamı kendi ölçeğinde yorumlaması gerekmesin.
+    calisanSayisi: p.calisanSayisi ?? 0,
+    yogunluk: yukBandi(p.calisanSayisi ?? 0),
   })),
   null,
   2,
@@ -157,7 +164,11 @@ KURALLAR:
 3. Mentörün uzmanlık alanı dışındaki projelere daha düşük puan ver — mentör süpervize edemeyeceği projeye yol haritası çizemez.
 4. Öğrencinin haftalık süresi azsa (5 saatin altı) kapsamı büyük projeleri geri plana at.
 5. Git deneyimi yoksa ilk projesi karmaşık dallanma gerektirmesin.
-6. "reason" tek cümle, Türkçe olsun.
+6. AYNI UYGUNLUKTAKİ iki projeden "yogunluk" değeri düşük olanı (bos > az >
+   yogun) tercih et — böylece iş az çalışılan projelere de dağılır.
+   ⚠️ BU İKİNCİL BİR ÖLÇÜT: öğrenciye UYMAYAN bir projeyi sırf boş diye önerme.
+   Uygunluk her zaman önce gelir; yoğunluk yalnızca beraberliği bozar.
+7. "reason" tek cümle, Türkçe olsun.
 
 Yanıtın SADECE şu formatta bir JSON dizisi olsun:
 [{"projectId": "listeden_bir_id", "matchScore": 95, "reason": "kısa açıklama"}]`;
