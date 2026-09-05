@@ -63,3 +63,6 @@ tmpclaude-*
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# E2E oturum durumu (#510) — geçerli oturum çerezi içerir
+/.oturum/
