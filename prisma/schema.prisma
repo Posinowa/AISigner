@@ -248,6 +248,25 @@ model AssignedProject {
   /// sonradan değişirse mevcut satırlar OLDUĞU GİBİ kalır — geçmiş atamaları
   /// yeniden yorumlamak, kısıtı geriye dönük uygulamak olurdu.
   tekilKey String? @unique
+
+  /// #513: BU ÜÇ İNDEKS SORGU DESENLERİNE DAYANIYOR.
+  ///
+  /// ⚠️ İlk ikisi #503'TE KAYBOLDU. Düşürülen `@@unique([studentProfileId,
+  /// projectTemplateId])` ve `@@unique([teamId, projectTemplateId])` yalnız
+  /// kısıt değildi — bileşik indeksin İLK sütunu tek başına kullanılabildiği
+  /// için `studentProfileId` ve `teamId` ile süzme indeksliydi. Yerine gelen
+  /// `tekilKey` HESAPLANMIŞ bir anahtar; o sütunlarla süzmede işe yaramıyor.
+  ///
+  /// İkisi de sürekli sorgulanıyor: `ogrencininAtamalariWhere`,
+  /// `mentorErisimiWhere`, öğrenci panosu, sertifika, mentör listeleri.
+  @@index([studentProfileId])
+  @@index([teamId])
+  /// ⚠️ `projectTemplateId` BİLEREK İNDEKSLENMEDİ. İndeks kullanılabilir
+  /// (ölçüldü: tek şablonla süzmede Bitmap Index Scan seçiliyor) ama kod
+  /// tabanında `AssignedProject`'i belirli bir şablonla süzen sorgu YOK —
+  /// #499'un yük sorgusu satırların ~%85'ini okuduğu için planlayıcı zaten
+  /// haklı olarak seq scan seçiyor. Ölçülmüş bir sorgu deseni olmadan indeks
+  /// eklemek yazma maliyeti getiren bir borç olurdu.
 }
 
 model Roadmap {
@@ -283,6 +302,12 @@ model RoadmapStep {
   assigneeId     String?
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
+
+  /// #513: `roadmapId` kod tabanının EN ÇOK SORGULANAN sütunu (her yol
+  /// haritası yüklemesi, #452'nin ilerleme toplaması, adım listeleri) ama
+  /// tablo yalnız birincil anahtar taşıyordu. Ölçüldü: 382 satır döndüren
+  /// bir sorgu 22.638 satırın tamamını tarıyordu.
+  @@index([roadmapId])
 
   roadmap  Roadmap             @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
   assignee User?               @relation("RoadmapStep_assignee", fields: [assigneeId], references: [id], onDelete: SetNull)
