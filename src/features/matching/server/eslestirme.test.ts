@@ -34,8 +34,15 @@ vi.mock("@/features/kvkk/riza", () => ({ profilSahibininRizasiVar: rizaMock }));
 vi.mock("@/features/ai/server/mentor-matching", () => ({ mentorleriSirala: siralaMock }));
 
 import { mentorOnerisiUret } from "./eslestirme";
+import { PROMPT_SURUMU, YEDEK_SURUM } from "@/lib/ai/uretim-kokeni";
 
-const mentorAnalizi = (id: string, rizali = true, role = "MENTOR") => ({
+const mentorAnalizi = (
+  id: string,
+  rizali = true,
+  role = "MENTOR",
+  uretimSurumu: string | null = PROMPT_SURUMU,
+) => ({
+  uretimSurumu,
   level: "SENIOR",
   summary: "Backend ağırlıklı",
   strengths: ["mimari"],
@@ -259,5 +266,119 @@ describe("dayanıklılık", () => {
   it("profili tamamlanmamış öğrenci için 'profil-yok'", async () => {
     prismaMock.user.findUnique.mockResolvedValue({ role: "STUDENT", studentProfile: null });
     expect(await cagir()).toEqual({ ok: false, neden: "profil-yok" });
+  });
+});
+
+/**
+ * #501 — YEDEK KÖKENLİ ANALİZ KARAR GİRDİSİ OLAMAZ.
+ *
+ * ⚠️ Bu dosya zaten "YEDEK SIRALAMAYA DÜŞMÜYORUZ; uydurulmuş bir liste,
+ * admin'in gerçek bir öneriden ayırt edemeyeceği bir karar girdisi olurdu"
+ * diyordu — ama kural yalnız SIRALAMA çıktısına uygulanıyordu. Bir katman
+ * yukarıda, model yanıt veremediğinde `MentorAnalysis` başvurunun kendisinden
+ * türetilmiş bir metinle KALICI kaydediliyor (#494) ve `idealStudentProfile`
+ * sıralama prompt'una gerçek analiz gibi giriyordu.
+ */
+describe("yedek kökenli analizler (#501)", () => {
+  it("⚠️ yedek analizli mentör SIRALAMAYA GİRMEZ", async () => {
+    prismaMock.mentorAnalysis.findMany.mockResolvedValue([
+      mentorAnalizi("m1"),
+      mentorAnalizi("m2", true, "MENTOR", YEDEK_SURUM),
+    ]);
+
+    await mentorOnerisiUret({ studentUserId: "s1", adminUserId: "a1" });
+
+    const adaylar = siralaMock.mock.calls[0][1];
+    expect(adaylar.map((a: { mentorId: string }) => a.mentorId)).toEqual(["m1"]);
+  });
+
+  /*
+   * ⚠️ ELEME SESSİZ DEĞİL (#328). "En uygun 3" ifadesi adayların yarısı
+   * elenmişken yanıltıcı olur; admin neyin arasından seçildiğini bilmeli.
+   */
+  it("⚠️ elenen yedek sayısı DÖNDÜRÜLÜR ve 'analizi yok' ile karışmaz", async () => {
+    prismaMock.mentorAnalysis.findMany.mockResolvedValue([
+      mentorAnalizi("m1"),
+      mentorAnalizi("m2", true, "MENTOR", YEDEK_SURUM),
+    ]);
+
+    const s = await mentorOnerisiUret({ studentUserId: "s1", adminUserId: "a1" });
+
+    if (!s.ok) throw new Error("beklenen: ok");
+    expect(s.yedekAnalizli).toBe(1);
+    expect(s.analiziOlmayan).toBe(0);
+    expect(s.degerlendirilen).toBe(1);
+  });
+
+  /*
+   * ⚠️ `null` KÖKEN ELENMEZ. O "bilinmiyor" demek — köken sütunları
+   * eklenmeden önce üretilmiş kayıtlar. Onları da elemek, bugün
+   * veritabanındaki TÜM analizleri düşürüp özelliği çalışmaz hâle getirirdi.
+   */
+  it("⚠️ kökeni BİLİNMEYEN analiz elenmez — özellik kendini kapatmasın", async () => {
+    prismaMock.mentorAnalysis.findMany.mockResolvedValue([
+      mentorAnalizi("m1", true, "MENTOR", null),
+      mentorAnalizi("m2", true, "MENTOR", null),
+    ]);
+
+    const s = await mentorOnerisiUret({ studentUserId: "s1", adminUserId: "a1" });
+
+    if (!s.ok) throw new Error("beklenen: ok");
+    expect(s.yedekAnalizli).toBe(0);
+    expect(s.degerlendirilen).toBe(2);
+  });
+
+  it("aday KALMAZSA öneri üretilmez — yedeklerle sıralama yapılmaz", async () => {
+    prismaMock.mentorAnalysis.findMany.mockResolvedValue([
+      mentorAnalizi("m1", true, "MENTOR", YEDEK_SURUM),
+    ]);
+
+    const s = await mentorOnerisiUret({ studentUserId: "s1", adminUserId: "a1" });
+
+    expect(s).toMatchObject({ ok: false, neden: "aday-yok" });
+    expect(siralaMock).not.toHaveBeenCalled();
+  });
+
+  /*
+   * ⚠️ ÖĞRENCİNİN KENDİ ANALİZİ DE YEDEK OLABİLİR. Yedekse prompt'a konserve
+   * bir metin girer ve sıralama, öğrenciyi hiç tanımayan bir özete göre
+   * yapılır. Alanlar "analiz yok" durumunu zaten destekliyor.
+   */
+  it("⚠️ öğrencinin YEDEK analizi sıralama girdisine KONMAZ", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      role: "STUDENT",
+      studentProfile: {
+        id: "sp1",
+        experienceLevel: "BEGINNER",
+        interests: ["backend"],
+        goals: "API yazmayı öğrenmek",
+        profileAnalysis: {
+          summary: "Yeni başlıyor",
+          strengths: ["meraklı"],
+          developmentAreas: ["test"],
+          technicalTracks: ["backend"],
+          uretimSurumu: YEDEK_SURUM,
+        },
+        mentorAssignments: [],
+      },
+    });
+
+    await mentorOnerisiUret({ studentUserId: "s1", adminUserId: "a1" });
+
+    const ogrenci = siralaMock.mock.calls[0][0];
+    expect(ogrenci.analizOzeti).toBeNull();
+    expect(ogrenci.guclüYonler).toEqual([]);
+    expect(ogrenci.gelisimAlanlari).toEqual([]);
+    expect(ogrenci.teknikAlanlar).toEqual([]);
+    // Beyan edilen veri (analiz DEĞİL) yerinde kalmalı — yoksa öneri hiç
+    // bilgisiz üretilirdi.
+    expect(ogrenci.ilgiAlanlari).toEqual(["backend"]);
+  });
+
+  it("öğrencinin GERÇEK analizi sıralama girdisine girer", async () => {
+    await mentorOnerisiUret({ studentUserId: "s1", adminUserId: "a1" });
+
+    const ogrenci = siralaMock.mock.calls[0][0];
+    expect(ogrenci.analizOzeti).toBe("Yeni başlıyor");
   });
 });

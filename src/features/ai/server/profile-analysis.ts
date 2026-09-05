@@ -1,7 +1,7 @@
 import { getModel } from "@/lib/ai/gemini-client";
 import { cozVeDogrula } from "@/lib/ai/response";
 import { VARSAYILAN_MODEL } from "@/lib/ai/model-adi";
-import { uretimKokeni, type UretimKokeni } from "@/lib/ai/uretim-kokeni";
+import { uretimKokeni, yedekKokeni, type UretimKokeni } from "@/lib/ai/uretim-kokeni";
 import { guvenliMetin, guvenliListe, veriBlogu } from "@/lib/ai/prompt";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
@@ -139,15 +139,20 @@ Lütfen aşağıdaki formatta SADECE JSON yanıtı ver (başka metin ekleme):
     logger.error('Profil analizi hatası', error);
 
     /*
-     * ⚠️ YEDEK ÇIKTIDA KÖKEN `null` — "gerçek AI" diye kaydedilmemeli.
+     * ⚠️ YEDEK ÇIKTI AÇIKÇA İŞARETLENİR — prompt sürümü YAZILMAZ.
      *
      * #377 kullanıcının mock'u gerçek çıktıdan ayırt EDEMEDİĞİNİ
      * belgelemişti; burada aynı çıktı VERİTABANINA kalıcı yazılıyor.
      * Prompt sürümü yazsaydık kayıt, hiç kurulmamış bir AI çağrısını
      * olmuş gibi gösterirdi.
+     *
+     * ⚠️ #494'te burada `null` vardı; `null` artık YALNIZCA "bilinmiyor"
+     * (köken sütunları eklenmeden önceki kayıtlar) demek. İkisi aynı
+     * değerken ne arayüzde doğru cümle kurulabiliyordu ne de yedek içerik
+     * karar girdisi olmaktan elenebiliyordu (#501).
      */
     return {
-      koken: null,
+      koken: yedekKokeni(),
       level: 'Orta',
       tracks: input.interests.slice(0, 3),
       summary: `${experienceLevelLabel(input.experienceLevel)} seviyesinde bir öğrenci. ${input.interests.join(', ')} alanlarında ilgi gösteriyor.`,

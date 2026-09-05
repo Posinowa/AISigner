@@ -54,14 +54,61 @@ export function uretimKokeni(model: string): UretimKokeni {
 }
 
 /**
+ * YEDEK (mock) çıktının kökeni.
+ *
+ * ⚠️ NEDEN `null` DEĞİL — #494'ün AÇIĞI. #494 yedek çıktıyı `null` köken ile
+ * kaydediyordu ("gerçek AI diye kaydedilmemeli", doğru). Ama `null` aynı
+ * zamanda KÖKEN SÜTUNLARI EKLENMEDEN ÖNCE üretilmiş kayıtların da değeri;
+ * yani `null` iki farklı şeyi birden anlatıyordu:
+ *
+ *   - "bu içerik uydurma" (yedek),
+ *   - "bunun ne olduğunu bilmiyoruz" (eski kayıt).
+ *
+ * Arayüzde bu ikisine aynı cümle kurulamaz ve karar girdisi olarak yalnız
+ * ilki elenebilir. Yedek artık AÇIK bir işaret taşıyor; `null` ise SADECE
+ * "bilinmiyor" demek.
+ */
+export const YEDEK_SURUM = "yedek";
+
+/** Yedek çıktıda model yok — çağrı ya hiç yapılamadı ya da yanıtı kullanılamadı. */
+export const YEDEK_MODEL = "yok";
+
+export function yedekKokeni(): UretimKokeni {
+  return { uretimSurumu: YEDEK_SURUM, uretimModeli: YEDEK_MODEL };
+}
+
+export function yedekKokenliMi(uretimSurumu: string | null | undefined): boolean {
+  return uretimSurumu === YEDEK_SURUM;
+}
+
+/**
  * Bu kayıt ESKİ bir prompt sürümüyle mi üretilmiş?
  *
  * ⚠️ `null` "eski" SAYILMAZ, "bilinmiyor" sayılır. Köken alanları
  * eklenmeden önce üretilmiş kayıtlar NULL taşıyor; onları "eski" diye
  * işaretlemek, gerçekte güncel olabilecek analizleri yeniden ürettirirdi
  * (ücretli AI çağrısı). Bilinmeyeni uydurmamak, #328/#331'in kararı.
+ *
+ * ⚠️ YEDEK DE "eski" SAYILMAZ: yedek içerik eski bir sürümle üretilmiş
+ * değil, HİÇ üretilmemiştir. "Eski sürüm" demek, yeniden üretmenin işe
+ * yarayacağını ima eder — oysa yedeğin sebebi genellikle AI'ın hiç
+ * çalışmamasıdır ve tekrar denemek aynı sonucu verir.
  */
 export function eskiSurumMu(uretimSurumu: string | null | undefined): boolean {
   if (!uretimSurumu) return false;
+  if (uretimSurumu === YEDEK_SURUM) return false;
   return uretimSurumu !== PROMPT_SURUMU;
+}
+
+/**
+ * Kaydın kökeninin TEK KELİMELİK durumu — arayüz ve eleme kararları buradan
+ * geçer, `uretimSurumu` metnini kimse elle karşılaştırmasın.
+ */
+export type KokenDurumu = "guncel" | "yedek" | "eski" | "bilinmiyor";
+
+export function kokenDurumu(uretimSurumu: string | null | undefined): KokenDurumu {
+  if (!uretimSurumu) return "bilinmiyor";
+  if (uretimSurumu === YEDEK_SURUM) return "yedek";
+  if (uretimSurumu === PROMPT_SURUMU) return "guncel";
+  return "eski";
 }

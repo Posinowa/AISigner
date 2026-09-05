@@ -1,8 +1,13 @@
 import { describe, it, expect } from "vitest";
 import {
   PROMPT_SURUMU,
+  YEDEK_MODEL,
+  YEDEK_SURUM,
   eskiSurumMu,
+  kokenDurumu,
   uretimKokeni,
+  yedekKokeni,
+  yedekKokenliMi,
 } from "./uretim-kokeni";
 import { VARSAYILAN_MODEL } from "./model-adi";
 
@@ -69,5 +74,55 @@ describe("sürüm biçimi", () => {
   it("sıralanabilir tarih biçimi — ne zaman değiştiği okunsun", () => {
     // `RIZA_METIN_SURUMU` (#327) ile aynı desen.
     expect(PROMPT_SURUMU).toMatch(/^\d{4}-\d{2}-v\d+$/);
+  });
+});
+
+describe("yedek köken (#501)", () => {
+  /*
+   * ⚠️ NEDEN AYRI BİR İŞARET: #494 yedek çıktıyı `null` köken ile
+   * kaydediyordu. Ama `null` aynı zamanda köken sütunları eklenmeden önce
+   * üretilmiş kayıtların değeri — yani tek bir değer "bu içerik uydurma"
+   * ile "bunun ne olduğunu bilmiyoruz"u birden anlatıyordu. Arayüzde bu
+   * ikisine aynı cümle kurulamaz, karar girdisi olarak yalnız ilki elenir.
+   */
+  it("⚠️ yedek işareti `null` DEĞİL — 'bilinmiyor' ile karışmamalı", () => {
+    expect(yedekKokeni().uretimSurumu).toBe(YEDEK_SURUM);
+    expect(yedekKokeni().uretimSurumu).not.toBeNull();
+    expect(yedekKokeni().uretimModeli).toBe(YEDEK_MODEL);
+  });
+
+  it("⚠️ yedek, prompt sürümü TAŞIMAZ — hiç kurulmamış çağrı olmuş gibi görünmesin", () => {
+    expect(yedekKokeni().uretimSurumu).not.toBe(PROMPT_SURUMU);
+  });
+
+  it("yedekKokenliMi yalnız yedek işaretine `true` der", () => {
+    expect(yedekKokenliMi(YEDEK_SURUM)).toBe(true);
+    expect(yedekKokenliMi(PROMPT_SURUMU)).toBe(false);
+    expect(yedekKokenliMi("2020-01-v1")).toBe(false);
+    expect(yedekKokenliMi(null)).toBe(false);
+    expect(yedekKokenliMi(undefined)).toBe(false);
+  });
+
+  /*
+   * ⚠️ "Eski sürüm" demek, YENİDEN ÜRETMENİN İŞE YARAYACAĞINI ima eder.
+   * Yedeğin sebebi ise genellikle AI'ın hiç çalışmamasıdır; aynı cümleyi
+   * kurmak kullanıcıyı yanlış eyleme iter.
+   */
+  it("⚠️ yedek ESKİ SAYILMAZ — farklı sorun, farklı çözüm", () => {
+    expect(eskiSurumMu(YEDEK_SURUM)).toBe(false);
+  });
+});
+
+describe("kokenDurumu", () => {
+  it("dört durumu ayırır", () => {
+    expect(kokenDurumu(PROMPT_SURUMU)).toBe("guncel");
+    expect(kokenDurumu(YEDEK_SURUM)).toBe("yedek");
+    expect(kokenDurumu("2020-01-v1")).toBe("eski");
+    expect(kokenDurumu(null)).toBe("bilinmiyor");
+    expect(kokenDurumu(undefined)).toBe("bilinmiyor");
+  });
+
+  it("⚠️ yedek ile bilinmiyor AYRI durumlar", () => {
+    expect(kokenDurumu(YEDEK_SURUM)).not.toBe(kokenDurumu(null));
   });
 });

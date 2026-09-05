@@ -16,7 +16,7 @@ vi.mock("@/lib/ai/gemini-client", () => ({
 }));
 
 import { analyzeMentorProfile, mentorYedekAnalizi } from "./mentor-analysis";
-import { PROMPT_SURUMU } from "@/lib/ai/uretim-kokeni";
+import { PROMPT_SURUMU, YEDEK_SURUM, YEDEK_MODEL } from "@/lib/ai/uretim-kokeni";
 import { VARSAYILAN_MODEL } from "@/lib/ai/model-adi";
 
 const girdi = {
@@ -147,19 +147,33 @@ describe("mentorYedekAnalizi — beyandan türetilen değerlendirme", () => {
 
 describe("üretim kökeni (#494)", () => {
   /**
-   * ⚠️ EN KRİTİK İDDİA: yedek (mock) çıktı köken TAŞIMAMALI.
+   * ⚠️ EN KRİTİK İDDİA: yedek (mock) çıktı PROMPT SÜRÜMÜ taşımamalı.
    *
-   * Bu sonuç `MentorAnalysis` tablosuna KALICI yazılıyor. Köken yazsaydık
+   * Bu sonuç `MentorAnalysis` tablosuna KALICI yazılıyor. Sürüm yazsaydık
    * kayıt, hiç kurulmamış bir AI çağrısını olmuş gibi gösterirdi ve
    * sonradan ayırt etmenin yolu kalmazdı — #377'nin belgelediği "kullanıcı
    * mock'u gerçek çıktıdan ayırt edemiyor" sorununun kalıcı hâli.
+   *
+   * ⚠️ #501: değer artık `null` DEĞİL, açık bir YEDEK işareti. `null`
+   * "bilinmiyor" anlamına ayrıldı (köken sütunları eklenmeden önceki
+   * kayıtlar); ikisi aynı değerken arayüz doğru cümleyi kuramıyor ve
+   * eşleştirme yedek içeriği eleyemiyordu.
    */
-  it("⚠️ AI başarısız olunca köken NULL — mock 'gerçek' diye kaydedilmesin", async () => {
+  it("⚠️ AI başarısız olunca köken YEDEK diye işaretlenir — prompt sürümü yazılmaz", async () => {
     modelMock.mockRejectedValue(new Error("AI çöktü"));
 
     const sonuc = await analyzeMentorProfile(girdi);
 
-    expect(sonuc.koken).toBeNull();
+    expect(sonuc.koken).toEqual({ uretimSurumu: YEDEK_SURUM, uretimModeli: YEDEK_MODEL });
+    expect(sonuc.koken?.uretimSurumu).not.toBe(PROMPT_SURUMU);
+  });
+
+  it("⚠️ yedek işareti `null`'dan AYRI — 'bilinmiyor' ile karışmasın", async () => {
+    modelMock.mockRejectedValue(new Error("AI çöktü"));
+
+    const sonuc = await analyzeMentorProfile(girdi);
+
+    expect(sonuc.koken).not.toBeNull();
   });
 
   it("AI başarılı olunca köken DOLU — sürüm ve model kayda geçer", async () => {
