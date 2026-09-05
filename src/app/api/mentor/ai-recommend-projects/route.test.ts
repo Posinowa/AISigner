@@ -108,7 +108,9 @@ describe("ai-recommend-projects (#189)", () => {
     // mentör 3 yerine 1-2 kullanılabilir öneri görüyordu.
     mentor("mentor-1");
     prismaMock.studentProfile.findFirst.mockResolvedValue({ id: "sp-1" });
-    prismaMock.assignedProject.findMany.mockResolvedValue([{ projectTemplateId: "t9" }]);
+    prismaMock.assignedProject.findMany.mockResolvedValue([
+      { projectTemplateId: "t9", projectTemplate: { tekrarlanabilir: false } },
+    ]);
 
     await POST(req({ studentProfileId: "sp-1" }));
 
@@ -134,7 +136,7 @@ describe("ai-recommend-projects (#189)", () => {
     mentor("mentor-1");
     prismaMock.studentProfile.findFirst.mockResolvedValue({ id: "sp-1" });
     prismaMock.assignedProject.findMany.mockResolvedValue([
-      { projectTemplateId: "takim-projesi" },
+      { projectTemplateId: "takim-projesi", projectTemplate: { tekrarlanabilir: false } },
     ]);
 
     await POST(req({ studentProfileId: "sp-1" }));
@@ -147,6 +149,31 @@ describe("ai-recommend-projects (#189)", () => {
     expect(prismaMock.projectTemplate.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: { notIn: ["takim-projesi"] }, fromProposal: false },
+      }),
+    );
+  });
+
+  /**
+   * #503 — TEKRARLANABİLİR ŞABLON ELEMEDEN MUAF.
+   *
+   * ⚠️ Portfolyo sitesi gibi herkesin yapması beklenen bir iş, zaten atanmış
+   * olsa da yeniden önerilebilmeli. Aksi halde bayrak YARI çalışırdı: mentör
+   * elle atayabilir ama AI hiç önermezdi.
+   */
+  it("⚠️ #503: tekrarlanabilir şablon atanmış olsa da aday kümesinde KALIR", async () => {
+    mentor("mentor-1");
+    prismaMock.studentProfile.findFirst.mockResolvedValue({ id: "sp-1" });
+    prismaMock.assignedProject.findMany.mockResolvedValue([
+      { projectTemplateId: "portfolyo", projectTemplate: { tekrarlanabilir: true } },
+      { projectTemplateId: "normal", projectTemplate: { tekrarlanabilir: false } },
+    ]);
+
+    await POST(req({ studentProfileId: "sp-1" }));
+
+    expect(prismaMock.projectTemplate.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        // Yalnız tekrarlanamaz olan eleniyor.
+        where: { id: { notIn: ["normal"] }, fromProposal: false },
       }),
     );
   });

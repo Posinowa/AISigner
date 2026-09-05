@@ -35,3 +35,18 @@ export function yukBandi(kisi: number): YukBandi {
   if (kisi <= 3) return "az";
   return "yogun";
 }
+
+/**
+ * ⚠️ TEKRARLANABİLİR ŞABLONDA YOĞUNLUK UYARI DEĞİLDİR (#503).
+ *
+ * Portfolyo sitesinde 200 kişi olması BEKLENEN durumdur — şablon zaten
+ * "herkes yapsın" diye işaretlenmiştir. Onu "yogun" saymak mentöre yanlış
+ * sinyal verir ve AI'ın ondan kaçınmasına yol açar; oysa #503'ün amacı tam
+ * tersi.
+ *
+ * ⚠️ SAYI YİNE GÖSTERİLİR — kaç kişi olduğu bilgi olarak değerli. Nötrleşen
+ * yalnızca "kaçın" anlamı taşıyan BANT.
+ */
+export function yukBandiSablona(kisi: number, tekrarlanabilir: boolean): YukBandi {
+  return tekrarlanabilir ? "az" : yukBandi(kisi);
+}

@@ -217,8 +217,32 @@ describe("takimaProjeAta", () => {
 
     expect(s.ok).toBe(true);
     const veri = prismaMock.assignedProject.create.mock.calls[0][0].data;
-    expect(veri).toEqual({ teamId: "t1", projectTemplateId: "pt1" });
+    expect(veri.teamId).toBe("t1");
+    expect(veri.projectTemplateId).toBe("pt1");
     expect(veri).not.toHaveProperty("studentProfileId");
+  });
+
+  /**
+   * #503: Tekillik artık `tekilKey` üzerinden — eski
+   * `@@unique([teamId, projectTemplateId])` onun yerine geçti.
+   */
+  it("⚠️ #503: tekrarlanamaz şablonda tekilKey DOLU — koruma sürer", async () => {
+    await takimaProjeAta({ teamId: "t1", projectTemplateId: "pt1" });
+
+    const veri = prismaMock.assignedProject.create.mock.calls[0][0].data;
+    expect(veri.tekilKey).toBe("tm:t1:pt1");
+  });
+
+  it("⚠️ #503: tekrarlanabilir şablonda tekilKey NULL — birden çok kez atanabilir", async () => {
+    prismaMock.projectTemplate.findUnique.mockResolvedValue({
+      id: "pt1",
+      tekrarlanabilir: true,
+    });
+
+    await takimaProjeAta({ teamId: "t1", projectTemplateId: "pt1" });
+
+    const veri = prismaMock.assignedProject.create.mock.calls[0][0].data;
+    expect(veri.tekilKey).toBeNull();
   });
 
   it("tek kişilik takıma proje atanamaz", async () => {

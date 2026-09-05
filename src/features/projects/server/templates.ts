@@ -10,6 +10,8 @@ export type CreateTemplateData = {
   githubRepoUrl?: string | null;
   /** #253: Şablonu oluşturan kişi. Sahiplik kontrolü buna dayanıyor. */
   createdById?: string | null;
+  /** #503: Aynı stajyere birden çok kez atanabilir mi? Varsayılan false. */
+  tekrarlanabilir?: boolean;
 };
 
 // #253: Sahip güncellemeyle DEĞİŞTİRİLEMEZ — aksi halde mentör bir şablonun
@@ -71,6 +73,8 @@ export async function createTemplate(data: CreateTemplateData) {
         track: data.track,
         githubRepoUrl: data.githubRepoUrl ?? null,
         createdById: data.createdById ?? null,
+        // #503: Varsayılan false — tekrar edilebilirlik istisna.
+        tekrarlanabilir: data.tekrarlanabilir ?? false,
       },
     });
   } catch (error) {

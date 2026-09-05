@@ -87,6 +87,15 @@ export const createTemplateSchema = z.object({
   }),
   track: z.array(z.string()).default([]),
   githubRepoUrl: githubRepoUrlSchema,
+  /**
+   * #503: Aynı stajyere birden çok kez atanabilir mi?
+   *
+   * ⚠️ VARSAYILAN `false` — tekrar edilebilirlik İSTİSNA. #58'in yarış
+   * koruması varsayılan olarak yerinde kalıyor; yalnız bu bayrak açıkken
+   * gevşiyor. Kararı ADMIN veriyor: bir şablonu herkese açmak platform
+   * çapında bir karar, tek mentörün tercihi değil.
+   */
+  tekrarlanabilir: z.boolean().default(false),
 });
 
 // Admin: Proje şablonu güncelleme
@@ -96,6 +105,14 @@ export const updateTemplateSchema = z.object({
   difficulty: z.enum(["EASY", "MEDIUM", "HARD"]).optional(),
   track: z.array(z.string()).optional(),
   githubRepoUrl: githubRepoUrlSchema,
+  /**
+   * #503: Sonradan işaretlenebilir/kaldırılabilir.
+   *
+   * ⚠️ GEÇMİŞ ATAMALARI ETKİLEMEZ: `tekilKey` yazma anında hesaplandığı için
+   * bayrak değişse de mevcut satırlar olduğu gibi kalır. Kısıtı geriye dönük
+   * uygulamak (ya da geriye dönük kaldırmak) sürpriz olurdu.
+   */
+  tekrarlanabilir: z.boolean().optional(),
 });
 
 // Mentor: Proje atama

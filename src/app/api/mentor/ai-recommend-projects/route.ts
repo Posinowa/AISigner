@@ -83,9 +83,16 @@ export async function POST(req: Request) {
     // meşgul".
     const atanmisAtamalar = await prisma.assignedProject.findMany({
       where: ogrencininAtamalariWhere(studentProfileId),
-      select: { projectTemplateId: true },
+      // #503: Tekrarlanabilir şablonlar bu elemeden MUAF.
+      select: { projectTemplateId: true, projectTemplate: { select: { tekrarlanabilir: true } } },
     });
-    const atanmisIdler = atanmisAtamalar.map((a) => a.projectTemplateId);
+    // ⚠️ TEKRARLANABİLİR ŞABLON ELENMİYOR (#503). Portfolyo sitesi gibi
+    // herkesin yapması beklenen bir iş, zaten atanmış olsa da yeniden
+    // önerilebilmeli — aksi halde bayrak yarı çalışırdı: mentör elle
+    // atayabilir ama AI hiç önermezdi.
+    const atanmisIdler = atanmisAtamalar
+      .filter((a) => !a.projectTemplate.tekrarlanabilir)
+      .map((a) => a.projectTemplateId);
 
     const [havuz, yukler] = await Promise.all([
       prisma.projectTemplate.findMany({

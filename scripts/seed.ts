@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { hash } from "@node-rs/argon2";
 import { seedProjectTemplates } from "./seed-projects";
+import { bireyselTekilKey } from "../src/features/projects/tekil-anahtar";
 
 const prisma = new PrismaClient();
 
@@ -115,18 +116,18 @@ async function main() {
   });
   const firstTemplate = await prisma.projectTemplate.findFirstOrThrow();
 
+  // #503: Bileşik tekillik `tekilKey`e taşındı (koşullu tekillik — bkz.
+  // `projects/tekil-anahtar.ts`). Seed idempotent kalsın diye upsert aynı
+  // anahtar üzerinden yapılıyor.
+  const seedTekilKey = bireyselTekilKey(studentProfile.id, firstTemplate.id);
   const assignedProject = await prisma.assignedProject.upsert({
-    where: {
-      studentProfileId_projectTemplateId: {
-        studentProfileId: studentProfile.id,
-        projectTemplateId: firstTemplate.id,
-      },
-    },
+    where: { tekilKey: seedTekilKey },
     update: {},
     create: {
       studentProfileId: studentProfile.id,
       projectTemplateId: firstTemplate.id,
       status: "IN_PROGRESS",
+      tekilKey: seedTekilKey,
     },
   });
 
