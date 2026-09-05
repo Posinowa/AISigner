@@ -33,6 +33,8 @@ type Sonuc = {
   degerlendirilen: number;
   analiziOlmayan: number;
   rizasiOlmayan: number;
+  /** #501: Analizi yedek içerikten üretildiği için elenenler. */
+  yedekAnalizli?: number;
 };
 
 const UYUM_ETIKETI: Record<Uyum, { metin: string; sinif: string }> = {
@@ -40,6 +42,39 @@ const UYUM_ETIKETI: Record<Uyum, { metin: string; sinif: string }> = {
   olasi: { metin: "Olası uyum", sinif: "bg-blue-50 text-blue-700 border-blue-200" },
   zayif: { metin: "Zayıf uyum", sinif: "bg-slate-100 text-slate-600 border-slate-200" },
 };
+
+/**
+ * #501: "Kaç mentör değerlendirildi, kaçı neden elendi" cümlesi — SAF ve
+ * ayrı test edilebilir.
+ *
+ * ⚠️ NEDEN ÇIKARILDI: cümle JSX içinde koşullu parçalarla kuruluyordu ve
+ * iki gerekçeyle bile virgülü elle yönetiyordu. Üçüncü gerekçe (#501)
+ * eklendiğinde kombinasyon sayısı ikiye katlanıyor; "iki gerekçe varsa
+ * virgül" gibi bir kural JSX'te sessizce yanlış cümle üretir ve hiçbir
+ * test onu görmez.
+ */
+export function elemeCumlesi(sonuc: {
+  degerlendirilen: number;
+  analiziOlmayan: number;
+  rizasiOlmayan: number;
+  yedekAnalizli?: number;
+}): string {
+  const gerekceler = [
+    sonuc.analiziOlmayan > 0 && `${sonuc.analiziOlmayan} mentör AI analizi olmadığı için`,
+    sonuc.rizasiOlmayan > 0 && `${sonuc.rizasiOlmayan} mentör yapay zekâ onayı olmadığı için`,
+    /*
+     * ⚠️ "ANALİZİ YOK" İLE AYNI CÜMLEYE KONMAZ: kayıt var ama içeriği AI
+     * üretmedi (#494 yedek çıktı). Çözümü de farklı — analizi yeniden
+     * üretmek. Tek bir "elendi" sayısı admin'i yanlış yere bakmaya iterdi.
+     */
+    (sonuc.yedekAnalizli ?? 0) > 0 &&
+      `${sonuc.yedekAnalizli} mentör analizi yapay zekâ tarafından üretilmediği için`,
+  ].filter((g): g is string => typeof g === "string");
+
+  const bas = `${sonuc.degerlendirilen} mentör değerlendirildi`;
+  if (gerekceler.length === 0) return bas;
+  return `${bas} · ${gerekceler.join(", ")} kapsam dışı`;
+}
 
 type Props = {
   studentId: string;
@@ -102,7 +137,7 @@ export function MentorOnerisiPaneli({ studentId, ogrenciAdi, onAta, atamaSuruyor
     );
   }
 
-  const elenen = (sonuc?.analiziOlmayan ?? 0) + (sonuc?.rizasiOlmayan ?? 0);
+  const kapsamCumlesi = sonuc ? elemeCumlesi(sonuc) : null;
 
   return (
     <div className="w-full">
@@ -197,17 +232,7 @@ export function MentorOnerisiPaneli({ studentId, ogrenciAdi, onAta, atamaSuruyor
           <p className="mt-2 flex gap-1.5 border-t border-slate-100 pt-2 text-[11px] text-slate-500">
             <Info className="w-3 h-3 shrink-0 mt-0.5" />
             <span>
-              {sonuc.degerlendirilen} mentör değerlendirildi
-              {elenen > 0 && (
-                <>
-                  {" "}
-                  · {sonuc.analiziOlmayan > 0 && `${sonuc.analiziOlmayan} mentör AI analizi olmadığı için`}
-                  {sonuc.analiziOlmayan > 0 && sonuc.rizasiOlmayan > 0 && ", "}
-                  {sonuc.rizasiOlmayan > 0 && `${sonuc.rizasiOlmayan} mentör yapay zekâ onayı olmadığı için`}
-                  {" "}kapsam dışı
-                </>
-              )}
-              . Öneri bir tavsiyedir; atama kararı sizindir.
+              {kapsamCumlesi}. Öneri bir tavsiyedir; atama kararı sizindir.
             </span>
           </p>
         </div>

@@ -36,8 +36,10 @@ export async function generateAndPersistMentorAnalysis(
       technicalTracks: sonuc.technicalTracks,
       idealStudentProfile: sinirla(sonuc.idealStudentProfile ?? "", ALAN_SINIRI.analizMetni),
       matchingNotes: sonuc.matchingNotes,
-      // #494: Köken. Yedek (mock) çıktıda `null` — gerçek AI diye
-      // kaydedilmemeli; kayıt kalıcı ve sonradan ayırt edilemez olurdu.
+      // #494: Köken. Yedek (mock) çıktı YEDEK diye işaretlenir (#501),
+      // gerçek AI diye kaydedilmemeli; kayıt kalıcı ve sonradan ayırt
+      // edilemez olurdu. `?? null` yalnızca kökeni HİÇ olmayan (elle
+      // kurulmuş) sonuçlar için: onlar gerçekten "bilinmiyor".
       uretimSurumu: sonuc?.koken?.uretimSurumu ?? null,
       uretimModeli: sonuc?.koken?.uretimModeli ?? null,
     },
@@ -49,8 +51,10 @@ export async function generateAndPersistMentorAnalysis(
       technicalTracks: sonuc.technicalTracks,
       idealStudentProfile: sinirla(sonuc.idealStudentProfile ?? "", ALAN_SINIRI.analizMetni),
       matchingNotes: sonuc.matchingNotes,
-      // #494: Köken. Yedek (mock) çıktıda `null` — gerçek AI diye
-      // kaydedilmemeli; kayıt kalıcı ve sonradan ayırt edilemez olurdu.
+      // #494: Köken. Yedek (mock) çıktı YEDEK diye işaretlenir (#501),
+      // gerçek AI diye kaydedilmemeli; kayıt kalıcı ve sonradan ayırt
+      // edilemez olurdu. `?? null` yalnızca kökeni HİÇ olmayan (elle
+      // kurulmuş) sonuçlar için: onlar gerçekten "bilinmiyor".
       uretimSurumu: sonuc?.koken?.uretimSurumu ?? null,
       uretimModeli: sonuc?.koken?.uretimModeli ?? null,
     },

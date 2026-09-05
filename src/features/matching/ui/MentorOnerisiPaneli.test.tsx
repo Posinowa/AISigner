@@ -14,7 +14,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
-import { MentorOnerisiPaneli } from "./MentorOnerisiPaneli";
+import { MentorOnerisiPaneli, elemeCumlesi } from "./MentorOnerisiPaneli";
 
 const yanit = (govde: unknown, ok = true, status = 200) =>
   vi.fn().mockResolvedValue({ ok, status, json: async () => govde });
@@ -142,5 +142,67 @@ describe("hata durumu", () => {
     await waitFor(() =>
       expect(screen.queryByText(/için öneriler/)).not.toBeInTheDocument(),
     );
+  });
+});
+
+/**
+ * #501 — kapsam cümlesi.
+ *
+ * ⚠️ NEDEN SAF FONKSİYONA ÇIKARILDI: cümle JSX içinde koşullu parçalarla
+ * kuruluyordu ve iki gerekçeyle bile virgülü elle yönetiyordu. Üçüncü gerekçe
+ * eklenince kombinasyon sayısı ikiye katlandı; JSX'te sessizce bozulan bir
+ * cümleyi hiçbir test görmezdi.
+ */
+describe("elemeCumlesi", () => {
+  it("eleme yoksa yalnız değerlendirilen sayısı", () => {
+    expect(elemeCumlesi({ degerlendirilen: 3, analiziOlmayan: 0, rizasiOlmayan: 0 })).toBe(
+      "3 mentör değerlendirildi",
+    );
+  });
+
+  it("tek gerekçe: virgül YOK", () => {
+    const c = elemeCumlesi({ degerlendirilen: 1, analiziOlmayan: 2, rizasiOlmayan: 0 });
+
+    expect(c).toContain("2 mentör AI analizi olmadığı için");
+    expect(c).toContain("kapsam dışı");
+    expect(c).not.toContain(",");
+  });
+
+  it("üç gerekçe birden: hepsi görünür, aralarında virgül", () => {
+    const c = elemeCumlesi({
+      degerlendirilen: 1,
+      analiziOlmayan: 2,
+      rizasiOlmayan: 3,
+      yedekAnalizli: 4,
+    });
+
+    expect(c).toContain("2 mentör AI analizi olmadığı için");
+    expect(c).toContain("3 mentör yapay zekâ onayı olmadığı için");
+    expect(c).toContain("4 mentör analizi yapay zekâ tarafından üretilmediği için");
+    expect(c.split(",")).toHaveLength(3);
+  });
+
+  /*
+   * ⚠️ "Analizi yok" ile aynı kefeye konamaz: kayıt VAR, içeriği uydurma.
+   * Çözümü de farklı — analizi yeniden üretmek. Tek bir "elendi" sayısı
+   * admin'i yanlış yere bakmaya iterdi.
+   */
+  it("⚠️ yedek gerekçesi 'analizi yok'tan AYRI cümle parçası", () => {
+    const yedek = elemeCumlesi({
+      degerlendirilen: 1,
+      analiziOlmayan: 0,
+      rizasiOlmayan: 0,
+      yedekAnalizli: 2,
+    });
+    const yok = elemeCumlesi({ degerlendirilen: 1, analiziOlmayan: 2, rizasiOlmayan: 0 });
+
+    expect(yedek).not.toBe(yok);
+    expect(yedek).toContain("üretilmediği için");
+  });
+
+  it("alan hiç gelmezse (eski sunucu yanıtı) çökmez", () => {
+    expect(() =>
+      elemeCumlesi({ degerlendirilen: 1, analiziOlmayan: 0, rizasiOlmayan: 0 }),
+    ).not.toThrow();
   });
 });

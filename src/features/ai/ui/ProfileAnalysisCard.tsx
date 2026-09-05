@@ -2,7 +2,9 @@
 // #48: Mentor detay sayfası ve admin modal'ı tarafından paylaşılan, #47'de
 // saklanan detaylı AI analizini gösteren kart.
 
-import { Award, TrendingUp, Compass, Lightbulb, Layers, Loader2, AlertCircle, Sparkles } from "lucide-react";
+import { Award, TrendingUp, Compass, Lightbulb, Layers, Loader2, AlertCircle, Sparkles, Info } from "lucide-react";
+
+import { kokenEtiketi, type KokenTonu } from "@/features/ai/koken-etiketi";
 
 export type ProfileAnalysisData = {
   level: string;
@@ -12,6 +14,14 @@ export type ProfileAnalysisData = {
   technicalTracks: string[];
   recommendedPath: string;
   recommendations: string[];
+  /**
+   * #501: Kaydın ÜRETİM KÖKENİ (#494). Opsiyonel: kart eski çağrı
+   * yerlerinden ve testlerden elle kurulmuş nesnelerle de çağrılıyor.
+   * Alan yoksa köken "bilinmiyor" olarak gösterilir — susmak, yedek
+   * içeriği gerçek analiz gibi göstermeye devam etmek olurdu.
+   */
+  uretimSurumu?: string | null;
+  uretimModeli?: string | null;
 };
 
 type Props = {
@@ -59,6 +69,39 @@ export function parseProfileAnalysisApiResponse(
   return { analysis: null, error: message };
 }
 
+/**
+ * #501: Köken şeridinin rengi. Ton → sınıf eşlemesi BURADA, çünkü metnin
+ * kendisi `koken-etiketi.ts`'te ve ikisinin ayrı yerde durması bilerek:
+ * metin sunucu/istemci farkı gözetmeden paylaşılıyor, renk yalnız bu
+ * karta ait.
+ */
+const KOKEN_SINIFI: Record<KokenTonu, string> = {
+  notr: "border-slate-200 bg-white text-slate-500",
+  uyari: "border-amber-200 bg-amber-50 text-amber-800",
+  hata: "border-red-200 bg-red-50 text-red-800",
+};
+
+export function KokenSeridi({
+  uretimSurumu,
+  uretimModeli,
+}: {
+  uretimSurumu?: string | null;
+  uretimModeli?: string | null;
+}) {
+  const etiket = kokenEtiketi(uretimSurumu, uretimModeli);
+
+  return (
+    <div
+      className={`flex gap-2 rounded-lg border px-3 py-2 text-[11px] leading-relaxed ${KOKEN_SINIFI[etiket.ton]}`}
+    >
+      <Info className="w-3.5 h-3.5 shrink-0 mt-[1px]" />
+      <span>
+        <span className="font-semibold">{etiket.baslik}</span> — {etiket.aciklama}
+      </span>
+    </div>
+  );
+}
+
 export function ProfileAnalysisCard({ analysis, loading, error }: Props) {
   const viewState = resolveProfileAnalysisViewState({ analysis, loading, error });
 
@@ -102,6 +145,11 @@ export function ProfileAnalysisCard({ analysis, loading, error }: Props) {
           {analysis.level}
         </span>
       </div>
+
+      {/* #501: Köken, İÇERİĞİN ÜSTÜNDE. Altta olsaydı okuyan kişi metni
+          önce değerlendirme olarak okur, uyarıyı sonra görürdü — yedek
+          içerikte bu, uyarının hiç olmamasıyla neredeyse aynı şey. */}
+      <KokenSeridi uretimSurumu={analysis.uretimSurumu} uretimModeli={analysis.uretimModeli} />
 
       <div className="bg-white rounded-lg p-4 text-sm text-gray-700 leading-relaxed">
         {analysis.summary}

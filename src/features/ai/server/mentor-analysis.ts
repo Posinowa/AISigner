@@ -1,7 +1,7 @@
 import { getModel } from "@/lib/ai/gemini-client";
 import { guvenliMetin, guvenliListe, veriBlogu } from "@/lib/ai/prompt";
 import { VARSAYILAN_MODEL } from "@/lib/ai/model-adi";
-import { uretimKokeni, type UretimKokeni } from "@/lib/ai/uretim-kokeni";
+import { uretimKokeni, yedekKokeni, type UretimKokeni } from "@/lib/ai/uretim-kokeni";
 import { logger } from "@/lib/logger";
 import { ilgiEtiketi, MENTOR_KIDEMLERI } from "@/features/student/models/secenekler";
 
@@ -38,7 +38,8 @@ export type MentorAnalysisResult = {
   idealStudentProfile: string;
   matchingNotes: string[];
   /**
-   * #494: Gerçek AI çıktısı mı, yedek (mock) mu? `null` = yedek.
+   * #494: Gerçek AI çıktısı mı, yedek (mock) mu? Yedek AÇIKÇA
+   * işaretlenir (#501); `null` yalnızca "bilinmiyor" demektir.
    * Opsiyonel: mevcut çağrı yerleri ve testler nesneyi elle kuruyor.
    */
   koken?: UretimKokeni | null;
@@ -59,9 +60,10 @@ export function mentorYedekAnalizi(girdi: MentorAnalysisInput): MentorAnalysisRe
     girdi.yearsExperience >= 6 ? "İleri" : girdi.yearsExperience >= 3 ? "Orta" : "Başlangıç";
 
   return {
-    // ⚠️ YEDEK: köken YOK. Prompt sürümü yazsaydık kayıt, hiç kurulmamış
-    // bir AI çağrısını olmuş gibi gösterirdi (#377'nin kalıcı hâli).
-    koken: null,
+    // ⚠️ YEDEK olduğu AÇIKÇA yazılır. Prompt sürümü yazsaydık kayıt, hiç
+    // kurulmamış bir AI çağrısını olmuş gibi gösterirdi (#377'nin kalıcı
+    // hâli). `null` bırakmak da olmazdı: o "bilinmiyor" demek (#501).
+    koken: yedekKokeni(),
     level: seviye,
     summary: `${girdi.title}${girdi.company ? ` (${girdi.company})` : ""}, ${girdi.yearsExperience} yıllık deneyimle ${alanlar.join(", ") || "belirtilmemiş alanlarda"} mentörlük yapmak istiyor. Haftada ${girdi.weeklyHours} saat ve aynı anda ${girdi.capacity} stajyer kapasitesi beyan etti.`,
     strengths: [
