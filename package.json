@@ -33,7 +33,7 @@
     "@sentry/nextjs": "^10.73.0",
     "class-variance-authority": "^0.7.1",
     "lucide-react": "^0.544.0",
-    "next": "^15.5.22",
+    "next": "^16.3.4",
     "next-auth": "^4.24.15",
     "nodemailer": "^9.0.0",
     "prisma": "^6.15.0",
