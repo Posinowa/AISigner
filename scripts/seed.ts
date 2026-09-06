@@ -141,36 +141,55 @@ async function main() {
     },
   });
 
-  const existingSteps = await prisma.roadmapStep.count({ where: { roadmapId: roadmap.id } });
-  if (existingSteps === 0) {
-    await prisma.roadmapStep.createMany({
-      data: [
-        {
-          roadmapId: roadmap.id,
-          order: 1,
-          title: "Faz 1: Proje Kurulumu ve Şema Tasarımı",
-          description: "Next.js ve PostgreSQL veritabanı altyapısının kurulması.",
-          status: "COMPLETED",
-          resources: ["https://nextjs.org/docs"],
-        },
-        {
-          roadmapId: roadmap.id,
-          order: 2,
-          title: "Faz 2: Kimlik Doğrulama ve Kullanıcı Yönetimi",
-          description: "Argon2 ve NextAuth ile giriş kayıt sisteminin geliştirilmesi.",
-          status: "IN_PROGRESS",
-          resources: ["https://next-auth.js.org"],
-        },
-        {
-          roadmapId: roadmap.id,
-          order: 3,
-          title: "Faz 3: Portföy Bileşenleri ve Canlıya Alma",
-          description: "Projelerin listelenmesi, responsive tasarım ve Docker ile deploy.",
-          status: "TODO",
-          resources: ["https://docker.com"],
-        },
-      ],
+  const demoSteps = [
+    {
+      order: 1,
+      title: "Faz 1: Proje Kurulumu ve Şema Tasarımı",
+      description: "Next.js ve PostgreSQL veritabanı altyapısının kurulması.",
+      status: "COMPLETED" as const,
+      resources: ["https://nextjs.org/docs"],
+    },
+    {
+      order: 2,
+      title: "Faz 2: Kimlik Doğrulama ve Kullanıcı Yönetimi",
+      description: "Argon2 ve NextAuth ile giriş kayıt sisteminin geliştirilmesi.",
+      status: "IN_PROGRESS" as const,
+      resources: ["https://next-auth.js.org"],
+    },
+    {
+      order: 3,
+      title: "Faz 3: Portföy Bileşenleri ve Canlıya Alma",
+      description: "Projelerin listelenmesi, responsive tasarım ve Docker ile deploy.",
+      status: "TODO" as const,
+      resources: ["https://docker.com"],
+    },
+  ];
+
+  for (const step of demoSteps) {
+    const existing = await prisma.roadmapStep.findFirst({
+      where: { roadmapId: roadmap.id, order: step.order },
     });
+    if (existing) {
+      await prisma.roadmapStep.update({
+        where: { id: existing.id },
+        data: {
+          title: step.title,
+          description: step.description,
+          resources: step.resources,
+        },
+      });
+    } else {
+      await prisma.roadmapStep.create({
+        data: {
+          roadmapId: roadmap.id,
+          order: step.order,
+          title: step.title,
+          description: step.description,
+          status: step.status,
+          resources: step.resources,
+        },
+      });
+    }
   }
 
   console.log("\n🎉 Seed tamamlandı — admin/mentor/student kullanıcıları, mentor-stajyer ataması, demo proje ataması ve proje şablonları hazır.");
