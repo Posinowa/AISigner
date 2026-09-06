@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { liderSecimiBaslat, type LiderKontrol } from "./lider-sekme";
 
 /**
  * Canlı akışa bağlanan istemci kancası (#329).
@@ -20,6 +21,21 @@ import { useEffect, useRef, useState } from "react";
  * "maliyet kullanıcı sayısından bağımsız" gerekçesinin aşınması. Üstelik
  * HTTP/1.1 arkasında tarayıcının origin başına 6 bağlantı kotasının yarısı
  * kalıcı akışlara gidiyordu.
+ *
+ * ⚠️ BAĞLANTI ARTIK SEKME BAŞINA DA DEĞİL, KULLANICI BAŞINA (#523).
+ * #358 sekme İÇİNDEKİ çokluğu çözmüştü ama sekme SAYISINI çözmemişti:
+ * altı sekme açan kullanıcıda kota tamamen dolup uygulama KİLİTLENİYORDU.
+ * Ölçüldü — beşinci sekmeye kadar hiçbir yavaşlama yok, altıncıda istek hiç
+ * başlamıyor. Artık sekmelerden biri "lider" seçiliyor, akışı yalnız o
+ * kuruyor ve olayları `BroadcastChannel` ile diğerlerine dağıtıyor
+ * (`lider-sekme.ts`).
+ *
+ * ⚠️ LİDER DEĞİŞİMİNDE KÜÇÜK BİR BOŞLUK VAR ve kabul edildi. Yeni lider
+ * taze bir akış kuruyor; sunucu imleci bağlantı anından başlattığı için
+ * (`canli-akis.ts`) devir sırasında geçen bir olay kaçabilir. Alternatifi
+ * olayları sekmeler arası kuyruklamaktı — kozmetik bir rozet için
+ * taşınamayacak kadar karmaşık. Yoklama yedeği (`bagli === false`) bu
+ * boşluğu zaten kapatıyor.
  */
 
 export type CanliOlay =
@@ -54,10 +70,28 @@ let aboneSayisi = 0;
 let bagliMi = false;
 let kapatmaZamanlayici: ReturnType<typeof setTimeout> | null = null;
 
+let lider: LiderKontrol | null = null;
+
 function durumuYay(yeni: boolean) {
   if (bagliMi === yeni) return;
   bagliMi = yeni;
   for (const d of durumDinleyicileri) d(yeni);
+  // Lider isek takipçi sekmeler de bilsin (yoklamaya düşüp düşmeyeceklerine
+  // buna bakarak karar veriyorlar).
+  lider?.durumYay(yeni);
+}
+
+/** Olayı bu sekmedeki tüketicilere dağıtır. */
+function olayiDagit(olay: CanliOlay) {
+  // Dinleyici kopyası üzerinde geziyoruz: bir dinleyici işlenirken abonelik
+  // bırakırsa (ör. yönlendirme) küme değişir ve iterasyon bozulurdu.
+  for (const d of [...dinleyiciler]) {
+    try {
+      d(olay);
+    } catch {
+      // Bir tüketicinin hatası diğerlerini engellememeli.
+    }
+  }
 }
 
 function baglantiKur() {
@@ -73,15 +107,9 @@ function baglantiKur() {
       // Bozuk bir olay akışı düşürmemeli.
       return;
     }
-    // Dinleyici kopyası üzerinde geziyoruz: bir dinleyici işlenirken abonelik
-    // bırakırsa (ör. yönlendirme) küme değişir ve iterasyon bozulurdu.
-    for (const d of [...dinleyiciler]) {
-      try {
-        d(olay);
-      } catch {
-        // Bir tüketicinin hatası diğerlerini engellememeli.
-      }
-    }
+    olayiDagit(olay);
+    // Lider isek aynı olayı diğer sekmelere de ilet.
+    lider?.olayYay(olay);
   };
 
   for (const tip of OLAY_TIPLERI) akis.addEventListener(tip, isle as EventListener);
@@ -100,10 +128,47 @@ function baglantiyiKapat() {
   durumuYay(false);
 }
 
+/**
+ * İlk abone geldiğinde çağrılır: lider seçimini başlatır.
+ *
+ * ⚠️ `liderSecimiBaslat` `null` dönerse (BroadcastChannel yok) ESKİ
+ * DAVRANIŞA düşülür — bu sekme kendi akışını kurar. Seçim yapılamadığı için
+ * hiç bağlanmamak, mesajlaşmayı tamamen öldürürdü.
+ */
+function akisiBaslat() {
+  if (lider) return;
+
+  lider = liderSecimiBaslat({
+    liderOldu: () => baglantiKur(),
+    liderlikBitti: () => {
+      // Liderliği bırakan sekme bağlantısını KAPATIR; olayları artık yeni
+      // liderden alacak. Durumu düşürmüyoruz: bağlantı yeni liderde açık.
+      akis?.close();
+      akis = null;
+    },
+    olayGeldi: (yuk) => olayiDagit(yuk as CanliOlay),
+    durumGeldi: (b) => {
+      if (bagliMi === b) return;
+      bagliMi = b;
+      for (const d of durumDinleyicileri) d(b);
+    },
+  });
+
+  if (!lider) baglantiKur();
+}
+
+function akisiDurdur() {
+  lider?.durdur();
+  lider = null;
+  baglantiyiKapat();
+}
+
 /** Yalnızca testler için: modül düzeyindeki paylaşımlı durumu sıfırlar. */
 export function canliAkisiSifirlaForTests(): void {
   if (kapatmaZamanlayici) clearTimeout(kapatmaZamanlayici);
   kapatmaZamanlayici = null;
+  lider?.durdur();
+  lider = null;
   akis?.close();
   akis = null;
   aboneSayisi = 0;
@@ -139,7 +204,7 @@ export function useCanliAkis(onOlay: (olay: CanliOlay) => void): { bagli: boolea
       kapatmaZamanlayici = null;
     }
 
-    baglantiKur();
+    akisiBaslat();
     // Bağlantı zaten açıksa yeni abone açılış olayını kaçırır; durumu ona
     // doğrudan bildiriyoruz.
     setBagli(bagliMi);
@@ -153,7 +218,7 @@ export function useCanliAkis(onOlay: (olay: CanliOlay) => void): { bagli: boolea
         aboneSayisi = 0;
         kapatmaZamanlayici = setTimeout(() => {
           kapatmaZamanlayici = null;
-          if (aboneSayisi === 0) baglantiyiKapat();
+          if (aboneSayisi === 0) akisiDurdur();
         }, KAPATMA_GECIKMESI_MS);
       }
     };
