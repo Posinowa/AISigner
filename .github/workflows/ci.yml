@@ -241,10 +241,17 @@ jobs:
       - name: Run E2E
         run: npm run test:e2e
 
+      # ⚠️ İKİ YOL DA YÜKLENİR. `playwright-report/` html raporu (özet),
+      # `test-results/` ise `trace: retain-on-failure` ile üretilen izler —
+      # ağ istekleri ve zaman çizgisi orada. #518'de CI'da düşüp lokalde hiç
+      # tekrarlanmayan bir hata çıktı ve elde inceleyecek hiçbir şey yoktu.
       - name: Upload report
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: playwright-report/
+          path: |
+            playwright-report/
+            test-results/
           retention-days: 7
+          if-no-files-found: warn
