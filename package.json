@@ -19,7 +19,8 @@
     "seed": "tsx --env-file-if-exists=.env scripts/seed.ts",
     "create:admin": "tsx --env-file-if-exists=.env scripts/create-admin.ts",
     "test:ai": "tsx --env-file=.env scripts/test-ai.ts",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "start:e2e": "node scripts/e2e-sunucu.mjs"
   },
   "dependencies": {
     "@google-cloud/storage": "^8.0.1",

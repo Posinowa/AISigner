@@ -95,7 +95,15 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: `npm run start -- --port ${PORT}`,
+    /*
+     * ⚠️ #518: ÜRETİMİN ÇALIŞTIRDIĞI SUNUCU. Önceden `next start` idi ve Next
+     * bunu her koşuda uyarıyordu ("does not work with output: standalone").
+     * `docker-entrypoint.sh` üretimde `exec node server.js` çalıştırıyor;
+     * ikisi farklı sunucu ve DAVRANIŞLARI da farklı (yönlendirme URL'lerinin
+     * göreli mi mutlak mı olduğu dahil). Gerekçe `scripts/e2e-sunucu.mjs`
+     * içinde ölçümüyle yazılı.
+     */
+    command: "npm run start:e2e",
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
