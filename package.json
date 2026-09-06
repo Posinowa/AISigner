@@ -23,7 +23,7 @@
   },
   "dependencies": {
     "@google-cloud/storage": "^8.0.1",
-    "@google/genai": "^2.20.0",
+    "@google/genai": "^2.21.0",
     "@hookform/resolvers": "^5.9.1",
     "@node-rs/argon2": "^2.2.0",
     "@octokit/rest": "^22.0.1",
