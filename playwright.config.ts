@@ -61,7 +61,16 @@ export default defineConfig({
    */
   retries: 0,
   workers: process.env.CI ? 2 : undefined,
-  reporter: process.env.CI ? [["github"], ["list"]] : [["list"]],
+  /*
+   * ⚠️ CI'DA `html` DA ÜRETİLİR — aksi halde `playwright-report/` HİÇ
+   * OLUŞMUYOR ve iş akışındaki "Upload report" adımı sessizce boş çıkıyor
+   * ("no artifact matches"). #518'de tam olarak bu yaşandı: CI'da üç test
+   * düştü, lokalde hiç tekrarlanmadı ve elde inceleyecek HİÇBİR ŞEY yoktu.
+   * `open: "never"` — koşucuda tarayıcı açmaya çalışmasın.
+   */
+  reporter: process.env.CI
+    ? [["github"], ["list"], ["html", { open: "never" }]]
+    : [["list"]],
 
   use: {
     baseURL: BASE_URL,
@@ -105,6 +114,13 @@ export default defineConfig({
      */
     command: "npm run start:e2e",
     url: BASE_URL,
+    /*
+     * ⚠️ SUNUCU ÇIKTISI GÖRÜNÜR OLMALI. Playwright `webServer.stdout`
+     * varsayılanını "ignore" yapıyor; yalnız stderr geçiyor. #518'de CI
+     * kırmızıya döndüğünde sunucunun tek satır logu yoktu ve "sunucu hata
+     * verdi mi" sorusu bile yanıtlanamadı.
+     */
+    stdout: "pipe",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
     env: {
