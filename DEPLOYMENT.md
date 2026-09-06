@@ -154,6 +154,12 @@ hangi modda olduğunuzu üstte gösterir (önizleme / gerçek).
 
 ---
 
+> ☁️ **Google Cloud (Cloud Run) için:** `docs/CLOUD-RUN.md`. Orada Cloud Run'a
+> özgü ve **ölçülmüş** tuzaklar var: anahtar dosyası yerine ADC (#522),
+> `--no-cpu-throttling` olmadan `after()` işlerinin askıya alınması,
+> `--min-instances=1` olmadan #329/#397/#490'ın sessizce durması ve
+> `HOSTNAME` env'inin yönlendirmeleri yanlış origin'e çıkarması.
+
 ## 3. Out Plane adımları
 
 1. **PostgreSQL oluştur**: Out Plane'de yönetilen Postgres ekle; bağlantı dizesini al,

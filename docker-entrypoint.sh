@@ -14,7 +14,14 @@ if [ -n "$GCP_CREDENTIALS_JSON" ]; then
   export GOOGLE_APPLICATION_CREDENTIALS="/app/gcp-credentials.json"
   echo "→ GCP kimlik dosyası env değişkeninden yazıldı (içerik gizli)."
 else
-  echo "→ GCP_CREDENTIALS_JSON tanımlı değil; AI özellikleri mock'a düşecek."
+  # #522: "mock'a düşecek" ARTIK DOĞRU DEĞİL ve yanıltıcıydı. Google Cloud'da
+  # (Cloud Run) kimlik servisin kendi service account'undan ADC ile gelir;
+  # ortada anahtar dosyası OLMAMASI beklenen durumdur. Anahtar dosyası yoksa
+  # `gemini-client.ts` googleAuthOptions'ı hiç vermiyor ve SDK ADC'yi çözüyor.
+  # Kimlik gerçekten yoksa çağrı patlar ve #335 gereği mock'a düşülür — ama
+  # bunu AÇILIŞTA iddia etmek, doğru kurulmuş bir Cloud Run servisinde
+  # operatöre yanlış alarm verirdi.
+  echo "→ GCP_CREDENTIALS_JSON tanımlı değil; kimlik ADC'den çözülecek (Cloud Run'da beklenen durum)."
 fi
 
 # --- Şema göçleri ---

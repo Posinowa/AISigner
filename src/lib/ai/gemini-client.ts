@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { existsSync } from "fs";
 import path from "path";
 import { VARSAYILAN_MODEL } from "./model-adi";
 
@@ -24,6 +25,56 @@ const LOCATION = process.env.GOOGLE_CLOUD_LOCATION || "us-central1";
 const CREDENTIALS_PATH =
   process.env.GOOGLE_APPLICATION_CREDENTIALS || "gcp-credentials.json";
 
+/**
+ * Kimlik DOSYASI mı kullanılacak, ADC mi? (#522)
+ *
+ * ⚠️ ÖNCESİ HER KOŞULDA DOSYA İSTİYORDU ve bu, Google Cloud'da (Cloud Run)
+ * doğru yöntemin tam tersi: orada kimlik servisin kendi service account'undan
+ * **ADC** ile gelir ve ORTADA HİÇ ANAHTAR DOSYASI OLMAZ — saklanacak,
+ * dağıtılacak, döndürülecek uzun ömürlü bir sır yok.
+ *
+ * Dosya yoksa `keyFilename` var olmayan bir yolu gösteriyor, istemci kurulumu
+ * patlıyor ve çağıran taraf #335'in graceful degradation'ı gereği MOCK'a
+ * düşüyordu. Yani IAM doğru ayarlanmış olsa bile AI **sessizce sahte içerik**
+ * üretirdi — #377'nin belgelediği körlüğün dağıtım tarafındaki hâli.
+ *
+ * ⚠️ TUTARSIZLIK KENDİNİ ELE VERİYORDU: `lib/storage/blob.ts` (GCS) zaten
+ * ADC kullanıyor, yalnız `projectId` veriyor. Aynı bulutta iki istemci iki
+ * farklı kimlik yöntemindeydi.
+ *
+ * ⚠️ YEREL GELİŞTİRME KIRILMIYOR: dosya varsa davranış aynen sürüyor.
+ *
+ * ## ⚠️ ADC KÖRLEMESİNE DENENMEZ — CI'DA ÖLÇÜLDÜ
+ *
+ * İlk sürüm "dosya yoksa ADC'ye düş" diyordu ve gerekçesi şuydu: platform
+ * tespiti yanılabilir, dosyanın varlığı yanılmaz. ÖLÇÜM bunu çürüttü.
+ *
+ * GCP DIŞINDA `googleAuthOptions` verilmediğinde SDK kimliği aramaya
+ * çıkıyor ve metadata sunucusunu (`169.254.169.254`) yokluyor. Orada bir
+ * şey olmadığı için istek HATA VERMİYOR, ASILIYOR: CI'da öğrenci panosunu
+ * yükleyen üç E2E testi 30 saniyelik zaman aşımına düştü. Yerelde
+ * görünmedi çünkü geliştirme makinesinde `gcp-credentials.json` var.
+ *
+ * Yani asıl mesele "kimlik bulunur mu" değil, BULUNAMAMANIN HIZI: #335'in
+ * sözleşmesi hatanın HEMEN fırlatılıp çağıran tarafın mock'a düşmesi.
+ * Yavaş bir başarısızlık, graceful degradation'ı sessiz bir kilitlenmeye
+ * çeviriyor.
+ *
+ * Bu yüzden ADC yalnızca gerçekten mümkün olduğunda deneniyor: Cloud Run
+ * konteyner sözleşmesi `K_SERVICE`'i garanti ediyor. Ne dosya ne de bu
+ * işaret varsa HEMEN fırlatılıyor.
+ */
+
+/** Cloud Run'ın konteynere enjekte ettiği işaret (konteyner sözleşmesi). */
+function cloudRunUzerindeMi(): boolean {
+  return Boolean(process.env.K_SERVICE?.trim());
+}
+
+function kimlikDosyasiYolu(): string | null {
+  const yol = path.resolve(process.cwd(), CREDENTIALS_PATH);
+  return existsSync(yol) ? yol : null;
+}
+
 
 /** Çağrı yerlerinin gördüğü normalize yanıt. SDK şekli buraya sızmaz. */
 export type AiYanit = { text: string };
@@ -45,13 +96,30 @@ function getIstemci(): GoogleGenAI {
     );
   }
 
+  const anahtarDosyasi = kimlikDosyasiYolu();
+
+  if (!anahtarDosyasi && !cloudRunUzerindeMi()) {
+    /*
+     * ⚠️ HIZLI FIRLAT — ADC'yi yoklamaya BIRAKMA. Gerekçe yukarıda:
+     * yoklama GCP dışında hata vermeden asılıyor ve #335'in "hemen mock'a
+     * düş" sözleşmesini 30 saniyelik bir kilitlenmeye çeviriyor.
+     */
+    throw new Error(
+      "Vertex AI kimliği yok: ne gcp-credentials.json var ne de Cloud Run üzerindeyiz (K_SERVICE tanımsız).",
+    );
+  }
+
   istemci = new GoogleGenAI({
     vertexai: true,
     project: projectId,
     location: LOCATION,
-    googleAuthOptions: {
-      keyFilename: path.resolve(process.cwd(), CREDENTIALS_PATH),
-    },
+    /*
+     * Dosya yoksa `googleAuthOptions` HİÇ verilmiyor — SDK kimliği ADC'den
+     * çözer (Cloud Run'da servisin service account'u). Boş bir nesne ya da
+     * `keyFilename: undefined` göndermek aynı şey değil: SDK'nın hangi
+     * varsayılanları uygulayacağını belirsizleştirirdi.
+     */
+    ...(anahtarDosyasi ? { googleAuthOptions: { keyFilename: anahtarDosyasi } } : {}),
   });
 
   return istemci;
