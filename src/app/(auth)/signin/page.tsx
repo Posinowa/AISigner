@@ -57,7 +57,15 @@ function SigninForm() {
         // Hard navigation cookie'nin server'a temiz gitmesini garanti eder; böylece
         // client tarafında getSession retry hack'ine (yavaş ağda kırılgan) gerek kalmaz.
         setGecisteMi(true)
-        window.location.href = "/"
+        // #538: Marka çizim animasyonunun (~1.3s) tamamlanması için bekleme süresi tanınır.
+        // Hareketi azalt (prefers-reduced-motion) aktifse beklemeden hemen yönlendirilir.
+        const hareketiAzalt =
+          typeof window !== "undefined" &&
+          window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+        const bekleme = hareketiAzalt ? 50 : 1300
+        setTimeout(() => {
+          window.location.href = "/"
+        }, bekleme)
         return
       }
     } catch (err: unknown) {

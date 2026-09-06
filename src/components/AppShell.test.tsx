@@ -24,10 +24,11 @@ import { AppShell } from "./AppShell";
  * Erişemeyeceği bir sayfaya bağlantı göstermek yanıltıcı olurdu.
  */
 describe("AppShell — öğrenci menüsü (#420)", () => {
-  it("aktif stajyer iki bağlantıyı da görür", () => {
+  it("aktif stajyer üç bağlantıyı da görür", () => {
     render(<AppShell role="STUDENT" />);
     expect(screen.getByRole("link", { name: "Projemi Öner" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Mentör Görüşmesi" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Ayarlar" })).toBeInTheDocument();
   });
 
   it("⚠️ MEZUN stajyerde 'Projemi Öner' GİZLİ (#208)", () => {
@@ -35,14 +36,15 @@ describe("AppShell — öğrenci menüsü (#420)", () => {
     expect(screen.queryByRole("link", { name: "Projemi Öner" })).not.toBeInTheDocument();
   });
 
-  it("⚠️ MEZUN stajyerde 'Mentör Görüşmesi' AÇIK kalır (#398)", () => {
+  it("⚠️ MEZUN stajyerde 'Mentör Görüşmesi' ve 'Ayarlar' AÇIK kalır (#398, #538)", () => {
     render(<AppShell role="STUDENT" mezun />);
     expect(screen.getByRole("link", { name: "Mentör Görüşmesi" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Ayarlar" })).toBeInTheDocument();
   });
 
   it("mevcut bağlantılar korunuyor", () => {
     render(<AppShell role="STUDENT" mezun />);
-    for (const ad of ["Panel", "Mesajlar", "AI Analizim", "Öneri & İstek"]) {
+    for (const ad of ["Panel", "Mesajlar", "AI Analizim", "Öneri & İstek", "Ayarlar"]) {
       expect(screen.getByRole("link", { name: ad })).toBeInTheDocument();
     }
   });
