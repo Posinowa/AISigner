@@ -113,7 +113,7 @@ COPY --from=migrator /migrator/node_modules ./.migrator/node_modules
 
 COPY docker-entrypoint.sh ./docker-entrypoint.sh
 
-# GÜVENLİK: konteyner root olarak koşmasın (savunma-derinliği). node:20 imajında
+# GÜVENLİK: konteyner root olarak koşmasın (savunma-derinliği). node:22 imajında
 # hazır gelen 'node' (uid 1000) kullanıcısına geçiyoruz. uploads klasörü + tüm
 # /app node'a devrediliyor ki entrypoint gcp-credentials.json'ı yazabilsin ve
 # öğrenci dosya yüklemeleri çalışsın.

@@ -33,8 +33,11 @@ echo "→ Prisma migrate deploy çalışıyor..."
 node ./.migrator/node_modules/prisma/build/index.js migrate deploy --schema=./prisma/schema.prisma
 
 # --- Sunucu ---
-# standalone çıktısının kendi sunucusu (server.js). Öncesi `npm run start:docker`
-# idi; standalone imajda npm script'leri ve `next` binary'si bulunmaz.
+# standalone çıktısının kendi sunucusu (server.js). Öncesi `next start` çağıran
+# bir npm script'i idi; standalone imajda npm script'leri ve `next` binary'si
+# bulunmaz. O script #526'da SİLİNDİ: hiçbir yerden çağrılmıyordu ama içeriği
+# `next start` olduğu için, meşru bir kaçış yolu sanılıp kullanıldığında
+# sessizce YANLIŞ sunucuyu başlatırdı (#518).
 # PORT/HOSTNAME env'lerini server.js kendisi okur.
 # exec: sinyaller (SIGTERM) doğrudan Node sürecine iletilsin (temiz kapanış) —
 # araya npm girmemesi, platformun kapatma sinyalinin kaybolmamasını da sağlar.
