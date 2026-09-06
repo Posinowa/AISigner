@@ -11,7 +11,7 @@ benzeri bir PaaS üzerinde **güvenli** biçimde canlıya almak içindir.
 
 | Bileşen | Değer |
 |---|---|
-| Runtime | Node 20 (Docker imajı: `node:20-bookworm-slim`) |
+| Runtime | **Node 22** (Docker imajı: `node:22-bookworm-slim`), `engines.node: >=22` — `.npmrc`'de `engine-strict=true` olduğu için uyumsuz sürüm kurulumu KIRAR (#483) |
 | Uygulama | Next.js 15 **standalone** çıktısı (`node server.js`), port **3000**. İmaj ~970 MB; runner'da `npm install` yoktur. Migration için Prisma CLI ayrı bir katmanda `/app/.migrator` altında taşınır. |
 | Veritabanı | PostgreSQL 14–18, **SSL zorunlu** |
 | AI (opsiyonel) | Google Vertex AI / Gemini — kimlik JSON'u env'den |

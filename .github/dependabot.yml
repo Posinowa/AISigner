@@ -13,7 +13,8 @@
 # (.env, .pem, credentials) Dependabot dahil herkeste çalışmaya devam ediyor.
 #
 # ⚠️ BİLİNEN TUZAK — LOCKFILE VE NPM SÜRÜMÜ (CLAUDE.md'de yazılı):
-# CI Node 20 / npm 10 kullanıyor. `package-lock.json` npm 11 ile üretilirse
+# CI Node 22 / npm 10 kullanıyor (#483 ile 20'den yükseltildi; kritik olan
+# npm sürümü ve o DEĞİŞMEDİ — node:22 imajı da npm 10 ile geliyor). `package-lock.json` npm 11 ile üretilirse
 # CI'da `npm ci` EUSAGE hatası veriyor (esbuild/@emnapi girdileri uyumsuz
 # kalıyor). Dependabot lockfile'ı KENDİ araç zinciriyle yeniden üretiyor ve
 # hangi npm sürümünü kullandığını yapılandıramıyoruz.
