@@ -55,6 +55,37 @@ export type SaklamaSuresi = {
  */
 export const SAKLAMA_SURELERI: SaklamaSuresi[] | null = null;
 
+export type HataTeshisSaglayicisi = {
+  /** Hizmetin adı — aydınlatma metninde yazılı görünür. */
+  ad: string;
+  /** Verinin işlendiği ülke/bölge. */
+  bolge: string;
+  /** Sağlayıcının kendi gizlilik metni. */
+  gizlilikUrl: string;
+};
+
+/**
+ * Sunucu hatalarının teşhisi için kullanılan üçüncü taraf hizmet.
+ *
+ * ⚠️ BU ALAN İLE ÇALIŞMA ZAMANI BİRBİRİNE BAĞLI (#519). `lib/sentry.ts`
+ * burası `null` iken KENDİNİ AÇMAZ — DSN tanımlı olsa bile. Sebep: hata
+ * teşhis hizmeti yurt dışına aktarımdır ve aydınlatma metninde YAZILI
+ * olmadan yapılamaz. İkisi ayrı ayrı yönetilseydi, biri açılıp diğeri
+ * unutulduğunda platform sessizce beyan edilmemiş bir aktarım yapardı.
+ *
+ * ⚠️ AKTARIM AÇIK RIZAYA BAĞLI DEĞİL, Vertex AI'dan (#321) FARKLI: orada
+ * işlenen şey stajyerin KENDİ verisi ve amaç ona hizmet üretmek. Burada
+ * işlenen şey uygulamanın kendi hata kaydı; kişisel veri taşımaması için
+ * `lib/sentry.ts` gövdeyi, başlıkları, çerezleri ve IP'yi ayıklıyor.
+ * Yine de metinde YAZILI — beyan edilmemiş bir alıcı, zararsız olsa bile
+ * KVKK m.10 açısından eksiktir.
+ */
+export const HATA_TESHIS: HataTeshisSaglayicisi | null = {
+  ad: "Sentry",
+  bolge: "Avrupa Birliği / ABD",
+  gizlilikUrl: "https://sentry.io/privacy/",
+};
+
 /**
  * Henüz yayımlanmamış başlıkların adları.
  *

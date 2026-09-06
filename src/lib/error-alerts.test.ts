@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
-const { sendMailMock, loggerErrorMock } = vi.hoisted(() => ({
+const { sendMailMock, loggerErrorMock, sentryMock } = vi.hoisted(() => ({
   sendMailMock: vi.fn(),
   loggerErrorMock: vi.fn(),
+  sentryMock: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/mail", () => ({ sendMail: (...a: unknown[]) => sendMailMock(...a) }));
+vi.mock("@/lib/sentry", () => ({ sentryBildir: sentryMock }));
 vi.mock("@/lib/logger", () => ({
   logger: { error: loggerErrorMock, warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
@@ -140,5 +142,52 @@ describe("dayanıklılık", () => {
     sendMailMock.mockClear();
     await bildirSunucuHatasi(new Error("benzersiz 0"), baglam);
     expect(sendMailMock).toHaveBeenCalledOnce();
+  });
+});
+
+/**
+ * #519 — SIRA: Sentry, e-posta kapılarının ÖNÜNDE.
+ *
+ * ⚠️ Aşağıdaki iki kapı e-postaya AİT: `ERROR_ALERT_EMAIL` yoksa erken
+ * dönülüyor ve aynı imzalı hata 15 dakika susturuluyor. Sentry çağrısı
+ * arkalarına konsaydı teşhis aracı SMTP yapılandırmasına ve e-posta selini
+ * önleyen bir susturmaya mahkûm olurdu — oysa Sentry'nin bütün değeri
+ * TEKRARLARI görmek ve e-posta hiç kurulmamışken de çalışmak.
+ */
+describe("Sentry bildirimi (#519)", () => {
+  it("⚠️ ERROR_ALERT_EMAIL tanımsızken BİLE Sentry'ye gider", async () => {
+    delete process.env.ERROR_ALERT_EMAIL;
+
+    await bildirSunucuHatasi(new Error("patladı"), baglam);
+
+    expect(sendMailMock).not.toHaveBeenCalled();
+    expect(sentryMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("⚠️ 15 dakikalık SUSTURMA Sentry'yi kapsamaz — tekrarların hepsi gider", async () => {
+    await bildirSunucuHatasi(new Error("patladı"), baglam);
+    await bildirSunucuHatasi(new Error("patladı"), baglam);
+    await bildirSunucuHatasi(new Error("patladı"), baglam);
+
+    // E-posta susturuldu…
+    expect(sendMailMock).toHaveBeenCalledTimes(1);
+    // …ama teşhis aracı her tekrarı gördü.
+    expect(sentryMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("teşhis için gereken bağlam etiket olarak taşınır", async () => {
+    await bildirSunucuHatasi(new Error("patladı"), { ...baglam, istekKimligi: "abc123" });
+
+    expect(sentryMock.mock.calls[0][1]).toMatchObject({
+      routePath: "/api/x",
+      method: "POST",
+      istekKimligi: "abc123",
+    });
+  });
+
+  it("istek kimliği yoksa etiket HİÇ konmaz — boş değer gürültü olurdu", async () => {
+    await bildirSunucuHatasi(new Error("patladı"), baglam);
+
+    expect(sentryMock.mock.calls[0][1]).not.toHaveProperty("istekKimligi");
   });
 });

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { LegalPage } from "@/features/legal/LegalPage";
-import { VERI_SORUMLUSU, SAKLAMA_SURELERI, eksikAlanlar } from "@/features/legal/kvkk";
+import { VERI_SORUMLUSU, SAKLAMA_SURELERI, HATA_TESHIS, eksikAlanlar } from "@/features/legal/kvkk";
 
 export const metadata: Metadata = {
   title: "Gizlilik Politikası ve KVKK Aydınlatma Metni — AISigner",
@@ -122,6 +122,27 @@ export default function PrivacyPage() {
         gönderimi, yapay zekâ hizmeti) ve yasal olarak yetkili kamu kurum ve
         kuruluşlarının talebi hâlinde yapılır.
       </p>
+      {HATA_TESHIS && (
+        <>
+          <p>
+            Sunucu tarafında oluşan teknik hataların teşhisi için{" "}
+            <strong>{HATA_TESHIS.ad}</strong> hizmeti kullanılır ve bu kayıtlar{" "}
+            {HATA_TESHIS.bolge} bölgesinde işlenir. Gönderilen kayıt, hatanın
+            teknik dökümünden ibarettir: hata mesajı, yığın izi, isteğin adres
+            deseni ve istek kimliği. İstek gövdesi, başlıklar, çerezler, adres
+            satırındaki sorgu bilgileri, IP adresiniz ve hesap bilgileriniz
+            gönderilmez.
+          </p>
+          <p>
+            Bu kayıtlar yalnızca hatanın giderilmesi amacıyla kullanılır ve
+            sizinle ilgili bir değerlendirme üretmez.{" "}
+            <a href={HATA_TESHIS.gizlilikUrl} target="_blank" rel="noreferrer noopener">
+              {HATA_TESHIS.ad} gizlilik metni
+            </a>
+            .
+          </p>
+        </>
+      )}
 
       <h2>6. Erişim ve Görünürlük</h2>
       <ul>
@@ -148,7 +169,8 @@ export default function PrivacyPage() {
         Platform <strong>yalnızca zorunlu çerezler</strong> kullanır. Reklam,
         analitik veya izleme amaçlı çerez, piksel ya da üçüncü taraf betiği
         çalıştırılmaz; tarayıcınızın yerel deposunda (localStorage) veri
-        tutulmaz.
+        tutulmaz. Hata teşhisi yalnızca sunucu tarafında yapılır; tarayıcınıza
+        bu amaçla hiçbir betik yüklenmez.
       </p>
       <ul>
         <li>

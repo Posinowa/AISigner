@@ -70,6 +70,9 @@ describe("bilgiler GİRİLDİKTEN sonra", () => {
       SAKLAMA_SURELERI: [
         { kategori: "Hesap bilgileri", sure: "Hesap silinene kadar" },
       ],
+      // #519: Bu blok şirket bilgilerini test ediyor; hata teşhis bölümü
+      // kendi describe'ında ayrıca kapsanıyor.
+      HATA_TESHIS: null,
       eksikAlanlar: () => [],
     }));
     return sayfayiBas();
@@ -166,5 +169,67 @@ describe("canlı testte bulunan kusurlar (#453)", () => {
     expect(screen.getByText(/Aşağıdaki başlıklarda/).textContent).not.toMatch(
       /ileterek iletebilirsiniz/,
     );
+  });
+});
+
+/**
+ * #519 — hata teşhis hizmeti (üçüncü tarafa aktarım).
+ *
+ * ⚠️ METİN İLE KOD BİRBİRİNE BAĞLI: `lib/sentry.ts` bu alan `null` iken
+ * DSN tanımlı olsa bile kendini açmıyor. Yani "hizmet açık ama metinde
+ * yazılı değil" durumu OLUŞAMAZ. Test iki durumu da kilitliyor; yalnız
+ * birini test etmek, sayfanın diğer durumda ne gösterdiğini kimsenin
+ * bilmemesi olurdu — ve bu herkese açık bir hukuki metin.
+ */
+describe("hata teşhis hizmeti (#519)", () => {
+  async function saglayiciyla(hataTeshis: unknown) {
+    vi.doMock("@/features/legal/kvkk", () => ({
+      VERI_SORUMLUSU: null,
+      SAKLAMA_SURELERI: null,
+      HATA_TESHIS: hataTeshis,
+      eksikAlanlar: () => [],
+    }));
+    return sayfayiBas();
+  }
+
+  it("kullanılmıyorsa bölüm HİÇ yazılmaz — olmayan bir aktarım beyan edilmez", async () => {
+    await saglayiciyla(null);
+
+    expect(screen.queryByText(/teknik hataların teşhisi/i)).not.toBeInTheDocument();
+  });
+
+  it("kullanılıyorsa hizmetin ADI ve BÖLGESİ yazılır", async () => {
+    await saglayiciyla({ ad: "Sentry", bolge: "AB", gizlilikUrl: "https://x.test" });
+
+    expect(screen.getByText(/teknik hataların teşhisi/i)).toBeInTheDocument();
+    expect(screen.getByText("Sentry")).toBeInTheDocument();
+  });
+
+  /*
+   * ⚠️ NE GÖNDERİLMEDİĞİ DE YAZILI OLMALI. "Hata kayıtları gönderilir"
+   * demek, kullanıcıya isteğinin tamamının gittiğini düşündürür; ayıklama
+   * `lib/sentry.ts`'te yapılıyor ve metin bunu SÖYLEMEZSE koruma
+   * kullanıcının bilgisi dışında kalır.
+   */
+  it("⚠️ gönderilmeyenleri açıkça sayar — IP, çerez, gövde, hesap bilgisi", async () => {
+    await saglayiciyla({ ad: "Sentry", bolge: "AB", gizlilikUrl: "https://x.test" });
+
+    const metin = document.body.textContent ?? "";
+    for (const beklenen of ["gövdesi", "çerezler", "IP adresiniz", "hesap bilgileriniz"]) {
+      expect(metin).toContain(beklenen);
+    }
+  });
+
+  /*
+   * ⚠️ ÇEREZ BÖLÜMÜNÜN İDDİASI KORUNMALI. Sayfa "üçüncü taraf betiği
+   * çalıştırılmaz" diyor ve bu, tarayıcı SDK'sının BİLEREK eklenmemesinin
+   * sebebi. Biri istemci tarafı Sentry eklerse bu cümle yalan olur.
+   */
+  it("⚠️ teşhisin YALNIZ SUNUCUDA yapıldığı yazılı kalır", async () => {
+    await saglayiciyla({ ad: "Sentry", bolge: "AB", gizlilikUrl: "https://x.test" });
+
+    const metin = document.body.textContent ?? "";
+    expect(metin).toContain("üçüncü taraf betiği");
+    expect(metin).toContain("yalnızca sunucu tarafında");
   });
 });
