@@ -35,8 +35,22 @@ döndürülecek uzun ömürlü bir sır olmaz.
 koşulda bir anahtar DOSYASI istiyordu; dosya yokken istemci kurulumu patlıyor
 ve çağıran taraf #335'in graceful degradation'ı gereği **mock'a düşüyordu** —
 yani IAM doğru ayarlanmış olsa bile AI **sessizce sahte içerik** üretirdi.
-Artık dosya yoksa `googleAuthOptions` hiç verilmiyor ve SDK ADC'yi çözüyor.
-(GCS tarafı zaten böyle çalışıyordu; tutarsızlık kendini ele veriyordu.)
+Artık Cloud Run'da (`K_SERVICE` tanımlıyken) dosya yoksa `googleAuthOptions`
+hiç verilmiyor ve SDK ADC'yi çözüyor. (GCS tarafı zaten böyle çalışıyordu;
+tutarsızlık kendini ele veriyordu.)
+
+⚠️ **ADC körlemesine denenmiyor — CI'da ölçüldü.** İlk düzeltme "dosya yoksa
+her ortamda ADC'ye düş" diyordu. GCP dışında SDK metadata sunucusunu
+(`169.254.169.254`) yokluyor ve istek **hata vermiyor, asılıyor**: CI'da
+öğrenci panosunu yükleyen üç E2E testi 30 saniyelik zaman aşımına düştü.
+#335'in sözleşmesi hatanın **hemen** fırlatılıp çağıran tarafın mock'a
+düşmesi; yavaş bir başarısızlık graceful degradation'ı sessiz bir
+kilitlenmeye çevirir. Bu yüzden ADC yalnızca Cloud Run işareti varken
+deneniyor, yoksa hemen fırlatılıyor.
+
+⚠️ Sonucu: **Cloud Run dışında** (ör. GCE/GKE) anahtar dosyası olmadan Vertex
+çalışmaz. Bugünkü hedef Cloud Run; başka bir GCP hizmetine taşınırsa
+`cloudRunUzerindeMi()` genişletilmeli.
 
 Servis hesabına verilecek roller:
 
