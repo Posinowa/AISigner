@@ -1,11 +1,8 @@
 import { DogrulanmisRozet } from "@/features/auth/ui/DogrulanmisRozet";
-import { AvatarUpload } from "@/features/profile/ui/AvatarUpload";
 import { RoadmapSteps } from "@/features/student/ui/RoadmapSteps";
 import { revizyonGerekceleri } from "@/features/roadmap/server/revizyon";
-import { TakilmaBildirimiAyari } from "@/features/radar/ui/TakilmaBildirimiAyari";
 import { YaklasanGorusme } from "@/features/ofis-saati/ui/YaklasanGorusme";
 import { ogrencininGorebilecegiSlotlar } from "@/features/ofis-saati/server/ofis-saati";
-import { IdariBolum } from "@/features/dashboard/ui/IdariBolum";
 import { odaktakiAdimIndeksi } from "@/features/roadmap/odak";
 import { OdakKarti } from "@/features/roadmap/ui/OdakKarti";
 import { prisma } from "@/lib/db";
@@ -338,6 +335,7 @@ export default async function StudentDashboardPage() {
       <ProfilTamamlaSeridi
         emailVerified={session.user.emailVerified}
         fotografVar={fotografVar}
+        fotografCapasi="/student-dashboard/ayarlar#profil"
       />
 
       {/* #416: Bugünün odağı — karşılamanın hemen altında, çalışma alanının
@@ -353,41 +351,6 @@ export default async function StudentDashboardPage() {
           #398'deki "rezerve edilmiş görüşme zamana bağlı bilgidir, saklanırsa
           kaçırılır" kararı korunuyor. */}
       <YaklasanGorusme slot={yaklasanGorusme} />
-
-      {/* #415: Her gün kullanılmayan idari araçlar tek katlanır bölümde.
-          Ölçüldü: bu üç blok birlikte 1022px yer kaplıyordu ve çalışma
-          alanını 2.6 ekran aşağı itiyordu. */}
-      <IdariBolum
-        /* Özet, AŞAĞIDA RENDER EDİLENLERLE aynı koşullardan kuruluyor —
-           mezunda form yokken başlık onu duyurmasın. */
-        ozet={[
-          ...(isGraduated
-            ? []
-            : [
-                `Takılma bildirimi: ${profile.takilmaBildirimi ? "açık" : "kapalı"}`,
-              ]),
-          "Profil fotoğrafı",
-        ]}
-        /* Fotoğraf eksikse üstteki şeridin `#profil` bağlantısı buraya
-           geliyor — blok kapalıyken o bağlantı ölü kalıyordu. */
-        varsayilanAcik={!fotografVar}
-      >
-        {/* #397: Takılma bildirimi tercihi. Ayarın ADI ve DURUMU katlanmış
-            özette de yazıyor — opt-in'in fark edilmemesi bilinen bedeldi. */}
-        {!isGraduated && <TakilmaBildirimiAyari baslangic={profile.takilmaBildirimi} />}
-
-        {/* #290: Fotoğraf yönetimi. Üstteki şerit fotoğraf eksikken buraya
-            bağ veriyor — çapa korunuyor. */}
-        <section id="profil" className="scroll-mt-24">
-          <h3 className="mb-3 text-sm font-semibold text-slate-900">Profil fotoğrafı</h3>
-          <AvatarUpload
-            userId={session.user.id}
-            basHarfler={firstName.slice(0, 2).toUpperCase()}
-            fotografVar={fotografVar}
-            ad={session.user.name}
-          />
-        </section>
-      </IdariBolum>
 
       {/* #290: Karşılamadaki "Sırada" bağlantısının hedefi. */}
       <div id={PROJELER_CAPASI.slice(1)} className="scroll-mt-24">

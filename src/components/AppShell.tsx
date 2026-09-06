@@ -87,6 +87,8 @@ const navByRole: Record<Role, { home: string; links: NavLink[] }> = {
        */
       { href: "/student-dashboard/proposals", label: "Projemi Öner", mezunGizle: true },
       { href: "/student-dashboard/ofis-saati", label: "Mentör Görüşmesi" },
+      // #538: Ayarlar ve öneriler bölümü ana panodan üst gezinmeye taşındı.
+      { href: "/student-dashboard/ayarlar", label: "Ayarlar" },
     ],
   },
 };
