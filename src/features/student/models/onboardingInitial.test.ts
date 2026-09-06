@@ -11,10 +11,11 @@ describe("buildOnboardingDefaultValues (#115)", () => {
       lastName: "",
       birthYear: undefined,
       phoneNumber: "",
+      city: "",
     });
-    expect(d.experience).toEqual({ level: "", knownTech: "" });
+    expect(d.experience).toEqual({ level: "", gitLevel: "", knownTech: "" });
     expect(d.vision).toEqual({ interest: [], futureGoal: "" });
-    expect(d.workingStyle).toEqual({ learningStyle: "", availability: "" });
+    expect(d.workingStyle).toEqual({ learningStyle: "", weeklyHours: undefined });
   });
 
   it("yalnızca signup verisi (profil alanları yok) → personal dolu, gerisi boş", () => {
@@ -29,6 +30,9 @@ describe("buildOnboardingDefaultValues (#115)", () => {
     expect(d.personal.phoneNumber).toBe("05551234567");
     expect(d.experience.level).toBe("");
     expect(d.vision.interest).toEqual([]);
+    // #289: Saat alanı 0 ile DOLMAMALI — sayı girdisi boş görünmeli.
+    expect(d.workingStyle.weeklyHours).toBeUndefined();
+    expect(d.education.school).toBe("");
   });
 
   it("profil VAR → tüm alanlar prefill edilir; compiled goals round-trip bozulmaz", () => {
@@ -48,6 +52,14 @@ describe("buildOnboardingDefaultValues (#115)", () => {
       interests: ["AI", "Web Development"],
       goals: compiled,
       availability: "part-time",
+      // #289: Genişletilen sorular.
+      weeklyHours: 12,
+      city: "Samsun",
+      gitLevel: "branching",
+      school: "OMÜ",
+      department: "Bilgisayar Mühendisliği",
+      classYear: "3",
+      englishLevel: "reading",
     });
 
     expect(d.personal.birthYear).toBe(2002);
@@ -55,7 +67,12 @@ describe("buildOnboardingDefaultValues (#115)", () => {
     expect(d.vision.futureGoal).toBe("AI destekli web uygulaması geliştirmek");
     expect(d.workingStyle.learningStyle).toBe("Adım adım doküman okuyarak");
     expect(d.vision.interest).toEqual(["AI", "Web Development"]);
-    expect(d.workingStyle.availability).toBe("part-time");
+    // #289: Uygunluk kovaları yerine saat.
+    expect(d.workingStyle.weeklyHours).toBe(12);
+    expect(d.personal.city).toBe("Samsun");
+    expect(d.experience.gitLevel).toBe("branching");
+    expect(d.education.department).toBe("Bilgisayar Mühendisliği");
+    expect(d.education.englishLevel).toBe("reading");
   });
 
   it("experienceLevel DB→form eşlemesi sabittir (#89-2)", () => {

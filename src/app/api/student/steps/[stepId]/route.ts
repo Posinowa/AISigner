@@ -1,7 +1,14 @@
 import { NextResponse } from "next/server";
+import { mezunYazmaKapisi } from "@/lib/auth/mezun-politikasi";
 import { prisma } from "@/lib/db";
+import {
+  ATAMA_SAHIPLIK_SELECT,
+  ogrencisiMi,
+} from "@/features/teams/server/sahiplik";
 import { requireAuth } from "@/lib/auth/guard";
 import { updateStepStatusSchema } from "@/lib/validations/api";
+import { adimDurumunuDegistir } from "@/features/roadmap/server/step-status";
+import { rotaHatasi } from "@/lib/api-hata";
 
 /**
  * PATCH /api/student/steps/[stepId]
@@ -15,6 +22,10 @@ export async function PATCH(
 ) {
   const auth = await requireAuth("STUDENT");
   if (!auth.authorized) return auth.response;
+
+  // #208: Mezun stajyerler için portfolyo salt-okunurdur (Seçenek A).
+  const mezunKapisi = mezunYazmaKapisi(auth.session, "Mezun öğrenciler tamamlanan staj adımlarının durumunu değiştiremez.");
+  if (mezunKapisi) return mezunKapisi;
 
   const { stepId } = await params;
 
@@ -36,10 +47,9 @@ export async function PATCH(
       include: {
         roadmap: {
           include: {
+            // #332: Sahiplik bireysel VEYA takım; tek tanımdan gelir.
             assignedProject: {
-              include: {
-                studentProfile: true,
-              },
+              select: { id: true, status: true, ...ATAMA_SAHIPLIK_SELECT },
             },
             steps: {
               orderBy: { order: "asc" },
@@ -54,8 +64,8 @@ export async function PATCH(
     }
 
     // Bu adım bu öğrenciye mi ait?
-    const profile = step.roadmap.assignedProject.studentProfile;
-    if (profile.userId !== auth.session.user.id) {
+    // #332: Öğrenci = bireysel sahip ya da AKTİF takım üyesi.
+    if (!ogrencisiMi(step.roadmap.assignedProject, auth.session.user.id)) {
       return NextResponse.json(
         { error: "Bu adım size ait değil." },
         { status: 403 }
@@ -92,6 +102,21 @@ export async function PATCH(
       );
     }
 
+    /*
+     * #379: REVİZYON İSTENEN ADIM YENİDEN BAŞLATILABİLİR.
+     *
+     * Aksi halde mentörün "eksik, revize et" demesi adımı KİLİTLERDİ —
+     * öğrenci ne düzeltebilir ne tamamlayabilirdi. Doğrudan COMPLETED'a
+     * atlamak yine kapalı: TODO'daki kuralın aynısı, geçmiş (#324) "yeniden
+     * çalıştı" adımını göstersin.
+     */
+    if (step.status === "REVISION_REQUESTED" && newStatus === "COMPLETED") {
+      return NextResponse.json(
+        { error: "Revizyon istenen adımı doğrudan tamamlayamazsınız. Önce yeniden başlatın." },
+        { status: 400 }
+      );
+    }
+
     if (step.status === "TODO" && newStatus === "COMPLETED") {
       return NextResponse.json(
         { error: "Bir adımı doğrudan tamamlayamazsınız. Önce başlatın." },
@@ -99,10 +124,15 @@ export async function PATCH(
       );
     }
 
-    // Durumu güncelle
-    const updated = await prisma.roadmapStep.update({
-      where: { id: stepId },
-      data: { status: newStatus },
+    // Durumu güncelle + geçişi GEÇMİŞE yaz (#324).
+    //
+    // Doğrudan `prisma.roadmapStep.update` ÇAĞIRMAYIN: geçmişi sessizce atlar
+    // ve analitik verisi kalıcı olarak eksilir. İkisi tek transaction'da.
+    const updated = await adimDurumunuDegistir({
+      stepId,
+      yeniDurum: newStatus,
+      oncekiDurum: step.status,
+      degistirenId: auth.session.user.id ?? null,
     });
 
     // Tüm adımlar tamamlandıysa proje durumunu da güncelle
@@ -137,7 +167,7 @@ export async function PATCH(
 
     return NextResponse.json({ step: updated });
   } catch (error) {
-    console.error("PATCH /api/student/steps/[stepId] error:", error);
+    rotaHatasi("PATCH /api/student/steps/[stepId] error:", error);
     return NextResponse.json(
       { error: "Adım durumu güncellenirken bir hata oluştu." },
       { status: 500 }

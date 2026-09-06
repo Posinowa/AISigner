@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server";
+import { mezunYazmaKapisi } from "@/lib/auth/mezun-politikasi";
 import { prisma } from "@/lib/db";
+import {
+  ATAMA_SAHIPLIK_SELECT,
+  erisebilirMi,
+  ogrencisiMi,
+} from "@/features/teams/server/sahiplik";
 import { requireAuth } from "@/lib/auth/guard";
-import { isAssignedMentor } from "@/lib/auth/mentor-access";
 import { createStepCommentSchema } from "@/lib/validations/api";
 import { createRateLimiter } from "@/lib/rate-limit";
+import { rotaHatasi } from "@/lib/api-hata";
 
 const limiter = createRateLimiter("step-comments", {
   maxRequests: 20,
@@ -47,7 +53,7 @@ export async function GET(
 
     return NextResponse.json({ comments });
   } catch (error) {
-    console.error("GET /api/steps/[stepId]/comments error:", error);
+    rotaHatasi("GET /api/steps/[stepId]/comments error:", error);
     return NextResponse.json(
       { error: "Yorumlar yüklenirken hata oluştu." },
       { status: 500 }
@@ -70,7 +76,7 @@ export async function POST(
   const { stepId } = await params;
   const userId = auth.session.user.id!;
 
-  const rl = limiter.check(userId);
+  const rl = await limiter.check(userId);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Çok fazla yorum gönderdiniz. Lütfen biraz bekleyin." },
@@ -88,9 +94,13 @@ export async function POST(
       );
     }
 
+    // #208: Mezun stajyerler için portfolyo salt-okunurdur (Seçenek A).
+    const mezunKapisi = mezunYazmaKapisi(auth.session, "Mezun öğrenciler staj adımlarına yorum ekleyemez.");
+    if (mezunKapisi) return mezunKapisi;
+
     // #52: Öğrenci yalnızca PUBLISHED roadmap adımına yorum ekleyebilir.
     // Mentor, taslağı (DRAFT) düzenleme/inceleme için yorum yapabilir.
-    const isStudent = step.roadmap.assignedProject.studentProfile.userId === userId;
+    const isStudent = ogrencisiMi(step.roadmap.assignedProject, userId);
     if (isStudent && step.roadmap.status !== "PUBLISHED") {
       return NextResponse.json(
         { error: "Bu yol haritası henüz yayınlanmadı. Yayınlandığında etkileşim kurabilirsiniz." },
@@ -122,7 +132,7 @@ export async function POST(
 
     return NextResponse.json({ comment }, { status: 201 });
   } catch (error) {
-    console.error("POST /api/steps/[stepId]/comments error:", error);
+    rotaHatasi("POST /api/steps/[stepId]/comments error:", error);
     return NextResponse.json(
       { error: "Yorum eklenirken hata oluştu." },
       { status: 500 }
@@ -141,13 +151,8 @@ async function getStepWithAccess(stepId: string, userId: string) {
     include: {
       roadmap: {
         include: {
-          assignedProject: {
-            include: {
-              studentProfile: {
-                include: { mentorAssignments: { select: { mentorId: true } } },
-              },
-            },
-          },
+          // #332: Sahiplik bireysel VEYA takım olabilir; tek tanımdan gelir.
+          assignedProject: { select: ATAMA_SAHIPLIK_SELECT },
         },
       },
     },
@@ -155,13 +160,9 @@ async function getStepWithAccess(stepId: string, userId: string) {
 
   if (!step) return null;
 
-  const profile = step.roadmap.assignedProject.studentProfile;
-
-  // Öğrenci kendi adımına erişebilir
-  if (profile.userId === userId) return step;
-
-  // #195: M:N — mentor, atanmış öğrencisinin adımına erişebilir (mentorlardan biri mi?)
-  if (isAssignedMentor(profile.mentorAssignments, userId)) return step;
+  // #332: Öğrenci = bireysel sahip ya da AKTİF takım üyesi.
+  // Mentör = öğrencinin kendi mentörü (#195) ya da takımın mentörü.
+  if (erisebilirMi(step.roadmap.assignedProject, userId)) return step;
 
   return null;
 }

@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { mezunYazmaKapisi } from "@/lib/auth/mezun-politikasi";
+import { guvenliMetin, guvenliListe, veriBlogu } from "@/lib/ai/prompt";
 import { requireAuth } from "@/lib/auth/guard";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { getTextModel } from "@/lib/ai/gemini-client";
@@ -6,6 +8,7 @@ import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { incrementCounter } from "@/lib/metrics";
 import { experienceLevelLabel } from "@/lib/experience-level";
+import { aiRizasiVar } from "@/features/kvkk/riza";
 
 const limiter = createRateLimiter("ai-chat", {
   maxRequests: 20,
@@ -39,9 +42,31 @@ export async function POST(req: Request) {
   const auth = await requireAuth("STUDENT");
   if (!auth.authorized) return auth.response;
 
+  // #208 review (bilinçli karar): Mezun portfolyosu SALT-OKUNUR olduğu için AI chat
+  // mezunlara kapalıdır. Gerekçe: her mesaj bir Gemini çağrısı (maliyet) ve chat aktif
+  // staj sürecine bağlı bir öğrenme aracı. Mezun geçmiş sohbetlerini görmeye devam eder.
+  // (Öneri/istek uçları bilinçli olarak AÇIK bırakıldı — bkz. CLAUDE.md #208.)
+  const mezunKapisi = mezunYazmaKapisi(auth.session, "Staj süreciniz tamamlandığı için AI asistanı kullanıma kapalıdır.");
+  if (mezunKapisi) return mezunKapisi;
+
   const userId = auth.session.user.id!;
 
-  const rl = limiter.check(userId);
+  // #321: KVKK açık rıza. Mesajlar Vertex AI'ya (ABD) gidiyor; rıza yoksa
+  // veri YURT DIŞINA ÇIKARILMAZ. Mock'a düşmüyoruz — kullanıcı neden
+  // çalışmadığını ve nasıl açacağını bilmeli.
+  if (!(await aiRizasiVar(userId))) {
+    return NextResponse.json(
+      {
+        error:
+          "Yapay zekâ asistanını kullanabilmek için profilinizden yapay zekâ " +
+          "işleme onayını vermeniz gerekiyor.",
+        rizaGerekli: true,
+      },
+      { status: 403 },
+    );
+  }
+
+  const rl = await limiter.check(userId);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Çok fazla mesaj gönderdiniz. Lütfen biraz bekleyin." },
@@ -70,20 +95,40 @@ export async function POST(req: Request) {
       );
     }
 
-    // Öğrenci bağlamını al (profil, projeler, roadmap)
+    /*
+     * Öğrenci bağlamını al (profil, projeler, roadmap).
+     *
+     * ⚠️ #376: PROJELER İKİ YOLDAN GELİR. Takım atamasında
+     * `AssignedProject.studentProfileId` NULL, sahiplik `teamId` üzerinde
+     * (#332). Yalnız `assignedProjects` çekilen sürümde takım projesindeki
+     * stajyer Posilog'a sorduğunda, Posilog HİÇ projesi ve yol haritası
+     * yokmuş gibi cevap veriyordu. Öğrenci panosunda #367 ile çözülen ayrım
+     * bu uca yansıtılmamıştı.
+     */
+    const ATAMA_ICERIK = {
+      include: {
+        projectTemplate: { select: { title: true, track: true, difficulty: true } },
+        roadmap: {
+          include: {
+            steps: {
+              orderBy: { order: "asc" as const },
+              select: { title: true, status: true, order: true },
+            },
+          },
+        },
+      },
+    };
+
     const profile = await prisma.studentProfile.findUnique({
       where: { userId },
       include: {
-        assignedProjects: {
-          include: {
-            projectTemplate: { select: { title: true, track: true, difficulty: true } },
-            roadmap: {
-              include: {
-                steps: {
-                  orderBy: { order: "asc" },
-                  select: { title: true, status: true, order: true },
-                },
-              },
+        assignedProjects: ATAMA_ICERIK,
+        // Ayrılmış üyelik sayılmaz: adım artık onun işi değil.
+        teamMemberships: {
+          where: { leftAt: null },
+          select: {
+            team: {
+              select: { name: true, assignedProjects: ATAMA_ICERIK },
             },
           },
         },
@@ -95,13 +140,32 @@ export async function POST(req: Request) {
     if (profile) {
       context += `\n\nÖğrenci Bilgileri:`;
       context += `\n- Deneyim Seviyesi: ${experienceLevelLabel(profile.experienceLevel)}`;
-      context += `\n- İlgi Alanları: ${profile.interests.join(", ")}`;
-      if (profile.goals) context += `\n- Hedefler: ${profile.goals}`;
+      // #390: Serbest metin ayraçlı bloğa sarılıyor — stajyer `goals`
+      // alanına talimat yazarak Posilog'u yönlendirebilirdi.
+      context += `\n${veriBlogu("- İlgi Alanları", guvenliListe(profile.interests))}`;
+      if (profile.goals) {
+        context += `\n${veriBlogu("- Hedefler", guvenliMetin(profile.goals))}`;
+      }
 
-      if (profile.assignedProjects.length > 0) {
+      /*
+       * #376: Bireysel + takim atamalari TEK listede.
+       *
+       * Takim adi bilerek yaziliyor: ortak panoda "su anki adim" baskasinin
+       * ustlendigi is olabilir (#332). Model bunu bireysel bir gorev gibi
+       * sunarsa ogrenciyi yanlis yonlendirir.
+       */
+      const projeler = [
+        ...profile.assignedProjects.map((atama) => ({ atama, takim: null as string | null })),
+        ...profile.teamMemberships.flatMap((uyelik) =>
+          uyelik.team.assignedProjects.map((atama) => ({ atama, takim: uyelik.team.name })),
+        ),
+      ];
+
+      if (projeler.length > 0) {
         context += `\n\nAktif Projeler:`;
-        profile.assignedProjects.forEach((ap) => {
-          context += `\n- ${ap.projectTemplate.title} (${ap.projectTemplate.difficulty}, ${ap.projectTemplate.track.join(", ")})`;
+        projeler.forEach(({ atama: ap, takim }) => {
+          context += `\n- ${guvenliMetin(ap.projectTemplate.title, 200)} (${ap.projectTemplate.difficulty}, ${guvenliListe(ap.projectTemplate.track)})`;
+          if (takim) context += ` [takım projesi: ${takim}]`;
           if (ap.roadmap?.steps) {
             const currentStep = ap.roadmap.steps.find(
               (s) => s.status === "IN_PROGRESS"
@@ -111,7 +175,7 @@ export async function POST(req: Request) {
             ).length;
             context += ` - ${completedCount}/${ap.roadmap.steps.length} adım tamamlandı`;
             if (currentStep) {
-              context += `, Şu anki adım: "${currentStep.title}"`;
+              context += `, Şu anki adım: "${guvenliMetin(currentStep.title, 200)}"`;
             }
           }
         });
@@ -157,8 +221,7 @@ export async function POST(req: Request) {
     });
 
     const result = await chat.sendMessage(message.trim());
-    const response = result.response;
-    const text = response.candidates?.[0]?.content?.parts?.[0]?.text || "Bunu tam çözemedim. Sorunu biraz daha somutlaştırır mısın — hangi adımda, tam olarak nerede takıldın?";
+    const text = result.text || "Bunu tam çözemedim. Sorunu biraz daha somutlaştırır mısın — hangi adımda, tam olarak nerede takıldın?";
 
     return NextResponse.json({ reply: text });
   } catch (error) {

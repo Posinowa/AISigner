@@ -9,6 +9,7 @@ import {
   listSuggestionsQuerySchema,
 } from "@/lib/validations/api";
 import { createRateLimiter } from "@/lib/rate-limit";
+import { rotaHatasi } from "@/lib/api-hata";
 
 // #163 (P1): Kimliği doğrulanmış öğrenci sınırsız öneri gönderip yönetici gelen
 // kutusunu spam'leyebiliyordu. ai-chat/forgot-password ile aynı desen.
@@ -42,7 +43,7 @@ export async function GET(req: Request) {
     const page = await listOwnSuggestions(auth.session.user.id!, parsedQuery.data);
     return NextResponse.json(page);
   } catch (error) {
-    console.error("GET /api/suggestions error:", error);
+    rotaHatasi("GET /api/suggestions error:", error);
     return NextResponse.json(
       { error: "Öneriler yüklenirken hata oluştu." },
       { status: 500 },
@@ -60,7 +61,7 @@ export async function POST(req: Request) {
   if (!auth.authorized) return auth.response;
 
   // #163 (P1): Kötüye kullanım/spam koruması — kullanıcı bazlı.
-  const rl = createLimiter.check(auth.session.user.id!);
+  const rl = await createLimiter.check(auth.session.user.id!);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Çok fazla öneri gönderdiniz. Lütfen bir süre sonra tekrar deneyin." },
@@ -84,7 +85,7 @@ export async function POST(req: Request) {
     });
     return NextResponse.json(created, { status: 201 });
   } catch (error) {
-    console.error("POST /api/suggestions error:", error);
+    rotaHatasi("POST /api/suggestions error:", error);
     return NextResponse.json(
       { error: "Öneri gönderilirken hata oluştu." },
       { status: 500 },

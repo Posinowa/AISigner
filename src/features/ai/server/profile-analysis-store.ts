@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { sinirla, ALAN_SINIRI } from "@/lib/ai/truncate";
 import { logger } from "@/lib/logger";
 import {
   analyzeStudentProfile,
@@ -30,22 +31,34 @@ export async function generateAndPersistProfileAnalysis(
     where: { studentProfileId },
     update: {
       level: result.level,
-      summary: result.summary,
+      summary: sinirla(result.summary ?? "", ALAN_SINIRI.analizMetni),
       strengths: result.strengths,
       developmentAreas: result.developmentAreas,
       technicalTracks: result.tracks,
-      recommendedPath: result.recommendedPath,
+      recommendedPath: sinirla(result.recommendedPath ?? "", ALAN_SINIRI.analizMetni),
       recommendations: result.recommendations,
+      // #494: Köken. Yedek (mock) çıktı YEDEK diye işaretlenir (#501),
+      // gerçek AI diye kaydedilmemeli; kayıt kalıcı ve sonradan ayırt
+      // edilemez olurdu. `?? null` yalnızca kökeni HİÇ olmayan (elle
+      // kurulmuş) sonuçlar için: onlar gerçekten "bilinmiyor".
+      uretimSurumu: result?.koken?.uretimSurumu ?? null,
+      uretimModeli: result?.koken?.uretimModeli ?? null,
     },
     create: {
       studentProfileId,
       level: result.level,
-      summary: result.summary,
+      summary: sinirla(result.summary ?? "", ALAN_SINIRI.analizMetni),
       strengths: result.strengths,
       developmentAreas: result.developmentAreas,
       technicalTracks: result.tracks,
-      recommendedPath: result.recommendedPath,
+      recommendedPath: sinirla(result.recommendedPath ?? "", ALAN_SINIRI.analizMetni),
       recommendations: result.recommendations,
+      // #494: Köken. Yedek (mock) çıktı YEDEK diye işaretlenir (#501),
+      // gerçek AI diye kaydedilmemeli; kayıt kalıcı ve sonradan ayırt
+      // edilemez olurdu. `?? null` yalnızca kökeni HİÇ olmayan (elle
+      // kurulmuş) sonuçlar için: onlar gerçekten "bilinmiyor".
+      uretimSurumu: result?.koken?.uretimSurumu ?? null,
+      uretimModeli: result?.koken?.uretimModeli ?? null,
     },
   });
 

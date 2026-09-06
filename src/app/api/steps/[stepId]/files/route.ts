@@ -1,12 +1,20 @@
 import { NextResponse } from "next/server";
+import { mezunYazmaKapisi } from "@/lib/auth/mezun-politikasi";
 import { prisma } from "@/lib/db";
+import {
+  ATAMA_SAHIPLIK_SELECT,
+  erisebilirMi,
+  ogrencisiMi,
+} from "@/features/teams/server/sahiplik";
 import { requireAuth } from "@/lib/auth/guard";
-import { isAssignedMentor } from "@/lib/auth/mentor-access";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { matchesExtensionSignature } from "@/lib/file-signature";
-import { saveStepFile } from "@/lib/storage/step-files";
+import { saveStepFile, deleteStepFile } from "@/lib/storage/step-files";
+import { logger } from "@/lib/logger";
+import { incrementCounter } from "@/lib/metrics";
 import path from "path";
 import crypto from "crypto";
+import { rotaHatasi } from "@/lib/api-hata";
 
 const limiter = createRateLimiter("file-upload", {
   maxRequests: 10,
@@ -82,7 +90,7 @@ export async function GET(
 
     return NextResponse.json({ files });
   } catch (error) {
-    console.error("GET /api/steps/[stepId]/files error:", error);
+    rotaHatasi("GET /api/steps/[stepId]/files error:", error);
     return NextResponse.json(
       { error: "Dosyalar yüklenirken hata oluştu." },
       { status: 500 }
@@ -104,7 +112,7 @@ export async function POST(
   const { stepId } = await params;
   const userId = auth.session.user.id!;
 
-  const rl = limiter.check(userId);
+  const rl = await limiter.check(userId);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Çok fazla dosya yükleme denemesi. Lütfen biraz bekleyin." },
@@ -122,9 +130,13 @@ export async function POST(
       );
     }
 
+    // #208: Mezun stajyerler için portfolyo salt-okunurdur (Seçenek A).
+    const mezunKapisi = mezunYazmaKapisi(auth.session, "Mezun öğrenciler staj adımlarına dosya yükleyemez.");
+    if (mezunKapisi) return mezunKapisi;
+
     // #52: Öğrenci yalnızca PUBLISHED roadmap adımına dosya yükleyebilir.
     // Mentor, taslağı (DRAFT) inceleme/düzenleme için yükleyebilir.
-    const isStudent = step.roadmap.assignedProject.studentProfile.userId === userId;
+    const isStudent = ogrencisiMi(step.roadmap.assignedProject, userId);
     if (isStudent && step.roadmap.status !== "PUBLISHED") {
       return NextResponse.json(
         { error: "Bu yol haritası henüz yayınlanmadı. Yayınlandığında etkileşim kurabilirsiniz." },
@@ -198,26 +210,45 @@ export async function POST(
     // #197: GCS veya yerel diske yaz (backend env'e göre seçilir).
     await saveStepFile(storedName, buffer, mimeType);
 
-    // Veritabanına kaydet
-    const stepFile = await prisma.stepFile.create({
-      data: {
-        stepId,
-        uploaderId: userId,
-        fileName: file.name.slice(0, 255), // Max 255 karakter
-        storedName,
-        mimeType,
-        fileSize: file.size,
-      },
-      include: {
-        uploader: {
-          select: { id: true, name: true, lastName: true, role: true },
+    let stepFile;
+    try {
+      // Veritabanına kaydet
+      stepFile = await prisma.stepFile.create({
+        data: {
+          stepId,
+          uploaderId: userId,
+          fileName: file.name.slice(0, 255), // Max 255 karakter
+          storedName,
+          mimeType,
+          fileSize: file.size,
         },
-      },
-    });
+        include: {
+          uploader: {
+            select: { id: true, name: true, lastName: true, role: true },
+          },
+        },
+      });
+    } catch (dbError) {
+      // #201: DB insert başarısız olursa storage'daki dosyayı temizle (orphan compensation).
+      try {
+        await deleteStepFile(storedName);
+        incrementCounter("storage.orphan_cleanup.success");
+      } catch (delErr) {
+        // Temizlik de başarısız → dosya storage'da öksüz kalır; operasyonel takip için
+        // logger + metrik (sessiz console.error yerine).
+        incrementCounter("storage.orphan_cleanup.failure");
+        logger.error("Öksüz adım dosyası temizlenemedi (upload rollback)", {
+          storedName,
+          stepId,
+          err: delErr,
+        });
+      }
+      throw dbError;
+    }
 
     return NextResponse.json({ file: stepFile }, { status: 201 });
   } catch (error) {
-    console.error("POST /api/steps/[stepId]/files error:", error);
+    rotaHatasi("POST /api/steps/[stepId]/files error:", error);
     return NextResponse.json(
       { error: "Dosya yüklenirken hata oluştu." },
       { status: 500 }
@@ -234,13 +265,8 @@ async function getStepWithAccess(stepId: string, userId: string) {
     include: {
       roadmap: {
         include: {
-          assignedProject: {
-            include: {
-              studentProfile: {
-                include: { mentorAssignments: { select: { mentorId: true } } },
-              },
-            },
-          },
+          // #332: Sahiplik bireysel VEYA takım olabilir; tek tanımdan gelir.
+          assignedProject: { select: ATAMA_SAHIPLIK_SELECT },
         },
       },
     },
@@ -248,10 +274,7 @@ async function getStepWithAccess(stepId: string, userId: string) {
 
   if (!step) return null;
 
-  const profile = step.roadmap.assignedProject.studentProfile;
-  if (profile.userId === userId) return step;
-  // #195: M:N — öğrencinin mentorlarından biri mi?
-  if (isAssignedMentor(profile.mentorAssignments, userId)) return step;
-
-  return null;
+  // #332: Öğrenci = bireysel sahip ya da AKTİF takım üyesi.
+  // Mentör = öğrencinin kendi mentörü (#195) ya da takımın mentörü.
+  return erisebilirMi(step.roadmap.assignedProject, userId) ? step : null;
 }

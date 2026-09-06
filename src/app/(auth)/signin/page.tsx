@@ -4,13 +4,14 @@
 import { Suspense, useState } from "react"
 import { validateUser } from "./actions"
 import { signIn } from "next-auth/react"
-import { LogIn } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { AuthCard } from "@/features/auth/ui/AuthCard"
 import { AuthField } from "@/features/auth/ui/AuthField"
 import { FormAlert } from "@/features/auth/ui/FormAlert"
 import { AuthSubmitButton } from "@/features/auth/ui/AuthSubmitButton"
+import { dogrulamaMesaji } from "@/features/auth/ui/dogrulama-mesaji"
+import { GecisPerdesi } from "@/features/brand/ui/GecisPerdesi"
 
 const initialState = { error: {} as Record<string, string[]> }
 
@@ -18,8 +19,12 @@ const initialState = { error: {} as Record<string, string[]> }
 function SigninForm() {
   const [state, setState] = useState(initialState)
   const [isPending, setIsPending] = useState(false)
+  // #285: Sert yönlendirme boyunca form ekranda kalıyordu; perde o boşluğu doldurur.
+  const [gecisteMi, setGecisteMi] = useState(false)
   const searchParams = useSearchParams()
   const justRegistered = searchParams.get("registered") === "true"
+  // #247: e-postadaki doğrulama bağlantısı kullanıcıyı buraya döndürür.
+  const dogrulama = dogrulamaMesaji(searchParams.get("dogrulama"))
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -51,7 +56,16 @@ function SigninForm() {
         // Yönlendirme kararı tek yerde — "/" route'unda (sunucu) — toplanıyor.
         // Hard navigation cookie'nin server'a temiz gitmesini garanti eder; böylece
         // client tarafında getSession retry hack'ine (yavaş ağda kırılgan) gerek kalmaz.
-        window.location.href = "/"
+        setGecisteMi(true)
+        // #538: Marka çizim animasyonunun (~1.3s) tamamlanması için bekleme süresi tanınır.
+        // Hareketi azalt (prefers-reduced-motion) aktifse beklemeden hemen yönlendirilir.
+        const hareketiAzalt =
+          typeof window !== "undefined" &&
+          window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+        const bekleme = hareketiAzalt ? 50 : 1300
+        setTimeout(() => {
+          window.location.href = "/"
+        }, bekleme)
         return
       }
     } catch (err: unknown) {
@@ -64,19 +78,28 @@ function SigninForm() {
     }
   }
 
+  if (gecisteMi) {
+    return <GecisPerdesi />
+  }
+
   return (
     <AuthCard
-      icon={LogIn}
       title={justRegistered ? "Hoş Geldiniz!" : "Tekrar Hoşgeldiniz"}
       subtitle={
         <>
           Hesabınız yok mu?{" "}
-          <Link href="/signup" className="font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:underline">
+          <Link href="/signup" className="font-semibold text-primary hover:text-primary/80 hover:underline">
             Kayıt olun
           </Link>
         </>
       }
     >
+      {dogrulama && (
+        <FormAlert variant={dogrulama.variant} title={dogrulama.title}>
+          {dogrulama.body}
+        </FormAlert>
+      )}
+
       {justRegistered && (
         <FormAlert variant="success" title="Hesabınız başarıyla oluşturuldu!">
           Şimdi e-posta ve şifrenizle giriş yapabilirsiniz.
@@ -108,7 +131,7 @@ function SigninForm() {
             <div className="mt-1.5 text-right">
               <Link
                 href="/forgot-password"
-                className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 hover:underline"
+                className="text-xs font-medium text-primary hover:text-primary/80 hover:underline"
               >
                 Şifremi Unuttum
               </Link>

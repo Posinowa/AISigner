@@ -99,34 +99,34 @@ export function ConfirmDialogProvider({ children }: { children: React.ReactNode 
             role="alertdialog"
             aria-modal="true"
             aria-labelledby="confirm-title"
-            className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-md overflow-hidden"
+            className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6">
               <div className="flex items-start gap-3">
                 {pending.options.danger && (
-                  <div className="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-950/40 flex items-center justify-center shrink-0">
-                    <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                  <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
+                    <AlertTriangle className="w-5 h-5 text-red-600" />
                   </div>
                 )}
                 <div className="min-w-0">
-                  <h2 id="confirm-title" className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  <h2 id="confirm-title" className="text-lg font-semibold text-slate-900">
                     {pending.options.title}
                   </h2>
                   {pending.options.description && (
-                    <p className="mt-1.5 text-sm text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-line">
+                    <p className="mt-1.5 text-sm text-slate-600 leading-relaxed whitespace-pre-line">
                       {pending.options.description}
                     </p>
                   )}
                 </div>
               </div>
             </div>
-            <div className="flex items-center justify-end gap-2 px-6 py-4 bg-slate-50 dark:bg-slate-950 border-t border-slate-100 dark:border-slate-800">
+            <div className="flex items-center justify-end gap-2 px-6 py-4 bg-slate-50 border-t border-slate-100">
               <button
                 ref={cancelBtnRef}
                 type="button"
                 onClick={() => close(false)}
-                className="px-4 py-2 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                className="px-4 py-2 rounded-xl text-sm font-medium text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 transition-colors"
               >
                 {pending.options.cancelLabel ?? "İptal"}
               </button>
@@ -137,7 +137,7 @@ export function ConfirmDialogProvider({ children }: { children: React.ReactNode 
                 className={`px-4 py-2 rounded-xl text-sm font-semibold text-white transition-colors ${
                   pending.options.danger
                     ? "bg-red-600 hover:bg-red-700"
-                    : "bg-blue-600 hover:bg-blue-700"
+                    : "bg-primary hover:bg-primary/90"
                 }`}
               >
                 {pending.options.confirmLabel ?? "Onayla"}

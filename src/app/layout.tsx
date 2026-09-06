@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { uygulamaUrl } from "@/lib/app-url";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { DebugNavbar } from "@/components/DebugNavbar"
@@ -16,9 +17,55 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const baseUrl = uygulamaUrl();
+
 export const metadata: Metadata = {
-  title: "AISigner - AI Destekli Stajyer Mentorluk Platformu",
-  description: "Stajyer ve öğrencilerin AI destekli profil analizi, mentor eşleştirmesi ve kişiselleştirilmiş öğrenme yol haritası ile gelişimini destekleyen açık kaynak platform.",
+  metadataBase: new URL(baseUrl),
+  title: {
+    default: "AISigner - AI Destekli Stajyer ve Mentörlük Platformu",
+    template: "%s | AISigner",
+  },
+  description:
+    "Stajyer ve öğrencilerin AI destekli profil analizi, mentör eşleştirmesi ve kişiselleştirilmiş öğrenme yol haritası ile gelişimini destekleyen açık kaynak platform.",
+  keywords: [
+    "AISigner",
+    "staj",
+    "stajyer",
+    "mentörlük",
+    "yapay zeka",
+    "yol haritası",
+    "yazılım stajı",
+    "kariyer gelişimi",
+  ],
+  authors: [{ name: "Posinowa Akademi", url: baseUrl }],
+  creator: "Posinowa",
+  publisher: "Posinowa",
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+    },
+  },
+  openGraph: {
+    type: "website",
+    locale: "tr_TR",
+    url: baseUrl,
+    title: "AISigner - AI Destekli Stajyer ve Mentörlük Platformu",
+    description:
+      "Stajyer ve öğrencilerin AI destekli profil analizi, mentör eşleştirmesi ve kişiselleştirilmiş öğrenme yol haritası platformu.",
+    siteName: "AISigner",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "AISigner - AI Destekli Stajyer ve Mentörlük Platformu",
+    description:
+      "Stajyer ve öğrencilerin AI destekli profil analizi, mentör eşleştirmesi ve kişiselleştirilmiş öğrenme yol haritası platformu.",
+  },
+  // icons: Next.js `src/app/favicon.ico` dosyasını otomatik algılayıp link
+  // etiketini kendisi basar. Burada ayrıca tanımlamak ikinci ve sürümsüz bir
+  // <link> üretiyordu; kaldırıldı.
 };
 
 export default function RootLayout({
@@ -27,19 +74,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="tr" suppressHydrationWarning>
-      <head>
-        {/*
-          #dark: Flash önleme. Sayfa boyanmadan ÖNCE tema sınıfını uygular;
-          aksi halde koyu tema seçili kullanıcı bir an beyaz ekran görür.
-          localStorage boşsa sistem tercihine düşer.
-        */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark');}}catch(e){}})();`,
-          }}
-        />
-      </head>
+    <html lang="tr">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >

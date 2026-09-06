@@ -5,17 +5,26 @@ const { requireAuthMock, prismaMock } = vi.hoisted(() => ({
   prismaMock: {
     roadmapStep: { findUnique: vi.fn(), update: vi.fn(), findMany: vi.fn() },
     assignedProject: { update: vi.fn() },
+    // #324: durum degisikligi + gecmis kaydi tek transaction'da.
+    stepStatusHistory: { create: vi.fn() },
+    $transaction: vi.fn(),
   },
 }));
 vi.mock("@/lib/auth/guard", () => ({
   requireAuth: (...a: unknown[]) => requireAuthMock(...a),
 }));
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
+// #324: Durum degisikligi artik gecmis kaydiyla birlikte yapiliyor.
+// `server-only` bu depoda test ortaminda mock'lanir (yerlesik desen).
+vi.mock("server-only", () => ({}));
 
 import { PATCH } from "./route";
 
-function student(id: string) {
-  requireAuthMock.mockResolvedValue({ authorized: true, session: { user: { id, role: "STUDENT" } } });
+function student(id: string, accountStatus = "APPROVED") {
+  requireAuthMock.mockResolvedValue({
+    authorized: true,
+    session: { user: { id, role: "STUDENT", accountStatus } },
+  });
 }
 const params = (stepId = "s-1") => Promise.resolve({ stepId });
 function req(body: unknown) {
@@ -61,6 +70,8 @@ describe("student steps PATCH — IDOR + kurallar (#184)", () => {
     prismaMock.roadmapStep.update.mockResolvedValue({ id: "s-1", status: "IN_PROGRESS" });
     prismaMock.roadmapStep.findMany.mockResolvedValue([]);
     prismaMock.assignedProject.update.mockResolvedValue({});
+    // #324: transaction, [guncellenmis adim, gecmis kaydi] doner.
+    prismaMock.$transaction.mockResolvedValue([{ id: "s-1", status: "IN_PROGRESS" }, {}]);
   });
 
   it("STUDENT değil (guard) → 403, DB'ye gidilmez", async () => {
@@ -126,6 +137,29 @@ describe("student steps PATCH — IDOR + kurallar (#184)", () => {
     });
   });
 
+  // #324 REGRESYON: durum degisikligi GECMISE de yazilmali. Dogrudan
+  // `prisma.roadmapStep.update` cagirmak gecmisi sessizce atlar ve analitik
+  // verisi kalici olarak eksilir — bugun kaydedilmeyen gecis geri gelmez.
+  it("durum degisikligi GECMISE kaydedilir (kim, nereden, nereye)", async () => {
+    student("student-1");
+    prismaMock.roadmapStep.findUnique.mockResolvedValue(stepGraph({ ownerUserId: "student-1" }));
+
+    await PATCH(req({ status: "IN_PROGRESS" }), { params: params() });
+
+    expect(prismaMock.stepStatusHistory.create).toHaveBeenCalledWith({
+      data: {
+        stepId: "s-1",
+        fromStatus: "TODO",
+        toStatus: "IN_PROGRESS",
+        // #379: Gerekçe alanı — öğrenci geçişlerinde boş.
+        note: null,
+        changedById: "student-1",
+      },
+    });
+    // Ikisi tek transaction'da: biri yazilip digeri yazilmamali.
+    expect(prismaMock.$transaction).toHaveBeenCalledOnce();
+  });
+
   it("TODO adımı doğrudan COMPLETED yapmak → 400", async () => {
     student("student-1");
     prismaMock.roadmapStep.findUnique.mockResolvedValue(
@@ -140,6 +174,66 @@ describe("student steps PATCH — IDOR + kurallar (#184)", () => {
     prismaMock.roadmapStep.findUnique.mockResolvedValue(
       stepGraph({ ownerUserId: "student-1", targetStatus: "COMPLETED" }),
     );
+    const res = await PATCH(req({ status: "IN_PROGRESS" }), { params: params() });
+    expect(res.status).toBe(400);
+  });
+
+  it("GRADUATED öğrenci adım durumunu değiştiremez → 403 (#208)", async () => {
+    student("student-1", "GRADUATED");
+    const res = await PATCH(req({ status: "IN_PROGRESS" }), { params: params() });
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toContain("Mezun öğrenciler");
+    expect(prismaMock.roadmapStep.findUnique).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * #379 — REVİZYON İSTENEN ADIM.
+ *
+ * Mentör "eksik, revize et" dediğinde adım KİLİTLENMEMELİ: öğrenci yeniden
+ * başlatıp düzeltebilmeli. Ama doğrudan COMPLETED'a atlamak kapalı —
+ * TODO'daki kuralın aynısı, geçmiş (#324) "yeniden çalıştı" adımını göstersin.
+ */
+describe("revizyon istenen adım (#379)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    requireAuthMock.mockResolvedValue({
+      authorized: true,
+      session: { user: { id: "student-1", role: "STUDENT" } },
+    });
+    prismaMock.roadmapStep.findMany.mockResolvedValue([]);
+    prismaMock.assignedProject.update.mockResolvedValue({});
+    prismaMock.$transaction.mockResolvedValue([{ id: "s-1", status: "IN_PROGRESS" }, {}]);
+  });
+
+  it("yeniden BAŞLATILABİLİR", async () => {
+    prismaMock.roadmapStep.findUnique.mockResolvedValue(
+      stepGraph({ ownerUserId: "student-1", targetStatus: "REVISION_REQUESTED" }),
+    );
+
+    const res = await PATCH(req({ status: "IN_PROGRESS" }), { params: params() });
+
+    expect(res.status).toBe(200);
+  });
+
+  it("DOĞRUDAN tamamlanamaz", async () => {
+    prismaMock.roadmapStep.findUnique.mockResolvedValue(
+      stepGraph({ ownerUserId: "student-1", targetStatus: "REVISION_REQUESTED" }),
+    );
+
+    const res = await PATCH(req({ status: "COMPLETED" }), { params: params() });
+
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain("yeniden başlatın");
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("TAMAMLANMIŞ adım hâlâ değiştirilemez — revizyon yolu mentörden geçer", async () => {
+    prismaMock.roadmapStep.findUnique.mockResolvedValue(
+      stepGraph({ ownerUserId: "student-1", targetStatus: "COMPLETED" }),
+    );
+
     const res = await PATCH(req({ status: "IN_PROGRESS" }), { params: params() });
     expect(res.status).toBe(400);
   });

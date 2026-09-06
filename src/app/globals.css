@@ -1,10 +1,5 @@
 @import "tailwindcss";
 
-/*
-  #dark: Sınıf tabanlı karanlık mod. `.dark` kökte olduğunda `dark:` varyantları
-  aktifleşir (sistem `prefers-color-scheme` değil; kullanıcı toggle'ı esas alınır).
-*/
-@custom-variant dark (&:where(.dark, .dark *));
 
 /*
   Tasarım tokenları (Tailwind v4 @theme).
@@ -20,7 +15,9 @@
   --color-popover: #ffffff;
   --color-popover-foreground: #090d16;
 
-  --color-primary: #4338ca;           /* Refined Indigo-700 / Indigo-600 */
+  /* #237: Marka rengi AISigner logosundan geliyor (lacivert). Acilis sayfasi
+     ile panel arasindaki renk dikisini kapatir. */
+  --color-primary: #23356c;           /* logo laciverti — beyaz yazi ile 11.68 */
   --color-primary-foreground: #ffffff;
 
   --color-secondary: #f1f5f9;         /* slate-100 */
@@ -29,53 +26,24 @@
   --color-muted: #f8fafc;             /* slate-50 */
   --color-muted-foreground: #64748b;  /* slate-500 */
 
-  --color-accent: #ecfdf5;            /* emerald-50 accent */
-  --color-accent-foreground: #047857; /* emerald-700 */
+  /* #237: Hover tonu emerald'den lacivert tintine cevrildi. Emerald "basari"
+     anlamini tasiyor; genel hover rengi olarak kullanilmasi yanilticiydi. */
+  --color-accent: #eef1f7;            /* lacivert tinti — uzerinde lacivert yazi 10.33 */
+  --color-accent-foreground: #23356c;
 
   --color-destructive: #dc2626;       /* red-600 */
   --color-destructive-foreground: #ffffff;
 
   --color-border: #e2e8f0;            /* slate-200 */
   --color-input: #e2e8f0;             /* slate-200 */
-  --color-ring: #6366f1;              /* indigo-500 */
+  --color-ring: #2d5890;              /* odak halkasi — lacivert x orta mavi */
 
   --radius: 0.75rem;
 }
 
-/*
-  Karanlık tema token override'ları.
-*/
-.dark {
-  --color-background: #090d16;        /* deep midnight obsidian */
-  --color-foreground: #f1f5f9;        /* slate-100 */
-
-  --color-card: #0f172a;              /* slate-900 */
-  --color-card-foreground: #f1f5f9;
-  --color-popover: #0f172a;
-  --color-popover-foreground: #f1f5f9;
-
-  --color-primary: #6366f1;           /* indigo-500 */
-  --color-primary-foreground: #ffffff;
-
-  --color-secondary: #1e293b;         /* slate-800 */
-  --color-secondary-foreground: #f1f5f9;
-
-  --color-muted: #1e293b;             /* slate-800 */
-  --color-muted-foreground: #94a3b8;  /* slate-400 */
-
-  --color-accent: #064e3b;            /* emerald-900 */
-  --color-accent-foreground: #6ee7b7;
-
-  --color-border: #1e293b;            /* slate-800 */
-  --color-input: #334155;             /* slate-700 */
-  --color-ring: #6366f1;
-}
 
 html {
   color-scheme: light;
-}
-html.dark {
-  color-scheme: dark;
 }
 
 body {
@@ -87,15 +55,149 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/*
+  ---------------------------------------------------------------------------
+  Açılış sayfası (landing) paleti.
+
+  Renkler AISigner logosundan örneklendi: lacivert #23356C (%30),
+  turkuaz #42B597 (%20), orta mavi #3E92CC (%11).
+
+  #245 ile koyu tema tamamen kaldırıldı; uygulama tek temalı. `.landing`
+  yine de kendi zeminini ve metin rengini açıkça boyuyor — bu blok kendi
+  başına eksiksiz kalsın diye.
+
+  Kontrast (WCAG AA 4.5:1) doğrulanmıştır:
+    ink/paper 15.4 · muted/paper 5.3 · beyaz/navy 11.7 · navy/teal 4.6
+  DİKKAT: teal (2.5) ve mid (3.4) beyaz üstünde metin için YETERSİZDİR.
+  Bunlar dolgu rengidir; etiket, bağlantı veya küçük metinde kullanmayın.
+  ---------------------------------------------------------------------------
+*/
+.landing {
+  --landing-paper: #f8f9fc;
+  --landing-paper-2: #eef1f7;
+  --landing-ink: #141f3d;
+  --landing-muted: #5b6885;
+  --landing-line: #d8deea;
+  --landing-line-soft: #e4e8f0;
+
+  --landing-navy: #23356c;   /* ana marka rengi: buton, vurgu, seed iller */
+  --landing-wave: #2d5890;   /* navy x mid %38 — dalgayla boyanan iller */
+  --landing-mid: #3e92cc;    /* logonun orta mavisi */
+  --landing-teal: #42b597;   /* vurgu: hover, dalga ucu */
+
+  --landing-map-off: #dde2ec;
+  --landing-map-seam: #f8f9fc;
+  --landing-stage: #eff2f8;
+
+  --landing-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+
+  /* K1: koyu tema devredeyken bile açılış açık kalsın */
+  background: var(--landing-paper);
+  color: var(--landing-ink);
+  color-scheme: light;
+}
+
+/*
+  Açılış sayfası — harita ve hareket.
+  Proje CSS module kullanmadığı için (glass-panel, premium-card gibi) özel
+  sınıflar burada yaşıyor. Tokenlar yukarıdaki .landing bloğundan geliyor.
+*/
+
+/* --- iller --- */
+.landing-prov {
+  fill: var(--landing-map-off);
+  stroke: var(--landing-map-seam);
+  stroke-width: 0.7;
+  stroke-linejoin: round;
+  opacity: 0;
+  transition:
+    fill 0.55s var(--landing-ease-out),
+    opacity 0.5s ease;
+}
+.landing-prov[data-in="true"] { opacity: 1; }
+.landing-prov[data-lit="true"] { fill: var(--landing-wave); }
+.landing-prov[data-seed="true"] { fill: var(--landing-navy); }
+.landing-prov[data-hover="true"] { fill: var(--landing-teal); }
+
+/* --- şehir işaretleri --- */
+.landing-pin {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.landing-pin[data-on="true"] {
+  animation: landing-pin-in 0.45s cubic-bezier(0.2, 0.9, 0.25, 1) forwards;
+}
+@keyframes landing-pin-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: none; }
+}
+.landing-pin-core {
+  position: absolute;
+  left: -3.5px;
+  top: -3.5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 2px var(--landing-navy);
+}
+.landing-pin[data-on="true"] .landing-pin-core::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 1.5px solid var(--landing-teal);
+  animation: landing-ring 1.4s cubic-bezier(0.16, 0.8, 0.3, 1) 1 forwards;
+}
+@keyframes landing-ring {
+  from { transform: scale(0.5); opacity: 0.85; }
+  to { transform: scale(4); opacity: 0; }
+}
+
+/* --- açılış sırası --- */
+@keyframes landing-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes landing-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.landing-rise {
+  opacity: 0;
+  animation: landing-rise 0.5s var(--landing-ease-out) forwards;
+}
+
+/* --- kaydırınca beliren bölümler --- */
+.landing-reveal {
+  opacity: 0;
+  transform: translateY(12px);
+  transition:
+    opacity 0.5s var(--landing-ease-out),
+    transform 0.5s var(--landing-ease-out);
+}
+.landing-reveal[data-shown="true"] {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* daha az ve daha yumuşak — sıfır değil */
+  .landing-rise { animation: landing-fade 0.3s ease forwards; }
+  .landing-reveal { transform: none; transition: opacity 0.3s ease; }
+  .landing-prov { transition-duration: 0.001ms; }
+  .landing-pin[data-on="true"] { animation-duration: 0.001ms; }
+  .landing-pin[data-on="true"] .landing-pin-core::after { animation: none; }
+}
+
 /* Custom premium subtle card and glow utilities */
 .glass-panel {
   background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(226, 232, 240, 0.8);
-}
-.dark .glass-panel {
-  background: rgba(15, 23, 42, 0.85);
-  border: 1px solid rgba(30, 41, 59, 0.8);
 }
 
 .premium-card {
@@ -110,4 +212,118 @@ body {
 input[type="password"]::-ms-reveal,
 input[type="password"]::-ms-clear {
   display: none;
+}
+
+/* #204: Sertifika PDF / Yazdırma İzolasyonu ve Renk Koruması. */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm;
+  }
+
+  *,
+  *::before,
+  *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    position: static !important;
+  }
+
+  /* Sayfadaki tüm gezinme, menü ve gereksiz bileşenleri gizle */
+  nav,
+  header,
+  aside,
+  footer,
+  .print-hidden,
+  [data-sonner-toaster],
+  button {
+    display: none !important;
+  }
+
+  /* Modal ve container'ların taşma ve backdrop filtrelerini sıfırla */
+  #certificate-modal-portal,
+  #certificate-modal-container {
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    transform: none !important;
+    inset: auto !important;
+  }
+
+  /* Sertifika baskı alanı */
+  #certificate-print-area {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    box-shadow: none !important;
+    border: none !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  #certificate-print-area * {
+    text-shadow: none !important;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   #285: Posinowa logosunun çizilme animasyonu (bekleme göstergesi).
+
+   Desen `dasharray: L L` yolu önce baştan doldurup sonra yine baştan sildiği
+   için döngü görünür bir sıçrama olmadan kapanıyor. Sabit hızda sürekli
+   hareket olduğu için `linear`. Yol uzunluğu bileşenden `--pn-uzunluk` ile
+   geliyor; tek kaynak orada, burada kopyası tutulmuyor. Negatif uç AYRI bir
+   değişken: `calc()` ile hesaplatılınca tarayıcı ara değer üretmiyor ve
+   animasyon iki uç arasında sıçrıyor (ölçüldü).
+--------------------------------------------------------------------------- */
+@keyframes posinowa-ciz {
+  from { stroke-dashoffset: var(--pn-uzunluk); }
+  to   { stroke-dashoffset: var(--pn-eksi); }
+}
+
+.posinowa-kalem {
+  /* Dış hat, orta çizgiden yaklaşık iki kat uzun; aynı süre kalemi iki kat
+     hızlandırırdı. 2,6 sn tempoyu eskisiyle aynı yerde tutuyor. */
+  animation: posinowa-ciz 2.6s linear infinite;
+}
+
+/* Hareketi azalt: çizim kalkar, yerine hafif bir opaklık nefesi gelir.
+   "Çalışıyor" bilgisi korunur, hareket kaldırılır. */
+@media (prefers-reduced-motion: reduce) {
+  @keyframes posinowa-nefes {
+    0%, 100% { opacity: 0.35; }
+    50%      { opacity: 1; }
+  }
+  .posinowa-kalem {
+    animation: posinowa-nefes 1.8s ease-in-out infinite;
+    stroke-dasharray: none;
+  }
 }

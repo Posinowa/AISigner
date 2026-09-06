@@ -1,0 +1,373 @@
+// @vitest-environment node
+import { describe, it, expect, beforeEach, vi } from "vitest";
+
+/**
+ * #255 — repo/milestone/issue işlemleri İDEMPOTENT olmalı.
+ *
+ * "Çalışma alanını güncelle" akışı bu davranışa dayanacak: aynı çağrı ikinci
+ * kez yapıldığında repo kopya milestone/issue ile dolmamalı. Bu testler o
+ * garantiyi kilitliyor.
+ */
+
+const { octokitMock, sahipTuruMock } = vi.hoisted(() => ({
+  sahipTuruMock: vi.fn(),
+  octokitMock: {
+    repos: { get: vi.fn(), createInOrg: vi.fn(), createForAuthenticatedUser: vi.fn() },
+    users: { getByUsername: vi.fn(), getAuthenticated: vi.fn() },
+    issues: {
+      listMilestones: vi.fn(),
+      createMilestone: vi.fn(),
+      listForRepo: vi.fn(),
+      create: vi.fn(),
+    },
+  },
+}));
+
+vi.mock("server-only", () => ({}));
+vi.mock("@/lib/logger", () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}));
+// #218: Retry mantığı GERÇEK çalışsın ama testler uyumasın — yalnızca
+// bekleme işlevi devre dışı bırakılıyor. Tamamen mock'lansaydı repo.ts'in
+// çağrıları gerçekten sarıp sarmadığı test edilmemiş olurdu.
+vi.mock("./retry", async () => {
+  const gercek = await vi.importActual<typeof import("./retry")>("./retry");
+  return {
+    ...gercek,
+    yenidenDene: <T,>(islem: () => Promise<T>, s: { ad: string }) =>
+      gercek.yenidenDene(islem, { ...s, bekle: async () => {} }),
+  };
+});
+
+vi.mock("./client", async () => {
+  const gercek = await vi.importActual<typeof import("./client")>("./client");
+  // ⚠️ `sahipTuruniCoz` burada MOCK'LANIYOR: gerçeği modül içindeki
+  // `getOctokit`'i kullanıyor (dışa aktarılanı değil), yani bu dosyada
+  // gerçek ağa çıkardı. Çözümleme mantığının kendi testleri
+  // `client.test.ts`'te — orada Octokit yapıcısı mock'lanıyor.
+  return { ...gercek, getOctokit: () => octokitMock, sahipTuruniCoz: sahipTuruMock };
+});
+
+import { repoyuHazirla, milestoneHazirla, issueHazirla, repoAdiUret } from "./repo";
+import { resetGitHubClientForTests } from "./client";
+
+const config = { token: "t", owner: "Posinowa" };
+
+/** GitHub 404'ü Octokit'te `status` taşıyan bir hata olarak gelir. */
+const httpHata = (status: number) => Object.assign(new Error("gh"), { status });
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  resetGitHubClientForTests();
+  // Varsayılan: organizasyon (mevcut testlerin varsaydığı dünya).
+  sahipTuruMock.mockResolvedValue({ ok: true, tur: "organizasyon" });
+});
+
+describe("repoAdiUret", () => {
+  it("Türkçe karakterleri çevirir", () => {
+    expect(repoAdiUret(["Ayşe", "Güncel Proje"])).toBe("ayse-guncel-proje");
+  });
+
+  it("geçersiz karakterleri tireye indirger", () => {
+    expect(repoAdiUret(["A!!!B", "C/D"])).toBe("a-b-c-d");
+  });
+
+  it("baştaki/sondaki tireleri kırpar", () => {
+    expect(repoAdiUret(["...proje..."])).toBe("proje");
+  });
+
+  it("tamamen geçersiz girdide anlamlı bir ada düşer", () => {
+    expect(repoAdiUret(["!!!"])).toBe("aisigner-proje");
+  });
+
+  it("çok uzun adı kısaltır", () => {
+    expect(repoAdiUret(["x".repeat(200)]).length).toBeLessThanOrEqual(90);
+  });
+});
+
+describe("repoyuHazirla — idempotent", () => {
+  it("repo varsa YENİDEN OLUŞTURULMAZ", async () => {
+    octokitMock.repos.get.mockResolvedValue({
+      data: { name: "mevcut", html_url: "https://github.com/Posinowa/mevcut" },
+    });
+
+    const r = await repoyuHazirla(config, { repoName: "mevcut", description: "d" });
+
+    expect(r).toMatchObject({ ok: true, olusturuldu: false });
+    expect(octokitMock.repos.createInOrg, "var olan repo yeniden açılmamalı").not.toHaveBeenCalled();
+  });
+
+  it("repo yoksa oluşturulur", async () => {
+    octokitMock.repos.get.mockRejectedValue(httpHata(404));
+    octokitMock.repos.createInOrg.mockResolvedValue({
+      data: { name: "yeni", html_url: "https://github.com/Posinowa/yeni" },
+    });
+
+    const r = await repoyuHazirla(config, { repoName: "yeni", description: "d" });
+
+    expect(r).toMatchObject({ ok: true, olusturuldu: true });
+    expect(octokitMock.repos.createInOrg).toHaveBeenCalled();
+  });
+
+  it("repo varsayılan olarak private açılır", async () => {
+    octokitMock.repos.get.mockRejectedValue(httpHata(404));
+    octokitMock.repos.createInOrg.mockResolvedValue({
+      data: { name: "y", html_url: "u" },
+    });
+
+    await repoyuHazirla(config, { repoName: "y", description: "d" });
+
+    expect(octokitMock.repos.createInOrg.mock.calls[0][0].private).toBe(true);
+  });
+
+  it("yetki hatasında OLUŞTURMAYI DENEMEZ", async () => {
+    // 404 dışındaki hata "yok" demek değil; körlemesine oluşturmak tehlikeli.
+    octokitMock.repos.get.mockRejectedValue(httpHata(403));
+
+    const r = await repoyuHazirla(config, { repoName: "x", description: "d" });
+
+    expect(r).toEqual({ ok: false, neden: "yetki-yok" });
+    expect(octokitMock.repos.createInOrg).not.toHaveBeenCalled();
+  });
+
+  it("oluşturma hatası yapılandırılmış sonuca çevrilir, fırlatılmaz", async () => {
+    octokitMock.repos.get.mockRejectedValue(httpHata(404));
+    octokitMock.repos.createInOrg.mockRejectedValue(httpHata(403));
+
+    const r = await repoyuHazirla(config, { repoName: "x", description: "d" });
+    expect(r).toEqual({ ok: false, neden: "yetki-yok" });
+  });
+});
+
+describe("milestoneHazirla — idempotent", () => {
+  it("aynı başlıklı milestone varsa yeniden oluşturulmaz", async () => {
+    octokitMock.issues.listMilestones.mockResolvedValue({
+      data: [{ number: 3, title: "Faz 1" }],
+    });
+
+    const r = await milestoneHazirla(config, { repoName: "r", title: "Faz 1" });
+
+    expect(r).toMatchObject({ ok: true, olusturuldu: false, veri: { number: 3 } });
+    expect(octokitMock.issues.createMilestone).not.toHaveBeenCalled();
+  });
+
+  it("kapalı milestone da kopya sayılır", async () => {
+    // state: "all" ile listelenmezse kapanmış fazın kopyası açılırdı.
+    octokitMock.issues.listMilestones.mockResolvedValue({
+      data: [{ number: 9, title: "Faz 2" }],
+    });
+
+    await milestoneHazirla(config, { repoName: "r", title: "Faz 2" });
+
+    expect(octokitMock.issues.listMilestones.mock.calls[0][0].state).toBe("all");
+    expect(octokitMock.issues.createMilestone).not.toHaveBeenCalled();
+  });
+
+  it("yoksa oluşturulur", async () => {
+    octokitMock.issues.listMilestones.mockResolvedValue({ data: [] });
+    octokitMock.issues.createMilestone.mockResolvedValue({
+      data: { number: 1, title: "Faz 1" },
+    });
+
+    const r = await milestoneHazirla(config, { repoName: "r", title: "Faz 1" });
+    expect(r).toMatchObject({ ok: true, olusturuldu: true });
+  });
+
+  it("listeleme hatasında oluşturmayı denemez", async () => {
+    octokitMock.issues.listMilestones.mockRejectedValue(httpHata(404));
+
+    const r = await milestoneHazirla(config, { repoName: "r", title: "F" });
+    expect(r).toEqual({ ok: false, neden: "bulunamadi" });
+    expect(octokitMock.issues.createMilestone).not.toHaveBeenCalled();
+  });
+});
+
+describe("issueHazirla — idempotent", () => {
+  it("aynı başlıklı issue varsa yeniden oluşturulmaz", async () => {
+    octokitMock.issues.listForRepo.mockResolvedValue({
+      data: [{ number: 7, title: "Görev A", html_url: "u7" }],
+    });
+
+    const r = await issueHazirla(config, {
+      repoName: "r",
+      title: "Görev A",
+      body: "b",
+    });
+
+    expect(r).toMatchObject({ ok: true, olusturuldu: false, veri: { number: 7 } });
+    expect(octokitMock.issues.create, "kopya issue açılmamalı").not.toHaveBeenCalled();
+  });
+
+  it("yoksa oluşturulur ve milestone'a bağlanır", async () => {
+    octokitMock.issues.listForRepo.mockResolvedValue({ data: [] });
+    octokitMock.issues.create.mockResolvedValue({
+      data: { number: 1, title: "Görev A", html_url: "u1" },
+    });
+
+    const r = await issueHazirla(config, {
+      repoName: "r",
+      title: "Görev A",
+      body: "b",
+      milestoneNumber: 4,
+    });
+
+    expect(r).toMatchObject({ ok: true, olusturuldu: true });
+    expect(octokitMock.issues.create.mock.calls[0][0].milestone).toBe(4);
+  });
+
+  it("kapalı issue da kopya sayılır", async () => {
+    octokitMock.issues.listForRepo.mockResolvedValue({
+      data: [{ number: 2, title: "Görev B", html_url: "u2" }],
+    });
+
+    await issueHazirla(config, { repoName: "r", title: "Görev B", body: "b" });
+
+    expect(octokitMock.issues.listForRepo.mock.calls[0][0].state).toBe("all");
+    expect(octokitMock.issues.create).not.toHaveBeenCalled();
+  });
+
+  it("oluşturma hatası fırlatılmaz", async () => {
+    octokitMock.issues.listForRepo.mockResolvedValue({ data: [] });
+    octokitMock.issues.create.mockRejectedValue(httpHata(429));
+
+    const r = await issueHazirla(config, { repoName: "r", title: "G", body: "b" });
+    expect(r).toEqual({ ok: false, neden: "oran-siniri" });
+  });
+});
+
+/**
+ * #218 — çağrılar gerçekten yeniden deneniyor mu.
+ *
+ * `retry.test.ts` yeniden deneme mantığını tek başına kanıtlıyor; buradaki
+ * testler `repo.ts`'in o mantığı gerçekten KULLANDIĞINI kanıtlıyor. İkisi
+ * ayrı sorular: mantık doğru olabilir ama hiçbir yerden çağrılmıyorsa
+ * işe yaramaz.
+ */
+describe("GitHub çağrıları yeniden denenir (#218)", () => {
+  it("repo okuma geçici hatada tekrar denenir", async () => {
+    octokitMock.repos.get
+      .mockRejectedValueOnce(httpHata(503))
+      .mockResolvedValue({
+        data: { name: "r", html_url: "https://github.com/Posinowa/r" },
+      });
+
+    const r = await repoyuHazirla(config, { repoName: "r", description: "d" });
+
+    expect(r.ok).toBe(true);
+    expect(octokitMock.repos.get).toHaveBeenCalledTimes(2);
+  });
+
+  it("issue oluşturma oran sınırında tekrar denenir", async () => {
+    octokitMock.issues.listForRepo.mockResolvedValue({ data: [] });
+    octokitMock.issues.create
+      .mockRejectedValueOnce(httpHata(429))
+      .mockResolvedValue({
+        data: { number: 1, title: "G", html_url: "u1" },
+      });
+
+    const r = await issueHazirla(config, { repoName: "r", title: "G", body: "b" });
+
+    expect(r.ok).toBe(true);
+    expect(octokitMock.issues.create).toHaveBeenCalledTimes(2);
+  });
+
+  it("KALICI hatada tekrar denenmez", async () => {
+    // 404 tekrarlansa da aynı sonucu verir; boşuna gecikme olmamalı.
+    octokitMock.repos.get.mockRejectedValue(httpHata(404));
+    octokitMock.repos.createInOrg.mockResolvedValue({
+      data: { name: "r", html_url: "u" },
+    });
+
+    await repoyuHazirla(config, { repoName: "r", description: "d" });
+
+    expect(octokitMock.repos.get).toHaveBeenCalledTimes(1);
+  });
+
+  it("deneme hakkı bitince yapılandırılmış hata döner", async () => {
+    octokitMock.repos.get.mockRejectedValue(httpHata(503));
+
+    const r = await repoyuHazirla(config, { repoName: "r", description: "d" });
+
+    expect(r).toEqual({ ok: false, neden: "bilinmeyen" });
+    expect(octokitMock.repos.get).toHaveBeenCalledTimes(3);
+  });
+});
+
+/**
+ * #346 — KİŞİSEL HESAPTA DEPO AÇMA.
+ *
+ * `repos.createInOrg` yalnızca organizasyonlara açık; kişisel hesapta 404
+ * veriyordu ve `repoyuHazirla` orada hiç çalışmıyordu.
+ *
+ * ⚠️ EN KRİTİK GARANTİ: hesap türü TAHMİN EDİLMİYOR, GitHub'a soruluyor.
+ * "createInOrg dene, 404 alırsan kişiseldir" mantığı yanlış yazılmış bir org
+ * adını da kişisel hesap sanıp DEPOYU BAŞKA YERE AÇARDI.
+ */
+describe("repoyuHazirla — hesap türüne göre uç seçimi (#346)", () => {
+  const yokSay = () => octokitMock.repos.get.mockRejectedValue(httpHata(404));
+
+  it("ORGANİZASYON → createInOrg", async () => {
+    yokSay();
+    sahipTuruMock.mockResolvedValue({ ok: true, tur: "organizasyon" });
+    octokitMock.repos.createInOrg.mockResolvedValue({
+      data: { name: "p", html_url: "https://github.com/Posinowa/p" },
+    });
+
+    const s = await repoyuHazirla(config, { repoName: "p", description: "d" });
+
+    expect(s.ok).toBe(true);
+    expect(octokitMock.repos.createInOrg).toHaveBeenCalled();
+    expect(octokitMock.repos.createForAuthenticatedUser).not.toHaveBeenCalled();
+  });
+
+  it("KİŞİSEL hesap → createForAuthenticatedUser", async () => {
+    yokSay();
+    sahipTuruMock.mockResolvedValue({ ok: true, tur: "kendi-hesabim" });
+    octokitMock.repos.createForAuthenticatedUser.mockResolvedValue({
+      data: { name: "p", html_url: "https://github.com/alperenesersu/p" },
+    });
+
+    const s = await repoyuHazirla(config, { repoName: "p", description: "d" });
+
+    expect(s.ok).toBe(true);
+    expect(octokitMock.repos.createForAuthenticatedUser).toHaveBeenCalled();
+    expect(octokitMock.repos.createInOrg).not.toHaveBeenCalled();
+  });
+
+  it("kişisel hesapta da private ve auto_init korunur", async () => {
+    yokSay();
+    sahipTuruMock.mockResolvedValue({ ok: true, tur: "kendi-hesabim" });
+    octokitMock.repos.createForAuthenticatedUser.mockResolvedValue({
+      data: { name: "p", html_url: "u" },
+    });
+
+    await repoyuHazirla(config, { repoName: "p", description: "d" });
+
+    const cagri = octokitMock.repos.createForAuthenticatedUser.mock.calls[0][0];
+    expect(cagri.private).toBe(true);
+    expect(cagri.auto_init).toBe(true);
+    // Kişisel uçta `owner`/`org` alanı YOK — depo token sahibinin altına açılır.
+    expect(cagri.org).toBeUndefined();
+    expect(cagri.owner).toBeUndefined();
+  });
+
+  it("hesap türü ÇÖZÜLEMEZSE hiçbir uç çağrılmaz", async () => {
+    yokSay();
+    sahipTuruMock.mockResolvedValue({ ok: false, neden: "bulunamadi" });
+
+    const s = await repoyuHazirla(config, { repoName: "p", description: "d" });
+
+    expect(s).toEqual({ ok: false, neden: "bulunamadi" });
+    expect(octokitMock.repos.createInOrg).not.toHaveBeenCalled();
+    expect(octokitMock.repos.createForAuthenticatedUser).not.toHaveBeenCalled();
+  });
+
+  it("mevcut repo varsa hesap türü HİÇ sorulmaz — gereksiz istek atılmaz", async () => {
+    octokitMock.repos.get.mockResolvedValue({ data: { name: "p", html_url: "u" } });
+
+    const s = await repoyuHazirla(config, { repoName: "p", description: "d" });
+
+    expect(s.ok).toBe(true);
+    expect(sahipTuruMock).not.toHaveBeenCalled();
+  });
+});

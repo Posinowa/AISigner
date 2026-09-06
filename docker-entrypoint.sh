@@ -14,15 +14,32 @@ if [ -n "$GCP_CREDENTIALS_JSON" ]; then
   export GOOGLE_APPLICATION_CREDENTIALS="/app/gcp-credentials.json"
   echo "→ GCP kimlik dosyası env değişkeninden yazıldı (içerik gizli)."
 else
-  echo "→ GCP_CREDENTIALS_JSON tanımlı değil; AI özellikleri mock'a düşecek."
+  # #522: "mock'a düşecek" ARTIK DOĞRU DEĞİL ve yanıltıcıydı. Google Cloud'da
+  # (Cloud Run) kimlik servisin kendi service account'undan ADC ile gelir;
+  # ortada anahtar dosyası OLMAMASI beklenen durumdur. Anahtar dosyası yoksa
+  # `gemini-client.ts` googleAuthOptions'ı hiç vermiyor ve SDK ADC'yi çözüyor.
+  # Kimlik gerçekten yoksa çağrı patlar ve #335 gereği mock'a düşülür — ama
+  # bunu AÇILIŞTA iddia etmek, doğru kurulmuş bir Cloud Run servisinde
+  # operatöre yanlış alarm verirdi.
+  echo "→ GCP_CREDENTIALS_JSON tanımlı değil; kimlik ADC'den çözülecek (Cloud Run'da beklenen durum)."
 fi
 
 # --- Şema göçleri ---
 # Prod'da güvenli: yalnızca uygulanmamış migration'ları uygular (db push/seed DEĞİL).
+# `npx` DEĞİL doğrudan yerel binary: npx, paket bulunmazsa sessizce ağdan
+# indirmeye çalışır. Prisma CLI imaja bilerek kopyalandığı (Dockerfile) için
+# doğrudan çağırmak hem hızlı hem de ağı kapalı ortamda deterministik.
 echo "→ Prisma migrate deploy çalışıyor..."
-npx prisma migrate deploy
+node ./.migrator/node_modules/prisma/build/index.js migrate deploy --schema=./prisma/schema.prisma
 
 # --- Sunucu ---
-# exec: sinyaller (SIGTERM) doğrudan Node sürecine iletilsin (temiz kapanış).
+# standalone çıktısının kendi sunucusu (server.js). Öncesi `next start` çağıran
+# bir npm script'i idi; standalone imajda npm script'leri ve `next` binary'si
+# bulunmaz. O script #526'da SİLİNDİ: hiçbir yerden çağrılmıyordu ama içeriği
+# `next start` olduğu için, meşru bir kaçış yolu sanılıp kullanıldığında
+# sessizce YANLIŞ sunucuyu başlatırdı (#518).
+# PORT/HOSTNAME env'lerini server.js kendisi okur.
+# exec: sinyaller (SIGTERM) doğrudan Node sürecine iletilsin (temiz kapanış) —
+# araya npm girmemesi, platformun kapatma sinyalinin kaybolmamasını da sağlar.
 echo "→ Uygulama başlatılıyor..."
-exec npm run start:docker
+exec node server.js

@@ -7,6 +7,8 @@ const { requireAuthMock, prismaMock } = vi.hoisted(() => ({
   prismaMock: {
     studentProfile: { findFirst: vi.fn() },
     assignedProject: { findFirst: vi.fn(), create: vi.fn() },
+    // #503: Atama öncesi şablonun `tekrarlanabilir` bayrağı okunuyor.
+    projectTemplate: { findUnique: vi.fn() },
   },
 }));
 vi.mock("@/lib/auth/guard", () => ({
@@ -15,6 +17,11 @@ vi.mock("@/lib/auth/guard", () => ({
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 
 import { POST } from "./route";
+
+/** #503: Varsayılan tekrarlanamaz — #58 korumasının test ettiği durum. */
+function sablonTekrarlanamaz() {
+  prismaMock.projectTemplate.findUnique.mockResolvedValue({ tekrarlanabilir: false });
+}
 
 function authAsMentor() {
   requireAuthMock.mockResolvedValue({
@@ -36,6 +43,7 @@ const validBody = { studentProfileId: "sp-1", projectTemplateId: "pt-1" };
 describe("POST /api/mentor/assign-project — duplicate koruması (#58)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    sablonTekrarlanamaz();
     // Öğrenci bu mentor'a ait (ownership geçer)
     prismaMock.studentProfile.findFirst.mockResolvedValue({ id: "sp-1", mentorId: "mentor-1" });
   });
@@ -101,5 +109,58 @@ describe("POST /api/mentor/assign-project — duplicate koruması (#58)", () => 
 
     const res = await POST(postReq(validBody));
     expect(res.status).toBe(500);
+  });
+
+  /**
+   * #503 — TEKRARLANABİLİR ŞABLON.
+   *
+   * Portfolyo sitesi gibi herkesin yapması beklenen işler ve araştırma
+   * ödevleri aynı stajyere birden çok kez atanabilmeli. #58'in koruması
+   * yalnız bu bayrak açıkken gevşiyor.
+   */
+  it("⚠️ #503: tekrarlanabilir şablonda ZATEN ATANMIŞ olsa da 201", async () => {
+    authAsMentor();
+    prismaMock.projectTemplate.findUnique.mockResolvedValue({ tekrarlanabilir: true });
+    // Ön kontrol bir kayıt bulsa BİLE atama geçmeli.
+    prismaMock.assignedProject.findFirst.mockResolvedValue({ id: "zaten-var" });
+    prismaMock.assignedProject.create.mockResolvedValue({ id: "ap-2" });
+
+    const res = await POST(postReq(validBody));
+
+    expect(res.status).toBe(201);
+    expect(prismaMock.assignedProject.create).toHaveBeenCalled();
+  });
+
+  it("⚠️ #503: tekrarlanabilir şablonda tekilKey NULL yazılır", async () => {
+    authAsMentor();
+    prismaMock.projectTemplate.findUnique.mockResolvedValue({ tekrarlanabilir: true });
+    prismaMock.assignedProject.findFirst.mockResolvedValue(null);
+    prismaMock.assignedProject.create.mockResolvedValue({ id: "ap-2" });
+
+    await POST(postReq(validBody));
+
+    expect(prismaMock.assignedProject.create.mock.calls[0][0].data.tekilKey).toBeNull();
+  });
+
+  it("⚠️ #503: tekrarlanamaz şablonda tekilKey DOLU — #58 koruması sürer", async () => {
+    authAsMentor();
+    prismaMock.assignedProject.findFirst.mockResolvedValue(null);
+    prismaMock.assignedProject.create.mockResolvedValue({ id: "ap-1" });
+
+    await POST(postReq(validBody));
+
+    expect(prismaMock.assignedProject.create.mock.calls[0][0].data.tekilKey).toBe(
+      "sp:sp-1:pt-1",
+    );
+  });
+
+  it("⚠️ #503: şablon yoksa 409 — var olmayan şablona atama yapılmaz", async () => {
+    authAsMentor();
+    prismaMock.projectTemplate.findUnique.mockResolvedValue(null);
+
+    const res = await POST(postReq(validBody));
+
+    expect(res.status).toBe(409);
+    expect(prismaMock.assignedProject.create).not.toHaveBeenCalled();
   });
 });

@@ -5,21 +5,21 @@ const { requireAuthMock, prismaMock, deleteStepFileMock, readStepFileMock } = vi
   requireAuthMock: vi.fn(),
   prismaMock: { stepFile: { findUnique: vi.fn(), delete: vi.fn() } },
   deleteStepFileMock: vi.fn(),
-  readStepFileMock: vi.fn(() => Promise.resolve(null)),
+  readStepFileMock: vi.fn<(...args: unknown[]) => Promise<Buffer | null>>(() => Promise.resolve(null)),
 }));
 vi.mock("@/lib/auth/guard", () => ({
-  requireAuth: (...a: unknown[]) => requireAuthMock(...a),
+  requireAuth: (...a: unknown[]) => requireAuthMock(a[0], a[1]),
 }));
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 vi.mock("@/lib/storage/step-files", () => ({
-  deleteStepFile: (...a: unknown[]) => deleteStepFileMock(...a),
-  readStepFile: (...a: unknown[]) => readStepFileMock(...a),
+  deleteStepFile: (fileName: string) => deleteStepFileMock(fileName),
+  readStepFile: (fileName: string) => readStepFileMock(fileName),
 }));
 
 import { DELETE, GET } from "./route";
 
-function authAs(id: string, role: "MENTOR" | "STUDENT" = "STUDENT") {
-  requireAuthMock.mockResolvedValue({ authorized: true, session: { user: { id, role } } });
+function authAs(id: string, role: "MENTOR" | "STUDENT" = "STUDENT", accountStatus = "APPROVED") {
+  requireAuthMock.mockResolvedValue({ authorized: true, session: { user: { id, role, accountStatus } } });
 }
 const params = (stepId = "step-1", fileId = "f-1") => Promise.resolve({ stepId, fileId });
 
@@ -46,13 +46,23 @@ function stepFile(over: { uploaderId: string; ownerUserId: string; mentorId: str
   };
 }
 
-describe("dosya sil/indir — yetki sınırları (#181)", () => {
+describe("dosya sil/indir — yetki sınırları (#181) & GRADUATED (#208)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     readStepFileMock.mockResolvedValue(null); // varsayılan: dosya yok
   });
 
   // ---- DELETE ----
+  it("DELETE: GRADUATED öğrenci dosya silemez → 403 (#208)", async () => {
+    authAs("student-1", "STUDENT", "GRADUATED");
+    const res = await DELETE(new Request("http://t", { method: "DELETE" }), { params: params() });
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toContain("Mezun öğrenciler");
+    expect(prismaMock.stepFile.delete).not.toHaveBeenCalled();
+  });
+
   it("DELETE: yükleyen siler", async () => {
     authAs("student-1");
     prismaMock.stepFile.findUnique.mockResolvedValue(

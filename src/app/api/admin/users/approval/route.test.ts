@@ -9,9 +9,12 @@ vi.mock("@/lib/auth/guard", () => ({
 }));
 vi.mock("@/features/admin/server/user", () => ({
   updateAccountStatus: (...a: unknown[]) => updateStatusMock(...a),
+  // Route bu sınıfı `instanceof` ile ayırt ediyor; mock'ta da bulunmalı.
+  AssignmentValidationError: class AssignmentValidationError extends Error {},
 }));
 
 import { POST } from "./route";
+import { AssignmentValidationError } from "@/features/admin/server/user";
 
 function admin(id = "admin-1") {
   requireAuthMock.mockResolvedValue({ authorized: true, session: { user: { id, role: "ADMIN" } } });
@@ -54,5 +57,36 @@ describe("admin users approval (#187)", () => {
     const res = await POST(req({ userId: "u1", accountStatus: "APPROVED" }));
     expect(res.status).toBe(200);
     expect(updateStatusMock).toHaveBeenCalledWith("u1", "APPROVED");
+  });
+});
+
+describe("onay kapısı — doğrulanmamış e-posta (#5)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("doğrulanmamış hesabı onaylamak 400 + anlamlı mesaj döner", async () => {
+    admin();
+    updateStatusMock.mockRejectedValue(
+      new AssignmentValidationError("Bu hesabın e-posta adresi henüz doğrulanmamış."),
+    );
+
+    const res = await POST(req({ userId: "u1", accountStatus: "APPROVED" }));
+
+    expect(res.status).toBe(400);
+    // Mesaj admin'e aynen gösteriliyor (UI toast'ta yansıtıyor) — neden
+    // onaylayamadığını anlaması gerek, genel bir "hata oluştu" yetmez.
+    await expect(res.json()).resolves.toEqual({
+      error: "Bu hesabın e-posta adresi henüz doğrulanmamış.",
+    });
+  });
+
+  it("beklenmeyen hata 500 döner ve iç detayı SIZDIRMAZ", async () => {
+    admin();
+    updateStatusMock.mockRejectedValue(new Error("connect ECONNREFUSED 10.0.0.5:5432"));
+
+    const res = await POST(req({ userId: "u1", accountStatus: "APPROVED" }));
+
+    expect(res.status).toBe(500);
+    const govde = await res.json();
+    expect(govde.error).not.toContain("ECONNREFUSED");
   });
 });

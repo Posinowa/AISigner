@@ -19,6 +19,14 @@ export type OnboardingInitialValues = {
   interests?: string[];
   goals?: string;
   availability?: string;
+  // #289: Genişletilen başvuru soruları.
+  city?: string;
+  gitLevel?: string;
+  weeklyHours?: number;
+  school?: string;
+  department?: string;
+  classYear?: string;
+  englishLevel?: string;
 };
 
 export function buildOnboardingDefaultValues(initial?: OnboardingInitialValues) {
@@ -32,9 +40,17 @@ export function buildOnboardingDefaultValues(initial?: OnboardingInitialValues) 
       lastName: initial?.lastName ?? "",
       birthYear: initial?.birthYear ?? undefined,
       phoneNumber: initial?.phoneNumber ?? "",
+      city: initial?.city ?? "",
+    },
+    education: {
+      school: initial?.school ?? "",
+      department: initial?.department ?? "",
+      classYear: initial?.classYear ?? "",
+      englishLevel: initial?.englishLevel ?? "",
     },
     experience: {
       level: initial?.experienceLevel ? experienceLevelToFormValue(initial.experienceLevel) : "",
+      gitLevel: initial?.gitLevel ?? "",
       knownTech: parsedGoals.knownTech,
     },
     vision: {
@@ -43,7 +59,9 @@ export function buildOnboardingDefaultValues(initial?: OnboardingInitialValues) 
     },
     workingStyle: {
       learningStyle: parsedGoals.learningStyle,
-      availability: initial?.availability ?? "",
+      // #289: Uygunluk kovaları yerine saat. Eski kayıtta saat yok —
+      // undefined bırakılıyor ki sayı alanı 0 ile dolmasın.
+      weeklyHours: initial?.weeklyHours,
     },
   };
 }

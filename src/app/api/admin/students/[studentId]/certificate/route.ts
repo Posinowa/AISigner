@@ -1,0 +1,113 @@
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+import { mentorunOgrencisiWhere } from "@/features/teams/server/sahiplik";
+import { requireAuth } from "@/lib/auth/guard";
+import {
+  getStudentCertificate,
+  updateCertificateDetails,
+} from "@/features/certificate/server/certificate";
+import { updateCertificateSchema } from "@/lib/validations/api";
+import { rotaHatasi } from "@/lib/api-hata";
+
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ studentId: string }> },
+) {
+  const auth = await requireAuth(["ADMIN", "MENTOR"]);
+  if (!auth.authorized) return auth.response;
+
+  const { studentId } = await params;
+  if (!studentId) {
+    return NextResponse.json({ error: "Öğrenci ID gerekli." }, { status: 400 });
+  }
+
+  // #204 IDOR: Mentör yalnızca KENDİ öğrencisinin sertifikasını görebilir (admin hepsini).
+  // studentId = öğrencinin User.id'si; M:N atama üzerinden sahiplik doğrulanır.
+  if (auth.session.user.role === "MENTOR") {
+    const owns = await prisma.studentProfile.findFirst({
+      // #370: Bireysel VEYA takım bağı. Sertifika BİREYSEL kalıyor (#332) ama
+      // takım mentörü de üyesinin belgesini görebilmeli — göremezse takım
+      // mentörlüğü yarım bir yetki olurdu.
+      where: {
+        userId: studentId,
+        ...mentorunOgrencisiWhere(auth.session.user.id!),
+      },
+      select: { id: true },
+    });
+    if (!owns) {
+      return NextResponse.json(
+        { error: "Bu öğrencinin sertifikasına erişim yetkiniz yok." },
+        { status: 403 },
+      );
+    }
+  }
+
+  try {
+    const certificate = await getStudentCertificate(studentId);
+    if (!certificate) {
+      return NextResponse.json(
+        { error: "Öğrenci sertifika profili bulunamadı." },
+        { status: 404 },
+      );
+    }
+    return NextResponse.json({ success: true, certificate });
+  } catch (error) {
+    rotaHatasi("Error loading student certificate:", error);
+    return NextResponse.json(
+      { error: "Sertifika bilgisi alınamadı." },
+      { status: 500 },
+    );
+  }
+}
+
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ studentId: string }> },
+) {
+  const auth = await requireAuth(["ADMIN"]);
+  if (!auth.authorized) return auth.response;
+
+  const { studentId } = await params;
+  if (!studentId) {
+    return NextResponse.json({ error: "Öğrenci ID gerekli." }, { status: 400 });
+  }
+
+  try {
+    const body = await request.json().catch(() => ({}));
+    const parsed = updateCertificateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message ?? "Geçersiz veri." },
+        { status: 400 },
+      );
+    }
+
+    const certificate = await getStudentCertificate(studentId);
+    if (!certificate) {
+      return NextResponse.json(
+        { error: "Öğrenci profili bulunamadı." },
+        { status: 404 },
+      );
+    }
+
+    // #208 review (P3): Not/derece kaydetmek belgeyi YAYINLAMAZ. `issuedAt`
+    // gönderilmez → belge yalnız mezuniyette resmileşir (ensureCertificateIssued).
+    const updated = await updateCertificateDetails(certificate.id, {
+      certificateNumber: parsed.data.certificateNumber,
+      mentorNote: parsed.data.mentorNote,
+      completionGrade: parsed.data.completionGrade,
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: "Sertifika ve referans notu başarıyla güncellendi.",
+      updated,
+    });
+  } catch (error) {
+    rotaHatasi("Error updating certificate:", error);
+    return NextResponse.json(
+      { error: "Sertifika güncellenemedi." },
+      { status: 500 },
+    );
+  }
+}

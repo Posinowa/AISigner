@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import "@testing-library/jest-dom/vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MessagingPanel } from "./MessagingPanel";
 
 // Panel görünürlük-farkında polling kullanıyor (#98); testlerde zamanlayıcı
@@ -48,7 +48,7 @@ describe("MessagingPanel — konuşma yükleme hatası (#126-6 / #97)", () => {
     const retry = await screen.findByRole("button", { name: /tekrar dene/i });
     fireEvent.click(retry);
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(screen.queryByText("Konuşmalar yüklenemedi.")).not.toBeInTheDocument();
     });
     expect(fetchMock.mock.calls.length).toBeGreaterThan(1);
@@ -63,7 +63,7 @@ describe("MessagingPanel — konuşma yükleme hatası (#126-6 / #97)", () => {
 
     render(<MessagingPanel currentUserId="user-1" />);
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(screen.queryByText("Konuşmalar yüklenemedi.")).not.toBeInTheDocument();
     });
   });

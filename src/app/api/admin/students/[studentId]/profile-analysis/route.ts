@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth/guard";
 import { getStoredProfileAnalysis } from "@/features/ai/server/profile-analysis-store";
+import { rotaHatasi } from "@/lib/api-hata";
 
 /**
  * GET /api/admin/students/[studentId]/profile-analysis
@@ -33,7 +34,7 @@ export async function GET(
     const analysis = await getStoredProfileAnalysis(studentProfile.id);
     return NextResponse.json({ analysis });
   } catch (error) {
-    console.error("GET /api/admin/students/[studentId]/profile-analysis error:", error);
+    rotaHatasi("GET /api/admin/students/[studentId]/profile-analysis error:", error);
     return NextResponse.json(
       { error: "Analiz yüklenirken hata oluştu." },
       { status: 500 },

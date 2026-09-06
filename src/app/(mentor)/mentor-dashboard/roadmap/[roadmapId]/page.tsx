@@ -1,12 +1,14 @@
 "use client";
 
+import { RevizyonIste } from "@/features/roadmap/ui/RevizyonIste";
+
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { extractApiErrorMessage } from "@/lib/api-error-message";
-import {
+import { RotateCcw,
   ArrowLeft,
   Save,
   CheckCircle,
@@ -21,17 +23,26 @@ import {
   Send,
   ChevronDown,
   ChevronUp,
+  AlertTriangle,
+  MessageSquare,
+  ArrowUp,
+  ArrowDown,
   Github,
   Loader2,
 } from "lucide-react";
+import { TASLAK_SONUCU } from "@/features/roadmap/taslak";
 import { StepComments } from "@/features/messaging/ui/StepComments";
 import { StepFiles } from "@/features/files/ui/StepFiles";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { kaynakEkle, kaynakKaldir, kaynakGuncelle } from "@/features/roadmap/kaynaklar";
+import { KaynakListesi } from "@/features/roadmap/ui/KaynakListesi";
 
 /* ─── Tipler ─── */
 type RoadmapStep = {
   id: string;
   order: number;
+  /** #407: Bu adımdaki yorum sayısı (toplam — okunma izi şemada yok). */
+  _count?: { comments: number };
   title: string;
   description: string;
   estimatedHours: number | null;
@@ -69,9 +80,16 @@ type Roadmap = {
 };
 
 const stepStatusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
-  TODO: { label: "Yapılacak", color: "bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-200", icon: Clock },
-  IN_PROGRESS: { label: "Devam Ediyor", color: "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300", icon: BookOpen },
-  COMPLETED: { label: "Tamamlandı", color: "bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300", icon: CheckCircle },
+  TODO: { label: "Yapılacak", color: "bg-gray-100 text-gray-700", icon: Clock },
+  IN_PROGRESS: { label: "Devam Ediyor", color: "bg-blue-100 text-blue-700", icon: BookOpen },
+  COMPLETED: { label: "Tamamlandı", color: "bg-green-100 text-green-700", icon: CheckCircle },
+  // #379: Mentör "eksik, revize et" dedi. Ayrı bir renk: panoda hiç
+  // çalışılmamış adımdan ayırt edilebilmeli.
+  REVISION_REQUESTED: {
+    label: "Revizyon istendi",
+    color: "bg-amber-100 text-amber-800",
+    icon: RotateCcw,
+  },
 };
 
 // #50: Boş input -> null (issue linki opsiyonel; boş string geçersiz URL sayılmasın).
@@ -192,6 +210,33 @@ export default function RoadmapReviewPage() {
       console.error(error);
     } finally {
       setSaving(false);
+    }
+  }
+
+  /* ─── Adım sırasını değiştir (#406) ─── */
+  //
+  // Sıra numarasını istemci HESAPLAMIYOR: yalnız "hangi adım, hangi yön"
+  // gönderiyor. Tabanı sunucu belirliyor, aksi halde iki adım aynı sırada
+  // kalabilirdi.
+  const [tasinan, setTasinan] = useState<string | null>(null);
+
+  async function handleTasi(stepId: string, yon: "yukari" | "asagi") {
+    setTasinan(stepId);
+    try {
+      const res = await fetch(`/api/mentor/roadmap/${roadmapId}/steps/reorder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stepId, yon }),
+      });
+      if (!res.ok) {
+        toast.error(await extractErrorMessage(res, "Adım taşınamadı."));
+        return;
+      }
+      await loadRoadmap();
+    } catch {
+      toast.error("Adım taşınamadı. Bağlantınızı kontrol edin.");
+    } finally {
+      setTasinan(null);
     }
   }
 
@@ -323,41 +368,26 @@ export default function RoadmapReviewPage() {
     }
   }
 
-  /* ─── Kaynak Yönetimi (edit) ─── */
-  function addEditResource() {
-    setEditForm((f) => ({ ...f, resources: [...f.resources, ""] }));
-  }
-  function removeEditResource(index: number) {
-    setEditForm((f) => ({
-      ...f,
-      resources: f.resources.filter((_, i) => i !== index),
-    }));
-  }
-  function updateEditResource(index: number, value: string) {
-    setEditForm((f) => {
-      const resources = [...f.resources];
-      resources[index] = value;
-      return { ...f, resources };
-    });
-  }
-
-  /* ─── Kaynak Yönetimi (new) ─── */
-  function addNewResource() {
-    setNewStepForm((f) => ({ ...f, resources: [...f.resources, ""] }));
-  }
-  function removeNewResource(index: number) {
-    setNewStepForm((f) => ({
-      ...f,
-      resources: f.resources.filter((_, i) => i !== index),
-    }));
-  }
-  function updateNewResource(index: number, value: string) {
-    setNewStepForm((f) => {
-      const resources = [...f.resources];
-      resources[index] = value;
-      return { ...f, resources };
-    });
-  }
+  /* ─── Kaynak Yönetimi ───
+   *
+   * #494: Bu üç işlem İKİ KEZ yazılıydı (düzenleme formu + yeni adım formu)
+   * ve gövdeleri birbirinin aynısıydı. Mantık artık `roadmap/kaynaklar.ts`'te;
+   * buradaki sarmalayıcılar yalnız hangi state'e yazılacağını söylüyor.
+   */
+  const editKaynak = {
+    ekle: () => setEditForm((f) => ({ ...f, resources: kaynakEkle(f.resources) })),
+    kaldir: (i: number) =>
+      setEditForm((f) => ({ ...f, resources: kaynakKaldir(f.resources, i) })),
+    guncelle: (i: number, v: string) =>
+      setEditForm((f) => ({ ...f, resources: kaynakGuncelle(f.resources, i, v) })),
+  };
+  const yeniKaynak = {
+    ekle: () => setNewStepForm((f) => ({ ...f, resources: kaynakEkle(f.resources) })),
+    kaldir: (i: number) =>
+      setNewStepForm((f) => ({ ...f, resources: kaynakKaldir(f.resources, i) })),
+    guncelle: (i: number, v: string) =>
+      setNewStepForm((f) => ({ ...f, resources: kaynakGuncelle(f.resources, i, v) })),
+  };
 
   /* ─── Toplam Saat ─── */
   const totalHours = roadmap?.steps.reduce((sum, s) => sum + (s.estimatedHours ?? 0), 0) ?? 0;
@@ -366,8 +396,8 @@ export default function RoadmapReviewPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="w-8 h-8 animate-spin text-purple-600 dark:text-purple-400" />
-        <span className="ml-3 text-gray-600 dark:text-slate-300">Yol haritası yükleniyor...</span>
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <span className="ml-3 text-gray-600">Yol haritası yükleniyor...</span>
       </div>
     );
   }
@@ -375,8 +405,8 @@ export default function RoadmapReviewPage() {
   if (!roadmap) {
     return (
       <div className="max-w-4xl mx-auto p-6 text-center py-20">
-        <h3 className="text-lg font-medium text-gray-900 dark:text-slate-100 mb-2">Yol haritası bulunamadı</h3>
-        <Link href="/mentor-dashboard" className="text-purple-600 dark:text-purple-400 hover:text-purple-800">
+        <h3 className="text-lg font-medium text-gray-900 mb-2">Yol haritası bulunamadı</h3>
+        <Link href="/mentor-dashboard" className="text-primary hover:text-[#3e92cc]">
           ← Dashboard&apos;a dön
         </Link>
       </div>
@@ -396,7 +426,7 @@ export default function RoadmapReviewPage() {
         <div className="flex items-center gap-3 min-w-0">
           <button
             onClick={() => router.back()}
-            className="p-2 text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-100 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+            className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
@@ -407,29 +437,29 @@ export default function RoadmapReviewPage() {
                   type="text"
                   value={titleValue}
                   onChange={(e) => setTitleValue(e.target.value)}
-                  className="min-w-0 flex-1 text-xl font-bold text-gray-900 dark:text-slate-100 border-b-2 border-purple-500 outline-none bg-transparent py-1"
+                  className="min-w-0 flex-1 text-xl font-bold text-gray-900 border-b-2 border-primary outline-none bg-transparent py-1"
                   autoFocus
                 />
-                <button onClick={handleSaveTitle} disabled={saving} className="text-purple-600 dark:text-purple-400 hover:text-purple-800">
+                <button onClick={handleSaveTitle} disabled={saving} className="text-primary hover:text-[#3e92cc]">
                   <Save className="w-5 h-5" />
                 </button>
-                <button onClick={() => setEditingTitle(false)} className="text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300">
+                <button onClick={() => setEditingTitle(false)} className="text-gray-400 hover:text-gray-600">
                   <X className="w-5 h-5" />
                 </button>
               </div>
             ) : (
               <h1
-                className="text-2xl font-bold text-gray-900 dark:text-slate-100 cursor-pointer hover:text-purple-700 transition-colors group"
+                className="text-2xl font-bold text-gray-900 cursor-pointer hover:text-primary transition-colors group"
                 onClick={() => {
                   setTitleValue(roadmap.title);
                   setEditingTitle(true);
                 }}
               >
                 {roadmap.title}
-                <Pencil className="w-4 h-4 ml-2 inline text-gray-300 group-hover:text-purple-500 transition-colors" />
+                <Pencil className="w-4 h-4 ml-2 inline text-gray-300 group-hover:text-[#3e92cc] transition-colors" />
               </h1>
             )}
-            <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
+            <p className="text-sm text-gray-500 mt-1">
               {studentName} &middot; {project.title}
             </p>
           </div>
@@ -439,8 +469,8 @@ export default function RoadmapReviewPage() {
           <span
             className={`px-3 py-1.5 text-xs font-bold rounded-full uppercase tracking-wider ${
               isDraft
-                ? "bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-300"
-                : "bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300"
+                ? "bg-yellow-100 text-yellow-800"
+                : "bg-green-100 text-green-800"
             }`}
           >
             {isDraft ? "Taslak" : "Yayında"}
@@ -466,52 +496,74 @@ export default function RoadmapReviewPage() {
         </div>
       </div>
 
+      {/* #405: Rozet durumu söylüyordu, SONUCUNU değil. Mentör "Taslak"ı
+          görüp stajyerin hiçbir adımı göremediğini fark etmiyordu.
+
+          ⚠️ Uyarı ENGELLEYİCİ DEĞİL: düzenleme sırasında taslağa geri almak
+          meşru bir işlem. Amaç durdurmak değil, unutulmasını önlemek. */}
+      {isDraft && (
+        <div
+          role="status"
+          className="mb-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4"
+        >
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-amber-900">
+              Bu yol haritası henüz taslak.
+            </p>
+            <p className="mt-0.5 text-sm leading-relaxed text-amber-800">
+              {TASLAK_SONUCU}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Proje Bilgisi + İstatistikler */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white dark:bg-slate-900 border rounded-xl p-4">
-          <div className="text-xs text-gray-500 dark:text-slate-400 font-medium uppercase tracking-wider mb-1">Proje</div>
-          <div className="text-sm font-semibold text-gray-900 dark:text-slate-100">{project.title}</div>
+        <div className="bg-white border rounded-xl p-4">
+          <div className="text-xs text-gray-500 font-medium uppercase tracking-wider mb-1">Proje</div>
+          <div className="text-sm font-semibold text-gray-900">{project.title}</div>
           <div className="flex gap-1 mt-2">
             {project.track.slice(0, 3).map((t, i) => (
-              <span key={i} className="px-2 py-0.5 text-[10px] font-medium bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-300 rounded">
+              <span key={i} className="px-2 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-600 rounded">
                 {t}
               </span>
             ))}
           </div>
         </div>
-        <div className="bg-white dark:bg-slate-900 border rounded-xl p-4">
-          <div className="text-xs text-gray-500 dark:text-slate-400 font-medium uppercase tracking-wider mb-1">Toplam Adım</div>
-          <div className="text-2xl font-bold text-purple-700 dark:text-purple-300">{roadmap.steps.length}</div>
+        <div className="bg-white border rounded-xl p-4">
+          <div className="text-xs text-gray-500 font-medium uppercase tracking-wider mb-1">Toplam Adım</div>
+          <div className="text-2xl font-bold text-primary">{roadmap.steps.length}</div>
         </div>
-        <div className="bg-white dark:bg-slate-900 border rounded-xl p-4">
-          <div className="text-xs text-gray-500 dark:text-slate-400 font-medium uppercase tracking-wider mb-1">Tahmini Süre</div>
-          <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{totalHours} <span className="text-sm font-normal text-gray-500 dark:text-slate-400">saat</span></div>
+        <div className="bg-white border rounded-xl p-4">
+          <div className="text-xs text-gray-500 font-medium uppercase tracking-wider mb-1">Tahmini Süre</div>
+          <div className="text-2xl font-bold text-blue-700">{totalHours} <span className="text-sm font-normal text-gray-500">saat</span></div>
         </div>
-        <div className="bg-white dark:bg-slate-900 border rounded-xl p-4">
-          <div className="text-xs text-gray-500 dark:text-slate-400 font-medium uppercase tracking-wider mb-1">Öğrenci</div>
-          <div className="text-sm font-semibold text-gray-900 dark:text-slate-100">{studentName}</div>
-          <div className="text-xs text-gray-500 dark:text-slate-400 mt-1">{student.email}</div>
+        <div className="bg-white border rounded-xl p-4">
+          <div className="text-xs text-gray-500 font-medium uppercase tracking-wider mb-1">Öğrenci</div>
+          <div className="text-sm font-semibold text-gray-900">{studentName}</div>
+          <div className="text-xs text-gray-500 mt-1">{student.email}</div>
         </div>
       </div>
 
       {/* Adımlar Listesi */}
       <div className="space-y-3">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-lg font-bold text-gray-900 dark:text-slate-100 flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+          <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-primary" />
             Yol Haritası Adımları
           </h2>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowAiModal(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg transition-all shadow-sm"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold bg-gradient-to-r from-primary to-[#3e92cc] hover:from-[#1b2a55] hover:to-[#2f7cb0] text-primary-foreground rounded-lg transition-all shadow-sm"
             >
               <Sparkles className="w-4 h-4" />
               Posilog ile Adım Üret
             </button>
             <button
               onClick={() => setShowAddForm(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/40 rounded-lg transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-primary/5 text-primary hover:bg-primary/10 rounded-lg transition-colors"
             >
               <Plus className="w-4 h-4" />
               Adım Ekle
@@ -530,8 +582,8 @@ export default function RoadmapReviewPage() {
               key={step.id}
               className={`border rounded-xl overflow-hidden transition-all ${
                 isEditing
-                  ? "border-purple-300 shadow-lg ring-2 ring-purple-100"
-                  : "bg-white dark:bg-slate-900 hover:shadow-md"
+                  ? "border-[#3e92cc] shadow-lg ring-2 ring-primary/10"
+                  : "bg-white hover:shadow-md"
               }`}
             >
               {/* Adım Başlığı */}
@@ -543,20 +595,62 @@ export default function RoadmapReviewPage() {
                   }
                 }}
               >
-                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 text-sm font-bold flex-shrink-0">
-                  {index + 1}
+                {/* #406: Sıra değiştirme. Kartın tamamı akordeonu açıp kapattığı
+                    için düğmeler stopPropagation yapmak zorunda — aksi halde
+                    taşıma her seferinde adımı da açardı. */}
+                <div
+                  className="flex flex-col flex-shrink-0"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleTasi(step.id, "yukari")}
+                    disabled={index === 0 || tasinan !== null}
+                    aria-label={`${step.title} adımını yukarı taşı`}
+                    className="p-0.5 text-gray-400 hover:text-primary disabled:opacity-25 disabled:hover:text-gray-400"
+                  >
+                    <ArrowUp className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleTasi(step.id, "asagi")}
+                    disabled={index === roadmap.steps.length - 1 || tasinan !== null}
+                    aria-label={`${step.title} adımını aşağı taşı`}
+                    className="p-0.5 text-gray-400 hover:text-primary disabled:opacity-25 disabled:hover:text-gray-400"
+                  >
+                    <ArrowDown className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary text-sm font-bold flex-shrink-0">
+                  {tasinan === step.id ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    index + 1
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-gray-900 dark:text-slate-100 truncate">{step.title}</h3>
+                  <h3 className="font-semibold text-gray-900 truncate">{step.title}</h3>
                   {!isExpanded && (
-                    <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5 truncate">{step.description}</p>
+                    <p className="text-xs text-gray-500 mt-0.5 truncate">{step.description}</p>
                   )}
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   {step.estimatedHours && (
-                    <span className="text-xs text-gray-400 dark:text-slate-500 flex items-center gap-1">
+                    <span className="text-xs text-gray-400 flex items-center gap-1">
                       <Clock className="w-3 h-3" />
                       {step.estimatedHours}s
+                    </span>
+                  )}
+                  {/* #407: Stajyer yorum yazdığında mentör de fark etmiyordu —
+                      yorumlar akordeonun içindeydi. Sıfırsa basılmıyor. */}
+                  {(step._count?.comments ?? 0) > 0 && (
+                    <span
+                      title={`${step._count?.comments} yorum`}
+                      className="flex items-center gap-1 rounded bg-gray-100 px-2 py-0.5 text-[10px] font-bold text-gray-600"
+                    >
+                      <MessageSquare className="w-3 h-3" />
+                      {step._count?.comments}
                     </span>
                   )}
                   <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full uppercase ${statusInfo.color}`}>
@@ -564,39 +658,39 @@ export default function RoadmapReviewPage() {
                     {statusInfo.label}
                   </span>
                   {isExpanded ? (
-                    <ChevronUp className="w-4 h-4 text-gray-400 dark:text-slate-500" />
+                    <ChevronUp className="w-4 h-4 text-gray-400" />
                   ) : (
-                    <ChevronDown className="w-4 h-4 text-gray-400 dark:text-slate-500" />
+                    <ChevronDown className="w-4 h-4 text-gray-400" />
                   )}
                 </div>
               </div>
 
               {/* Açılır İçerik */}
               {isExpanded && (
-                <div className="border-t px-5 pb-5 pt-4 bg-gray-50/50 dark:bg-slate-950/50">
+                <div className="border-t px-5 pb-5 pt-4 bg-gray-50/50">
                   {isEditing ? (
                     /* ─── Düzenleme Modu ─── */
                     <div className="space-y-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">Başlık</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Başlık</label>
                         <input
                           type="text"
                           value={editForm.title}
                           onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                          className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-300 focus:border-purple-400 outline-none"
+                          className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#3e92cc] focus:border-[#3e92cc] outline-none"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">Açıklama</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Açıklama</label>
                         <textarea
                           value={editForm.description}
                           onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
                           rows={4}
-                          className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-300 focus:border-purple-400 outline-none resize-none"
+                          className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#3e92cc] focus:border-[#3e92cc] outline-none resize-none"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">Tahmini Süre (saat)</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Tahmini Süre (saat)</label>
                         <input
                           type="number"
                           min={0}
@@ -604,59 +698,40 @@ export default function RoadmapReviewPage() {
                           onChange={(e) =>
                             setEditForm({ ...editForm, estimatedHours: parseInt(e.target.value) || 0 })
                           }
-                          className="w-32 border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-300 focus:border-purple-400 outline-none"
+                          className="w-32 border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#3e92cc] focus:border-[#3e92cc] outline-none"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">GitHub Issue Linki (opsiyonel)</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">GitHub Issue Linki (opsiyonel)</label>
                         <input
                           type="text"
                           value={editForm.githubIssueUrl}
                           onChange={(e) => setEditForm({ ...editForm, githubIssueUrl: e.target.value })}
                           placeholder="https://github.com/kullanici/repo/issues/12"
-                          className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-300 focus:border-purple-400 outline-none"
+                          className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#3e92cc] focus:border-[#3e92cc] outline-none"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">Kaynaklar</label>
-                        <div className="space-y-2">
-                          {editForm.resources.map((res, i) => (
-                            <div key={i} className="flex items-center gap-2">
-                              <input
-                                type="text"
-                                value={res}
-                                onChange={(e) => updateEditResource(i, e.target.value)}
-                                placeholder="https://... veya kaynak adı"
-                                className="flex-1 border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-300 focus:border-purple-400 outline-none"
-                              />
-                              <button
-                                onClick={() => removeEditResource(i)}
-                                className="p-1.5 text-gray-400 dark:text-slate-500 hover:text-red-500 transition-colors"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            </div>
-                          ))}
-                          <button
-                            onClick={addEditResource}
-                            className="text-xs text-purple-600 dark:text-purple-400 hover:text-purple-800 font-medium"
-                          >
-                            + Kaynak Ekle
-                          </button>
-                        </div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Kaynaklar</label>
+                        <KaynakListesi
+                          kaynaklar={editForm.resources}
+                          onGuncelle={editKaynak.guncelle}
+                          onKaldir={editKaynak.kaldir}
+                          onEkle={editKaynak.ekle}
+                        />
                       </div>
                       <div className="flex items-center gap-2 pt-2">
                         <button
                           onClick={handleSaveStep}
                           disabled={saving}
-                          className="flex items-center gap-1.5 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors"
+                          className="flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-[#1b2a55] text-primary-foreground text-sm font-medium rounded-lg transition-colors"
                         >
                           <Save className="w-4 h-4" />
                           {saving ? "Kaydediliyor..." : "Kaydet"}
                         </button>
                         <button
                           onClick={cancelEditStep}
-                          className="px-4 py-2 text-sm text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-slate-100 font-medium"
+                          className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 font-medium"
                         >
                           İptal
                         </button>
@@ -665,13 +740,23 @@ export default function RoadmapReviewPage() {
                   ) : (
                     /* ─── Görüntüleme Modu ─── */
                     <div>
-                      <p className="text-sm text-gray-700 dark:text-slate-200 leading-relaxed whitespace-pre-wrap">
+                      <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
                         {step.description}
                       </p>
 
+                      {/* #379: Mentör onay kapısı. Yalnız TAMAMLANMIŞ adımda
+                          görünür — bileşen kendi içinde karar veriyor. */}
+                      <div className="mt-4">
+                        <RevizyonIste
+                          stepId={step.id}
+                          stepStatus={step.status}
+                          onTamamlandi={loadRoadmap}
+                        />
+                      </div>
+
                       {step.resources.length > 0 && (
                         <div className="mt-4">
-                          <h4 className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-2">
+                          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
                             Kaynaklar
                           </h4>
                           <div className="flex flex-wrap gap-2">
@@ -681,7 +766,7 @@ export default function RoadmapReviewPage() {
                                 href={resource.startsWith("http") ? resource : `https://www.google.com/search?q=${encodeURIComponent(resource)}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 rounded-lg transition-colors"
+                                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg transition-colors"
                               >
                                 <ExternalLink className="w-3 h-3" />
                                 {resource.length > 50 ? resource.substring(0, 50) + "..." : resource}
@@ -692,7 +777,7 @@ export default function RoadmapReviewPage() {
                       )}
 
                       {step.estimatedHours && (
-                        <div className="mt-3 text-xs text-gray-500 dark:text-slate-400 flex items-center gap-1">
+                        <div className="mt-3 text-xs text-gray-500 flex items-center gap-1">
                           <Clock className="w-3 h-3" />
                           Tahmini: {step.estimatedHours} saat
                         </div>
@@ -703,24 +788,24 @@ export default function RoadmapReviewPage() {
                           href={step.githubIssueUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-slate-100 transition-colors"
+                          className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 transition-colors"
                         >
                           <Github className="w-3.5 h-3.5" />
                           {step.githubIssueUrl.replace(/^https:\/\/github\.com\//, "")}
                         </a>
                       )}
 
-                      <div className="flex items-center gap-2 mt-4 pt-3 border-t border-gray-100 dark:border-slate-800">
+                      <div className="flex items-center gap-2 mt-4 pt-3 border-t border-gray-100">
                         <button
                           onClick={() => startEditStep(step)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 dark:hover:bg-purple-900/40 rounded-lg transition-colors"
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary bg-primary/5 hover:bg-primary/10 rounded-lg transition-colors"
                         >
                           <Pencil className="w-3.5 h-3.5" />
                           Düzenle
                         </button>
                         <button
                           onClick={() => handleDeleteStep(step.id)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-lg transition-colors"
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                           Sil
@@ -754,85 +839,66 @@ export default function RoadmapReviewPage() {
 
         {/* Yeni Adım Ekleme Formu */}
         {showAddForm && (
-          <div className="border-2 border-dashed border-purple-300 rounded-xl p-5 bg-purple-50/30 dark:bg-purple-950/40/30">
-            <h3 className="text-sm font-bold text-purple-800 dark:text-purple-300 mb-4 flex items-center gap-2">
+          <div className="border-2 border-dashed border-[#3e92cc] rounded-xl p-5 bg-primary/5/30">
+            <h3 className="text-sm font-bold text-primary mb-4 flex items-center gap-2">
               <Plus className="w-4 h-4" />
               Yeni Adım Ekle
             </h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">Başlık *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Başlık *</label>
                 <input
                   type="text"
                   value={newStepForm.title}
                   onChange={(e) => setNewStepForm({ ...newStepForm, title: e.target.value })}
                   placeholder="Adım başlığı..."
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-300 focus:border-purple-400 outline-none"
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#3e92cc] focus:border-[#3e92cc] outline-none"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">Açıklama *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Açıklama *</label>
                 <textarea
                   value={newStepForm.description}
                   onChange={(e) => setNewStepForm({ ...newStepForm, description: e.target.value })}
                   rows={3}
                   placeholder="Bu adımda ne yapılacak..."
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-300 focus:border-purple-400 outline-none resize-none"
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#3e92cc] focus:border-[#3e92cc] outline-none resize-none"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">Tahmini Süre (saat)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tahmini Süre (saat)</label>
                 <input
                   type="number"
                   min={0}
                   value={newStepForm.estimatedHours}
                   onChange={(e) => setNewStepForm({ ...newStepForm, estimatedHours: parseInt(e.target.value) || 0 })}
-                  className="w-32 border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-300 focus:border-purple-400 outline-none"
+                  className="w-32 border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#3e92cc] focus:border-[#3e92cc] outline-none"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">GitHub Issue Linki (opsiyonel)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">GitHub Issue Linki (opsiyonel)</label>
                 <input
                   type="text"
                   value={newStepForm.githubIssueUrl}
                   onChange={(e) => setNewStepForm({ ...newStepForm, githubIssueUrl: e.target.value })}
                   placeholder="https://github.com/kullanici/repo/issues/12"
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-300 focus:border-purple-400 outline-none"
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#3e92cc] focus:border-[#3e92cc] outline-none"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">Kaynaklar</label>
-                <div className="space-y-2">
-                  {newStepForm.resources.map((res, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={res}
-                        onChange={(e) => updateNewResource(i, e.target.value)}
-                        placeholder="https://... veya kaynak adı"
-                        className="flex-1 border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-300 focus:border-purple-400 outline-none"
-                      />
-                      <button
-                        onClick={() => removeNewResource(i)}
-                        className="p-1.5 text-gray-400 dark:text-slate-500 hover:text-red-500 transition-colors"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                  <button
-                    onClick={addNewResource}
-                    className="text-xs text-purple-600 dark:text-purple-400 hover:text-purple-800 font-medium"
-                  >
-                    + Kaynak Ekle
-                  </button>
-                </div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Kaynaklar</label>
+                <KaynakListesi
+                  kaynaklar={newStepForm.resources}
+                  onGuncelle={yeniKaynak.guncelle}
+                  onKaldir={yeniKaynak.kaldir}
+                  onEkle={yeniKaynak.ekle}
+                />
               </div>
               <div className="flex items-center gap-2 pt-2">
                 <button
                   onClick={handleAddStep}
                   disabled={saving}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-[#1b2a55] text-primary-foreground text-sm font-medium rounded-lg transition-colors"
                 >
                   <Plus className="w-4 h-4" />
                   {saving ? "Ekleniyor..." : "Ekle"}
@@ -842,7 +908,7 @@ export default function RoadmapReviewPage() {
                     setShowAddForm(false);
                     setNewStepForm({ title: "", description: "", estimatedHours: 2, resources: [""], githubIssueUrl: "" });
                   }}
-                  className="px-4 py-2 text-sm text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-slate-100 font-medium"
+                  className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 font-medium"
                 >
                   İptal
                 </button>
@@ -855,10 +921,10 @@ export default function RoadmapReviewPage() {
       {/* 🤖 Posilog AI Asistanı Modal */}
       {showAiModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-purple-200 dark:border-slate-800 space-y-5">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-primary/20 space-y-5">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-slate-100 flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-primary" />
                 Posilog AI Mentör Asistanı
               </h3>
               <button
@@ -869,7 +935,7 @@ export default function RoadmapReviewPage() {
               </button>
             </div>
 
-            <div className="bg-purple-50 dark:bg-purple-950/30 p-4 rounded-xl border border-purple-100 dark:border-purple-900/40 text-xs text-purple-900 dark:text-purple-200 space-y-1">
+            <div className="bg-primary/5 p-4 rounded-xl border border-primary/15 text-xs text-primary space-y-1">
               <div className="font-semibold text-sm">💡 Posilog Akıllı Adım Önerisi</div>
               <p>
                 Posilog, öğrencini (<strong>{studentName}</strong>) ve projeyi (<strong>{project.title}</strong>) analiz ederek mevcut adımların arkasına sıradaki en mantıklı öğrenme fazını otomatik üretecektir.
@@ -877,7 +943,7 @@ export default function RoadmapReviewPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-gray-700 dark:text-slate-300 mb-1">
+              <label className="block text-xs font-semibold text-gray-700 mb-1">
                 Özel İletmek İstediğiniz Konu / İpucu (Opsiyonel)
               </label>
               <textarea
@@ -885,7 +951,7 @@ export default function RoadmapReviewPage() {
                 onChange={(e) => setAiPrompt(e.target.value)}
                 placeholder="Örn: Docker konteynerleştirme ve CI/CD pipeline kurulumu odaklı bir adım olsun..."
                 rows={3}
-                className="w-full border rounded-xl p-3 text-xs focus:ring-2 focus:ring-purple-400 outline-none bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
+                className="w-full border rounded-xl p-3 text-xs focus:ring-2 focus:ring-[#3e92cc] outline-none bg-white text-gray-900"
               />
             </div>
 
@@ -894,7 +960,7 @@ export default function RoadmapReviewPage() {
                 type="button"
                 onClick={() => setShowAiModal(false)}
                 disabled={generatingAiStep}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition"
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-100 transition"
               >
                 İptal
               </button>
@@ -902,7 +968,7 @@ export default function RoadmapReviewPage() {
                 type="button"
                 onClick={handleGenerateAIStep}
                 disabled={generatingAiStep}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs font-semibold shadow-md shadow-purple-600/20 transition disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-primary to-[#3e92cc] hover:from-[#1b2a55] hover:to-[#2f7cb0] text-primary-foreground text-xs font-semibold shadow-md shadow-primary/20 transition disabled:opacity-50"
               >
                 {generatingAiStep ? (
                   <>

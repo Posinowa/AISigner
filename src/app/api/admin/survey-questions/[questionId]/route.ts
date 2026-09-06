@@ -5,6 +5,7 @@ import {
 } from "@/features/survey/server/survey";
 import { requireAuth } from "@/lib/auth/guard";
 import { updateSurveyQuestionSchema } from "@/lib/validations/api";
+import { rotaHatasi } from "@/lib/api-hata";
 
 /**
  * PATCH /api/admin/survey-questions/[questionId]
@@ -31,7 +32,7 @@ export async function PATCH(
     const updated = await updateSurveyQuestion(questionId, parsed.data);
     return NextResponse.json(updated);
   } catch (error) {
-    console.error("PATCH /api/admin/survey-questions/[questionId] error:", error);
+    rotaHatasi("PATCH /api/admin/survey-questions/[questionId] error:", error);
     return NextResponse.json(
       { error: "Anket sorusu güncellenirken hata oluştu." },
       { status: 500 },
@@ -55,7 +56,7 @@ export async function DELETE(
     await deleteSurveyQuestion(questionId);
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("DELETE /api/admin/survey-questions/[questionId] error:", error);
+    rotaHatasi("DELETE /api/admin/survey-questions/[questionId] error:", error);
     return NextResponse.json(
       { error: "Anket sorusu silinirken hata oluştu." },
       { status: 500 },

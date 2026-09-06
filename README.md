@@ -12,13 +12,22 @@ AISigner, stajyer/öğrencilerin kısa bir anketle güçlü yönlerini ve seviye
 - Admin’in mentör ataması
 - Mentörün proje havuzundan öğrenciye proje ataması
 - AI destekli roadmap üretimi ve adımların onaylanması
-- GitHub fork/PR akışına dayalı çalışma düzeni (bkz. "GitHub Entegrasyonu — Mevcut Durum")
+- Otomatik GitHub çalışma alanı: depo, faz (milestone) ve issue üretimi (bkz. "GitHub Entegrasyonu — Mevcut Durum")
 
 ### GitHub Entegrasyonu — Mevcut Durum
 
-- ✅ Proje şablonlarına GitHub repository URL'i eklenebilir (admin, `ProjectTemplate.githubRepoUrl`).
-- ✅ Roadmap adımlarına GitHub issue linki eklenebilir (mentor, `RoadmapStep.githubIssueUrl`); öğrenci roadmap üzerinde bu linki görür.
-- ❌ Henüz **yok**: otomatik fork/PR oluşturma, issue durumu senkronizasyonu, webhook/GitHub App entegrasyonu. Şu an akış tamamen link-bazlı ve manuel — öğrenci/mentor repo ve issue linklerini elle takip eder.
+- ✅ **Çalışma alanı kurulumu**: mentör talep eder, **admin onaylar**, depo + milestone + issue otomatik açılır (#349).
+  Hedef hesabın organizasyon mu kişisel mi olduğu GitHub'a **sorulur**, tahmin edilmez (#346).
+- ✅ **Webhook** ile iki yönlü senkron (#326): issue/PR kapandığında adım tamamlanır,
+  yeniden açıldığında geri çekilir (#378).
+- ✅ **AI kod incelemesi**: PR açıldığında Gemini ön inceleme yazar (#327). KVKK açık rızası şart.
+- ✅ **Mentör onay kapısı**: tamamlanmış adım gerekçeyle revizyona döndürülebilir; merge edilmiş
+  iş için yeni issue açılır, edilmemişse mevcut issue yeniden açılır (#379).
+- ✅ **Stajyer kendi projesini önerebilir** (#366): depoyu biz açarız / var olan depo bağlanır /
+  depo organizasyona devredilir. Kararı admin verir.
+- ⚠️ **Bağlanan depoda (BAGLA) webhook ve AI kod incelemesi ÇALIŞMAZ** — depo stajyerin
+  hesabında ve `GITHUB_TOKEN` orada yetkisiz. #348 (GitHub App) bunu çözecek.
+- ❌ Henüz **yok**: otomatik fork/PR oluşturma; bot kimliği hâlâ kişisel erişim belirteci (#348).
 
 ## Ön Gereksinimler
 
@@ -128,6 +137,14 @@ npm run seed
 >| Student | student@example.com | geçici_şifre    |
 
 > Bu kullanıcılarla `/signin` üzerinden giriş yapabilir, yönlendirme ve layout guard’ları test edebilirsin.
+>
+> **Şifre (#216):** Varsayılan yukarıdaki gibidir. Farklı bir şifre istersen `DEMO_PASSWORD` env'i ile
+> geçebilirsin (`DEMO_PASSWORD='...' npm run seed`) — bu durumda değer **konsola yazılmaz**, yalnızca
+> `DEMO_PASSWORD env'inden` ibaresi görünür. `npm run seed` tekrar çalıştırıldığında demo hesapların
+> şifre/rol/`accountStatus` bilgisi **tazelenir** (şifreni unutursan kurtarır).
+>
+> ⚠️ `npm run seed` **production'da çalışmaz** (kod seviyesinde engellenir). Canlıda gerçek yönetici
+> hesabı için `npm run create:admin` kullanılır — bkz. `DEPLOYMENT.md`.
 
 ---
 
@@ -652,7 +669,8 @@ Uygulama Next.js App Router mimarisiyle yapılandırılmıştır. Dosya sistemi 
 
 ### M5 – GitHub Akışı Rehberi
 - Dokümantasyon: fork → branch → PR akışı, `gh` CLI yönergeleri.
-- (Opsiyon) PR/Issue read‑only durumlarını uygulamada göstermek için webhook/cron okuma taslağı.
+- ~~(Opsiyon) PR/Issue durumlarını webhook/cron ile okuma taslağı.~~ **Tamamlandı** — #326 ile
+  webhook, #378 ile yeniden açılma senkronu canlıda.
 
 ### M6 – Geri Bildirim ve Görünürlük
 - Öğrenci/Mentor yorum alanları (uygulama içi), ilerleme yüzdesi, bildirim taslağı.

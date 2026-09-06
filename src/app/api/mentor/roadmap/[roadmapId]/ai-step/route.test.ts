@@ -1,15 +1,38 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-const { requireAuthMock, prismaMock, getModelMock } = vi.hoisted(() => ({
+const { requireAuthMock, prismaMock, getModelMock, rizaMock, loggerMock, limitMock } = vi.hoisted(() => ({
   requireAuthMock: vi.fn(),
-  prismaMock: { roadmap: { findUnique: vi.fn() } },
+  /*
+   * Gemini çağıran her uç gibi kısıtlı.
+   *
+   * Varsayılan İZİN VERİR ve bu bir TABAN UYGULAMA (`vi.fn(impl)`) —
+   * `mockResolvedValue` DEĞİL. Dosyadaki describe'lar `vi.clearAllMocks()`
+   * çağırıyor; o çağrıları siler ama uygulamayı silmez. Taban uygulama
+   * olmasaydı limit mock'u `undefined` dönüp `rl.allowed` falsy olurdu ve
+   * limitle ilgisi olmayan her test 429 alırdı.
+   */
+  limitMock: vi.fn<
+    (anahtar: string) => Promise<{ allowed: boolean; retryAfterSeconds?: number }>
+  >(async () => ({ allowed: true })),
+  prismaMock: {
+    roadmap: { findUnique: vi.fn() },
+    roadmapStep: { create: vi.fn(), findFirst: vi.fn(), count: vi.fn() },
+  },
   getModelMock: vi.fn(),
+  rizaMock: vi.fn(),
+  loggerMock: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
+vi.mock("@/lib/logger", () => ({ logger: loggerMock }));
 vi.mock("@/lib/auth/guard", () => ({
   requireAuth: (...a: unknown[]) => requireAuthMock(...a),
 }));
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 vi.mock("@/lib/ai/gemini-client", () => ({ getModel: (...a: unknown[]) => getModelMock(...a) }));
+// #389: Kardeş uç generate-roadmap rızayı kontrol ediyordu, burası atlamıştı.
+vi.mock("@/features/kvkk/riza", () => ({ profilSahibininRizasiVar: rizaMock }));
+vi.mock("@/lib/rate-limit", () => ({
+  createRateLimiter: () => ({ check: (anahtar: string) => limitMock(anahtar) }),
+}));
 
 import { POST } from "./route";
 
@@ -38,5 +61,235 @@ describe("mentor ai-step route — yetki (#178-3)", () => {
     prismaMock.roadmap.findUnique.mockResolvedValue(null);
     const res = await POST(req(), ctx);
     expect(res.status).toBe(404);
+  });
+});
+
+/**
+ * #377 — ai-step ARTIK `cozVeDogrula`'DAN GEÇİYOR.
+ *
+ * Öncesinde elle ```json temizliği vardı ve tip yalnızca varsayılıyordu.
+ * Buradaki sürüm `cozVeDogrula`'dan DAHA ZAYIFTI: modelin JSON'un başına
+ * eklediği açıklama metnini ayıklamıyordu, o durumda `JSON.parse` patlayıp
+ * akış SESSİZCE fallback adıma düşüyordu — mentör uydurma bir adım alıyor,
+ * bunu gerçek AI çıktısından ayırt edemiyordu.
+ */
+describe("model çıktısı çözümleme (#377)", () => {
+  const ADIM = {
+    title: "Kimlik doğrulama katmanı",
+    description: "NextAuth ile oturum akışını kur.",
+    estimatedHours: 5,
+    resources: ["https://next-auth.js.org"],
+  };
+
+  function modelDondursun(text: string) {
+    getModelMock.mockReturnValue({
+      generateContent: vi.fn().mockResolvedValue({ text }),
+    });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    requireAuthMock.mockResolvedValue({
+      authorized: true,
+      session: { user: { id: "m", role: "MENTOR" } },
+    });
+    prismaMock.roadmap.findUnique.mockResolvedValue({
+      id: "r-1",
+      steps: [],
+      assignedProject: {
+        studentProfile: {
+          userId: "o-1",
+          experienceLevel: "BEGINNER",
+          interests: [],
+          // Prompt öğrenci adını kullanıyor; eksik bırakmak sessizce
+          // fallback'e düşürüyordu.
+          user: { name: "Ogrenci" },
+          mentorAssignments: [{ mentorId: "m" }],
+        },
+        team: null,
+        projectTemplate: { title: "Proje", description: "aciklama" },
+      },
+    });
+    rizaMock.mockResolvedValue(true);
+    prismaMock.roadmapStep.create.mockImplementation(
+      async ({ data }: { data: Record<string, unknown> }) => ({ id: "st-1", ...data }),
+    );
+  });
+
+  it("⚠️ ```json BLOĞUNA sarılı çıktı çözülür", async () => {
+    modelDondursun(["```json", JSON.stringify(ADIM), "```"].join("\n"));
+
+    const res = await POST(req({ prompt: "auth" }), ctx);
+    const veri = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(veri.step.title).toBe(ADIM.title);
+    expect(loggerMock.warn).not.toHaveBeenCalled();
+  });
+
+  it("⚠️ BAŞINA AÇIKLAMA eklenmiş çıktı çözülür — eski regex bunu ayıklamıyordu", async () => {
+    modelDondursun("Tabii, işte adım:" + "\n\n" + JSON.stringify(ADIM));
+
+    const res = await POST(req({ prompt: "auth" }), ctx);
+    const veri = await res.json();
+
+    expect(veri.step.title).toBe(ADIM.title);
+  });
+
+  it("eksik alanlarda fallback DEĞERLER kullanılır", async () => {
+    modelDondursun(JSON.stringify({ title: "Sadece baslik", description: "aciklama" }));
+
+    const res = await POST(req({ prompt: "x" }), ctx);
+    const veri = await res.json();
+
+    expect(veri.step.estimatedHours).toBe(3);
+    expect(veri.step.resources.length).toBeGreaterThan(0);
+  });
+
+  it("ŞEMAYA uymayan çıktıda fallback adım üretilir VE loglanır", async () => {
+    // `description` yok — eski sürüm bunu sessizce atlıyordu.
+    modelDondursun(JSON.stringify({ title: "eksik" }));
+
+    const res = await POST(req({ prompt: "x" }), ctx);
+    const veri = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(veri.step.title).not.toBe("eksik");
+    expect(loggerMock.warn).toHaveBeenCalled();
+  });
+
+  it("bozuk JSON'da fallback adım üretilir VE loglanır", async () => {
+    modelDondursun("{bu json degil");
+
+    const res = await POST(req({ prompt: "x" }), ctx);
+
+    expect(res.status).toBe(200);
+    expect(loggerMock.warn).toHaveBeenCalled();
+  });
+});
+
+/**
+ * #389 — ai-step KVKK RIZASINI ATLIYORDU.
+ *
+ * Kardeş uç `generate-roadmap` `profilSahibininRizasiVar` ile kapılıydı;
+ * burası değildi. Prompt öğrencinin ADINI, deneyim seviyesini ve proje
+ * bağlamını taşıyor — işlemi mentör başlatsa da veri öğrenciye ait.
+ */
+describe("KVKK açık rızası (#389)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    requireAuthMock.mockResolvedValue({
+      authorized: true,
+      session: { user: { id: "m", role: "MENTOR" } },
+    });
+    prismaMock.roadmap.findUnique.mockResolvedValue({
+      id: "r-1",
+      steps: [],
+      assignedProject: {
+        studentProfile: {
+          id: "sp-1",
+          userId: "o-1",
+          experienceLevel: "BEGINNER",
+          interests: [],
+          user: { name: "Ogrenci" },
+          mentorAssignments: [{ mentorId: "m" }],
+        },
+        team: null,
+        projectTemplate: { title: "Proje", description: "aciklama" },
+      },
+    });
+    getModelMock.mockReturnValue({
+      generateContent: vi.fn().mockResolvedValue({ text: "{}" }),
+    });
+  });
+
+  it("⚠️ RIZA YOKSA 403 ve MODEL ÇAĞRILMAZ", async () => {
+    rizaMock.mockResolvedValue(false);
+
+    const res = await POST(req({ prompt: "auth" }), ctx);
+
+    expect(res.status).toBe(403);
+    expect((await res.json()).rizaGerekli).toBe(true);
+    expect(getModelMock).not.toHaveBeenCalled();
+  });
+
+  it("rıza ÖĞRENCİ PROFİLİ üzerinden sorulur — mentörün değil", async () => {
+    rizaMock.mockResolvedValue(true);
+
+    await POST(req({ prompt: "auth" }), ctx);
+
+    expect(rizaMock).toHaveBeenCalledWith("sp-1");
+  });
+
+  it("⚠️ rıza yokken FALLBACK ADIM da üretilmez", async () => {
+    // Mentör bir adım üretmeyi bilerek istedi; sessizce jenerik bir adım
+    // almamalı. Açık hata dönüyoruz.
+    rizaMock.mockResolvedValue(false);
+
+    await POST(req({ prompt: "auth" }), ctx);
+
+    expect(prismaMock.roadmapStep.create).not.toHaveBeenCalled();
+  });
+
+  it("rıza varsa akış normal — regresyon yok", async () => {
+    rizaMock.mockResolvedValue(true);
+
+    const res = await POST(req({ prompt: "auth" }), ctx);
+
+    expect(res.status).toBe(200);
+    expect(getModelMock).toHaveBeenCalled();
+  });
+});
+
+describe("maliyet kapısı — rate limit", () => {
+  /*
+   * Bu uç Gemini çağırıyor ama limitleyicisi YOKTU; kardeşi
+   * `generate-roadmap` 60 sn'de 5 istekle sınırlıydı. Yetkili bir mentör
+   * gerekiyor, ama üretim tek tıkla tekrarlanabildiği için tek oturum
+   * faturayı sınırsız büyütebilirdi.
+   */
+  beforeEach(() => {
+    vi.clearAllMocks();
+    requireAuthMock.mockResolvedValue({
+      authorized: true,
+      session: { user: { id: "men-1", role: "MENTOR" } },
+    });
+  });
+
+  it("tavan dolduğunda 429 + Retry-After", async () => {
+    limitMock.mockResolvedValueOnce({ allowed: false, retryAfterSeconds: 42 });
+
+    const res = await POST(req(), ctx);
+
+    expect(res.status).toBe(429);
+    expect(res.headers.get("Retry-After")).toBe("42");
+  });
+
+  it("tavan dolduğunda ne DB'ye ne MODELE gidilir", async () => {
+    limitMock.mockResolvedValueOnce({ allowed: false, retryAfterSeconds: 1 });
+
+    await POST(req(), ctx);
+
+    expect(prismaMock.roadmap.findUnique).not.toHaveBeenCalled();
+    expect(getModelMock).not.toHaveBeenCalled();
+  });
+
+  it("sayaç MENTÖR BAŞINA — kapsam oturumdan", async () => {
+    prismaMock.roadmap.findUnique.mockResolvedValue(null);
+
+    await POST(req(), ctx);
+
+    expect(limitMock).toHaveBeenCalledWith("men-1");
+  });
+
+  it("kapı YETKİDEN SONRA — oturumsuz istek sayacı tüketmez", async () => {
+    requireAuthMock.mockResolvedValue({
+      authorized: false,
+      response: new Response(null, { status: 403 }),
+    });
+
+    await POST(req(), ctx);
+
+    expect(limitMock).not.toHaveBeenCalled();
   });
 });

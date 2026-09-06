@@ -1,6 +1,9 @@
 import { prisma } from "@/lib/db";
+import { mentorunOgrencisiWhere } from "@/features/teams/server/sahiplik";
 import { Prisma } from "@prisma/client";
 import { logger } from "@/lib/logger";
+import { kodIncelemesiDurumu } from "@/features/kvkk/kod-incelemesi-durumu";
+import { atamaTekilKey } from "@/features/projects/tekil-anahtar";
 
 // #58: Aynı proje aynı öğrenciye iki kez atanmaya çalışılırsa — route bunu 409'a çevirir.
 export class AssignmentConflictError extends Error {
@@ -32,6 +35,22 @@ export type StudentWithProfile = {
       };
       createdAt: Date;
     }[];
+    /**
+     * #367/#393: Öğrencinin AKTİF takım üyelikleri.
+     *
+     * ⚠️ Takım atamasında `AssignedProject.studentProfileId` NULL, sahiplik
+     * `teamId` üzerinde (#332). Proje sayaçları bu dalı da okumalı; yalnız
+     * `assignedProjects`'e bakan sürüm takımı olup bireysel projesi olmayan
+     * stajyer için "aktif projesi yok" diyordu.
+     */
+    teamMemberships: {
+      role: string;
+      team: {
+        id: string;
+        name: string;
+        assignedProjects: { id: string; status: string }[];
+      };
+    }[];
   } | null;
 };
 
@@ -42,11 +61,38 @@ export async function getMentorStudents(mentorId: string): Promise<StudentWithPr
       where: {
         role: "STUDENT",
         studentProfile: {
-          // #195: M:N — bu mentörün atandığı öğrenciler.
-          mentorAssignments: { some: { mentorId } },
+          // #367: MENTÖRÜN ÖĞRENCİLERİ İKİ YOLDAN GELİR.
+          //
+          // Öncesi yalnız bireysel bağa bakıyordu. #332 ile mentör TAKIMA da
+          // atanabiliyor ve takım üyeleriyle arasında bireysel bir
+          // `MentorAssignment` kaydı YOK — dolayısıyla takım mentörü kendi
+          // panelinde HİÇBİR ŞEY göremiyordu. Yetki katmanı doğru çalışıyordu
+          // (API 200 dönüyordu), ama arayüzde takıma giden yol yoktu.
+          OR: [
+            // #195: M:N — bu mentörün doğrudan atandığı öğrenciler.
+            { mentorAssignments: { some: { mentorId } } },
+            // #332: Bu mentörün takımlarındaki AKTİF üyeler.
+            {
+              teamMemberships: {
+                some: { leftAt: null, team: { mentors: { some: { mentorId } } } },
+              },
+            },
+          ],
         },
       },
-      include: {
+      // ⚠️ `include` DEĞİL `select`: `include` kullanıcının TÜM sütunlarını
+      // döndürüyordu ve içinde `password` (argon2 hash) de vardı — mentör
+      // panelinin JSON yanıtında istemciye kadar gidiyordu. `getAllUsers`
+      // aynı sebeple zaten `select` kullanıyor; burası atlanmıştı.
+      select: {
+        id: true,
+        name: true,
+        lastName: true,
+        email: true,
+        role: true,
+        accountStatus: true,
+        createdAt: true,
+        avatarFile: true,
         studentProfile: {
           include: {
             assignedProjects: {
@@ -58,9 +104,69 @@ export async function getMentorStudents(mentorId: string): Promise<StudentWithPr
                     difficulty: true,
                   },
                 },
+                // #405: Taslak yol haritası panoda işaretlenebilsin. Takım
+                // projelerinde bu alan zaten seçiliydi, bireysel projelerde
+                // hiç çekilmiyordu — dolayısıyla mentör "yol haritası var mı,
+                // yayında mı" sorusunu panodan yanıtlayamıyordu.
+                //
+                // #432: Adım durumları da geliyor — mentör öğrencisinin NEREDE
+                // olduğunu panodan görebilsin. Yalnız `status` ve `updatedAt`:
+                // başlık/açıklama pano için gereksiz yük.
+                roadmap: {
+                  select: {
+                    id: true,
+                    status: true,
+                    steps: { select: { status: true, updatedAt: true } },
+                  },
+                },
               },
               orderBy: {
                 createdAt: "desc",
+              },
+            },
+            // #367: Öğrencinin AKTİF takım üyelikleri — mentör panelinde
+            // "bu stajyer hangi takımda, ortak projesi ne" görünsün.
+            teamMemberships: {
+              where: { leftAt: null },
+              select: {
+                role: true,
+                team: {
+                  select: {
+                    id: true,
+                    name: true,
+                    members: {
+                      where: { leftAt: null },
+                      select: {
+                        role: true,
+                        studentProfile: {
+                          select: {
+                            user: { select: { id: true, name: true, lastName: true, email: true } },
+                          },
+                        },
+                      },
+                    },
+                    assignedProjects: {
+                      select: {
+                        id: true,
+                        // #393: Pano sayaçları aktif/tamamlanmış ayrımı için
+                        // durumu okuyor; seçilmediği için takım projeleri
+                        // hiç sayılamıyordu.
+                        status: true,
+                        githubRepoUrl: true,
+                        githubStatus: true,
+                        projectTemplate: { select: { id: true, title: true } },
+                        // #432: Takım projesinin ilerlemesi de panoda görünsün.
+                        roadmap: {
+                          select: {
+                            id: true,
+                            status: true,
+                            steps: { select: { status: true, updatedAt: true } },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
               },
             },
           },
@@ -87,12 +193,24 @@ export async function getStudentDetail(studentId: string, mentorId: string) {
       where: {
         id: studentId,
         role: "STUDENT",
-        studentProfile: {
-          // #195: M:N — öğrencinin mentorlarından biri bu mentör mü?
-          mentorAssignments: { some: { mentorId } },
-        },
+        // #370: Bağ İKİ YOLDAN gelir. #367 LİSTEYİ düzeltmişti ama burası
+        // bireysel bağa bakmayı sürdürüyordu: takım mentörü üyeyi panelinde
+        // görüyor, tıklayınca 404 alıyordu.
+        studentProfile: mentorunOgrencisiWhere(mentorId),
       },
-      include: {
+      // ⚠️ `include` DEĞİL `select`: `include` kullanıcının TÜM sütunlarını
+      // döndürüyordu ve içinde `password` (argon2 hash) de vardı — mentör
+      // panelinin JSON yanıtında istemciye kadar gidiyordu. `getAllUsers`
+      // aynı sebeple zaten `select` kullanıyor; burası atlanmıştı.
+      select: {
+        id: true,
+        name: true,
+        lastName: true,
+        email: true,
+        role: true,
+        accountStatus: true,
+        createdAt: true,
+        avatarFile: true,
         studentProfile: {
           include: {
             assignedProjects: {
@@ -107,10 +225,78 @@ export async function getStudentDetail(studentId: string, mentorId: string) {
                       }
                     }
                   }
-                }
+                },
+                // #349: Çalışma alanı talebinin SON durumu. Yalnız sonuncusu
+                // gerekiyor — mentör ekranı "talep ettim mi, ne oldu" sorusunu
+                // cevaplıyor, geçmiş dökümü değil.
+                workspaceRequests: {
+                  orderBy: { createdAt: "desc" },
+                  take: 1,
+                  select: {
+                    id: true,
+                    status: true,
+                    adminNote: true,
+                    createdAt: true,
+                    decidedAt: true,
+                  },
+                },
               },
               orderBy: {
                 createdAt: "desc",
+              },
+            },
+            /*
+             * #442: TAKIM PROJELERİ DE GELİYOR.
+             *
+             * ⚠️ Takım atamasında `studentProfileId` NULL (#332), dolayısıyla
+             * üstteki `assignedProjects` takım projesini HİÇ getirmiyordu:
+             * mentör, takımda aktif çalışan bir stajyeri "projesi yok" olarak
+             * görüyordu. Canlı doğrulandı (`assignedProjects: 0 kayıt`).
+             *
+             * ⚠️ #367 AYNI HATAYI ÜÇ YÜZEYDE düzeltmişti ama BURASI atlanmıştı:
+             * mentör listesi ve öğrenci panosu takım bağını soruyor, mentörün
+             * öğrenci DETAYI sormuyordu.
+             *
+             * Seçim bireysel dalla AYNI şekilde — iki liste birleştirilecek.
+             */
+            teamMemberships: {
+              where: { leftAt: null },
+              select: {
+                team: {
+                  select: {
+                    id: true,
+                    name: true,
+                    members: {
+                      where: { leftAt: null },
+                      select: {
+                        role: true,
+                        studentProfile: {
+                          select: {
+                            user: { select: { id: true, name: true, lastName: true, email: true } },
+                          },
+                        },
+                      },
+                    },
+                    assignedProjects: {
+                      include: {
+                        projectTemplate: true,
+                        roadmap: { include: { steps: { orderBy: { order: "asc" } } } },
+                        workspaceRequests: {
+                          orderBy: { createdAt: "desc" },
+                          take: 1,
+                          select: {
+                            id: true,
+                            status: true,
+                            adminNote: true,
+                            createdAt: true,
+                            decidedAt: true,
+                          },
+                        },
+                      },
+                      orderBy: { createdAt: "desc" },
+                    },
+                  },
+                },
               },
             },
             // #48: Detaylı AI profil analizi (varsa) — mentor kendi öğrencisininkini görür.
@@ -120,7 +306,54 @@ export async function getStudentDetail(studentId: string, mentorId: string) {
       },
     });
 
-    return student;
+    if (!student) return student;
+
+    /*
+     * #394: AI KOD İNCELEMESİNİN DURUMU.
+     *
+     * Kural (takımda herkesin güncel rızası) doğru ve gevşetilmiyor; eksik
+     * olan SESSİZLİĞİYDİ. Engelleme hiç kimseye söylenmiyordu: PR'ı açan
+     * öğrenci incelemenin neden gelmediğini bilmiyor, mentör de durumu
+     * göremiyordu (sayaç artıyor ama o yalnızca teşhis).
+     *
+     * ⚠️ Atama başına TEK sorgu; öğrencinin birkaç projesi olabilir ama
+     * sayı küçük ve durum atamaya özgü (takım üyeleri farklı olabilir).
+     */
+    /*
+     * #442: BİREYSEL + TAKIM atamaları TEK listede.
+     *
+     * Arayüz `assignedProjects`'i okuyor; birleştirmeyi burada yapmak, sayfanın
+     * iki ayrı liste yönetmesinden iyi. Her satıra `takim` işareti konuyor:
+     *
+     * ⚠️ Takım satırı BİREYSELMİŞ GİBİ durmamalı — pano ortak, yapılan iş
+     * tüm takımı etkiliyor.
+     * ⚠️ Takımda AI yol haritası üretimi KAPALI (#332, açık 400); arayüz o
+     * düğmeyi takım satırında sunmamalı.
+     */
+    const takimlar = (student.studentProfile?.teamMemberships ?? []).map((u) => u.team);
+    const tumAtamalar = [
+      ...(student.studentProfile?.assignedProjects ?? []).map((p) => ({
+        ...p,
+        takim: null as (typeof takimlar)[number] | null,
+      })),
+      ...takimlar.flatMap((t) => t.assignedProjects.map((p) => ({ ...p, takim: t }))),
+    ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+    const atamalar = tumAtamalar;
+    const kodIncelemesi = Object.fromEntries(
+      await Promise.all(
+        atamalar.map(async (a) => [a.id, await kodIncelemesiDurumu(a.id)] as const),
+      ),
+    );
+
+    return {
+      ...student,
+      // #442: Arayüz tek liste okuyor; takım projeleri de burada.
+      studentProfile: student.studentProfile
+        ? { ...student.studentProfile, assignedProjects: tumAtamalar }
+        : student.studentProfile,
+      kodIncelemesi,
+    };
   } catch (error) {
     // "Bulunamadı" durumunu findFirst zaten null ile döner (exception atmaz);
     // buraya yalnızca gerçek DB hatasında düşülür → yutmak yerine rethrow.
@@ -140,8 +373,8 @@ export async function assignProjectToStudent(
     const studentProfile = await prisma.studentProfile.findFirst({
       where: {
         id: studentProfileId,
-        // #195: M:N — bu mentör öğrencinin mentorlarından biri mi?
-        mentorAssignments: { some: { mentorId } },
+        // #370: bireysel VEYA takım bağı.
+        ...mentorunOgrencisiWhere(mentorId),
       },
     });
 
@@ -149,16 +382,33 @@ export async function assignProjectToStudent(
       throw new Error("Bu öğrenci size atanmamış");
     }
 
-    // Aynı projeyi daha önce atanmış mı kontrol et (hızlı yol — kullanıcı dostu)
-    const existingAssignment = await prisma.assignedProject.findFirst({
-      where: {
-        studentProfileId,
-        projectTemplateId,
-      },
+    // #503: Şablon TEKRARLANABİLİR mi? Portfolyo sitesi gibi herkesin yapması
+    // beklenen işler ve araştırma ödevleri aynı stajyere birden çok kez
+    // atanabilmeli.
+    const sablon = await prisma.projectTemplate.findUnique({
+      where: { id: projectTemplateId },
+      select: { tekrarlanabilir: true },
     });
-
-    if (existingAssignment) {
+    if (!sablon) {
       throw new AssignmentConflictError();
+    }
+
+    // Aynı projeyi daha önce atanmış mı kontrol et (hızlı yol — kullanıcı dostu)
+    //
+    // ⚠️ TEKRARLANABİLİR ŞABLONDA BU KONTROL ATLANIR (#503). Kontrolün amacı
+    // #58'in "aynı proje aynı öğrenciye iki kez" korumasıydı; tekrarlanabilir
+    // şablonlarda o davranış İSTENEN şey.
+    if (!sablon.tekrarlanabilir) {
+      const existingAssignment = await prisma.assignedProject.findFirst({
+        where: {
+          studentProfileId,
+          projectTemplateId,
+        },
+      });
+
+      if (existingAssignment) {
+        throw new AssignmentConflictError();
+      }
     }
 
     // Projeyi ata
@@ -167,6 +417,13 @@ export async function assignProjectToStudent(
         studentProfileId,
         projectTemplateId,
         status: "PENDING",
+        // #503: Koşullu tekillik. Tekrarlanamaz şablonda anahtar dolu →
+        // yarış koruması (P2002) aynen sürer; tekrarlanabilirde NULL.
+        tekilKey: atamaTekilKey({
+          projectTemplateId,
+          tekrarlanabilir: sablon.tekrarlanabilir,
+          studentProfileId,
+        }),
       },
       include: {
         projectTemplate: true,
@@ -214,10 +471,8 @@ export async function updateProjectStatus(
     const assignedProject = await prisma.assignedProject.findFirst({
       where: {
         id: assignedProjectId,
-        studentProfile: {
-          // #195: M:N — öğrencinin mentorlarından biri mi?
-          mentorAssignments: { some: { mentorId } },
-        },
+        // #370: bireysel VEYA takım bağı.
+        studentProfile: mentorunOgrencisiWhere(mentorId),
       },
     });
 
@@ -254,8 +509,8 @@ export async function unassignProject(
   const assignedProject = await prisma.assignedProject.findFirst({
     where: {
       id: assignedProjectId,
-      // #195: M:N — öğrencinin mentorlarından biri mi?
-      studentProfile: { mentorAssignments: { some: { mentorId } } },
+      // #370: bireysel VEYA takım bağı.
+      studentProfile: mentorunOgrencisiWhere(mentorId),
     },
     include: {
       roadmap: {

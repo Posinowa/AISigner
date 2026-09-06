@@ -16,6 +16,8 @@ type ProjectTemplate = {
   difficulty: "EASY" | "MEDIUM" | "HARD";
   track: string[];
   githubRepoUrl?: string | null;
+  /** #503: Aynı stajyere birden çok kez atanabilir mi? */
+  tekrarlanabilir?: boolean;
 };
 
 type FormData = {
@@ -24,12 +26,13 @@ type FormData = {
   difficulty: "EASY" | "MEDIUM" | "HARD";
   track: string;
   githubRepoUrl: string;
+  tekrarlanabilir: boolean;
 };
 
 const difficultyColors = {
-  EASY: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200",
-  MEDIUM: "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200",
-  HARD: "bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border border-red-200",
+  EASY: "bg-emerald-50 text-emerald-700 border border-emerald-200",
+  MEDIUM: "bg-amber-50 text-amber-700 border border-amber-200",
+  HARD: "bg-red-50 text-red-700 border border-red-200",
 };
 
 export default function ProjectsPage() {
@@ -43,6 +46,7 @@ export default function ProjectsPage() {
     difficulty: "EASY",
     track: "",
     githubRepoUrl: "",
+    tekrarlanabilir: false,
   });
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(true); // Sayfa yükleniyor durumu
@@ -75,7 +79,14 @@ export default function ProjectsPage() {
   }, [loadTemplates]);
 
   function resetForm() {
-    setForm({ title: "", description: "", difficulty: "EASY", track: "", githubRepoUrl: "" });
+    setForm({
+      title: "",
+      description: "",
+      difficulty: "EASY",
+      track: "",
+      githubRepoUrl: "",
+      tekrarlanabilir: false,
+    });
     setIsFormOpen(false);
     setEditingId(null);
   }
@@ -90,6 +101,9 @@ export default function ProjectsPage() {
       difficulty: template.difficulty,
       track: template.track.join(", "),
       githubRepoUrl: template.githubRepoUrl ?? "",
+      // #508: Düzenlemede mevcut değer yüklenmezse form her açılışta bayrağı
+      // sıfırlar ve admin farkında olmadan KAPATIR.
+      tekrarlanabilir: template.tekrarlanabilir ?? false,
     });
     setEditingId(template.id);
     setIsFormOpen(true);
@@ -169,12 +183,12 @@ export default function ProjectsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/30">
       <div className="max-w-6xl mx-auto p-4 sm:p-6">
       {/* Geri linki */}
       <Link
         href="/admin-dashboard"
-        className="inline-flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors mb-4"
+        className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 transition-colors mb-4"
       >
         <ArrowLeft className="w-4 h-4" />
         Yönetici Paneline Dön
@@ -187,13 +201,13 @@ export default function ProjectsPage() {
             <FolderKanban className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Proje Şablonları</h1>
-            <p className="text-slate-500 dark:text-slate-400 mt-0.5 text-sm">Öğrenciler için proje şablonlarını yönet</p>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Proje Şablonları</h1>
+            <p className="text-slate-500 mt-0.5 text-sm">Öğrenciler için proje şablonlarını yönet</p>
           </div>
         </div>
         <button
           onClick={() => setIsFormOpen(true)}
-          className="inline-flex items-center px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold rounded-xl text-sm shadow-md shadow-blue-200 transition-all"
+          className="inline-flex items-center px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold rounded-xl text-sm shadow-md shadow-primary transition-all"
         >
           <Plus className="w-4 h-4 mr-2" />
           Yeni Şablon
@@ -209,7 +223,7 @@ export default function ProjectsPage() {
             aria-modal="true"
             aria-label={editingId ? "Şablonu Düzenle" : "Yeni Şablon Ekle"}
             tabIndex={-1}
-            className="bg-white dark:bg-slate-900 rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto outline-none"
+            className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto outline-none"
           >
             <div className="flex justify-between items-center p-6 border-b">
               <h2 className="text-xl font-semibold">
@@ -218,7 +232,7 @@ export default function ProjectsPage() {
               <button
                 onClick={resetForm}
                 aria-label="Kapat"
-                className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
+                className="text-slate-400 hover:text-slate-600"
               >
                 <X className="w-6 h-6" />
               </button>
@@ -226,45 +240,45 @@ export default function ProjectsPage() {
 
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-2">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
                   Başlık
                 </label>
                 <input
                   type="text"
                   value={form.title}
                   onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent"
                   placeholder="Proje başlığı girin"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-2">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
                   Açıklama (Markdown)
                 </label>
                 <textarea
                   value={form.description}
                   onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
                   rows={8}
-                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent font-mono text-sm"
                   placeholder="Proje açıklamasını markdown formatında yazın..."
                   required
                 />
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                <p className="text-xs text-slate-500 mt-1">
                   Markdown formatını kullanabilirsiniz (# başlık, **kalın**, *italik*, vb.)
                 </p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-2">
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
                     Zorluk Seviyesi
                   </label>
                   <select
                     value={form.difficulty}
                     onChange={e => setForm(f => ({ ...f, difficulty: e.target.value as "EASY" | "MEDIUM" | "HARD" }))}
-                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent"
                   >
                     <option value="EASY">Kolay</option>
                     <option value="MEDIUM">Orta</option>
@@ -273,47 +287,79 @@ export default function ProjectsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-2">
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
                     Kategoriler
                   </label>
                   <input
                     type="text"
                     value={form.track}
                     onChange={e => setForm(f => ({ ...f, track: e.target.value }))}
-                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent"
                     placeholder="React, Next.js, TypeScript..."
                   />
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  <p className="text-xs text-slate-500 mt-1">
                     Virgülle ayırarak birden fazla kategori girebilirsiniz
                   </p>
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-2">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
                   GitHub Repository URL (opsiyonel)
                 </label>
                 <input
                   type="text"
                   value={form.githubRepoUrl}
                   onChange={e => setForm(f => ({ ...f, githubRepoUrl: e.target.value }))}
-                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent"
                   placeholder="https://github.com/kullanici/repo"
                 />
+              </div>
+
+              {/* #508: #503'ün bayrağı arayüzde YOKTU — özellik yalnız
+                  doğrudan veritabanı güncellemesiyle açılabiliyordu. */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.tekrarlanabilir}
+                    onChange={e => setForm(f => ({ ...f, tekrarlanabilir: e.target.checked }))}
+                    className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-2 focus:ring-ring"
+                  />
+                  <span className="text-sm">
+                    <span className="font-medium text-slate-800">
+                      Aynı stajyere birden çok kez atanabilsin
+                    </span>
+                    {/* ⚠️ METİN SONUCU SÖYLÜYOR, DURUMU DEĞİL (#405 dersi):
+                        "tekrarlanabilir" tek başına ne anlama geldiğini
+                        söylemiyor. */}
+                    <span className="mt-1 block text-xs leading-relaxed text-slate-500">
+                      Portfolyo sitesi gibi herkesin yapması beklenen işler ve
+                      araştırma ödevleri için. Kapalıyken bir proje aynı
+                      stajyere yalnızca bir kez atanabilir.
+                    </span>
+                    {form.tekrarlanabilir && (
+                      <span className="mt-1.5 block text-xs leading-relaxed text-amber-700">
+                        ⚠️ Bu ayarı sonradan kapatmak, daha önce yapılmış
+                        tekrarlı atamaları geri almaz.
+                      </span>
+                    )}
+                  </span>
+                </label>
               </div>
 
               <div className="flex justify-end gap-3 pt-4 border-t">
                 <button
                   type="button"
                   onClick={resetForm}
-                  className="px-4 py-2 text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                  className="px-4 py-2 text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
                 >
                   İptal
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                  className="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg transition-colors disabled:opacity-50"
                 >
                   {loading ? "Kaydediliyor..." : editingId ? "Güncelle" : "Kaydet"}
                 </button>
@@ -326,20 +372,20 @@ export default function ProjectsPage() {
       {/* Loading State */}
       {pageLoading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-600 dark:text-blue-400" />
-          <span className="ml-3 text-slate-600 dark:text-slate-300">Şablonlar yükleniyor...</span>
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+          <span className="ml-3 text-slate-600">Şablonlar yükleniyor...</span>
         </div>
       ) : loadError ? (
         /* #59: "Hiç şablon yok" ile "istek başarısız oldu" karışmasın diye ayrı hata durumu. */
         <div className="text-center py-12">
-          <div className="w-14 h-14 rounded-2xl bg-red-50 dark:bg-red-950/40 flex items-center justify-center mx-auto mb-4">
-            <AlertCircle className="w-7 h-7 text-red-500 dark:text-red-400" />
+          <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-7 h-7 text-red-500" />
           </div>
-          <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">Şablonlar yüklenemedi</h3>
-          <p className="text-slate-600 dark:text-slate-300 mb-4">Bağlantıda bir sorun oluştu. Lütfen tekrar deneyin.</p>
+          <h3 className="text-lg font-medium text-slate-900 mb-2">Şablonlar yüklenemedi</h3>
+          <p className="text-slate-600 mb-4">Bağlantıda bir sorun oluştu. Lütfen tekrar deneyin.</p>
           <button
             onClick={loadTemplates}
-            className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+            className="inline-flex items-center px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-lg transition-colors"
           >
             Tekrar Dene
           </button>
@@ -349,12 +395,12 @@ export default function ProjectsPage() {
           {/* Templates Grid */}
           {templates.length === 0 ? (
             <div className="text-center py-12">
-              <div className="text-slate-400 dark:text-slate-500 text-6xl mb-4">📝</div>
-              <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">Henüz şablon yok</h3>
-              <p className="text-slate-600 dark:text-slate-300 mb-4">İlk proje şablonunuzu ekleyerek başlayın</p>
+              <div className="text-slate-400 text-6xl mb-4">📝</div>
+              <h3 className="text-lg font-medium text-slate-900 mb-2">Henüz şablon yok</h3>
+              <p className="text-slate-600 mb-4">İlk proje şablonunuzu ekleyerek başlayın</p>
               <button
                 onClick={() => setIsFormOpen(true)}
-                className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+                className="inline-flex items-center px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-lg transition-colors"
               >
                 <Plus className="w-5 h-5 mr-2" />
                 Yeni Şablon Ekle
@@ -363,31 +409,44 @@ export default function ProjectsPage() {
           ) : (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {templates.map(template => (
-                <div key={template.id} className="bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 hover:shadow-md transition-shadow">
+                <div key={template.id} className="bg-white rounded-lg shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
                   <div className="p-6">
                     <div className="flex justify-between items-start mb-3">
-                      <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 line-clamp-2">
+                      <h3 className="text-lg font-semibold text-slate-900 line-clamp-2">
                         {template.title}
                       </h3>
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${difficultyColors[template.difficulty]}`}>
-                        {template.difficulty === "EASY" ? "Kolay" : 
-                         template.difficulty === "MEDIUM" ? "Orta" : "Zor"}
-                      </span>
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        {/* #508: İşaretli şablonlar tek bakışta görünsün —
+                            admin hangilerinin herkese açık olduğunu bilmeden
+                            havuzu yönetemez. */}
+                        {template.tekrarlanabilir && (
+                          <span
+                            title="Aynı stajyere birden çok kez atanabilir"
+                            className="px-2 py-1 text-xs font-medium rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200"
+                          >
+                            Tekrarlanabilir
+                          </span>
+                        )}
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${difficultyColors[template.difficulty]}`}>
+                          {template.difficulty === "EASY" ? "Kolay" :
+                           template.difficulty === "MEDIUM" ? "Orta" : "Zor"}
+                        </span>
+                      </div>
                     </div>
 
                     {/* #91: Markdown soyulmuş, kelime sınırında ve koşullu ellipsis'li önizleme. */}
-                    <p className="text-slate-600 dark:text-slate-300 text-sm mb-4 line-clamp-3">
+                    <p className="text-slate-600 text-sm mb-4 line-clamp-3">
                       {markdownPreview(template.description, 120)}
                     </p>
 
                     <div className="flex flex-wrap gap-1 mb-4">
                       {template.track.slice(0, 3).map((tag, index) => (
-                        <span key={index} className="px-2 py-1 text-xs bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded">
+                        <span key={index} className="px-2 py-1 text-xs bg-slate-100 text-slate-700 rounded">
                           {tag}
                         </span>
                       ))}
                       {template.track.length > 3 && (
-                        <span className="px-2 py-1 text-xs bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded">
+                        <span className="px-2 py-1 text-xs bg-slate-100 text-slate-500 rounded">
                           +{template.track.length - 3} daha
                         </span>
                       )}
@@ -398,7 +457,7 @@ export default function ProjectsPage() {
                         href={template.githubRepoUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 mb-4 transition-colors"
+                        className="inline-flex items-center gap-1.5 text-xs text-slate-600 hover:text-slate-900 mb-4 transition-colors"
                       >
                         <Github className="w-3.5 h-3.5" />
                         {template.githubRepoUrl.replace(/^https:\/\/github\.com\//, "")}
@@ -406,13 +465,13 @@ export default function ProjectsPage() {
                     )}
 
                     <div className="flex justify-between items-center">
-                      <span className="text-xs text-slate-500 dark:text-slate-400">
+                      <span className="text-xs text-slate-500">
                         ID: {template.id.slice(0, 8)}...
                       </span>
                       <div className="flex gap-2">
                         <button
                           onClick={() => startEdit(template)}
-                          className="p-2 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-lg transition-colors"
+                          className="p-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                           aria-label={`${template.title} şablonunu düzenle`}
                           title="Düzenle"
                         >
@@ -420,7 +479,7 @@ export default function ProjectsPage() {
                         </button>
                         <button
                           onClick={() => handleDelete(template.id)}
-                          className="p-2 text-slate-600 dark:text-slate-300 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors"
+                          className="p-2 text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                           aria-label={`${template.title} şablonunu sil`}
                           title="Sil"
                         >

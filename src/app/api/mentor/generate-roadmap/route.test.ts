@@ -5,6 +5,10 @@ const { requireAuthMock, prismaMock, generateRoadmapMock } = vi.hoisted(() => ({
   prismaMock: {
     assignedProject: { findUnique: vi.fn() },
     roadmap: { delete: vi.fn(), create: vi.fn() },
+    // #410: Kayıtlı profil analizi prompt'a giriyor.
+    profileAnalysis: { findUnique: vi.fn() },
+    // #423: Geçmişte tamamlanan adım başlıkları prompt'a giriyor.
+    roadmapStep: { findMany: vi.fn() },
   },
   generateRoadmapMock: vi.fn(),
 }));
@@ -18,6 +22,11 @@ vi.mock("@/features/ai/server/generate-roadmap", () => ({
 // Rate limiter: testte hep izin ver.
 vi.mock("@/lib/rate-limit", () => ({
   createRateLimiter: () => ({ check: () => ({ allowed: true }) }),
+}));
+// #321: KVKK rizasi — varsayilan olarak VAR; ayri bir test yoklugunu olcuyor.
+const { rizaMock } = vi.hoisted(() => ({ rizaMock: vi.fn() }));
+vi.mock("@/features/kvkk/riza", () => ({
+  profilSahibininRizasiVar: (...a: unknown[]) => rizaMock(...a),
 }));
 
 import { POST } from "./route";
@@ -38,7 +47,8 @@ function assignedProject(roadmap: { id: string; status: string } | null) {
   return {
     id: "ap-1",
     // #195: M:N — bu mentöre atanmış öğrenci.
-    studentProfile: { mentorAssignments: [{ mentorId: MENTOR_ID }] },
+    // #410: `id` de gerekiyor — kayıtlı profil analizi onunla okunuyor.
+    studentProfile: { id: "sp-1", mentorAssignments: [{ mentorId: MENTOR_ID }] },
     projectTemplate: { title: "Proje" },
     roadmap,
   };
@@ -49,6 +59,23 @@ describe("generate-roadmap overwrite koruması (#178-4)", () => {
     vi.clearAllMocks();
     generateRoadmapMock.mockResolvedValue([]);
     prismaMock.roadmap.create.mockResolvedValue({ id: "r-new", steps: [] });
+    prismaMock.profileAnalysis.findUnique.mockResolvedValue(null);
+    prismaMock.roadmapStep.findMany.mockResolvedValue([]);
+    rizaMock.mockResolvedValue(true);
+  });
+
+  // #321 KVKK: islemi MENTOR tetikliyor ama veri OGRENCIYE ait. Ogrencinin
+  // rizasi yoksa profil verisi Vertex AI'ya (ABD) gonderilmemeli.
+  it("öğrencinin KVKK rızası yoksa 403 döner ve AI ÇAĞRILMAZ", async () => {
+    mentor();
+    prismaMock.assignedProject.findUnique.mockResolvedValue(assignedProject(null));
+    rizaMock.mockResolvedValue(false);
+
+    const res = await POST(req({ assignedProjectId: "ap-1" }));
+
+    expect(res.status).toBe(403);
+    expect((await res.json()).rizaGerekli).toBe(true);
+    expect(generateRoadmapMock).not.toHaveBeenCalled();
   });
 
   it("MENTOR değil → guard yanıtı döner (403)", async () => {
@@ -110,5 +137,70 @@ describe("generate-roadmap overwrite koruması (#178-4)", () => {
     mentor();
     const res = await POST(req({ assignedProjectId: "ap-1", overwrite: "evet" }));
     expect(res.status).toBe(400);
+  });
+});
+
+/**
+ * #410: Kayıtlı profil analizi (#47) üretime GEÇİYOR.
+ *
+ * ⚠️ Bu girdi bugüne kadar hiç kullanılmıyordu: prompt yalnız seviye, ilgi
+ * alanları ve hedefleri görüyordu, oysa platform her stajyer için
+ * `strengths`, `developmentAreas`, `recommendedPath` üretip saklıyordu.
+ */
+describe("profil analizi üretime geçiyor (#410)", () => {
+  const analiz = {
+    strengths: ["Hızlı öğreniyor"],
+    developmentAreas: ["Test yazma zayıf"],
+    recommendedPath: "Önce testler.",
+    // Şemada olan ama üretime GEÇMEYEN alanlar — kapsam bilinçli dar.
+    level: "BEGINNER",
+    summary: "özet",
+    technicalTracks: ["backend"],
+    recommendations: ["öneri"],
+  };
+
+  beforeEach(() => {
+    // Kurulum üstteki describe'ın beforeEach'inde; bu blok kendi kurulumunu
+    // yapmak zorunda (mock değerleri testler arasında sızmasın).
+    vi.clearAllMocks();
+    mentor();
+    generateRoadmapMock.mockResolvedValue([]);
+    prismaMock.roadmap.create.mockResolvedValue({ id: "r-new", steps: [] });
+    prismaMock.assignedProject.findUnique.mockResolvedValue(assignedProject(null));
+    prismaMock.roadmapStep.findMany.mockResolvedValue([]);
+    rizaMock.mockResolvedValue(true);
+  });
+
+  it("⚠️ analiz VARSA generateRoadmap'e üçüncü argüman olarak geçer", async () => {
+    prismaMock.profileAnalysis.findUnique.mockResolvedValue(analiz);
+
+    await POST(req({ assignedProjectId: "ap-1" }));
+
+    const ucuncu = generateRoadmapMock.mock.calls[0][2];
+    expect(ucuncu).toEqual({
+      strengths: ["Hızlı öğreniyor"],
+      developmentAreas: ["Test yazma zayıf"],
+      recommendedPath: "Önce testler.",
+    });
+  });
+
+  it("⚠️ analiz YOKSA null geçer, üretim ÇÖKMEZ (#352 — rıza geri alınınca silinir)", async () => {
+    prismaMock.profileAnalysis.findUnique.mockResolvedValue(null);
+    prismaMock.roadmapStep.findMany.mockResolvedValue([]);
+
+    const res = await POST(req({ assignedProjectId: "ap-1" }));
+
+    expect(res.status).toBe(200);
+    expect(generateRoadmapMock.mock.calls[0][2]).toBeNull();
+  });
+
+  it("analiz ÖĞRENCİNİN profiline göre okunuyor", async () => {
+    prismaMock.profileAnalysis.findUnique.mockResolvedValue(analiz);
+
+    await POST(req({ assignedProjectId: "ap-1" }));
+
+    expect(prismaMock.profileAnalysis.findUnique).toHaveBeenCalledWith({
+      where: { studentProfileId: "sp-1" },
+    });
   });
 });

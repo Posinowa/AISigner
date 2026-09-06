@@ -22,12 +22,12 @@ export function FormAlert({
     return (
       <div
         role="status"
-        className="mb-6 flex items-start gap-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 px-4 py-3"
+        className="mb-6 flex items-start gap-3 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3"
       >
         <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" aria-hidden="true" />
         <div>
-          {title && <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">{title}</p>}
-          <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">{children}</p>
+          {title && <p className="text-sm font-semibold text-emerald-800">{title}</p>}
+          <p className="text-xs text-emerald-600 mt-0.5">{children}</p>
         </div>
       </div>
     );
@@ -36,8 +36,11 @@ export function FormAlert({
   return (
     <div
       role="alert"
-      className="rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-100 px-4 py-3 text-sm text-red-600 dark:text-red-400"
+      className="rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-600"
     >
+      {/* #247: başlık daha önce yalnızca başarı dalında render ediliyordu;
+          hata kutusuna geçilen title sessizce kayboluyordu. */}
+      {title && <p className="font-semibold text-red-700">{title}</p>}
       {children}
     </div>
   );

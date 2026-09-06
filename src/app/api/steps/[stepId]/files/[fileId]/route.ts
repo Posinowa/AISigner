@@ -1,8 +1,16 @@
 import { NextResponse } from "next/server";
+import { mezunYazmaKapisi } from "@/lib/auth/mezun-politikasi";
 import { prisma } from "@/lib/db";
+import {
+  ATAMA_SAHIPLIK_SELECT,
+  erisebilirMi,
+  mentoruMu,
+} from "@/features/teams/server/sahiplik";
 import { requireAuth } from "@/lib/auth/guard";
-import { isAssignedMentor } from "@/lib/auth/mentor-access";
 import { readStepFile, deleteStepFile } from "@/lib/storage/step-files";
+import { logger } from "@/lib/logger";
+import { incrementCounter } from "@/lib/metrics";
+import { rotaHatasi } from "@/lib/api-hata";
 
 /**
  * GET /api/steps/[stepId]/files/[fileId]
@@ -26,13 +34,8 @@ export async function GET(
           include: {
             roadmap: {
               include: {
-                assignedProject: {
-                  include: {
-                    studentProfile: {
-                      include: { mentorAssignments: { select: { mentorId: true } } },
-                    },
-                  },
-                },
+                // #332: Sahiplik bireysel VEYA takım; tek tanımdan gelir.
+                assignedProject: { select: ATAMA_SAHIPLIK_SELECT },
               },
             },
           },
@@ -48,9 +51,9 @@ export async function GET(
     }
 
     // Erişim kontrolü
-    const profile = stepFile.step.roadmap.assignedProject.studentProfile;
-    // #195: M:N — sahibi ya da mentorlarından biri değilse reddet.
-    if (profile.userId !== userId && !isAssignedMentor(profile.mentorAssignments, userId)) {
+    // #332: Sahip = bireysel öğrenci ya da aktif takım üyesi; mentör = kendi
+    // mentörü (#195) ya da takımın mentörü.
+    if (!erisebilirMi(stepFile.step.roadmap.assignedProject, userId)) {
       return NextResponse.json(
         { error: "Bu dosyaya erişim yetkiniz yok." },
         { status: 403 }
@@ -85,7 +88,7 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error("GET /api/steps/[stepId]/files/[fileId] error:", error);
+    rotaHatasi("GET /api/steps/[stepId]/files/[fileId] error:", error);
     return NextResponse.json(
       { error: "Dosya indirilirken hata oluştu." },
       { status: 500 }
@@ -104,6 +107,10 @@ export async function DELETE(
   const auth = await requireAuth(["MENTOR", "STUDENT"]);
   if (!auth.authorized) return auth.response;
 
+  // #208: Mezun stajyerler için portfolyo salt-okunurdur (Seçenek A).
+  const mezunKapisi = mezunYazmaKapisi(auth.session, "Mezun öğrenciler staj adımlarından dosya silemez.");
+  if (mezunKapisi) return mezunKapisi;
+
   const { stepId, fileId } = await params;
   const userId = auth.session.user.id!;
   const userRole = auth.session.user.role;
@@ -116,13 +123,8 @@ export async function DELETE(
           include: {
             roadmap: {
               include: {
-                assignedProject: {
-                  include: {
-                    studentProfile: {
-                      include: { mentorAssignments: { select: { mentorId: true } } },
-                    },
-                  },
-                },
+                // #332: Sahiplik bireysel VEYA takım; tek tanımdan gelir.
+                assignedProject: { select: ATAMA_SAHIPLIK_SELECT },
               },
             },
           },
@@ -138,10 +140,10 @@ export async function DELETE(
     }
 
     // Erişim kontrolü: yükleyen veya mentor silebilir
-    const profile = stepFile.step.roadmap.assignedProject.studentProfile;
     const isUploader = stepFile.uploaderId === userId;
-    // #195: M:N — mentör, öğrencinin mentorlarından biri mi?
-    const isMentor = userRole === "MENTOR" && isAssignedMentor(profile.mentorAssignments, userId);
+    // #195/#332: Mentör = öğrencinin kendi mentörü ya da takımın mentörü.
+    const isMentor =
+      userRole === "MENTOR" && mentoruMu(stepFile.step.roadmap.assignedProject, userId);
 
     if (!isUploader && !isMentor) {
       return NextResponse.json(
@@ -150,15 +152,26 @@ export async function DELETE(
       );
     }
 
-    // #197: GCS veya yerel diskten sil (backend env'e göre).
-    await deleteStepFile(stepFile.storedName);
-
-    // Veritabanından sil
+    // #201: Önce veritabanı kaydını sil (tutarlılık garantisi)
     await prisma.stepFile.delete({ where: { id: fileId } });
+
+    // #197: GCS veya yerel diskten sil (backend env'e göre)
+    try {
+      await deleteStepFile(stepFile.storedName);
+    } catch (delErr) {
+      // DB kaydı zaten silindi; storage silinemezse dosya öksüz kalır → operasyonel
+      // takip için logger + metrik (#201 review: sessiz console.error yerine).
+      incrementCounter("storage.delete.failure");
+      logger.error("Adım dosyası storage'dan silinemedi (DB kaydı silindi)", {
+        storedName: stepFile.storedName,
+        fileId,
+        err: delErr,
+      });
+    }
 
     return NextResponse.json({ message: "Dosya başarıyla silindi." });
   } catch (error) {
-    console.error("DELETE /api/steps/[stepId]/files/[fileId] error:", error);
+    rotaHatasi("DELETE /api/steps/[stepId]/files/[fileId] error:", error);
     return NextResponse.json(
       { error: "Dosya silinirken hata oluştu." },
       { status: 500 }

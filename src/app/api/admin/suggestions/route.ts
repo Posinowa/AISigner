@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { listAllSuggestions } from "@/features/suggestions/server/suggestions";
 import { requireAuth } from "@/lib/auth/guard";
 import { listSuggestionsQuerySchema } from "@/lib/validations/api";
+import { rotaHatasi } from "@/lib/api-hata";
 
 /**
  * GET /api/admin/suggestions?status=OPEN&cursor=<id>&limit=<n>
@@ -28,7 +29,7 @@ export async function GET(req: Request) {
     const page = await listAllSuggestions(parsed.data);
     return NextResponse.json(page);
   } catch (error) {
-    console.error("GET /api/admin/suggestions error:", error);
+    rotaHatasi("GET /api/admin/suggestions error:", error);
     return NextResponse.json(
       { error: "Öneriler yüklenirken hata oluştu." },
       { status: 500 },

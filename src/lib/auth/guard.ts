@@ -35,6 +35,34 @@ export async function requireAuth(
     };
   }
 
+  /*
+   * ⚠️ #391: ROLÜN VARLIĞI ZORUNLU — rol istensin istenmesin.
+   *
+   * `nextauth.ts` JWT callback'i silinmiş kullanıcıda yetkiyi doğru şekilde
+   * kaldırıyor (`token.role = undefined`), ama bu kapı iki yerden birden
+   * kaçıyordu:
+   *
+   *   1. Rol kontrolü `if (requiredRole)` içindeydi — `requireAuth()` rolsüz
+   *      çağrıldığında (ör. `/api/suggestions`) blok hiç çalışmıyordu.
+   *   2. Durum kapısı `role === "STUDENT" || role === "MENTOR"` ile sınırlı;
+   *      `role` undefined olduğu için o da devre dışı kalıyordu.
+   *
+   * Sonuç: silinen hesabın jetonu, süresi dolana kadar iş görmeye devam
+   * ediyordu. #44 tam bu pencereyi kapatmak için kurulmuştu.
+   *
+   * 401 dönüyoruz, 403 değil: hesap artık YOK — istemci oturumu temizleyip
+   * yeniden giriş yapmalı. 403 "giriş yaptın ama yetkin yok" derdi.
+   */
+  if (!session.user.role) {
+    return {
+      authorized: false as const,
+      response: NextResponse.json(
+        { error: "Oturumunuz artık geçerli değil. Lütfen yeniden giriş yapın." },
+        { status: 401 },
+      ),
+    };
+  }
+
   if (requiredRole) {
     const allowedRoles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
     if (!allowedRoles.includes(session.user.role as Role)) {
@@ -48,19 +76,29 @@ export async function requireAuth(
     }
   }
 
-  // Onaylanmamış stajyer hesabı (PENDING/REJECTED) hiçbir student işlemi yapamaz.
-  // Admin/mentor bu kontrolden etkilenmez (yalnızca STUDENT rolüne uygulanır).
+  // Onaylanmamış hesap (PENDING/REJECTED) hiçbir korumalı işlem yapamaz.
+  //
+  // #249: Kontrol önceden yalnızca STUDENT rolüne uygulanıyordu; onaylanmamış
+  // bir MENTOR hesabı mentör uçlarını çağırabiliyordu. ADMIN bilerek kapsam
+  // dışı — admin kendi hesabını kilitleyemesin.
   //
   // #143 istisnası: profil tamamlama uçları `allowUnapprovedStudent` ile PENDING'e
   // açılabilir — kullanıcı onaya düşmeden önce profilini doldurabilsin. REJECTED
   // bu istisnadan yararlanamaz.
+  // İstisna yalnızca stajyere ait: açılan uçlar profil tamamlama akışı.
   const isPendingButAllowed =
-    options?.allowUnapprovedStudent && session.user.accountStatus === "PENDING";
+    options?.allowUnapprovedStudent &&
+    session.user.role === "STUDENT" &&
+    session.user.accountStatus === "PENDING";
+
+  const onayGerektirenRol =
+    session.user.role === "STUDENT" || session.user.role === "MENTOR";
 
   if (
-    session.user.role === "STUDENT" &&
+    onayGerektirenRol &&
     session.user.accountStatus &&
     session.user.accountStatus !== "APPROVED" &&
+    session.user.accountStatus !== "GRADUATED" &&
     !isPendingButAllowed
   ) {
     return {

@@ -28,12 +28,57 @@ function tab(shift = false): KeyboardEvent {
   return new KeyboardEvent("keydown", { key: "Tab", shiftKey: shift, cancelable: true });
 }
 
-describe("getFocusable (#126-5)", () => {
+describe("getFocusable (#126-5 / #160)", () => {
   it("odaklanabilir elemanları döner, disabled'ı hariç tutar", () => {
     const items = getFocusable(container);
     expect(items).toHaveLength(3); // button, input, button (disabled hariç)
     expect(items[0]).toBe(first);
     expect(items[items.length - 1]).toBe(last);
+  });
+
+  it("role='button' olan elemanları dahil eder; aria-disabled ve tabindex=-1 olanları hariç tutar", () => {
+    const customDiv = document.createElement("div");
+    const roleBtn = document.createElement("div");
+    roleBtn.setAttribute("role", "button");
+    roleBtn.setAttribute("tabindex", "0");
+
+    const disabledRoleBtn = document.createElement("div");
+    disabledRoleBtn.setAttribute("role", "button");
+    disabledRoleBtn.setAttribute("aria-disabled", "true");
+
+    const tabIndexMinusBtn = document.createElement("div");
+    tabIndexMinusBtn.setAttribute("role", "button");
+    tabIndexMinusBtn.setAttribute("tabindex", "-1");
+
+    customDiv.append(roleBtn, disabledRoleBtn, tabIndexMinusBtn);
+    document.body.appendChild(customDiv);
+
+    const items = getFocusable(customDiv);
+    expect(items).toHaveLength(1);
+    expect(items[0]).toBe(roleBtn);
+  });
+
+  it("hidden, aria-hidden='true' veya display:none olan elemanları hariç tutar", () => {
+    const customDiv = document.createElement("div");
+
+    const visibleBtn = document.createElement("button");
+    visibleBtn.textContent = "Görünür";
+
+    const hiddenBtn = document.createElement("button");
+    hiddenBtn.hidden = true;
+
+    const ariaHiddenBtn = document.createElement("button");
+    ariaHiddenBtn.setAttribute("aria-hidden", "true");
+
+    const displayNoneBtn = document.createElement("button");
+    displayNoneBtn.style.display = "none";
+
+    customDiv.append(visibleBtn, hiddenBtn, ariaHiddenBtn, displayNoneBtn);
+    document.body.appendChild(customDiv);
+
+    const items = getFocusable(customDiv);
+    expect(items).toHaveLength(1);
+    expect(items[0]).toBe(visibleBtn);
   });
 
   it("null container'da boş dizi döner", () => {

@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
+import { mezunYazmaKapisi } from "@/lib/auth/mezun-politikasi";
 import { prisma } from "@/lib/db";
+import {
+  ATAMA_SAHIPLIK_SELECT,
+  mentoruMu,
+} from "@/features/teams/server/sahiplik";
 import { requireAuth } from "@/lib/auth/guard";
-import { isAssignedMentor } from "@/lib/auth/mentor-access";
 import { updateStepCommentSchema } from "@/lib/validations/api";
+import { rotaHatasi } from "@/lib/api-hata";
 
 /**
  * PUT /api/steps/[stepId]/comments/[commentId]
@@ -14,6 +19,10 @@ export async function PUT(
 ) {
   const auth = await requireAuth(["MENTOR", "STUDENT"]);
   if (!auth.authorized) return auth.response;
+
+  // #208: Mezun stajyerler için portfolyo salt-okunurdur (Seçenek A).
+  const mezunKapisi = mezunYazmaKapisi(auth.session, "Mezun öğrenciler staj adımlarındaki yorumları düzenleyemez.");
+  if (mezunKapisi) return mezunKapisi;
 
   const { stepId, commentId } = await params;
   const userId = auth.session.user.id!;
@@ -61,7 +70,7 @@ export async function PUT(
 
     return NextResponse.json({ comment: updated });
   } catch (error) {
-    console.error("PUT /api/steps/[stepId]/comments/[commentId] error:", error);
+    rotaHatasi("PUT /api/steps/[stepId]/comments/[commentId] error:", error);
     return NextResponse.json(
       { error: "Yorum güncellenirken hata oluştu." },
       { status: 500 }
@@ -79,6 +88,10 @@ export async function DELETE(
 ) {
   const auth = await requireAuth(["MENTOR", "STUDENT"]);
   if (!auth.authorized) return auth.response;
+
+  // #208: Mezun stajyerler için portfolyo salt-okunurdur (Seçenek A).
+  const mezunKapisi2 = mezunYazmaKapisi(auth.session, "Mezun öğrenciler staj adımlarındaki yorumları silemez.");
+  if (mezunKapisi2) return mezunKapisi2;
 
   const { stepId, commentId } = await params;
   const userId = auth.session.user.id!;
@@ -109,20 +122,16 @@ export async function DELETE(
       include: {
         roadmap: {
           include: {
-            assignedProject: {
-              include: {
-                studentProfile: {
-                  include: { mentorAssignments: { select: { mentorId: true } } },
-                },
-              },
-            },
+            // #332: Sahiplik bireysel VEYA takım; tek tanımdan gelir.
+            assignedProject: { select: ATAMA_SAHIPLIK_SELECT },
           },
         },
       },
     });
 
     // #195: M:N — öğrencinin mentorlarından biri mi?
-    if (isAssignedMentor(step?.roadmap.assignedProject.studentProfile.mentorAssignments, userId)) {
+    // #195/#332: Mentör = öğrencinin kendi mentörü ya da takımın mentörü.
+    if (step && mentoruMu(step.roadmap.assignedProject, userId)) {
       await prisma.stepComment.delete({ where: { id: commentId } });
       return NextResponse.json({ success: true });
     }
@@ -132,7 +141,7 @@ export async function DELETE(
       { status: 403 }
     );
   } catch (error) {
-    console.error("DELETE /api/steps/[stepId]/comments/[commentId] error:", error);
+    rotaHatasi("DELETE /api/steps/[stepId]/comments/[commentId] error:", error);
     return NextResponse.json(
       { error: "Yorum silinirken hata oluştu." },
       { status: 500 }

@@ -19,7 +19,25 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # ⚠️ SÖZLEŞME DENETİMİ DEPENDABOT'TA ATLANIR (#476).
+      #
+      # Dependabot dal adını `dependabot/npm_and_yarn/...` olarak üretir ve
+      # gövdesine `Closes #N` yazmaz; ikisi de YAPILANDIRILABİLİR DEĞİL. Bu
+      # yüzden açtığı her PR pr-guard'da kırmızı kalıyor ve HİÇBİRİ merge
+      # edilemiyordu — #470 Dependabot'u kurarken bu ayar yapılmamıştı.
+      # Sorun `.github/dependabot.yml` içinde zaten yazılıydı; gruplama
+      # gürültüyü azalttı ama PR'ları merge edilebilir yapmadı.
+      #
+      # ⚠️ MUAFİYET YALNIZ BU ADIMA. Aşağıdaki "Check changed files" adımı
+      # yasak dosya denetimini (.env, .pem, .key, credentials.json,
+      # service-account.json) yapıyor ve o GERÇEK bir güvenlik kapısı —
+      # Dependabot dahil HERKESTE çalışmaya devam ediyor. İşi "Dependabot ise
+      # pr-guard'ı atla" diye çözmek o kapıyı da kapatırdı.
       - name: Validate PR title, branch and linked issue
+        # ⚠️ `github.actor` DEĞİL, PR YAZARI. `github.actor` bir insan
+        # kontrolü yeniden çalıştırdığında o insana dönüşür ve denetim
+        # yeniden kırmızı olurdu; yazar alanı PR'ın ömrü boyunca sabit.
+        if: github.event.pull_request.user.login != 'dependabot[bot]'
         shell: bash
         run: |
           set -euo pipefail
@@ -58,6 +76,8 @@ jobs:
             exit 1
           fi
 
+      # ⚠️ BU ADIM DEPENDABOT'TA DA ÇALIŞIR (#476) — yasak dosya denetimi
+      # aktör ayrımı yapmaz.
       - name: Check changed files and PR size
         env:
           GH_TOKEN: ${{ github.token }}

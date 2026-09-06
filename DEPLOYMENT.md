@@ -11,8 +11,8 @@ benzeri bir PaaS üzerinde **güvenli** biçimde canlıya almak içindir.
 
 | Bileşen | Değer |
 |---|---|
-| Runtime | Node 20 (Docker imajı: `node:20-bookworm-slim`) |
-| Uygulama | Next.js 15 standalone, port **3000** |
+| Runtime | **Node 22** (Docker imajı: `node:22-bookworm-slim`), `engines.node: >=22` — `.npmrc`'de `engine-strict=true` olduğu için uyumsuz sürüm kurulumu KIRAR (#483) |
+| Uygulama | Next.js 15 **standalone** çıktısı (`node server.js`), port **3000**. İmaj ~970 MB; runner'da `npm install` yoktur. Migration için Prisma CLI ayrı bir katmanda `/app/.migrator` altında taşınır. |
 | Veritabanı | PostgreSQL 14–18, **SSL zorunlu** |
 | AI (opsiyonel) | Google Vertex AI / Gemini — kimlik JSON'u env'den |
 | Dosya yükleme | Yerel disk `/app/uploads` (kalıcılık için Volume gerekir) |
@@ -35,15 +35,50 @@ Out Plane konsolunda servisin **Variables** bölümüne girilir.
 | `DATABASE_URL` | Postgres bağlantısı. **`?sslmode=require` ekleyin.** | `postgresql://user:pass@host:5432/aisigner?sslmode=require` |
 | `AUTH_SECRET` | **JWT imzalama sırrı** (oturum + middleware). Yoksa uygulama prod'da açılmaz. **Yeni ve güçlü üretin.** | `openssl rand -base64 32` çıktısı |
 | `NEXTAUTH_URL` | Uygulamanın public URL'i (NextAuth callback'leri). | `https://aisigner.example.com` |
+| `NEXT_PUBLIC_APP_URL` | **Sertifika doğrulama, QR, LinkedIn ve e-posta bağlantılarının tabanı.** Tanımsızsa uygulama üretimde **açılmaz** (#392). | `https://aisigner.example.com` |
 
-> **Dikkat:** Bu proje NextAuth v4 ile **`AUTH_SECRET`** kullanır (`NEXTAUTH_SECRET` DEĞİL).
-> Bir platform şablonu `NEXTAUTH_SECRET` isterse, `AUTH_SECRET`'i mutlaka ayrıca girin.
+> **`NEXT_PUBLIC_APP_URL` neden sessizce varsayılmıyor (#392).** Bu değer yedi
+> ayrı yerde okunuyordu ve **üç farklı** varsayılana düşüyordu; sonucu
+> sertifikanın QR bağlantısı bir alan adına, LinkedIn paylaşımı **başka** bir
+> alan adına gidiyordu. Sertifika basılıp paylaşıldıktan sonra **geri
+> alınamaz**: yanlış alan adı taşıyan belgeler dolaşımda kalır. Bu yüzden
+> eksikse gürültülü şekilde başarısız oluyoruz.
+>
+> ⚠️ `NEXT_PUBLIC_*` değişkenleri **derleme anında** gömülür — imajı
+> oluştururken tanımlı olmalı, yalnızca çalıştırma anında vermek yetmez.
+
+> **`NEXTAUTH_SECRET` GİRMEYİN.** Bu proje NextAuth v4'ü `AUTH_SECRET` ile
+> yapılandırır ve kodda `NEXTAUTH_SECRET` hiç okunmaz. Parola-sıfırlama ve
+> e-posta-doğrulama token'ları da (`lib/auth/reset-token.ts`,
+> `lib/auth/verification-token.ts`) `AUTH_SECRET` ile HMAC imzalanır.
+> Ayrı bir `NEXTAUTH_SECRET` girmek işe yaramaz; iki sırrı ayrı sanmak
+> rotasyon sırasında yanlışını değiştirmene yol açar.
 
 ### Güvenlik için önerilen
 
-| Değişken | Açıklama |
-|---|---|
-| `NEXTAUTH_SECRET` | Parola-sıfırlama token'larının imzalanmasında kullanılır. Verilmezse sabit bir decoy fallback devreye girer → token'lar tahmin edilebilir olur. **Ayrı, güçlü bir değer girin.** |
+| Değişken | Varsayılan | Açıklama |
+|---|---|---|
+| `TRUSTED_PROXY_HOPS` | `1` | Uygulamanın ÖNÜNDEKİ güvenilen ters vekil sayısı. Rate-limit'in istemci IP'sini `X-Forwarded-For` zincirinden **sağdan** kaçıncı girdiden okuyacağını belirler (`lib/client-ip.ts`). Tek PaaS yönlendiricisi → `1` (varsayılan, çoğu kurulum). Önde ayrıca CDN varsa (Cloudflare + platform LB) → `2`. **Fazla büyük vermeyin:** zincir kısa kalırsa istemcinin uydurduğu değere düşülür ve rate-limit atlatılabilir hale gelir. |
+
+### E-posta (SMTP) — doğrulama ve şifre sıfırlama için ZORUNLU
+
+| Değişken | Varsayılan | Açıklama |
+|---|---|---|
+| `SMTP_HOST` | _(yok)_ | SMTP sunucusu. **Üçü de (host/user/pass) verilmezse e-posta tamamen devre dışı kalır.** |
+| `SMTP_USER` | _(yok)_ | SMTP kullanıcı adı. |
+| `SMTP_PASS` | _(yok)_ | SMTP parolası. Asla loglanmaz. |
+| `SMTP_PORT` | `587` | 465 → örtük TLS, 587 → STARTTLS. |
+| `SMTP_SECURE` | port'a göre | `true`/`false` ile elle geçilebilir. |
+| `MAIL_FROM` | `SMTP_USER` | Gönderen adresi. Çoğu sunucu SMTP hesabından farklı bir adresi reddeder. |
+
+> **Sessiz başarısızlık uyarısı:** `sendMail` sözleşme gereği hata FIRLATMAZ — yapılandırma
+> eksikse yalnızca bir uyarı loglar ve `{ sent: false }` döner. Kayıt akışı e-posta yüzünden
+> kırılmasın diye böyle. Sonucu: SMTP verilmeden canlıya çıkılırsa **doğrulama e-postaları ve
+> şifre sıfırlama bağlantıları hiç gitmez**, kullanıcılar kalıcı olarak "Doğrulanmamış" kalır
+> ve parolasını unutan hesap kurtarılamaz. Hiçbir yerde hata görünmez.
+
+**Doğrulama:** Test hesabıyla kayıt olup doğrulama e-postasının ulaştığını, ardından
+"Şifremi Unuttum" akışının bağlantı gönderdiğini teyit edin.
 
 ### AI için (opsiyonel — verilmezse AI özellikleri mock'a düşer)
 
@@ -58,11 +93,72 @@ Out Plane konsolunda servisin **Variables** bölümüne girilir.
 
 | Değişken | Varsayılan | Açıklama |
 |---|---|---|
+| `NEXT_PUBLIC_APP_URL` | `https://aisigner.com` | **#204/SEO** — `robots.txt`, `sitemap.xml` ve canonical/OG URL'lerinin taban adresi. Gerçek domain'e ayarlanmazsa fallback kullanılır. ⚠️ **`NEXT_PUBLIC_` = build-time**: değeri **imaj build edilirken** mevcut olmalı (yalnız runtime env yetmez). Aşağıya bak. |
 | `GCS_BUCKET` | _(yok)_ | **#197** — Dosya yüklemelerinin kalıcılığı. Verilirse yüklemeler bu GCS bucket'ına yazılır (deploy'da silinmez, çok-instance ölçeklenir). Kimlik: mevcut `GCP_CREDENTIALS_JSON` (ADC). Verilmezse yerel disk. |
-| `GITHUB_ORG` | `Posinowa` | GitHub çalışma alanı URL'lerinde kullanılan org. |
+| `GITHUB_TOKEN` | _(yok)_ | **#218** — Verilirse GitHub'da **gerçek** repo/milestone/issue oluşturulur. Verilmezse sistem önizleme (simülasyon) modunda kalır: bağlantılar türetilir ama GitHub'da hiçbir şey yaratılmaz. Gerekli yetkiler aşağıda. |
+| `GITHUB_WEBHOOK_SECRET` | _(yok)_ | **#326** — GitHub'dan gelen olayların (issue kapandı, PR merge edildi) HMAC imzasını doğrular. GitHub'da webhook oluştururken girdiğiniz **Secret** ile aynı olmalı. **Tanımsızsa uç 503 döner** ve hiçbir olay işlenmez — bu bilinçli: "sır yoksa geç" davranışı, kimlik doğrulamasız public bir ucu tamamen açık bırakırdı. Üret: `openssl rand -hex 32`. |
+| `GITHUB_ORG` | `Posinowa` | GitHub çalışma alanı URL'lerinde kullanılan org. **Tanımlı ama boş bırakılırsa** entegrasyon bilerek devre dışı kalır — sessizce varsayılana düşmek yanlış hesapta repo açmaya yol açabilir. |
 | `PORT` | `3000` | Platform farklı bir port dayatıyorsa. |
+| `ERROR_ALERT_EMAIL` | _(yok)_ | **#316** — Üretimdeki yakalanmamış sunucu hatalarının bildirileceği operatör adresi. **Tanımsızsa özellik kapalıdır.** SMTP'ye bağımlıdır: `sendMail` hata fırlatmadığı için SMTP eksikse bildirim de sessizce gitmez (gönderim sonucu loglanır). Aynı hata en fazla 15 dk'da bir bildirilir; aradaki tekrarlar sayılıp bir sonraki iletide raporlanır — susturma olmadan bir hata seli SMTP hesabınızı kısıtlatabilir. |
+| `SENTRY_DSN` | _(yok)_ | **#519** — Sunucu hatalarının gönderileceği Sentry projesinin DSN'i. **Tanımsızsa özellik kapalıdır** ve bu bir hata değildir (`mail.ts` / GCS deseni). ⚠️ **İKİ KOŞUL BİRDEN:** DSN tanımlı olsa bile `features/legal/kvkk.ts` içindeki `HATA_TESHIS` `null` ise Sentry **kendini AÇMAZ** ve sebebini loglar — hata teşhisi yurt dışına aktarımdır ve aydınlatma metninde yazılı olmadan yapılamaz. ⚠️ **Yalnız sunucu tarafı**: tarayıcı SDK'sı bilerek yok (CSP `connect-src 'self'` engellerdi ve `/privacy` "üçüncü taraf betiği çalıştırılmaz" diyor). Bedeli: istemci hataları görünmez. ⚠️ Kaynak haritası yüklenmiyor (`SENTRY_AUTH_TOKEN` gerektirir); yığın çerçeveleri küçültülmüş kodu gösterir, aksiyon alınan bilgi (hata adı, mesaj, rota deseni, istek kimliği) etkilenmez. `APP_VERSION` tanımlıysa sürüm etiketi olarak gider. |
+| `GIT_COMMIT_SHA` | _(yok)_ | **#10** — `/api/health`'in `version` alanı. Deploy sonrası "yeni sürüm gerçekten yayında mı?" kontrolünü (§8.5) anlamlı kılan tek şey. Platform commit SHA'sını başka bir adla veriyorsa (`RAILWAY_GIT_COMMIT_SHA`, `SOURCE_COMMIT`) route onları da okur. Hiçbiri yoksa imaj build'inde `--build-arg APP_VERSION=<sha>` geçilebilir; o da yoksa `version` **"bilinmiyor"** döner. |
+
+### GitHub token yetkileri (#218)
+
+Token **yalnızca sunucu tarafında** okunur ve hiçbir log'a yazılmaz.
+
+**Minimum yetki** — organizasyon altında repo açmak için:
+
+| Token tipi | Gerekli |
+|---|---|
+| Fine-grained PAT | Organizasyona erişim + `Repository: Administration (write)`, `Issues (write)`, `Contents (read)` |
+| Classic PAT | `repo` (özel repo açmak için tamamı) |
+
+Repolar **private** açılır ve `auto_init` ile başlatılır.
+
+**Önizleme → gerçek geçişi:** `GITHUB_TOKEN` tanımlanmadan önce oluşturulmuş çalışma
+alanlarının kayıtlı URL'leri simülasyondan gelmedir ve GitHub'da karşılığı yoktur. Token
+tanımlandıktan sonra ilgili atamada **Güncelle**'ye basmak repo adını kayıtlı URL'den
+alacağı için o eski adla gerçek repo açmaya çalışır. Temiz başlangıç isteniyorsa
+`AssignedProject.githubRepoUrl` alanını boşaltıp `githubStatus`'ü `NOT_PROVISIONED`
+yapın; sonraki kurulum adı yeniden türetir.
+
+**Üretimde `GITHUB_TOKEN` ZORUNLUDUR (#179).** Token tanımlı değilken önizleme modu
+yalnızca geliştirmede çalışır; `NODE_ENV=production` altında çalışma alanı oluşturma
+**hata verir**. Sebebi: önizleme veritabanına sahte repo/issue URL'leri yazıp atamayı
+`PROVISIONED` damgalıyordu — admin "oluşturuldu" görüyor, öğrenci 404 veren bağlantıya
+tıklıyor ve kayıt sonradan gerçek kurulumdan ayırt edilemiyordu.
+
+**Doğrulama:** Admin panelinde *Öğrenci Proje İlerlemesi & GitHub Yönetimi* sayfası
+hangi modda olduğunuzu üstte gösterir (önizleme / gerçek).
 
 ---
+
+> **`NEXT_PUBLIC_APP_URL` build-time notu:** Next.js `NEXT_PUBLIC_*` değişkenlerini
+> **build sırasında** bundle'a gömer, yani **çalışma anı env'i yetmez** ve imaj ortama
+> özel olur. Out Plane GitHub-connect ile build ederken servis değişkenlerini build'e de
+> enjekte ediyorsa değeri girmen yeterlidir. Saf `docker build` kullanıyorsan **zorunlu
+> build-arg**:
+>
+> ```bash
+> docker build --build-arg NEXT_PUBLIC_APP_URL=https://<alan-adi> >              --build-arg APP_VERSION=$(git rev-parse HEAD) -t aisigner:<sha> .
+> ```
+>
+> ⚠️ **Verilmezse imaj BUILD OLMAZ** — ve bu bilinçli. Bu not eskiden "verilmezse
+> robots/sitemap `https://aisigner.com`'a işaret eder" diyordu; o davranış **#392'de
+> kaldırıldı** (`app-url.ts` artık üretimde fırlatıyor: yanlış alan adı taşıyan bir
+> sertifika QR'ı basıldıktan sonra geri alınamaz). Ama Dockerfile arg'ı hiç kabul
+> etmiyordu, yani **imaj #400'den beri hiç build olmuyordu**; CI `docker build`
+> koşmadığı için de görünmedi. İkisi de düzeltildi: arg zorunlu ve eksikse build
+> saniyeler içinde açık bir mesajla durur, CI da artık imajı derliyor.
+
+---
+
+> ☁️ **Google Cloud (Cloud Run) için:** `docs/CLOUD-RUN.md`. Orada Cloud Run'a
+> özgü ve **ölçülmüş** tuzaklar var: anahtar dosyası yerine ADC (#522),
+> `--no-cpu-throttling` olmadan `after()` işlerinin askıya alınması,
+> `--min-instances=1` olmadan #329/#397/#490'ın sessizce durması ve
+> `HOSTNAME` env'inin yönlendirmeleri yanlış origin'e çıkarması.
 
 ## 3. Out Plane adımları
 
@@ -75,12 +171,26 @@ Out Plane konsolunda servisin **Variables** bölümüne girilir.
    `→ Prisma migrate deploy çalışıyor...` ve `→ Uygulama başlatılıyor...`.
 5. **Doğrula**: `https://<url>/api/health` 200 dönmeli; ardından `/signin`.
 
-### İlk admin'i güvenli oluştur
+### İlk admin'i güvenli oluştur (#206)
 
-`npm run seed` **prod'da ÇALIŞTIRILMAZ** (aşağıdaki güvenlik listesine bakın). İlk yönetici için:
-tek seferlik güvenli bir script ile veya DB'ye elle, **güçlü ve benzersiz** bir parolayla
-(argon2 hash — `@node-rs/argon2`'nin `hash()` fonksiyonu; `scripts/seed.ts` örnek alınabilir)
-bir ADMIN kullanıcı ekleyin.
+`npm run seed` **prod'da ÇALIŞTIRILMAZ** — zayıf demo admin (`admin@example.com`) açar.
+Gerçek yöneticiyi **`scripts/create-admin.ts`** ile oluştur: kimlik bilgileri **ortam
+değişkeninden** okunur (repoya hardcode edilmez, parola loglanmaz), argon2 ile hash'lenir,
+ADMIN + APPROVED olarak **idempotent** upsert edilir (aynı komut parola sıfırlamak için de
+kullanılabilir).
+
+Bir **dev makineden**, prod DB'ye SSL ile bağlanarak tek sefer çalıştır:
+
+```bash
+DATABASE_URL="postgresql://user:pass@host:5432/db?sslmode=require" \
+ADMIN_EMAIL="admin@posinowa.com" \
+ADMIN_PASSWORD="<güçlü-parola>" \
+npm run create:admin
+```
+
+> **Not:** `tsx` bir dev bağımlılığıdır; prod imajında (`--omit=dev`) yoktur. Bu yüzden script,
+> imaj içinde değil, `tsx`'in bulunduğu bir dev makineden prod `DATABASE_URL`'ine karşı çalıştırılır.
+> `ADMIN_PASSWORD`'ü terminal geçmişine yazmamak için tek satırda inline env olarak ver.
 
 ---
 
@@ -88,13 +198,18 @@ bir ADMIN kullanıcı ekleyin.
 
 - [ ] **`gcp-credentials.json` repoda YOK.** `.gitignore` + `.dockerignore` korur; imaja da girmez.
 - [ ] **`.env` repoda YOK.** Tüm sırlar platformun Variables bölümünde.
-- [ ] **`NEXTAUTH_SECRET` yeni üretildi** (`openssl rand -base64 32`) — demo/örnek değer DEĞİL.
+- [ ] **`AUTH_SECRET` yeni üretildi** (`openssl rand -base64 32`) — demo/örnek değer DEĞİL.
+      (`NEXTAUTH_SECRET` diye ayrı bir değişken YOK; bkz. §2.)
+- [ ] **`TRUSTED_PROXY_HOPS` platformun vekil sayısıyla uyumlu.** Yanlışsa rate-limit
+      atlatılabilir — doğrulaması aşağıda (§7).
 - [ ] **`DATABASE_URL` içinde `sslmode=require`** var.
 - [ ] **Prod'da `npm run seed` çalıştırılmadı.** Seed; `admin@example.com` / `mentor@example.com`
       / `student@example.com` kullanıcılarını **sabit zayıf parola** ile açar — canlıda arka kapı olur.
 - [ ] İlk admin **güçlü, benzersiz parolayla** oluşturuldu.
 - [ ] Konteyner **root değil** (`node` kullanıcısı) — Dockerfile bunu sağlar.
 - [ ] `GCP_CREDENTIALS_JSON` yalnızca platform secret'ı olarak duruyor; logda içeriği görünmüyor.
+- [ ] **`GITHUB_TOKEN` tanımlı.** Üretimde eksikse proje atama hata verir (#179) — önizleme
+      modu yalnızca geliştirmede geçerlidir.
 
 ---
 
@@ -106,6 +221,285 @@ bir ADMIN kullanıcı ekleyin.
     oluştur; servis hesabına `Storage Object Admin` yetkisi ver.
   - **`GCS_BUCKET` verme:** yerel disk `/app/uploads`. Volume bağlanmazsa **her deploy'da silinir**;
     kalıcılık için Out Plane Volume'ünü `/app/uploads`'a bağla (tek-instance).
-- **Tek-instance varsayımı**: `rate-limit.ts`, forgot-password token'ları ve `metrics.ts`
-  bellek-içi (process-local) tutulur. **Birden çok instance** çalıştıracaksanız bunlar
-  instance'lar arasında paylaşılmaz → Redis'e taşıyın. Tek instance ile sorun yok.
+- **Rate-limit artık ÇOK-INSTANCE GÜVENLİ (#322)**: sayaçlar veritabanında
+  (`RateLimit` tablosu) tutuluyor ve artırma tek atomik SQL ifadesiyle yapılıyor.
+  Öncesi süreç belleğindeydi ve birden çok instance'ta brute-force koruması
+  **sessizce** zayıflıyordu (5 denemelik limit 3 pod'da fiilen 15 oluyordu).
+  Redis gerekmiyor — veritabanı zaten var.
+  - ⚠️ **Fail-open**: veritabanına ulaşılamazsa istek GEÇİRİLİR ve durum loglanır.
+    Kesintide tüm girişleri kilitlememek için bilinçli karar; rate-limit bir
+    savunma-derinliği katmanı, kimlik doğrulamanın kendisi değil.
+- **`metrics.ts` hâlâ süreç-yerel**: yalnız teşhis amaçlı sayaçlar, instance
+  başına ayrı sayar. Güvenlik etkisi yok.
+  - Şifre-sıfırlama ve e-posta-doğrulama token'ları **artık bellekte DEĞİL**: durumsuz
+    HMAC (`AUTH_SECRET` ile imzalı), çok-instance'ta sorunsuz çalışır.
+
+---
+
+## 6. 🚀 Canlıya Alma (Cutover) Kontrol Listesi (#201)
+
+Canlı ortama ilk çıkış veya ana sürüm geçişlerinde şu adımlar sırayla tamamlanmalıdır:
+
+1. **GCS Depolama Doğrulaması:**
+   - [ ] GCP Cloud Storage üzerinde bucket oluşturuldu (ör. `aisigner-prod-uploads`).
+   - [ ] Service account'a `roles/storage.objectAdmin` yetkisi verildi.
+   - [ ] Out Plane değişkenlerine `GCS_BUCKET=aisigner-prod-uploads` eklendi.
+   - [ ] Bir dosya yüklenip indirildiği ve DB bağlantı kesintisinde orphan dosya temizliğinin çalıştığı doğrulandı.
+
+2. **Veritabanı ve Şema Geçişi:**
+   - [ ] `DATABASE_URL`'in `sslmode=require` parametresi taşıdığı teyit edildi.
+   - [ ] `npx prisma migrate deploy`'un `docker-entrypoint.sh` üzerinden hatasız tamamlandığı loglandı.
+   - [ ] M:N mentör atama tablosu (`MentorAssignment`) kayıtlarının sağlıklı ilişkilendirildiği doğrulandı.
+
+3. **E-posta Gönderimi:**
+   - [ ] `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS` tanımlandı (eksikse e-posta SESSİZCE devre dışı kalır).
+   - [ ] Test kaydıyla doğrulama e-postasının ulaştığı görüldü.
+   - [ ] "Şifremi Unuttum" akışının bağlantı gönderdiği görüldü.
+
+4. **İlk Yönetici & Sistem Kontrolü:**
+   - [ ] `ADMIN_EMAIL` ve `ADMIN_PASSWORD` ile `npm run create:admin` çalıştırılarak ilk yönetici açıldı.
+   - [ ] `/api/health` uç noktası `200 OK` döndü.
+   - [ ] Admin dashboard ve mentör/öğrenci akışları canlı ortamda duman testinden (smoke test) geçirildi.
+
+---
+
+## 7. Ters vekil (proxy) doğrulaması — rate-limit'in gerçekten çalıştığını teyit et
+
+Rate-limit anahtarı istemci IP'sidir ve IP `X-Forwarded-For` zincirinden **sağdan**
+`TRUSTED_PROXY_HOPS` kadar sayılarak okunur (`lib/client-ip.ts`). Sayı yanlışsa limit ya
+herkesi tek kovaya toplar (meşru kullanıcılar birbirini kilitler) ya da istemcinin
+uydurduğu değere düşer (**limit tamamen atlatılır**).
+
+> ⚠️ **İSTEK SAYISI LİMİTİ AŞMALI.** Bu bölümün önceki hâli 7 istek attırıyordu,
+> oysa `/api/auth/reset-password` IP limiti **10/300 sn**. 7 istek limite hiç
+> ulaşmadığı için test **her koşulda "hepsi 200"** veriyordu — yani doğru
+> yapılandırılmış bir kurulumda bile "limit atlatılabilir" sinyali üretiyor ve
+> operatörü `TRUSTED_PROXY_HOPS`'u boş yere değiştirmeye itiyordu. Yerelde ölçüldü.
+>
+> Limit değeri değişirse buradaki sayı da değişmeli: **istek sayısı > `maxRequests`**.
+
+### A) Kontrol testi — limit gerçekten çalışıyor mu?
+
+Önce mekanizmanın ayakta olduğunu görün. **Aynı** `X-Forwarded-For` ile 13 istek:
+
+```bash
+for i in $(seq 1 13); do
+  curl -s -o /dev/null -w "%{http_code} "     -X POST https://<alan-adi>/api/auth/reset-password     -H "Content-Type: application/json"     -H "X-Forwarded-For: 7.7.7.7"     -d '{"email":"yok@example.com"}'
+done; echo
+```
+
+- [ ] Son istekler **429** → limitleyici ayakta ve anahtar IP'den türüyor.
+- [ ] Hepsi **200** → limit hiç çalışmıyor. `RateLimit` tablosuna yazılabildiğini
+      kontrol edin: DB'ye ulaşılamazsa `rate-limit.ts` bilerek **fail-open** davranır
+      (#322) ve bu durumda sorun vekil ayarı değil, veritabanı erişimidir.
+
+### B) Asıl test — uydurma `X-Forwarded-For` limiti atlatabiliyor mu?
+
+Şimdi **her istekte farklı** bir sahte IP gönderin:
+
+```bash
+for i in $(seq 20 32); do
+  curl -s -o /dev/null -w "%{http_code} "     -X POST https://<alan-adi>/api/auth/reset-password     -H "Content-Type: application/json"     -H "X-Forwarded-For: 8.8.8.$i"     -d '{"email":"yok@example.com"}'
+done; echo
+```
+
+- [ ] Son istekler **429** dönüyor → **doğru.** Vekil gerçek istemci IP'sini zincire
+      ekliyor, uygulama sağdan onu okuyor ve uydurma değer anahtarı değiştiremiyor.
+- [ ] Hepsi **200** dönüyor → `TRUSTED_PROXY_HOPS` yanlış. Uygulamaya ulaşan **ham**
+      `X-Forwarded-For` zincirini loglayıp kaç girdi geldiğini sayın ve değeri düzeltin.
+
+> **A geçip B kalıyorsa** tablo nettir: limitleyici çalışıyor ama anahtar istemcinin
+> kontrolünde. **A da kalıyorsa** önce veritabanı/limitleyici sorununu çözün; B'nin
+> sonucu o zamana kadar anlamsızdır.
+>
+> ℹ️ Bu testi **yerelde** (vekil olmadan) çalıştırırsanız B'nin "hepsi 200" vermesi
+> BEKLENEN sonuçtur: önünde zinciri uzatan bir vekil yokken sahte değer tek girdidir
+> ve doğru okunur. B ancak gerçek vekilin arkasında anlamlıdır.
+
+## 8. 💾 Yedekleme ve geri dönüş (backup & rollback)
+
+> Bu bölüm daha önce hiç yoktu. Yedeği olmayan bir sistemde ilk ciddi hata,
+> kurtarılamayan bir veri kaybıdır — ve bunu fark ettiğiniz an yedek almak için
+> çok geçtir. **Canlıya çıkmadan önce en az bir kez geri yükleme provası yapın.**
+
+### 8.1 Neyin yedeği alınmalı
+
+| Veri | Nerede | Kaybedilirse |
+|---|---|---|
+| **PostgreSQL** | Yönetilen DB | Her şey: kullanıcılar, yol haritaları, sertifikalar. Kurtarılamaz. |
+| **Yüklenen dosyalar** | `GCS_BUCKET` ya da `/app/uploads` | Öğrenci teslimleri. DB'deki `StepFile` satırları öksüz kalır. |
+| **Sırlar** (`AUTH_SECRET` vb.) | Platform Variables | `AUTH_SECRET` kaybolursa tüm oturumlar + bekleyen sıfırlama/doğrulama bağlantıları geçersiz olur (parolalar etkilenmez). |
+
+> ⚠️ `AUTH_SECRET`'i yedekleyin ve **rotasyonun bedelini bilin**: değiştirdiğiniz an
+> herkes sistemden atılır ve gönderilmiş tüm şifre-sıfırlama / e-posta-doğrulama
+> bağlantıları ölür (ikisi de bu sır ile HMAC imzalanıyor).
+
+### 8.2 Yedek alma
+
+Out Plane'in yönetilen Postgres'i otomatik yedek sunuyorsa **onu açın** ve saklama
+süresini not edin. Ek olarak, elle bir anlık görüntü (özellikle **her deploy öncesi**):
+
+```bash
+pg_dump --format=custom --no-owner --no-privileges \
+  "postgresql://user:pass@host:5432/aisigner?sslmode=require" \
+  > aisigner-$(date +%Y%m%d-%H%M).dump
+```
+
+Dosyalar için `GCS_BUCKET` kullanıyorsanız bucket'ta **Object Versioning**'i açın;
+yerel diskteyseniz volume anlık görüntüsü alın.
+
+### 8.3 Geri yükleme provası (canlıya çıkmadan ÖNCE, bir kez)
+
+Yedeğin var olması yetmez — geri yüklenebildiği **kanıtlanmalıdır**.
+
+```bash
+createdb aisigner_restore_test
+pg_restore --no-owner --no-privileges -d aisigner_restore_test aisigner-YYYYMMDD-HHMM.dump
+psql -d aisigner_restore_test -c 'SELECT count(*) FROM "User";'
+```
+
+- [ ] `pg_restore` hatasız tamamlandı
+- [ ] Satır sayıları canlıyla tutarlı
+- [ ] Test veritabanı sonrasında silindi
+
+### 8.4 Sürüm geri alma (rollback)
+
+**Uygulama kodu** — platformdan bir önceki imaja/deploy'a dön. Kod geri alma
+genelde güvenlidir; **tehlike şemadadır**.
+
+**Şema** — `prisma migrate deploy` ileri yönlüdür, otomatik geri alma **yoktur**.
+Bu yüzden `docs/MIGRATIONS.md`'deki **expand/contract** kuralı yalnız bir stil
+tercihi değil, rollback'i mümkün kılan şeydir:
+
+- **Yalnızca eklemeli (additive) migration** → eski kod yeni şemayla çalışmaya
+  devam eder, kodu geri almak **yeterlidir**. Güvenli durum.
+- **Yıkıcı migration** (kolon/tablo silme, rename, NOT NULL) → eski kod yeni
+  şemada **çalışmaz**. Kodu geri almak yetmez; yedekten dönmek gerekir ve
+  **migration'dan sonraki tüm veri kaybedilir**.
+
+> Bu nedenle: yıkıcı bir migration'ı **asla** aynı deploy'da göndermeyin.
+> CI'daki `check:migrations` guard'ı (#198) bunu zaten engelliyor — `-- migration-safety-ack:`
+> ile geçmeden önce yedeğinizin tazeliğini teyit edin.
+
+**Sıralama (yıkıcı olmayan deploy için):**
+
+1. Deploy öncesi `pg_dump` al.
+2. Deploy et, `/api/health`'in **200** ve `version` alanının yeni commit'i
+   gösterdiğini teyit et.
+3. Sorun varsa platformdan önceki imaja dön; şema eklemeli olduğu için müdahale gerekmez.
+4. Şema geri alınmak zorundaysa: uygulamayı durdur → yedekten geri yükle → eski imajı başlat.
+
+### 8.5 Deploy sonrası hızlı doğrulama
+
+```bash
+curl -s https://<alan-adi>/api/health
+```
+
+- [ ] `status: "ok"`, `db: "connected"`
+- [ ] `version` **beklenen commit** — eski değer görünüyorsa yeni sürüm yayına çıkmamıştır.
+      `"bilinmiyor"` görüyorsanız sürüm damgası hiç ayarlanmamış demektir: `GIT_COMMIT_SHA`
+      çalışma-anı değişkenini girin ya da imajı `--build-arg APP_VERSION=<sha>` ile kurun.
+- [ ] ⚠️ **`"0.1.0"` gibi bir PAKET SÜRÜMÜ görüyorsanız damga YOK demektir.** `surum()`
+      son çare olarak `npm_package_version`'a düşüyor; bu değer `package.json`'dan gelir,
+      her deploy'da aynıdır ve **hiçbir şey kanıtlamaz**. "bilinmiyor" yalnızca standalone
+      Docker imajında görünür (orada `npm` yoktur); imaj dışında çalıştırıyorsanız eksik
+      damga kendini paket sürümü kılığında gösterir. Ölçüldü: `GIT_COMMIT_SHA` boşken
+      `npm start` ile `version: "0.1.0"` döndü.
+      Damga olmadan bu kontrol hiçbir şey doğrulamaz.
+- [ ] `uptimeSeconds` küçük (yeniden başlatıldığını doğrular)
+
+---
+
+## 9. 🔔 Hata bildirimi (#316)
+
+Loglar üretimde yapısal JSON (§bkz. `lib/logger.ts`) — yani *aranabilir*. Ama **log
+yazmak ile haberdar olmak aynı şey değil**: birinin bakması gerekir. Bu yüzden
+yakalanmamış sunucu hataları ayrıca e-posta ile bildirilir
+(`src/instrumentation.ts` → `lib/error-alerts.ts`).
+
+**Açmak için:** `ERROR_ALERT_EMAIL` girin (SMTP zaten yapılandırılmış olmalı).
+Tanımsızsa özellik kapalıdır ve uygulama hiçbir şekilde etkilenmez.
+
+**Doğrulama:** aşağıdaki uç kasıtlı olarak yoktur, bu yüzden 404 döner ve bildirim
+üretmez. Gerçek doğrulama için deploy sonrası bir hata oluştuğunda kutunuzu kontrol
+edin; ya da geçici olarak `ERROR_ALERT_EMAIL`'i kendi adresinize alıp bilinen bir
+hatayı tetikleyin.
+
+- [ ] `ERROR_ALERT_EMAIL` tanımlı ve okunan bir kutuya gidiyor
+- [ ] SMTP çalışıyor (§2'deki test kaydı akışı ile teyit edilmiş olmalı)
+
+> ⚠️ **Susturma tek instance içindir.** Sayaçlar bellekte (`metrics.ts` ile aynı
+> kısıt; rate-limit #322'de veritabanına taşındı). Çok instance çalıştırılırsa her
+> instance kendi susturmasını uygular ve bildirim sayısı instance sayısıyla
+> çarpılır — gürültü artar ama veri kaybı olmaz.
+
+> ⚠️ **Bildirim e-postası yığın izi taşır.** Yığın izi ve hata mesajı kullanıcı
+> verisi içerebilir. Adresin operatöre ait, erişimi sınırlı bir kutu olduğundan
+> emin olun. Sorgu dizesi bilerek bildirime konmaz (PII sıklıkla oradadır).
+
+---
+
+## 10. 🔗 GitHub webhook kurulumu (#326)
+
+Issue kapandığında veya PR merge edildiğinde AISigner'daki yol haritası adımı
+otomatik olarak tamamlanır. Bunun için GitHub'ın olayları bize göndermesi gerekir.
+
+**GitHub tarafı** — repo (veya org) → Settings → Webhooks → Add webhook:
+
+| Alan | Değer |
+|---|---|
+| Payload URL | `https://<alan-adi>/api/webhooks/github` |
+| Content type | `application/json` |
+| Secret | `GITHUB_WEBHOOK_SECRET` ile **aynı** değer |
+| Events | "Let me select individual events" → **Issues** ve **Pull requests** |
+
+**Doğrulama:**
+
+- [ ] GitHub'daki webhook sayfasında "Recent Deliveries" sekmesinde son teslimat **200** dönmüş
+- [ ] Bir test issue'su kapatıldığında ilgili adım panelde tamamlandı görünüyor
+- [ ] `GITHUB_WEBHOOK_SECRET` girilmeden test edilirse **503** dönüyor (sessizce başarılı görünmüyor)
+
+> ⚠️ **Uç kimlik doğrulamasız ve public** (middleware `publicPaths`'inde). Tek koruma
+> HMAC imzası. Sır rotasyonunda GitHub'daki değeri de güncellemeyi unutmayın —
+> aksi halde tüm teslimatlar 401 alır ve adımlar sessizce senkronize olmaz.
+>
+> Aynı teslimat iki kez gelirse (GitHub yeniden dener) ikinci kez işlenmez;
+> `ProcessedWebhook` tablosu teslimat kimliğini tutuyor.
+
+### 10.1 AI kod incelemesi (#327)
+
+Aynı webhook, **PR açıldığında** Gemini destekli bir ön inceleme yorumu bırakır.
+Ek bir kurulum adımı yoktur — yukarıdaki "Pull requests" olayı yeterlidir — ama
+şunlar sağlanmazsa özellik SESSİZCE devre dışı kalır (bu bilinçlidir; hiçbiri
+uygulamayı çökertmez):
+
+| Koşul | Sağlanmazsa |
+|---|---|
+| `GITHUB_TOKEN` PR'a **yorum yazma** izni taşımalı | yorum yazılamaz, loglanır |
+| `GOOGLE_CLOUD_PROJECT` + kimlik dosyası | inceleme üretilemez, **yorum yazılmaz** |
+| Repo bir `AssignedProject.githubRepoUrl` ile eşleşmeli | dokunulmaz |
+| Öğrenci **yürürlükteki** KVKK metnine rıza vermiş olmalı | inceleme yapılmaz |
+
+**⚠️ Rıza sürümü yükseltildi.** Kod incelemesi öğrencinin **kodunu** da yurt
+dışına gönderdiği için rıza metninin kapsamı genişledi ve `RIZA_METIN_SURUMU`
+`2026-09-v1` oldu. Eski metne rıza vermiş kullanıcılar sohbet/analiz
+özelliklerini KAYBETMEZ, ancak kod incelemesi almazlar; yeniden rıza vermeleri
+gerekir (profil ayarlarındaki AI rızası anahtarı).
+
+**Maliyet tavanları** (`src/features/github/server/pr-inceleme.ts`):
+
+| Sınır | Değer |
+|---|---|
+| Öğrenci başına günlük inceleme | 10 |
+| Platform geneli günlük inceleme | 200 |
+| PR başına azami dosya | 30 |
+| PR başına azami diff | 40.000 karakter |
+
+Lockfile, build çıktısı ve ikili dosyalar diff'e hiç girmez. Aynı PR'a ikinci
+yorum yazılmaz (yorumlardaki `<!-- aisigner-ai-review -->` işareti aranır).
+
+**Doğrulama:**
+
+- [ ] Test PR'ında yorum "🤖 AI ön incelemesi" başlığıyla ve mentör ibaresiyle görünüyor
+- [ ] Aynı PR'a ikinci teslimat gönderildiğinde **ikinci yorum yazılmıyor**
+- [ ] Rızası olmayan bir öğrencinin PR'ında yorum **yazılmıyor**

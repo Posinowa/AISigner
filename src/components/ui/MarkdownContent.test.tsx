@@ -29,6 +29,14 @@ describe("MarkdownContent — biçimlendirme (#126-2)", () => {
     expect(container.querySelector("h2")).toHaveTextContent("Başlık");
     expect(container.querySelectorAll("ul li")).toHaveLength(2);
   });
+
+  it("compact=true olduğunda daha kompakt sınıflarla render eder (#160)", () => {
+    const { container } = render(<MarkdownContent compact>{"# Başlık\n\nParagraf"}</MarkdownContent>);
+    const h1 = container.querySelector("h1");
+    expect(h1).toHaveClass("text-base");
+    const p = container.querySelector("p");
+    expect(p).toHaveClass("text-xs");
+  });
 });
 
 describe("MarkdownContent — XSS güvenliği (#126-2)", () => {

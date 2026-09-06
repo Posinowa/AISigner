@@ -47,11 +47,11 @@ export const saveSurveyAnswersSchema = z.object({
     .min(1, "En az bir cevap gerekli"),
 });
 
-// Admin: Stajyer hesap onay durumu güncelleme (approve/reject)
+// Admin: Stajyer hesap onay durumu güncelleme (approve/reject/graduated)
 export const updateAccountStatusSchema = z.object({
   userId: z.string().min(1, "Kullanıcı ID gerekli"),
-  accountStatus: z.enum(["PENDING", "APPROVED", "REJECTED"], {
-    error: "Geçersiz durum. PENDING, APPROVED veya REJECTED olmalı.",
+  accountStatus: z.enum(["PENDING", "APPROVED", "REJECTED", "GRADUATED"], {
+    error: "Geçersiz durum. PENDING, APPROVED, REJECTED veya GRADUATED olmalı.",
   }),
 });
 
@@ -87,6 +87,15 @@ export const createTemplateSchema = z.object({
   }),
   track: z.array(z.string()).default([]),
   githubRepoUrl: githubRepoUrlSchema,
+  /**
+   * #503: Aynı stajyere birden çok kez atanabilir mi?
+   *
+   * ⚠️ VARSAYILAN `false` — tekrar edilebilirlik İSTİSNA. #58'in yarış
+   * koruması varsayılan olarak yerinde kalıyor; yalnız bu bayrak açıkken
+   * gevşiyor. Kararı ADMIN veriyor: bir şablonu herkese açmak platform
+   * çapında bir karar, tek mentörün tercihi değil.
+   */
+  tekrarlanabilir: z.boolean().default(false),
 });
 
 // Admin: Proje şablonu güncelleme
@@ -96,6 +105,14 @@ export const updateTemplateSchema = z.object({
   difficulty: z.enum(["EASY", "MEDIUM", "HARD"]).optional(),
   track: z.array(z.string()).optional(),
   githubRepoUrl: githubRepoUrlSchema,
+  /**
+   * #503: Sonradan işaretlenebilir/kaldırılabilir.
+   *
+   * ⚠️ GEÇMİŞ ATAMALARI ETKİLEMEZ: `tekilKey` yazma anında hesaplandığı için
+   * bayrak değişse de mevcut satırlar olduğu gibi kalır. Kısıtı geriye dönük
+   * uygulamak (ya da geriye dönük kaldırmak) sürpriz olurdu.
+   */
+  tekrarlanabilir: z.boolean().optional(),
 });
 
 // Mentor: Proje atama
@@ -110,6 +127,14 @@ export const generateRoadmapSchema = z.object({
   // #178-4: Var olan yol haritasını silip yeniden üretme. Ham `as` cast yerine
   // şemadan geçer; route yalnızca DRAFT roadmap için siler (PUBLISHED korunur).
   overwrite: z.boolean().optional(),
+  /**
+   * #423: Mentörün üretimi yönlendiren serbest metni.
+   *
+   * ⚠️ Mentör metni de KULLANICI METNİDİR; prompt'a `veriBlogu` ile
+   * sarılarak giriyor (#390). "Yetkili kişi yazdı" varsayımı #390'da tam
+   * olarak bu yüzden reddedilmişti.
+   */
+  yonlendirme: z.string().max(500, "Yönlendirme en fazla 500 karakter").optional(),
 });
 
 // Mentor: AI proje önerisi
@@ -158,6 +183,15 @@ export const updateStepSchema = z.object({
   order: z.number().int().positive().optional(),
   status: z.enum(["TODO", "IN_PROGRESS", "COMPLETED"]).optional(),
   githubIssueUrl: githubIssueUrlSchema,
+});
+
+// Mentor: Yol haritası adımını bir sıra taşıma (#406)
+//
+// Serbest bir `order` sayısı KABUL ETMİYORUZ: tabanı mentor değil sunucu
+// belirliyor. Aksi halde iki adım aynı sırada kalabilirdi.
+export const adimTasiSchema = z.object({
+  stepId: z.string().min(1, "Adım kimliği gerekli"),
+  yon: z.enum(["yukari", "asagi"]),
 });
 
 // Mentor: Proje kaldırma
@@ -257,3 +291,195 @@ export const updateSuggestionSchema = z
   .refine((data) => data.status !== undefined || data.adminNote !== undefined, {
     message: "Güncellenecek en az bir alan gönderilmeli",
   });
+
+// ==========================================
+// 🎓 Sertifika ve Mezuniyet Şemaları (#204, #208)
+// ==========================================
+
+export const completionGradeEnum = z.enum([
+  "Üstün Başarı",
+  "Onur Derecesi",
+  "Yüksek Başarı",
+  "Başarılı",
+]);
+
+export const updateCertificateSchema = z.object({
+  certificateNumber: z.string().min(1).max(50).optional(),
+  mentorNote: z
+    .string()
+    .max(2000, "Referans notu en fazla 2000 karakter olabilir.")
+    .optional()
+    .nullable(),
+  completionGrade: completionGradeEnum.optional().nullable(),
+});
+
+
+// #349: Çalışma alanı talebi (mentör açar, admin karara bağlar).
+export const createWorkspaceRequestSchema = z.object({
+  assignedProjectId: z.string().min(1, "Atama ID'si gerekli"),
+  // Gerekçe opsiyonel; uzunluk sınırı şemadaki VarChar(500) ile aynı.
+  mentorNote: z.string().max(500, "Not en fazla 500 karakter olabilir").optional(),
+});
+
+export const decideWorkspaceRequestSchema = z.object({
+  onay: z.boolean(),
+  // Reddin gerekçesi ZORUNLU ama bu kural sunucu katmanında: burada
+  // `onay: false` ile boş not ayrımı yapmak şemayı `superRefine` ile
+  // karmaşıklaştırırdı ve kural iki yerde tekrarlanırdı.
+  adminNote: z.string().max(500, "Not en fazla 500 karakter olabilir").optional(),
+});
+
+// #328: Mentör önerisi — yalnız öğrenci kimliği; sıralama sunucuda kurulur.
+export const matchMentorsSchema = z.object({
+  studentId: z.string().min(1, "Öğrenci ID'si gerekli"),
+});
+
+// #332 Faz 2: Takım yönetimi.
+const takimRolEnum = z.enum(["frontend", "backend", "fullstack", "qa", "design"]);
+
+export const createTeamSchema = z.object({
+  name: z
+    .string()
+    .min(2, "Takım adı en az 2 karakter olmalı")
+    .max(60, "Takım adı en fazla 60 karakter olabilir")
+    .transform((v) => v.trim()),
+});
+
+export const addTeamMemberSchema = z.object({
+  studentUserId: z.string().min(1, "Öğrenci gerekli"),
+  role: takimRolEnum,
+});
+
+export const setTeamMentorsSchema = z.object({
+  mentorIds: z.array(z.string().min(1)).max(10, "En fazla 10 mentör"),
+});
+
+export const assignTeamProjectSchema = z.object({
+  projectTemplateId: z.string().min(1, "Proje şablonu gerekli"),
+});
+
+// #332: Adımı üstlenme/bırakma. null = bırak.
+export const claimStepSchema = z.object({
+  assigneeId: z.string().min(1).nullable(),
+});
+
+// #366: Stajyerin kendi proje önerisi.
+const kaynakEnum = z.enum(["BIZIM", "BAGLA", "DEVRET"]);
+
+/**
+ * Proje önerisi alan sınırları — TEK KAYNAK (#408).
+ *
+ * ⚠️ Arayüz de bu sayıları okuyor. Elle kopyalanan bir "30", biri
+ * değiştirilip diğeri unutulduğunda sessizce ayrışırdı ve kullanıcıya
+ * yanlış bir eşik gösterilirdi.
+ */
+export const ONERI_SINIRLARI = {
+  baslik: { enAz: 5, enCok: 120 },
+  aciklama: { enAz: 30, enCok: 4000 },
+  hedefler: { enAz: 20, enCok: 2000 },
+} as const;
+
+export const createProposalSchema = z.object({
+  /*
+   * ⚠️ `.trim()` ÖNCE, `.min()` SONRA — sıra önemli.
+   *
+   * Öncesi `.min(30).transform(v => v.trim())` idi: 35 BOŞLUK `min(30)`'u
+   * geçiyor ve BOŞ STİNG olarak kaydediliyordu. Ölçüldü. `.trim()`
+   * zincirin başında olduğunda kırpılmış uzunluk doğrulanıyor.
+   */
+  title: z
+    .string()
+    .trim()
+    .min(ONERI_SINIRLARI.baslik.enAz, `Başlık en az ${ONERI_SINIRLARI.baslik.enAz} karakter`)
+    .max(ONERI_SINIRLARI.baslik.enCok),
+  description: z
+    .string()
+    .trim()
+    .min(
+      ONERI_SINIRLARI.aciklama.enAz,
+      `Açıklama en az ${ONERI_SINIRLARI.aciklama.enAz} karakter olmalı`,
+    )
+    .max(ONERI_SINIRLARI.aciklama.enCok),
+  goals: z
+    .string()
+    .trim()
+    .min(
+      ONERI_SINIRLARI.hedefler.enAz,
+      `Hedefler en az ${ONERI_SINIRLARI.hedefler.enAz} karakter olmalı`,
+    )
+    .max(ONERI_SINIRLARI.hedefler.enCok),
+  technologies: z.array(z.string().min(1).max(40)).max(10, "En fazla 10 teknoloji"),
+  kaynak: kaynakEnum,
+  // BAGLA/DEVRET için zorunluluk sunucu katmanında: burada `superRefine` ile
+  // kurmak kuralı iki yerde tekrarlardı.
+  repoUrl: z.string().url("Geçerli bir GitHub adresi girin").optional().nullable(),
+});
+
+export const decideProposalSchema = z.object({
+  onay: z.boolean(),
+  adminNote: z.string().max(500).optional(),
+  // Admin stajyerin tercihini geçersiz kılabilir.
+  kaynak: kaynakEnum.optional(),
+});
+
+/**
+ * "Yazıyor..." sinyali (#354).
+ *
+ * `yaziyor: false` sinyali SİLER — mesaj gönderen ya da alanı terk eden
+ * kullanıcı, süre dolmasını beklemeden göstergeden düşmeli.
+ */
+export const typingSignalSchema = z.object({
+  to: z.string().min(1, "Alıcı gerekli"),
+  yaziyor: z.boolean(),
+});
+
+/**
+ * Adım revizyon isteği (#379).
+ *
+ * Gerekçe ZORUNLU ve boş olamaz: gerekçesiz revizyon öğrenciye aynı işi
+ * tekrar yaptırır (#366'daki red gerekçesi deseni).
+ */
+export const revizyonIsteSchema = z.object({
+  gerekce: z
+    .string()
+    .trim()
+    .min(10, "Gerekçe en az 10 karakter olmalı")
+    .max(1000, "Gerekçe en fazla 1000 karakter olabilir"),
+});
+
+/**
+ * Ofis saati (#398).
+ *
+ * ⚠️ GÖRÜŞME LİNKİ MENTÖRÜN GİRDİĞİ METİN. Yalnız http/https kabul ediliyor;
+ * `javascript:` gibi şemalar stajyerin tıkladığı yerde kod çalıştırırdı.
+ */
+export const gorusmeLinkiSchema = z.object({
+  link: z
+    .string()
+    .trim()
+    .max(500)
+    .refine(
+      (v) => {
+        if (v === "") return true;
+        try {
+          return ["http:", "https:"].includes(new URL(v).protocol);
+        } catch {
+          return false;
+        }
+      },
+      { message: "Geçerli bir http(s) adresi girin." },
+    ),
+});
+
+export const ofisSaatiAcSchema = z.object({
+  baslangic: z.string().datetime(),
+  bitis: z.string().datetime(),
+});
+
+export const ofisSaatiRezerveSchema = z.object({
+  not: z.string().trim().max(500).optional(),
+});
+
+export const gorusmeNotuSchema = z.object({
+  not: z.string().trim().max(2000),
+});

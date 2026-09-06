@@ -3,6 +3,9 @@ import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth/guard";
 import { sendMessageSchema, getMessagesSchema } from "@/lib/validations/api";
 import { createRateLimiter } from "@/lib/rate-limit";
+// #354: Erişim kuralı ortak modülde — "yazıyor..." sinyali aynısını kullanıyor.
+import { verifyConversationAccess } from "@/features/messaging/server/erisim";
+import { rotaHatasi } from "@/lib/api-hata";
 
 const limiter = createRateLimiter("messages", {
   maxRequests: 30,
@@ -86,7 +89,7 @@ export async function GET(req: Request) {
       hasMore,
     });
   } catch (error) {
-    console.error("GET /api/messages error:", error);
+    rotaHatasi("GET /api/messages error:", error);
     return NextResponse.json(
       { error: "Mesajlar yüklenirken hata oluştu." },
       { status: 500 }
@@ -105,7 +108,7 @@ export async function POST(req: Request) {
   const userId = auth.session.user.id!;
   const userRole = auth.session.user.role;
 
-  const rl = limiter.check(userId);
+  const rl = await limiter.check(userId);
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Çok fazla mesaj gönderdiniz. Lütfen biraz bekleyin." },
@@ -157,50 +160,10 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ message }, { status: 201 });
   } catch (error) {
-    console.error("POST /api/messages error:", error);
+    rotaHatasi("POST /api/messages error:", error);
     return NextResponse.json(
       { error: "Mesaj gönderilirken hata oluştu." },
       { status: 500 }
     );
   }
-}
-
-/**
- * Konuşma erişim kontrolü.
- * - ADMIN: herkesle mesajlaşabilir (sadece otherUserId var olmalı).
- * - MENTOR/STUDENT: sadece birbirine atanmış mentor/öğrenci çiftleri mesajlaşabilir.
- */
-async function verifyConversationAccess(
-  userId: string,
-  otherUserId: string,
-  userRole?: string
-): Promise<boolean> {
-  if (userRole === "ADMIN") {
-    const exists = await prisma.user.findUnique({
-      where: { id: otherUserId },
-      select: { id: true },
-    });
-    return !!exists;
-  }
-
-  // Karşı taraf ADMIN ise (admin → user mesajına yanıt) izin ver
-  const other = await prisma.user.findUnique({
-    where: { id: otherUserId },
-    select: { role: true },
-  });
-  if (other?.role === "ADMIN") return true;
-
-  // #195: M:N — karşı taraf, benim (mentör) öğrencilerimden biri mi?
-  const asMentor = await prisma.studentProfile.findFirst({
-    where: { userId: otherUserId, mentorAssignments: { some: { mentorId: userId } } },
-  });
-  if (asMentor) return true;
-
-  // #195: M:N — karşı taraf, benim (öğrenci) mentorlarımdan biri mi?
-  const asStudent = await prisma.studentProfile.findFirst({
-    where: { userId, mentorAssignments: { some: { mentorId: otherUserId } } },
-  });
-  if (asStudent) return true;
-
-  return false;
 }

@@ -1,14 +1,46 @@
 import { NextResponse } from "next/server";
-import { getAllUsers, updateUserRole, setStudentMentors, AssignmentValidationError } from "@/features/admin/server/user";
+import {
+  getAllUsers,
+  kullaniciSayilari,
+  updateUserRole,
+  setStudentMentors,
+  AssignmentValidationError,
+} from "@/features/admin/server/user";
+import { gecerliKategori } from "@/features/admin/kategoriler";
 import { requireAuth } from "@/lib/auth/guard";
 import { updateRoleSchema, assignMentorSchema } from "@/lib/validations/api";
+import { rotaHatasi } from "@/lib/api-hata";
 
-export async function GET() {
+/**
+ * Kullanıcı listesi — sayfalı, sunucuda filtreli/aranan.
+ *
+ * ⚠️ YANIT ŞEKLİ DEĞİŞTİ: düz dizi yerine `{ users, nextCursor, sayilar }`.
+ * `TakimYonetimi` her iki şekli de karşılıyordu (`Array.isArray(veri) ? ...`),
+ * panel bu PR'da güncellendi.
+ *
+ * ⚠️ SAYAÇLAR HER SAYFADA DÖNMÜYOR. İlk istekte (imleçsiz) hesaplanıyor;
+ * "daha fazla yükle" isteklerinde `sayilar` YOK. Sayaçlar sayfaya göre
+ * değişmiyor, her sayfada üç toplama sorgusu daha koşturmak boşuna yük
+ * olurdu.
+ */
+export async function GET(req: Request) {
   const auth = await requireAuth("ADMIN");
   if (!auth.authorized) return auth.response;
 
-  const users = await getAllUsers();
-  return NextResponse.json(users);
+  const { searchParams } = new URL(req.url);
+  const cursor = searchParams.get("cursor");
+
+  const [liste, sayilar] = await Promise.all([
+    getAllUsers({
+      kategori: gecerliKategori(searchParams.get("kategori")),
+      q: searchParams.get("q") ?? "",
+      cursor,
+      limit: Number(searchParams.get("limit")) || undefined,
+    }),
+    cursor ? Promise.resolve(null) : kullaniciSayilari(),
+  ]);
+
+  return NextResponse.json({ ...liste, ...(sayilar ? { sayilar } : {}) });
 }
 
 export async function PATCH(req: Request) {
@@ -51,7 +83,7 @@ export async function POST(req: Request) {
     if (error instanceof AssignmentValidationError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
-    console.error("POST /api/admin/users assignMentor error:", error);
+    rotaHatasi("POST /api/admin/users assignMentor error:", error);
     return NextResponse.json(
       { error: "Mentor atama sırasında bir hata oluştu." },
       { status: 500 },

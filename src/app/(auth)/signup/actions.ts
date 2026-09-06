@@ -7,6 +7,15 @@ import { signupSchema } from "@/features/auth/models/user"
 import { redirect } from "next/navigation"
 import { headers } from "next/headers"
 import { createRateLimiter } from "@/lib/rate-limit"
+import { getClientIp } from "@/lib/client-ip"
+import { sendVerificationEmail } from "@/features/auth/server/email-verification"
+import { AI_RIZA_ALANI } from "@/features/kvkk/riza-alani"
+import { RIZA_METIN_SURUMU } from "@/features/kvkk/riza"
+import {
+  BASVURU_ALAN_ADI,
+  basvuruRolu,
+  basvuruTipiCoz,
+} from "@/features/auth/models/basvuru-tipi"
 
 const signupLimiter = createRateLimiter("signup", {
   maxRequests: 5,
@@ -22,12 +31,8 @@ export async function signupAction(
   formData: FormData
 ): Promise<SignupState> {
   // Rate limiting
-  const headersList = await headers();
-  const ip =
-    headersList.get("x-real-ip") ||
-    headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    "anonymous";
-  const rl = signupLimiter.check(ip);
+  const ip = getClientIp(await headers());
+  const rl = await signupLimiter.check(ip);
   if (!rl.allowed) {
     return { error: { email: ["Çok fazla kayıt denemesi. Lütfen 5 dakika bekleyin."] } };
   }
@@ -55,18 +60,41 @@ export async function signupAction(
     const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } })
     if (existing) return { error: { email: ["Bu email zaten kayıtlı"] } }
 
+    // #250: Rol istemciden geliyor — beyaz listeyle çözülüyor, tanınmayan
+    // her değer stajyere düşüyor. ADMIN hiçbir girdiyle üretilemez.
+    const role = basvuruRolu(basvuruTipiCoz(formData.get(BASVURU_ALAN_ADI)))
+
+    // #321: Onay kutusu işaretliyse "evet" gelir. Kesin eşitlik: tanınmayan
+    // hiçbir değer rıza sayılmaz.
+    const aiRizasi = formData.get(AI_RIZA_ALANI) === "evet"
+
     const hashedPassword = await hash(password)
-    await prisma.user.create({
+    const yeniKullanici = await prisma.user.create({
       data: {
         name: parsed.data.name.trim(),
         lastName: parsed.data.lastName.trim(),
         email: normalizedEmail,
         password: hashedPassword,
         phone: parsed.data.phone ?? null,
-        role: "STUDENT",
-        // Yeni stajyer hesabı admin onayına kadar PENDING — aktif değildir.
+        role,
+        // Yeni hesap admin onayına kadar PENDING — aktif değildir.
+        // #250: mentör başvurusu da aynı onaydan geçer.
         accountStatus: "PENDING",
+        // #321: KVKK açık rıza. İşaretlenmediyse null kalır ve AI özellikleri
+        // kapalı olur; kayıt yine tamamlanır (rıza zorunlu tutulamaz).
+        ...(aiRizasi
+          ? { aiConsentAt: new Date(), aiConsentVersion: RIZA_METIN_SURUMU }
+          : {}),
       },
+      select: { id: true, name: true },
+    })
+
+    // #247: Doğrulama e-postası. Gönderilemezse kayıt AKIŞI KIRILMAZ —
+    // hesap oluşmuş olur, kullanıcı doğrulamayı sonra yapabilir.
+    await sendVerificationEmail({
+      userId: yeniKullanici.id,
+      email: normalizedEmail,
+      name: yeniKullanici.name,
     })
   } catch (err) {
     // redirect() Next.js'te NEXT_REDIRECT throw eder — onu yakalayıp swallow etmemeliyiz

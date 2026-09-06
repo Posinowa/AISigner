@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import "@testing-library/jest-dom/vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { ConfirmDialogProvider } from "@/components/ui/ConfirmDialog";
 
 import ProjectsPage from "./page";
@@ -47,7 +47,7 @@ describe("Admin projects — fetch fail error state (#123 / #89-3)", () => {
     fireEvent.click(retry);
 
     // İkinci istek başarılı ([]) → hata görünümü kaybolmalı.
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(screen.queryByText("Şablonlar yüklenemedi")).not.toBeInTheDocument();
     });
     expect(fetchMock).toHaveBeenCalledTimes(2);

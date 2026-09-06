@@ -4,6 +4,7 @@ import Credentials from "next-auth/providers/credentials"
 import { prisma } from "@/lib/auth/prisma"
 import { hash, verify } from "@node-rs/argon2";
 import { createRateLimiter } from "@/lib/rate-limit";
+import { getClientIp } from "@/lib/client-ip";
 
 
 // AUTH_SECRET kontrolü - üretim ortamında eksikse hata fırlat
@@ -33,17 +34,6 @@ function getDummyHash(): Promise<string> {
   return dummyHashPromise;
 }
 
-function getClientIp(headers: Record<string, string | string[] | undefined> | undefined): string {
-  const h = headers ?? {};
-  const realIp = h["x-real-ip"];
-  const realIpStr = Array.isArray(realIp) ? realIp[0] : realIp;
-  if (realIpStr) return realIpStr.trim();
-  const fwd = h["x-forwarded-for"];
-  const fwdStr = Array.isArray(fwd) ? fwd[0] : fwd;
-  if (fwdStr) return fwdStr.split(",")[0]!.trim();
-  return "anonymous";
-}
-
 // NextAuth konfigürasyonu
 export const authOptions : AuthOptions = {
   session: { strategy: "jwt"},
@@ -68,7 +58,7 @@ export const authOptions : AuthOptions = {
         const emailKey = `email:${normalizedEmail}`
 
         // Bloke kontrolü (sayacı artırmadan): limit aşıldıysa pahalı işe girmeden reddet
-        if (!loginLimiterByIp.peek(ipKey).allowed || !loginLimiterByEmail.peek(emailKey).allowed) {
+        if (!(await loginLimiterByIp.peek(ipKey)).allowed || !(await loginLimiterByEmail.peek(emailKey)).allowed) {
           throw new Error("Çok fazla başarısız giriş denemesi. Lütfen birkaç dakika sonra tekrar deneyin.")
         }
 
@@ -82,33 +72,38 @@ export const authOptions : AuthOptions = {
 
         if (!user || !isValid) {
           // Yalnızca başarısız denemeleri say
-          loginLimiterByIp.check(ipKey)
-          loginLimiterByEmail.check(emailKey)
+          await loginLimiterByIp.check(ipKey)
+          await loginLimiterByEmail.check(emailKey)
           return null
         }
 
         // Başarılı giriş → sayaçları temizle (meşru kullanıcı cezalandırılmasın)
-        loginLimiterByIp.reset(ipKey)
-        loginLimiterByEmail.reset(emailKey)
+        await loginLimiterByIp.reset(ipKey)
+        await loginLimiterByEmail.reset(emailKey)
 
         return user
       },
     }),
   ],
-   cookies: {
-    sessionToken: {
-      name: "next-auth.session-token",
-      options: {
-        httpOnly: true,  // JS tarafından erişilemez (XSS koruması)
-        sameSite: "lax"as const,  // CSRF koruması için SameSite=Lax
-        path: "/", // Her yerde geçerli
-        secure: process.env.NODE_ENV === "production", // Prod ortamında HTTPS şart
-      },
-    },
-  },
-  
- 
-callbacks: {
+  // ⚠️ ÇEREZ ADINI ELLE VERMEYİN (canlıyı kıran hata buradaydı).
+  //
+  // Burada `cookies.sessionToken.name` sabit "next-auth.session-token" idi.
+  // Ama `middleware.ts` oturumu `getToken()` ile okuyor ve NextAuth v4'ün
+  // `getToken` varsayılanı çerez adını NEXTAUTH_URL'e bakarak seçiyor:
+  //
+  //     secureCookie = NEXTAUTH_URL.startsWith("https://")
+  //     cookieName   = secureCookie ? "__Secure-next-auth.session-token"
+  //                                 : "next-auth.session-token"
+  //
+  // Sonuç: HTTPS'te uygulama çerezi "next-auth.session-token" adıyla yazıyor,
+  // middleware "__Secure-next-auth.session-token" arıyor, bulamıyor ve giriş
+  // yapmış HERKESİ /signin'e geri atıyordu. Lokalde (http) iki ad da aynı
+  // olduğu için hata hiç görünmüyordu.
+  //
+  // Blok kaldırıldı: NextAuth varsayılanı httpOnly + sameSite:"lax" + path:"/"
+  // + secure(https) zaten veriyor, ÜSTELİK doğru adı seçiyor ve prod'da
+  // "__Secure-" önekinin tarayıcı korumasını da kazandırıyor.
+  callbacks: {
     async jwt({ token, user }) {
       if (user) {
         // İlk giriş — bilgileri token'a yaz
@@ -128,15 +123,25 @@ callbacks: {
         try {
           const dbUser = await prisma.user.findUnique({
             where: { id: token.id as string },
-            select: { role: true, accountStatus: true },
+            // #259: Doğrulama durumu da tazeleniyor — kullanıcı e-postasını
+            // doğruladığında rozeti görmek için yeniden giriş yapmak zorunda
+            // kalmasın. Aynı sorgu, ek maliyet yok.
+            select: { role: true, accountStatus: true, emailVerified: true, avatarFile: true },
           })
           if (dbUser) {
             token.role = dbUser.role
             token.accountStatus = dbUser.accountStatus
+            token.emailVerified = dbUser.emailVerified?.toISOString() ?? null
+            // #290: Arayüz depolama adına ihtiyaç duymuyor, yalnızca fotoğrafın
+            // OLUP OLMADIĞINI bilmesi yeterli. Adı taşımak jetonu gereksiz
+            // büyütür ve dosya adını istemciye sızdırırdı.
+            token.fotografVar = Boolean(dbUser.avatarFile)
           } else {
             // Kullanıcı silinmiş → yetkiyi kaldır
             token.role = undefined
             token.accountStatus = undefined
+            token.emailVerified = null
+            token.fotografVar = false
           }
         } catch {
           // DB geçici hatası → mevcut token değerlerini koru (oturumu bozma)
@@ -155,6 +160,8 @@ callbacks: {
         email: token.email?? "",
         role: typeof token.role === "string" ? token.role : undefined,
         accountStatus: typeof token.accountStatus === "string" ? token.accountStatus : undefined,
+        emailVerified: typeof token.emailVerified === "string" ? token.emailVerified : null,
+        fotografVar: token.fotografVar === true,
       }
       return session
     },

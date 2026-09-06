@@ -5,6 +5,7 @@ import {
 } from "@/features/survey/server/survey";
 import { requireAuth } from "@/lib/auth/guard";
 import { saveSurveyAnswersSchema } from "@/lib/validations/api";
+import { rotaHatasi } from "@/lib/api-hata";
 
 /**
  * POST /api/student/survey-answers
@@ -35,7 +36,7 @@ export async function POST(req: Request) {
     if (error instanceof SurveyValidationError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
-    console.error("POST /api/student/survey-answers error:", error);
+    rotaHatasi("POST /api/student/survey-answers error:", error);
     return NextResponse.json(
       { error: "Cevaplar kaydedilirken hata oluştu." },
       { status: 500 },

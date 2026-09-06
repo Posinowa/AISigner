@@ -12,5 +12,17 @@ KURULUM.md
 # (gcp-credentials.json .gitignore'da olduğu için repo'da yoktur; ama lokalde
 #  varken `docker build` yapılırsa COPY . . ile imaja sızardı — burada engelliyoruz.)
 gcp-credentials.json
+service-account.json
 uploads
+
+# Yukarıdaki adlar tek tek sayılmıştı ve iki gerçek sır listeden KAÇMIŞTI:
+# service-account.json (GCP private_key) ve AISigner-main.env (AUTH_SECRET +
+# DATABASE_URL). `.env.*` deseni "AISigner-main.env"i yakalamıyor. Bu yüzden
+# artık ada değil BİÇİME göre eliyoruz — yeni bir sır dosyası eklendiğinde
+# listeyi güncellemeyi unutmak sızıntıya yol açmasın.
+*.env
+*credentials*.json
+*service-account*.json
+*.pem
+*.key
 

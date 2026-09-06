@@ -25,12 +25,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       # #198: Yıkıcı (geriye-uyumsuz) migration guard — bağımlılık gerektirmez.
@@ -79,3 +79,179 @@ jobs:
       - name: Skip build
         if: env.HAS_BUILD != 'true'
         run: echo "No build script found. Skipping."
+
+  # ---------------------------------------------------------------------------
+  # Bağımlılık güvenlik taraması (#469).
+  #
+  # ⚠️ EŞİK BİLEREK İKİYE BÖLÜNDÜ. Tek bir `npm audit` çalıştırıp her
+  # bulguda CI'yı kırmak klasik bir tuzak: dev bağımlılıklarındaki geçişli
+  # uyarıların çoğu düzeltilemiyor (upstream'i bekliyor) ve kırmızı CI
+  # ilgisiz her işi bloke ediyor. Bir süre sonra ekip "audit'i yok say"
+  # alışkanlığı ediniyor — yani tarama hiç olmamasından daha kötü hale
+  # geliyor.
+  #
+  #   - BLOKE EDEN: yalnız ÜRETİM bağımlılıkları, yalnız high/critical.
+  #     Bunlar kullanıcıya giden artefaktta yaşıyor ve aksiyon alınabilir.
+  #   - BİLGİ AMAÇLI: dev dahil tam tarama, `continue-on-error` ile.
+  #     Görünür olur ama işi durdurmaz.
+  #
+  # Ölçüm (bu PR yazılırken): her iki tarama da 0 açık veriyordu, yani eşik
+  # bugün yeşil bir CI'yı kırmıyor.
+  # ---------------------------------------------------------------------------
+  guvenlik:
+    name: dependency audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      # `npm audit` kurulum gerektirmiyor; lockfile'dan çalışıyor.
+      - name: Üretim bağımlılıkları — high/critical (BLOKE EDER)
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Tam tarama (dev dahil) — bilgi amaçlı
+        continue-on-error: true
+        run: npm audit
+
+  # ---------------------------------------------------------------------------
+  # Deploy edilen ASIL artefakt: imaj.
+  #
+  # ⚠️ Bu iş bir HATADAN doğdu. CI yalnızca `npm run build` koşuyordu ve o
+  # geçiyordu; ama `docker build` #400'den beri KIRIKTI ve kimse fark etmedi.
+  # Sebep: `NEXT_PUBLIC_APP_URL` CI'da env olarak tanımlı, Dockerfile'da ise
+  # hiç geçirilmiyordu. Yani yeşil bir CI, deploy edilemeyen bir imajla
+  # birlikte yaşayabiliyordu.
+  #
+  # Ayrı bir iş: ana CI'yı yavaşlatmıyor, paralel koşuyor. Yalnızca BUILD
+  # ediyor, hiçbir yere push etmiyor — amaç imajın üretilebildiğini kanıtlamak.
+  # ---------------------------------------------------------------------------
+  docker:
+    name: docker image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          # Değer client bundle'a gömüldüğü için build-arg ZORUNLU; burada
+          # yalnızca imajın üretilebildiğini kanıtlıyoruz, bu yüzden CI'ya özel
+          # bir yer tutucu yeterli. Gerçek deploy'da alan adı geçilmeli
+          # (DEPLOYMENT.md §5).
+          build-args: |
+            NEXT_PUBLIC_APP_URL=https://ci.example.invalid
+            APP_VERSION=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ---------------------------------------------------------------------------
+  # Uçtan uca testler (#505).
+  #
+  # ⚠️ Bu iş de bir HATADAN doğdu — aslında İKİ hatadan, ikisi de canlıya
+  # çıktı ve ikisi de 2400'den fazla birim testinin hepsinden geçmişti:
+  #
+  #   - #308: oturum çerezinin adı elle sabitlenmişti. NextAuth adı
+  #     `NEXTAUTH_URL`'e göre seçtiği için HTTPS'te giriş yapan HERKES
+  #     `/signin`'e geri atılıyordu; lokalde (http) hiç görünmüyordu.
+  #   - #375: oturumsuz kullanıcıyı yönlendiren blok `/api/` kontrolünden
+  #     ÖNCE çalışıyordu; her API isteği 307 ile HTML login sayfasına
+  #     gidiyordu ve arayüz bunu "veri yüklenemedi" diye gösteriyordu.
+  #
+  # İkisi de modüllerin İÇİNDE değil ARASINDA yaşıyordu; mock'lanmış birim
+  # testleri middleware + NextAuth + tarayıcı çerezi birleşimini görmüyor.
+  #
+  # ⚠️ ÜRETİM DERLEMESİ üzerinde koşar (`next start`), `next dev` değil:
+  # StrictMode'un çift efekti ve dev'e özgü önbellek davranışı gerçek
+  # davranışı gizler.
+  # ---------------------------------------------------------------------------
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: aisigner_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      AUTH_SECRET: e2e-placeholder-secret
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/aisigner_e2e?schema=public
+      # ⚠️ PORT HER YERDE AYNI OLMALI. `NEXT_PUBLIC_APP_URL` derleme anında
+      # client bundle'a GÖMÜLÜYOR (#400'ün docker imajını kıran sebebi);
+      # build ile çalıştırma farklı porta bakarsa test, ürün hatası olmayan
+      # bir kırmızı üretir.
+      E2E_PORT: 3100
+      NEXT_PUBLIC_APP_URL: http://127.0.0.1:3100
+      NEXTAUTH_URL: http://127.0.0.1:3100
+      # Seed'in demo hesaplarına yazacağı şifre. Atılabilir bir CI
+      # veritabanına ekiliyor; gerçek bir sır değil.
+      DEMO_PASSWORD: e2e-demo-parolasi
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Yalnız chromium: tarayıcı çeşitliliği bu testlerin amacı değil,
+      # oturum/middleware sözleşmesi tarayıcıdan bağımsız.
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Apply migrations
+        run: npx prisma migrate deploy
+
+      - name: Seed demo accounts
+        run: npm run seed
+
+      - name: Build
+        run: npm run build
+
+      - name: Run E2E
+        run: npm run test:e2e
+
+      # ⚠️ İKİ YOL DA YÜKLENİR. `playwright-report/` html raporu (özet),
+      # `test-results/` ise `trace: retain-on-failure` ile üretilen izler —
+      # ağ istekleri ve zaman çizgisi orada. #518'de CI'da düşüp lokalde hiç
+      # tekrarlanmayan bir hata çıktı ve elde inceleyecek hiçbir şey yoktu.
+      - name: Upload report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: warn

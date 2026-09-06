@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import {
+  ATAMA_SAHIPLIK_SELECT,
+  mentoruMu,
+} from "@/features/teams/server/sahiplik";
 import { requireAuth } from "@/lib/auth/guard";
-import { isAssignedMentor } from "@/lib/auth/mentor-access";
 import { updateRoadmapSchema } from "@/lib/validations/api";
+import { rotaHatasi } from "@/lib/api-hata";
 
 // GET: Roadmap detayını getir
 export async function GET(
@@ -18,16 +22,19 @@ export async function GET(
     const roadmap = await prisma.roadmap.findUnique({
       where: { id: roadmapId },
       include: {
-        steps: { orderBy: { order: "asc" } },
+        steps: {
+          orderBy: { order: "asc" },
+          // #407: Yorum sayısı liste sorgusundan — adım başına ayrı istek N+1 olurdu.
+          include: { _count: { select: { comments: true } } },
+        },
+        // #332: Sahiplik bireysel VEYA takım; yetki tek tanımdan gelir.
         assignedProject: {
-          include: {
+          select: {
+            ...ATAMA_SAHIPLIK_SELECT,
             projectTemplate: true,
             studentProfile: {
               include: {
-                user: {
-                  select: { name: true, lastName: true, email: true },
-                },
-                // #195: M:N yetki kontrolü için atanmış mentorlar.
+                user: { select: { name: true, lastName: true, email: true } },
                 mentorAssignments: { select: { mentorId: true } },
               },
             },
@@ -44,7 +51,7 @@ export async function GET(
     }
 
     // Mentor ownership kontrolü — #195: öğrencinin mentorlarından biri mi?
-    if (!isAssignedMentor(roadmap.assignedProject.studentProfile.mentorAssignments, auth.session.user.id)) {
+    if (!mentoruMu(roadmap.assignedProject, auth.session.user.id)) {
       return NextResponse.json(
         { error: "Bu yol haritasına erişim yetkiniz yok." },
         { status: 403 }
@@ -53,7 +60,7 @@ export async function GET(
 
     return NextResponse.json(roadmap);
   } catch (error) {
-    console.error("Roadmap GET Error:", error);
+    rotaHatasi("Roadmap GET Error:", error);
     return NextResponse.json(
       { error: "Yol haritası getirilirken hata oluştu." },
       { status: 500 }
@@ -83,9 +90,8 @@ export async function PUT(
       include: {
         assignedProject: {
           include: {
-            studentProfile: {
-              include: { mentorAssignments: { select: { mentorId: true } } },
-            },
+            // #332: Sahiplik bireysel VEYA takım.
+            ...ATAMA_SAHIPLIK_SELECT,
           },
         },
       },
@@ -96,7 +102,7 @@ export async function PUT(
     }
 
     // #195: öğrencinin mentorlarından biri mi?
-    if (!isAssignedMentor(existingRoadmap.assignedProject.studentProfile.mentorAssignments, auth.session.user.id)) {
+    if (!mentoruMu(existingRoadmap.assignedProject, auth.session.user.id)) {
       return NextResponse.json(
         { error: "Bu yol haritasını güncelleme yetkiniz yok." },
         { status: 403 }
@@ -111,13 +117,17 @@ export async function PUT(
       where: { id: roadmapId },
       data: updateData,
       include: {
-        steps: { orderBy: { order: "asc" } },
+        steps: {
+          orderBy: { order: "asc" },
+          // #407: Yorum sayısı liste sorgusundan — adım başına ayrı istek N+1 olurdu.
+          include: { _count: { select: { comments: true } } },
+        },
       },
     });
 
     return NextResponse.json(roadmap);
   } catch (error) {
-    console.error("Roadmap PUT Error:", error);
+    rotaHatasi("Roadmap PUT Error:", error);
     return NextResponse.json(
       { error: "Yol haritası güncellenirken hata oluştu." },
       { status: 500 }

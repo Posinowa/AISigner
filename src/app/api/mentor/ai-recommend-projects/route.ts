@@ -4,6 +4,10 @@ import { recommendProjects } from "@/features/ai/server/project-recommendations"
 import { requireAuth } from "@/lib/auth/guard";
 import { recommendProjectsSchema } from "@/lib/validations/api";
 import { createRateLimiter } from "@/lib/rate-limit";
+import { profilSahibininRizasiVar } from "@/features/kvkk/riza";
+import { projeYukleriniGetir } from "@/features/projects/server/yuk";
+import { mentorunOgrencisiWhere, ogrencininAtamalariWhere } from "@/features/teams/server/sahiplik";
+import { rotaHatasi } from "@/lib/api-hata";
 
 const limiter = createRateLimiter("ai-recommend-projects", {
   maxRequests: 10,
@@ -14,7 +18,7 @@ export async function POST(req: Request) {
   const auth = await requireAuth("MENTOR");
   if (!auth.authorized) return auth.response;
 
-  const rl = limiter.check(auth.session.user.id ?? "anonymous");
+  const rl = await limiter.check(auth.session.user.id ?? "anonymous");
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Çok fazla istek. Lütfen biraz bekleyin." },
@@ -37,8 +41,8 @@ export async function POST(req: Request) {
     const studentProfile = await prisma.studentProfile.findFirst({
       where: {
         id: studentProfileId,
-        // #195: M:N — bu mentör öğrencinin mentorlarından biri mi?
-        mentorAssignments: { some: { mentorId: auth.session.user.id } },
+        // #370: bireysel VEYA takım bağı.
+        ...mentorunOgrencisiWhere(auth.session.user.id!),
       },
     });
 
@@ -49,30 +53,95 @@ export async function POST(req: Request) {
       );
     }
 
-    // 3. Sistemdeki tüm müsait proje şablonlarını çekiyoruz
-    const availableProjects = await prisma.projectTemplate.findMany();
+    // #321: KVKK açık rıza — veri öğrenciye ait, rıza da öğrencinin.
+    if (!(await profilSahibininRizasiVar(studentProfile.id))) {
+      return NextResponse.json(
+        {
+          error:
+            "Bu öğrenci yapay zekâ işleme onayı vermediği için AI üretimi " +
+            "kullanılamıyor. Öğrenci onayı profilinden verebilir.",
+          rizaGerekli: true,
+        },
+        { status: 403 },
+      );
+    }
+
+    // #295: Zaten atanmış projeler aday kümesinden ÇIKARILIYOR. Eskiden
+    // AI bunlara da slot harcıyordu; arayüz onları gizlediği için mentör
+    // 3 yerine 1-2 kullanılabilir öneri görüyordu.
+    //
+    // ⚠️ ATAMALAR `sahiplik.ts`'TEN SORULUR (#498). Burada
+    // `studentProfile.assignedProjects` okunuyordu ve takım atamasında
+    // `studentProfileId` NULL olduğu için (#332) takımın projesi süzgece HİÇ
+    // girmiyordu: AI, öğrencinin takımıyla hâlihazırda çalıştığı projeyi
+    // öneriyordu — canlıda listenin başında, %95 eşleşmeyle görüldü.
+    //
+    // ⚠️ AYRILMIŞ TAKIM KAPSAM DIŞI (`leftAt: null`). Ayrıldığı takımın
+    // projesini bireysel olarak yeniden önermek meşru — öğrenci artık o işi
+    // tek başına yapabilir. Sertifikadaki karar (#449) bunun TERSİydi ve
+    // gerekçesi farklıydı: orada soru "bu kişi ne yaptı", burada "şu an neyle
+    // meşgul".
+    const atanmisAtamalar = await prisma.assignedProject.findMany({
+      where: ogrencininAtamalariWhere(studentProfileId),
+      // #503: Tekrarlanabilir şablonlar bu elemeden MUAF.
+      select: { projectTemplateId: true, projectTemplate: { select: { tekrarlanabilir: true } } },
+    });
+    // ⚠️ TEKRARLANABİLİR ŞABLON ELENMİYOR (#503). Portfolyo sitesi gibi
+    // herkesin yapması beklenen bir iş, zaten atanmış olsa da yeniden
+    // önerilebilmeli — aksi halde bayrak yarı çalışırdı: mentör elle
+    // atayabilir ama AI hiç önermezdi.
+    const atanmisIdler = atanmisAtamalar
+      .filter((a) => !a.projectTemplate.tekrarlanabilir)
+      .map((a) => a.projectTemplateId);
+
+    const [havuz, yukler] = await Promise.all([
+      prisma.projectTemplate.findMany({
+        where: {
+          // #366: Öneriden türeyen şablonlar başka öğrencilere ÖNERİLMEZ.
+          fromProposal: false,
+          ...(atanmisIdler.length ? { id: { notIn: atanmisIdler } } : {}),
+        },
+      }),
+      // #499: Şablon başına kaç stajyerin çalıştığı — AI aynı uygunluktaki
+      // projelerden az çalışılanı tercih etsin diye prompt'a giriyor.
+      projeYukleriniGetir(),
+    ]);
+    const availableProjects = havuz.map((p) => ({
+      ...p,
+      calisanSayisi: yukler.get(p.id) ?? 0,
+    }));
 
     if (!availableProjects || availableProjects.length === 0) {
       return NextResponse.json(
-        { error: "Sistemde değerlendirilecek proje şablonu bulunmuyor." }, 
+        { error: "Bu öğrenci için önerilebilecek yeni proje şablonu kalmadı." },
         { status: 404 }
       );
     }
 
-    // 4. Hazırladığımız AI servisine verileri gönderip tavsiyeleri alıyoruz
-    const recommendations = await recommendProjects(studentProfile, availableProjects);
+    // #295: Mentörün kendi uzmanlığı da öneriye giriyor — süpervize
+    // edemeyeceği bir projeye yol haritası çizemez.
+    const mentorProfile = await prisma.mentorProfile.findUnique({
+      where: { userId: auth.session.user.id },
+      select: { expertise: true, seniority: true },
+    });
+
+    const recommendations = await recommendProjects(
+      studentProfile,
+      availableProjects,
+      mentorProfile ?? undefined,
+    );
 
     // 5. Sonuçları frontend'e JSON olarak başarıyla dönüyoruz
     return NextResponse.json({ recommendations }, { status: 200 });
 
   } catch (error) {
-    const err = error as Error & { cause?: Error; status?: number; httpError?: { statusCode?: number } };
-    const rootCause = err.cause?.message || err.message || String(error);
-    console.error("AI Öneri API Hatası:", rootCause);
-    console.error("Tam hata:", error);
+    // #295: Ham hata metni İSTEMCİYE DÖNMÜYOR. Eskiden `rootCause` doğrudan
+    // gövdeye yazılıyordu; iç hata metni (prompt parçaları dahil olabilir)
+    // istemciye sızıyordu. Ayrıntı sunucu kaydında kalıyor.
+    rotaHatasi("AI Öneri API Hatası:", error);
     return NextResponse.json(
-      { error: rootCause },
-      { status: 500 }
+      { error: "Öneriler hazırlanamadı. Lütfen tekrar deneyin." },
+      { status: 500 },
     );
   }
 }

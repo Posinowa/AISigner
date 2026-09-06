@@ -1,4 +1,8 @@
+import { z } from "zod";
+import { guvenliMetin, veriBlogu } from "@/lib/ai/prompt";
 import { getModel } from "@/lib/ai/gemini-client";
+import { cozVeDogrula, AiCiktiGecersizError } from "@/lib/ai/response";
+import { sinirla, ALAN_SINIRI } from "@/lib/ai/truncate";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 
@@ -6,6 +10,28 @@ export type GeneratedIssueSpec = {
   title: string;
   bodyMarkdown: string;
 };
+
+/**
+ * #377: Model çıktısının ŞEKLİ doğrulanıyor.
+ *
+ * Öncesinde ham `JSON.parse(text)` vardı. Model — `responseMimeType` istense
+ * bile — çıktıyı ```json bloğuna sarabiliyor ya da başına açıklama
+ * ekleyebiliyor (#335'in kurduğu `cozVeDogrula` tam bunun için var). O
+ * durumda `JSON.parse` SyntaxError fırlatıyor ve akış SESSİZCE mock
+ * içeriğe düşüyordu: mentör/öğrenci uydurma issue başlıklarıyla çalışıyor,
+ * bunu gerçek AI çıktısından ayırt edemiyordu.
+ *
+ * Boş liste de reddediliyor: "issue üretildi" denip hiçbir şey üretmemek,
+ * mock'a düşmekten daha sinsi bir sessiz başarısızlık olurdu.
+ */
+const issueSemasi = z
+  .array(
+    z.object({
+      title: z.string().trim().min(1),
+      bodyMarkdown: z.string().trim().min(1),
+    }),
+  )
+  .min(1);
 
 /**
  * Bir RoadmapStep (Ana Faz) başlık ve açıklamasını alarak, öğrencinin deneyim seviyesine uygun
@@ -23,7 +49,11 @@ export async function generateStepIssues(params: {
   try {
     const model = getModel();
     const prompt = `
-Sen kıdemli biryazılım mimarısın. "${projectTitle}" projesindeki "${stepTitle}" (${stepDescription}) ana fazını, ${experienceLevel} seviyesindeki bir stajyer/öğrenci için 3 ile 4 arasında somut, uygulamaya dayalı GitHub Issue'larına bölmelisin.
+Sen kıdemli bir yazılım mimarısın. Aşağıdaki proje ve fazı, ${experienceLevel} seviyesindeki bir stajyer/öğrenci için 3 ile 4 arasında somut, uygulamaya dayalı GitHub Issue'larına bölmelisin.
+
+${veriBlogu("PROJE", guvenliMetin(projectTitle, 200))}
+${veriBlogu("FAZ BAŞLIĞI", guvenliMetin(stepTitle, 200))}
+${veriBlogu("FAZ AÇIKLAMASI", guvenliMetin(stepDescription))}
 
 Her Issue şunları içermelidir:
 1. "title": Aksiyon odaklı net başlık (örn: "[Auth] #1.1 - Argon2 Şifreleme ve Zod Şema Doğrulaması")
@@ -43,19 +73,26 @@ JSON Formatı:
 `;
 
     const response = await model.generateContent(prompt);
-    const text = response.response.candidates?.[0]?.content?.parts?.[0]?.text;
 
-    if (!text) {
-      throw new Error("AI yanıtı boş geldi");
-    }
-
-    const issues: GeneratedIssueSpec[] = JSON.parse(text);
+    // #377: Metin çıkarımı + kod bloğu temizliği + JSON + şema doğrulaması
+    // tek yerden. Boş yanıt da burada yakalanıyor.
+    const issues: GeneratedIssueSpec[] = cozVeDogrula(
+      response,
+      issueSemasi,
+      "issue-generator",
+    );
 
     // DB'ye kaydet
     await storeGeneratedIssues(stepId, issues);
     return issues;
   } catch (error) {
-    logger.error("AI Issue üretimi başarısız oldu, mock fallback kullanılıyor", { error });
+    // ⚠️ DÜŞÜŞ SESSİZ DEĞİL. `cozVeDogrula` sayacı da artırıyor (#335), ama
+    // burada da açıkça loglanıyor: mock içerik üretime karıştığında bunun
+    // izlenebilir olması gerekiyor.
+    logger.error("AI Issue üretimi başarısız oldu, mock fallback kullanılıyor", {
+      error: error instanceof Error ? error.message : String(error),
+      dogrulama: error instanceof AiCiktiGecersizError ? error.kaynak : undefined,
+    });
     const fallbackIssues = getMockIssues(stepTitle, experienceLevel);
     await storeGeneratedIssues(stepId, fallbackIssues);
     return fallbackIssues;
@@ -63,18 +100,32 @@ JSON Formatı:
 }
 
 async function storeGeneratedIssues(stepId: string, issues: GeneratedIssueSpec[]) {
-  // Önceki issue'ları temizle
+  // #269: GitHub'a GÖNDERİLMİŞ kayıtlar korunur.
+  //
+  // Önceden bu silme `where: { stepId }` idi ve adımdaki tüm kayıtları —
+  // `githubIssueUrl` dahil — siliyordu. Provisioning her çalıştığında AI'ı
+  // yeniden çağırdığı için: bağlantılar kayboluyor, yeni üretilen başlıklar
+  // farklı olduğunda GitHub'da KOPYA issue açılıyordu.
+  //
+  // Asıl koruma çağıran tarafta (provisioning artık gönderilmiş adımda AI'ı
+  // hiç çağırmıyor); burası savunma derinliği.
   await prisma.stepIssue.deleteMany({
-    where: { stepId },
+    where: { stepId, githubIssueUrl: null },
   });
 
-  // Yeni üretilenleri ekle
+  // Korunan kayıtların order'ı bozulmasın: yeni satırlar onların ardından
+  // numaralanır.
+  const korunanSayisi = await prisma.stepIssue.count({ where: { stepId } });
+
   await prisma.stepIssue.createMany({
     data: issues.map((issue, index) => ({
       stepId,
-      order: index + 1,
-      title: issue.title,
-      bodyMarkdown: issue.bodyMarkdown,
+      order: korunanSayisi + index + 1,
+      // #318: Şema sınırına göre kırp. Model 4000 karakteri aşan bir gövde
+      // ürettiğinde Postgres "right truncated" fırlatıyor; çağrı try/catch
+      // içinde olduğu için bu SESSİZCE mock içeriğe düşmeye yol açıyordu.
+      title: sinirla(issue.title ?? "", ALAN_SINIRI.issueTitle),
+      bodyMarkdown: sinirla(issue.bodyMarkdown ?? "", ALAN_SINIRI.issueBody),
     })),
   });
 }
