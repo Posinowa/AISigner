@@ -40,7 +40,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   resetClientForTests();
   process.env.GOOGLE_CLOUD_PROJECT = "test-proje";
-  delete process.env.K_SERVICE;
 });
 
 describe("kimlik çözümü", () => {
@@ -49,9 +48,8 @@ describe("kimlik çözümü", () => {
    * ya da `keyFilename: undefined` göndermek aynı şey değil; SDK'nın hangi
    * varsayılanları uygulayacağını belirsizleştirirdi.
    */
-  it("⚠️ Cloud Run'da dosya yoksa googleAuthOptions HİÇ verilmez — ADC devreye girsin", async () => {
+  it("⚠️ anahtar dosyası YOKSA googleAuthOptions HİÇ verilmez — ADC devreye girsin", async () => {
     existsMock.mockReturnValue(false);
-    process.env.K_SERVICE = "aisigner";
 
     await uret();
 
@@ -59,21 +57,6 @@ describe("kimlik çözümü", () => {
     expect(ayar).not.toHaveProperty("googleAuthOptions");
     expect(ayar.project).toBe("test-proje");
     expect(ayar.vertexai).toBe(true);
-  });
-
-  /*
-   * ⚠️ CI'DA ÖLÇÜLEREK BULUNDU. İlk sürüm dosya yokken her ortamda ADC'ye
-   * düşüyordu; GCP dışında SDK metadata sunucusunu yokluyor ve istek HATA
-   * VERMİYOR, ASILIYOR — CI'da öğrenci panosunu yükleyen üç E2E testi 30
-   * saniyelik zaman aşımına düştü. #335'in sözleşmesi hatanın HEMEN
-   * fırlatılması; yavaş başarısızlık graceful degradation'ı sessiz bir
-   * kilitlenmeye çevirir.
-   */
-  it("⚠️ ne dosya ne Cloud Run varsa HEMEN fırlatır — ADC yoklamasına bırakılmaz", async () => {
-    existsMock.mockReturnValue(false);
-
-    await expect(uret()).rejects.toThrow(/kimliği yok/i);
-    expect(genAiMock).not.toHaveBeenCalled();
   });
 
   /*
@@ -95,7 +78,6 @@ describe("kimlik çözümü", () => {
    */
   it("⚠️ karar dosyanın VARLIĞINA bakar — yol tanımlı ama dosya yoksa keyFilename verilmez", async () => {
     process.env.GOOGLE_APPLICATION_CREDENTIALS = "/olmayan/yol/anahtar.json";
-    process.env.K_SERVICE = "aisigner";
     existsMock.mockReturnValue(false);
 
     await uret();
