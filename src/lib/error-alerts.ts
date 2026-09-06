@@ -1,6 +1,7 @@
 import "server-only";
 import { logger } from "@/lib/logger";
 import { sendMail } from "@/lib/mail";
+import { sentryBildir } from "@/lib/sentry";
 
 /**
  * Üretimdeki sunucu hatalarını operatöre e-posta ile bildirir.
@@ -117,6 +118,25 @@ export async function bildirSunucuHatasi(
   baglam: HataBaglami = {},
 ): Promise<void> {
   try {
+    /*
+     * ⚠️ SENTRY, E-POSTA KAPILARININ ÖNÜNDE (#519) — sıra kritik.
+     *
+     * Aşağıdaki iki kapı e-postaya AİT: `ERROR_ALERT_EMAIL` tanımlı değilse
+     * erken dönülüyor ve aynı imzalı hata 15 dakika susturuluyor. Sentry
+     * çağrısı arkalarına konsaydı teşhis aracı, SMTP yapılandırmasına ve
+     * e-posta selini önleyen bir susturmaya mahkûm olurdu — oysa Sentry'nin
+     * bütün değeri TEKRARLARI görmek (sıklık, ilk/son görülme) ve e-posta
+     * hiç kurulmamışken de çalışmak.
+     *
+     * Gruplama Sentry'nin kendi işi; burada susturmaya ihtiyaç yok.
+     */
+    sentryBildir(hata, {
+      routePath: baglam.routePath ?? "-",
+      path: baglam.path ?? "-",
+      method: baglam.method ?? "-",
+      ...(baglam.istekKimligi ? { istekKimligi: baglam.istekKimligi } : {}),
+    });
+
     const to = alici();
     if (!to) return; // Özellik kapalı — sessizce geç.
 

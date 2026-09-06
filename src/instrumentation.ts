@@ -78,6 +78,27 @@ export function register(): void {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
 
   /*
+   * ⚠️ SENTRY BURADA KURULUR, `error-alerts.ts` içinde DEĞİL. Kurulum
+   * süreç düzeyinde bir kez olmalı; hata yolunda kurmak, ilk hataya kadar
+   * SDK'nın hiç ayağa kalkmaması (ve yakalanmamış istisnaların kaçması)
+   * demek olurdu. Sayaç yayınıyla aynı gerekçe.
+   *
+   * ⚠️ Dinamik import — NEXT_RUNTIME koruması altında: `@sentry/nextjs`
+   * Node çekirdek modüllerine iniyor ve edge paketinde yok.
+   */
+  void (async () => {
+    try {
+      const { sentryKur } = await import("@/lib/sentry");
+      await sentryKur();
+    } catch (hata) {
+      const { logger } = await import("@/lib/logger");
+      logger.warn("Sentry kurulamadı", {
+        hata: hata instanceof Error ? hata.message : String(hata),
+      });
+    }
+  })();
+
+  /*
    * ⚠️ AÇILIŞTA BİR SATIR: yayıcının gerçekten ayağa kalktığını gösteren
    * TEK kanıt bu. Aksi halde sessizce çalışmayan bir teşhis yayıcısı,
    * "sinyal toplanıyor ama kimse görmüyor" durumunun aynısını üretirdi —
