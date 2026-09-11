@@ -22,7 +22,7 @@
     "start:e2e": "node scripts/e2e-sunucu.mjs"
   },
   "dependencies": {
-    "@google-cloud/storage": "^8.0.1",
+    "@google-cloud/storage": "^8.1.0",
     "@google/genai": "^2.21.0",
     "@hookform/resolvers": "^5.9.1",
     "@node-rs/argon2": "^2.2.0",
@@ -59,7 +59,7 @@
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@typescript-eslint/eslint-plugin": "^8.69.0",
+    "@typescript-eslint/eslint-plugin": "^8.70.0",
     "@typescript-eslint/parser": "^8.41.0",
     "eslint": "^9",
     "eslint-config-next": "15.5.0",
