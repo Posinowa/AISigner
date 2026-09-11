@@ -27,7 +27,7 @@
     "@hookform/resolvers": "^5.9.1",
     "@node-rs/argon2": "^2.2.0",
     "@octokit/rest": "^22.0.1",
-    "@prisma/client": "^6.15.0",
+    "@prisma/client": "^7.10.0",
     "@radix-ui/react-progress": "^1.1.16",
     "@radix-ui/react-slot": "^1.2.3",
     "@sentry/nextjs": "^10.73.0",
