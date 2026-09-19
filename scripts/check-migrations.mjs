@@ -6,7 +6,7 @@
 //
 // Neden: Out Plane downtime'sız deploy'da eski + yeni sürüm kısa süre birlikte koşar.
 // Yeni konteynerdeki `migrate deploy` bir kolonu drop ederse, hâlâ trafik alan eski
-// sürüm o kolonu sorgulayınca hata verir. Çözüm expand/contract'tır (docs/MIGRATIONS.md).
+// sürüm o kolonu sorgulayınca hata verir. Çözüm expand/contract'tır (CONTRIBUTING.md → Migration Güvenliği).
 //
 // Bilinçli/güvenli bir drop (ör. ilk deploy — boş DB, ya da expand/contract'ın 3.
 // fazı) için migration dosyasının başına şu yorumu ekleyin:
@@ -92,7 +92,7 @@ if (isMainModule) {
   }
   console.error(`
 Zero-downtime deploy'da eski sürüm hâlâ koşarken bu ifadeler onu bozabilir.
-Çözüm (bkz. docs/MIGRATIONS.md): expand/contract — önce additive ekle, sonra AYRI
+Çözüm (bkz. CONTRIBUTING.md → Migration Güvenliği): expand/contract — önce additive ekle, sonra AYRI
 bir deploy'da drop et. Bilinçli ve güvenli olduğundan eminsen migration dosyasının
 başına şu yorumu ekle:
 

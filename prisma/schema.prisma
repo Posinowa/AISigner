@@ -201,7 +201,7 @@ model AssignedProject {
   ///
   /// Bireysel atamada dolu, TAKIM atamasında NULL — sahiplik o zaman `teamId`
   /// üzerinden. NOT NULL'dan nullable'a geçiş expand-safe'tir (tersi yıkıcı
-  /// olurdu, bkz. `docs/MIGRATIONS.md`); mevcut satırlar aynen geçerli kalır.
+  /// olurdu, bkz. `CONTRIBUTING.md` → Migration Güvenliği); mevcut satırlar aynen geçerli kalır.
   ///
   /// ⚠️ İKİSİNDEN TAM BİRİ dolu olmalı. Prisma bunu ifade edemediği için kısıt
   /// migration'da ham CHECK olarak duruyor (`assigned_project_sahip_tek`).
