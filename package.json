@@ -35,7 +35,7 @@
     "lucide-react": "^0.544.0",
     "next": "^15.5.22",
     "next-auth": "^4.24.15",
-    "nodemailer": "^9.0.0",
+    "nodemailer": "^9.1.1",
     "prisma": "^6.15.0",
     "qrcode": "^1.5.4",
     "react": "19.2.8",
@@ -71,9 +71,9 @@
     "vitest": "^4.1.11"
   },
   "overrides": {
-    "sharp": "^0.35.0",
+    "sharp": "^0.35.4",
     "postcss": "^8.4.31",
-    "nodemailer": "^9.0.0",
+    "nodemailer": "^9.1.1",
     "deepmerge-ts": "^8.0.2",
     "uuid": "^11.1.1"
   }
