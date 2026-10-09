@@ -184,7 +184,9 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16-alpine
+        # Docker Hub'ın kimliksiz indirme limiti paylaşımlı runner'larda doluyor (#557);
+        # aynı resmi imaj limitsiz mirror.gcr.io aynasından çekiliyor.
+        image: mirror.gcr.io/library/postgres:16-alpine
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
