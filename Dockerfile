@@ -1,4 +1,6 @@
-FROM node:22-bookworm-slim AS base
+# Resmi node imajı, Docker Hub indirme limitine takılmamak için mirror.gcr.io
+# aynasından (#557). İçerik docker.io/library/node:22-bookworm-slim ile aynı.
+FROM mirror.gcr.io/library/node:22-bookworm-slim AS base
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
