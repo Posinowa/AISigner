@@ -45,6 +45,12 @@ updates:
           - patch
     # Major sürümler AYRI kalsın: kırıcı değişiklik ihtimali var, tek tek
     # incelenmeli. (Gruba dahil edilmediği için kendi PR'ını alır.)
+    # eslint major'ı YOK SAY (#555): eslint-config-next@15 eslint 10'u peer olarak
+    # kabul etmiyor, eslint 10 PR'ı (#552) `npm ci`'da ERESOLVE ile kırılıyor.
+    # eslint-config-next eslint 10'u desteklediğinde bu blok kaldırılmalı.
+    ignore:
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
     commit-message:
       prefix: "chore"
     labels:
