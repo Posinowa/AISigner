@@ -9,110 +9,30 @@ import {
 } from "@/features/admin/kategoriler";
 import { IstatistikKartlari } from "@/features/admin/ui/IstatistikKartlari";
 import { AramaVeKategoriler } from "@/features/admin/ui/AramaVeKategoriler";
-import { MentorAtamaHucresi } from "@/features/admin/ui/MentorAtamaHucresi";
+import { KullaniciSatiri } from "@/features/admin/ui/KullaniciSatiri";
+import { AnalizModali } from "@/features/admin/ui/AnalizModali";
+import {
+  getDisplayName,
+  roleConfig,
+  type Mentor,
+  type User,
+} from "@/features/admin/ui/kullanici-sabitleri";
 import { extractApiErrorMessage } from "@/lib/api-error-message";
 import { MentorBasvuruModal } from "@/features/mentors/ui/MentorBasvuruModal";
-import {
-  Users,
-  GraduationCap,
-  UserCog,
-  AlertCircle,
-  Loader2,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  Sparkles,
-  X,
-  Trash2,
-  Award,
-  RefreshCw,
-  FileText,
-} from "lucide-react";
+import { AlertCircle, Clock, Loader2, Sparkles, UserCog, Users } from "lucide-react";
 import { toast } from "sonner";
 import { useModalA11y } from "@/components/ui/useModalA11y";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import {
-  ProfileAnalysisCard,
   parseProfileAnalysisApiResponse,
   type ProfileAnalysisData,
 } from "@/features/ai/ui/ProfileAnalysisCard";
 import { CertificateModal } from "@/components/certificate/CertificateModal";
-import { DogrulanmisRozet } from "@/features/auth/ui/DogrulanmisRozet";
-import { Avatar } from "@/features/profile/ui/Avatar";
 import type { CertificateData } from "@/features/certificate/server/certificate";
-import { ROL_ROZETI, DURUM_ROZETI } from "@/lib/ui/rol-renkleri";
 
-type User = {
-  id: string;
-  email: string;
-  name: string | null;
-  lastName: string | null;
-  role: "ADMIN" | "MENTOR" | "STUDENT";
-  accountStatus: "PENDING" | "APPROVED" | "REJECTED" | "GRADUATED";
-  // #259: Dolu ise e-postası doğrulanmış hesap.
-  emailVerified?: string | null;
-  // #265: Fotoğrafı var mı — gereksiz 404 isteği atmamak için.
-  avatarFile?: string | null;
-  studentProfile?: {
-    id: string;
-    // #195: M:N — atanmış mentorlar (0..n).
-    mentors: { id: string; name: string | null; lastName: string | null }[];
-  } | null;
-};
-
-type Mentor = {
-  id: string;
-  name: string | null;
-  lastName: string | null;
-  email: string;
-  /** #404: Açılır listede yük görünsün diye. */
-  aktifOgrenci: number;
-  kapasite: number | null;
-};
-
-// #489: Kategori listesi TEK KAYNAKTA (`admin/kategoriler.ts`). Burada elle
-// sayılıyordu; `PanelKategorisi` onu `"STUDENT"` hariç türetiyor, yani yeni
-// bir kategori eklendiğinde panel otomatik haberdar oluyor.
+// Kategori listesi TEK KAYNAKTA (`admin/kategoriler.ts`): `PanelKategorisi`
+// onu "STUDENT" hariç türetiyor; yeni kategori otomatik yansıyor (#489).
 type FilterCategory = PanelKategorisi;
-
-const roleConfig: Record<User["role"], { label: string; color: string }> = {
-  // #338: Renkler merkezi kaynaktan — DebugNavbar ve mesajlaşma ile aynı
-  // eşlemeyi paylaşıyor. Öncesi her dosya kendi tablosunu tutuyordu ve
-  // birbiriyle çelişiyorlardı.
-  ADMIN: { label: ROL_ROZETI.ADMIN.etiket, color: ROL_ROZETI.ADMIN.sinif },
-  MENTOR: { label: ROL_ROZETI.MENTOR.etiket, color: ROL_ROZETI.MENTOR.sinif },
-  STUDENT: { label: ROL_ROZETI.STUDENT.etiket, color: ROL_ROZETI.STUDENT.sinif },
-};
-
-const statusConfig: Record<
-  User["accountStatus"],
-  { label: string; color: string; icon: typeof Clock }
-> = {
-  PENDING: {
-    label: "Onay Bekliyor",
-    color:
-      "bg-amber-50 text-amber-700 border-amber-200",
-    icon: Clock,
-  },
-  APPROVED: {
-    label: "Aktif Stajyer",
-    color:
-      "bg-emerald-50 text-emerald-700 border-emerald-200",
-    icon: CheckCircle2,
-  },
-  GRADUATED: {
-    label: "Mezun / Staj Bitti",
-    color:
-      DURUM_ROZETI.GRADUATED,
-    icon: GraduationCap,
-  },
-  REJECTED: {
-    label: "Reddedildi",
-    color:
-      "bg-red-50 text-red-700 border-red-200",
-    icon: XCircle,
-  },
-};
 
 export default function AdminDashboard() {
   const confirm = useConfirm();
@@ -495,20 +415,6 @@ export default function AdminDashboard() {
    */
   const stats = sayilar ?? BOS_SAYILAR;
 
-  const getDisplayName = (u: { name: string | null; lastName: string | null; email?: string }) => {
-    const full = `${u.name ?? ""} ${u.lastName ?? ""}`.trim();
-    return full || u.email?.split("@")[0] || "İsimsiz";
-  };
-
-  const getInitials = (u: {
-    name: string | null;
-    lastName: string | null;
-    email: string;
-  }) => {
-    const parts = [u.name, u.lastName].filter(Boolean) as string[];
-    if (parts.length > 0) return parts.map((p) => p[0].toUpperCase()).join("");
-    return u.email[0]?.toUpperCase() ?? "?";
-  };
 
   if (loading) {
     return (
@@ -655,266 +561,21 @@ export default function AdminDashboard() {
                 <div className="col-span-3 text-right">Hızlı Eylemler & Silme</div>
               </div>
 
-              {filteredUsers.map((user) => {
-                const isUpdating = updating === user.id;
-                const status = statusConfig[user.accountStatus];
-                const StatusIcon = status.icon;
-
-                return (
-                  <div
-                    key={user.id}
-                    className="grid grid-cols-1 lg:grid-cols-12 gap-4 px-6 py-4.5 hover:bg-slate-50/80 items-center transition-colors"
-                  >
-                    {/* Kullanıcı Künyesi */}
-                    <div className="lg:col-span-4 flex items-center gap-3.5 min-w-0">
-                      {/* #265: Fotoğraf varsa gösterilir; yoksa eskisi gibi
-                          baş harfler. Renkler rol/durum bilgisini taşıdığı için
-                          fallback'te korunuyor. */}
-                      <Avatar
-                        userId={user.id}
-                        basHarfler={getInitials(user)}
-                        fotografVar={Boolean(user.avatarFile)}
-                        ad={getDisplayName(user)}
-                        arkaPlanSinifi={
-                          user.accountStatus === "GRADUATED"
-                            ? "bg-gradient-to-br from-primary to-[#3e92cc] ring-2 ring-primary/20"
-                            : user.role === "ADMIN"
-                              ? "bg-gradient-to-br from-indigo-500 to-indigo-700"
-                              : user.role === "MENTOR"
-                                ? "bg-gradient-to-br from-blue-500 to-cyan-600"
-                                : "bg-gradient-to-br from-emerald-500 to-teal-600"
-                        }
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-bold text-slate-900 truncate">
-                            {getDisplayName(user)}
-                          </p>
-                          {user.accountStatus === "GRADUATED" && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-primary/10 text-primary border border-primary/20">
-                              <Award className="w-3 h-3" /> Mezun
-                            </span>
-                          )}
-                          {/* #259: Doğrulama durumu künyede; admin listeye
-                              bakarken hangi hesapların doğrulandığını görsün. */}
-                          <DogrulanmisRozet
-                            emailVerified={user.emailVerified}
-                            boyut="kucuk"
-                          />
-                        </div>
-                        <p className="text-xs text-slate-500 truncate">
-                          {user.email}
-                        </p>
-                        {/* #287: Mentörün başvuru cevapları — onay kararı
-                            artık ad-soyada bakılarak verilmiyor. */}
-                        {user.role === "MENTOR" && (
-                          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                            <button
-                              onClick={() => setBasvuruMentoru(user)}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-md border bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 transition-colors"
-                            >
-                              <FileText className="w-3 h-3" /> Başvuruyu Gör
-                            </button>
-                          </div>
-                        )}
-
-                        {user.role === "STUDENT" && (
-                          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                            <span
-                              className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-md border ${status.color}`}
-                            >
-                              <StatusIcon className="w-3 h-3" />
-                              {status.label}
-                            </span>
-                            {user.studentProfile && (
-                              <button
-                                onClick={() => openAnalysisModal(user)}
-                                className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-md border bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 transition-colors"
-                              >
-                                <Sparkles className="w-3 h-3" /> Analizi Gör
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Rol Seçici (Onay Korumalı) */}
-                    <div className="lg:col-span-2 flex items-center gap-2">
-                      <select
-                        value={user.role}
-                        onChange={(e) =>
-                          handleRoleChange(user, e.target.value as User["role"])
-                        }
-                        disabled={isUpdating}
-                        className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-white text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-ring focus:border-blue-500 disabled:opacity-50 transition"
-                      >
-                        <option value="ADMIN">👑 Yönetici</option>
-                        <option value="MENTOR">🧑‍🏫 Mentor</option>
-                        <option value="STUDENT">🎓 Öğrenci</option>
-                      </select>
-                    </div>
-
-                    {/* Staj Durumu & Mentor Ataması — #489: `MentorAtamaHucresi`. */}
-                    <MentorAtamaHucresi
-                      user={user}
-                      mentors={mentors}
-                      isUpdating={isUpdating}
-                      gorunenAd={getDisplayName}
-                      onMentorlariAyarla={handleSetMentors}
-                    />
-
-                    {/* Hızlı Aksiyonlar & Güvenli Silme Butonu */}
-                    <div className="lg:col-span-3 flex items-center justify-start lg:justify-end gap-2 flex-wrap">
-                      {isUpdating ? (
-                        <Loader2 className="animate-spin w-4 h-4 text-blue-600 my-1" />
-                      ) : (
-                        <>
-                          {/* #250: Mentör başvurusu. Onay butonları önceden
-                              yalnızca STUDENT satırlarında vardı; admin
-                              başvuruyu görebiliyor ama onaylayamıyordu.
-                              "Mezun Et" mentöre uygulanmaz.
-                              Reddet yalnızca bekleyen başvuruda: aktif bir
-                              mentörün yetkisini almak atanmış öğrencileri
-                              etkiler, o ayrı bir iş. */}
-                          {user.role === "MENTOR" &&
-                            (user.accountStatus === "PENDING" ||
-                              user.accountStatus === "REJECTED") && (
-                              <>
-                                <button
-                                  onClick={() =>
-                                    handleAccountStatus(
-                                      user,
-                                      "APPROVED",
-                                      `${getDisplayName(user)} adlı kişinin mentör başvurusunu onaylamak istediğinize emin misiniz?
-
-Onaylandığında mentör paneline erişebilecek.`,
-                                    )
-                                  }
-                                  title="Mentör Başvurusunu Onayla"
-                                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition-colors"
-                                >
-                                  <CheckCircle2 className="w-3.5 h-3.5" /> Onayla
-                                </button>
-
-                                {user.accountStatus === "PENDING" && (
-                                  <button
-                                    onClick={() =>
-                                      handleAccountStatus(
-                                        user,
-                                        "REJECTED",
-                                        `${getDisplayName(user)} adlı kişinin mentör başvurusunu reddetmek istediğinize emin misiniz?`,
-                                      )
-                                    }
-                                    title="Mentör Başvurusunu Reddet"
-                                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-white border border-slate-200 hover:border-red-300 hover:text-red-600 text-slate-600 text-xs font-semibold shadow-sm transition-colors"
-                                  >
-                                    <XCircle className="w-3.5 h-3.5" /> Reddet
-                                  </button>
-                                )}
-                              </>
-                            )}
-
-                          {user.role === "STUDENT" && (
-                            <>
-                              {/* Onay Bekleyen veya Reddedilen → Onayla */}
-                              {(user.accountStatus === "PENDING" ||
-                                user.accountStatus === "REJECTED") && (
-                                <button
-                                  onClick={() =>
-                                    handleAccountStatus(
-                                      user,
-                                      "APPROVED",
-                                      `${getDisplayName(user)} adlı öğrencinin hesabını onaylamak ve aktifleştirmek istediğinize emin misiniz?`,
-                                    )
-                                  }
-                                  title="Stajyeri Onayla"
-                                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition-colors"
-                                >
-                                  <CheckCircle2 className="w-3.5 h-3.5" /> Onayla
-                                </button>
-                              )}
-
-                              {/* Aktif Stajyer → Mezun Et */}
-                              {user.accountStatus === "APPROVED" && (
-                                <button
-                                  onClick={() =>
-                                    handleAccountStatus(
-                                      user,
-                                      "GRADUATED",
-                                      `🎓 ${getDisplayName(user)} adlı öğrencinin staj sürecini başarıyla tamamlayıp "Mezun" durumuna geçirmek istediğinize emin misiniz?\n\nÖğrenci hesabına tekrar girdiğinde tebrik ve başarı mesajı ile karşılanacaktır.`,
-                                    )
-                                  }
-                                  title="Stajı Bitir & Mezun Et"
-                                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-primary hover:bg-[#1b2a55] text-primary-foreground text-xs font-semibold shadow-sm transition-colors"
-                                >
-                                  <GraduationCap className="w-3.5 h-3.5" /> Mezun Et
-                                </button>
-                              )}
-
-                              {/* Onay Bekleyen veya Aktif → Reddet */}
-                              {(user.accountStatus === "PENDING" ||
-                                user.accountStatus === "APPROVED") && (
-                                <button
-                                  onClick={() =>
-                                    handleAccountStatus(
-                                      user,
-                                      "REJECTED",
-                                      `${getDisplayName(user)} adlı öğrencinin başvurusunu/stajyerlik durumunu reddetmek istediğinize emin misiniz?`,
-                                    )
-                                  }
-                                  title="Başvuruyu Reddet"
-                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 text-xs font-semibold border border-red-200 transition-colors"
-                                >
-                                  <XCircle className="w-3.5 h-3.5" /> Reddet
-                                </button>
-                              )}
-
-                              {/* Mezun veya Reddedilen → Tekrar Aktifleştir */}
-                              {(user.accountStatus === "GRADUATED" ||
-                                user.accountStatus === "REJECTED") && (
-                                <button
-                                  onClick={() =>
-                                    handleAccountStatus(
-                                      user,
-                                      "APPROVED",
-                                      `${getDisplayName(user)} adlı öğrencinin staj hesabını yeniden "Aktif Stajyer" durumuna getirmek istediğinize emin misiniz?`,
-                                    )
-                                  }
-                                  title="Yeniden Aktifleştir"
-                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold border border-slate-200 transition-colors"
-                                >
-                                  <RefreshCw className="w-3.5 h-3.5" /> Aktifleştir
-                                </button>
-                              )}
-
-                              {/* Sertifika ve Mentör Referans Notu Yönetimi */}
-                              {user.studentProfile && (
-                                <button
-                                  onClick={() => openCertificateModal(user)}
-                                  title="Sertifika & Mentör Notu Yönetimi"
-                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold border border-indigo-200 transition-colors"
-                                >
-                                  <Award className="w-3.5 h-3.5" /> Sertifika & Not
-                                </button>
-                              )}
-                            </>
-                          )}
-
-                          {/* Kalıcı Hesap Silme Butonu (Tüm roller için - admin kendini silemez) */}
-                          <button
-                            onClick={() => handleDeleteUser(user)}
-                            title="Hesabı Kalıcı Olarak Sil"
-                            className="inline-flex items-center justify-center p-2 rounded-xl text-slate-400 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+              {filteredUsers.map((user) => (
+                <KullaniciSatiri
+                  key={user.id}
+                  user={user}
+                  mentors={mentors}
+                  isUpdating={updating === user.id}
+                  onRolDegistir={handleRoleChange}
+                  onMentorlariAyarla={handleSetMentors}
+                  onHesapDurumu={handleAccountStatus}
+                  onSil={handleDeleteUser}
+                  onBasvuruGor={(u) => setBasvuruMentoru(u)}
+                  onAnalizGor={openAnalysisModal}
+                  onSertifika={openCertificateModal}
+                />
+              ))}
 
               {/*
                 Sayfalama — "daha fazla yükle".
@@ -950,41 +611,14 @@ Onaylandığında mentör paneline erişebilecek.`,
         />
       )}
       {analysisModalUser && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div
-            ref={analysisModalRef}
-            role="dialog"
-            aria-modal="true"
-            aria-label="AI Profil Analizi"
-            tabIndex={-1}
-            className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto outline-none border border-slate-200"
-          >
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 sticky top-0 bg-white rounded-t-3xl z-10">
-              <div>
-                <h2 className="text-lg font-bold text-slate-900">
-                  AI Profil Analizi
-                </h2>
-                <p className="text-xs text-slate-500">
-                  {getDisplayName(analysisModalUser)} ({analysisModalUser.email})
-                </p>
-              </div>
-              <button
-                onClick={closeAnalysisModal}
-                aria-label="Kapat"
-                className="p-2 rounded-xl hover:bg-slate-100 text-slate-500 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-6">
-              <ProfileAnalysisCard
-                analysis={analysisData}
-                loading={analysisLoading}
-                error={analysisError}
-              />
-            </div>
-          </div>
-        </div>
+        <AnalizModali
+          kullanici={analysisModalUser}
+          dialogRef={analysisModalRef}
+          analysis={analysisData}
+          loading={analysisLoading}
+          error={analysisError}
+          onKapat={closeAnalysisModal}
+        />
       )}
 
       {/* Admin — Sertifika & Referans Notu Modal'ı */}
