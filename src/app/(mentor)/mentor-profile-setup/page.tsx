@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth/nextauth";
-import { prisma } from "@/lib/db";
+import { mentorProfilKurulumKaydiniGetir } from "@/features/mentors/server/profil-kurulum-sorgu";
 import { MentorBasvuruForm } from "@/features/mentors/ui/MentorBasvuruForm";
 
 export const dynamic = "force-dynamic";
@@ -20,23 +20,7 @@ export default async function MentorProfileSetupPage() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) redirect("/signin");
 
-  const mevcut = await prisma.mentorProfile.findUnique({
-    where: { userId: session.user.id },
-    select: {
-      title: true,
-      company: true,
-      yearsExperience: true,
-      seniority: true,
-      expertise: true,
-      capacity: true,
-      weeklyHours: true,
-      motivation: true,
-      mentoringStyle: true,
-      githubUrl: true,
-      linkedinUrl: true,
-      city: true,
-    },
-  });
+  const mevcut = await mentorProfilKurulumKaydiniGetir(session.user.id);
 
   const ad = session.user.name?.split(" ")[0] ?? "Mentör";
 
