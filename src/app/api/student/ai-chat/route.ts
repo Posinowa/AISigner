@@ -4,11 +4,11 @@ import { guvenliMetin, guvenliListe, veriBlogu } from "@/lib/ai/prompt";
 import { requireAuth } from "@/lib/auth/guard";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { getTextModel } from "@/lib/ai/gemini-client";
-import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { incrementCounter } from "@/lib/metrics";
 import { experienceLevelLabel } from "@/lib/experience-level";
 import { aiRizasiVar } from "@/features/kvkk/riza";
+import { ogrenciSohbetProfiliniGetir } from "@/features/student/server/sohbet-profili";
 
 const limiter = createRateLimiter("ai-chat", {
   maxRequests: 20,
@@ -98,42 +98,9 @@ export async function POST(req: Request) {
     /*
      * Öğrenci bağlamını al (profil, projeler, roadmap).
      *
-     * ⚠️ #376: PROJELER İKİ YOLDAN GELİR. Takım atamasında
-     * `AssignedProject.studentProfileId` NULL, sahiplik `teamId` üzerinde
-     * (#332). Yalnız `assignedProjects` çekilen sürümde takım projesindeki
-     * stajyer Posilog'a sorduğunda, Posilog HİÇ projesi ve yol haritası
-     * yokmuş gibi cevap veriyordu. Öğrenci panosunda #367 ile çözülen ayrım
-     * bu uca yansıtılmamıştı.
+     * ⚠️ #376: PROJELER İKİ YOLDAN GELİR (sorgu servisinde, #332).
      */
-    const ATAMA_ICERIK = {
-      include: {
-        projectTemplate: { select: { title: true, track: true, difficulty: true } },
-        roadmap: {
-          include: {
-            steps: {
-              orderBy: { order: "asc" as const },
-              select: { title: true, status: true, order: true },
-            },
-          },
-        },
-      },
-    };
-
-    const profile = await prisma.studentProfile.findUnique({
-      where: { userId },
-      include: {
-        assignedProjects: ATAMA_ICERIK,
-        // Ayrılmış üyelik sayılmaz: adım artık onun işi değil.
-        teamMemberships: {
-          where: { leftAt: null },
-          select: {
-            team: {
-              select: { name: true, assignedProjects: ATAMA_ICERIK },
-            },
-          },
-        },
-      },
-    });
+    const profile = await ogrenciSohbetProfiliniGetir(userId);
 
     // Bağlam oluştur
     let context = "";
