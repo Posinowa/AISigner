@@ -19,8 +19,10 @@ import {
 } from "@/features/admin/ui/kullanici-sabitleri";
 import { extractApiErrorMessage } from "@/lib/api-error-message";
 import { MentorBasvuruModal } from "@/features/mentors/ui/MentorBasvuruModal";
-import { AlertCircle, Clock, Loader2, Sparkles, UserCog, Users } from "lucide-react";
+import { Sparkles, Users } from "lucide-react";
 import { toast } from "sonner";
+import { YuklemeEkrani, HataEkrani } from "@/features/admin/ui/AdminDurumEkranlari";
+import { MentorBasvuruUyarisi, AdminBildirimleri } from "@/features/admin/ui/AdminUyarilari";
 import { useModalA11y } from "@/components/ui/useModalA11y";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import {
@@ -416,38 +418,8 @@ export default function AdminDashboard() {
   const stats = sayilar ?? BOS_SAYILAR;
 
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-50">
-        <Loader2 className="animate-spin h-7 w-7 text-blue-600 mr-3" />
-        <span className="text-slate-600 font-medium">
-          Kullanıcılar yükleniyor...
-        </span>
-      </div>
-    );
-  }
-
-  if (loadError) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 px-4 text-center">
-        <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mb-4">
-          <AlertCircle className="w-7 h-7 text-red-500" />
-        </div>
-        <h2 className="text-lg font-semibold text-slate-900">
-          Kullanıcılar yüklenemedi
-        </h2>
-        <p className="text-slate-500 text-sm mt-1 mb-5">
-          Bağlantıda bir sorun oluştu. Lütfen tekrar deneyin.
-        </p>
-        <button
-          onClick={loadData}
-          className="rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium px-5 py-2.5 transition-colors"
-        >
-          Tekrar Dene
-        </button>
-      </div>
-    );
-  }
+  if (loading) return <YuklemeEkrani />;
+  if (loadError) return <HataEkrani onTekrarDene={loadData} />;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/30">
@@ -471,26 +443,7 @@ export default function AdminDashboard() {
           </a>
         </div>
 
-        {/* #250: Mentör başvurusu bekliyorsa admin bunu panele girer girmez
-            görmeli; başvuru listedeki satırlardan birine gömülü kalmasın. */}
-        {stats.mentorBasvuruCount > 0 && (
-          <button
-            onClick={() => setFilterCategory("MENTOR_BASVURU")}
-            className="mb-6 w-full flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3.5 text-left transition hover:border-amber-300"
-          >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
-              <UserCog className="h-4.5 w-4.5" />
-            </span>
-            <span className="min-w-0">
-              <span className="block text-sm font-semibold text-amber-900">
-                {stats.mentorBasvuruCount} mentör başvurusu onay bekliyor
-              </span>
-              <span className="block text-xs text-amber-700">
-                Başvuruları görmek için tıklayın.
-              </span>
-            </span>
-          </button>
-        )}
+        <MentorBasvuruUyarisi stats={stats} setFilterCategory={setFilterCategory} />
 
         {/* İstatistik Kartları — #489: sunum `IstatistikKartlari`'ne taşındı. */}
         <IstatistikKartlari
@@ -499,35 +452,7 @@ export default function AdminDashboard() {
           onKategori={setFilterCategory}
         />
 
-        {/* Onay bekleyen stajyerler bildirim kartı */}
-        {stats.pendingCount > 0 && filterCategory === "ALL" && (
-          <div className="mb-6 flex items-start gap-3 rounded-2xl bg-amber-50/90 border border-amber-200 px-5 py-4">
-            <Clock className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
-            <div className="text-sm">
-              <p className="font-semibold text-amber-950">
-                {stats.pendingCount} stajyer onay bekliyor
-              </p>
-              <p className="text-amber-800 mt-0.5">
-                Aşağıdaki listeden bekleyen öğrencileri onaylayabilir veya profil analizlerini inceleyerek mentör atayabilirsiniz.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Uyarı banner — mentor atanmamış aktif öğrenciler */}
-        {stats.studentsWithoutMentor > 0 && filterCategory === "ALL" && (
-          <div className="mb-6 flex items-start gap-3 rounded-2xl bg-blue-50/90 border border-blue-200 px-5 py-4">
-            <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
-            <div className="text-sm">
-              <p className="font-semibold text-blue-950">
-                {stats.studentsWithoutMentor} aktif öğrencinin mentoru seçilmedi
-              </p>
-              <p className="text-blue-800 mt-0.5">
-                Onaylanmış stajyerlerinize ilgili alandaki mentörlerini aşağıdaki listeden doğrudan atayabilirsiniz.
-              </p>
-            </div>
-          </div>
-        )}
+        <AdminBildirimleri stats={stats} filterCategory={filterCategory} />
 
         {/* Arama & Kategori Filtreleri — #489: `AramaVeKategoriler`. */}
         <AramaVeKategoriler
