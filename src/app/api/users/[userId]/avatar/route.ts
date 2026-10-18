@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth/guard";
 import { readAvatar } from "@/lib/storage/avatars";
+import { avatarDosyasiniGetir } from "@/features/profile/server/avatar";
 import { resimTipiniBelirle } from "@/lib/images";
 
 /**
@@ -24,16 +24,13 @@ export async function GET(
 
   const { userId } = await params;
 
-  const kullanici = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { avatarFile: true },
-  });
+  const avatarFile = await avatarDosyasiniGetir(userId);
 
-  if (!kullanici?.avatarFile) {
+  if (!avatarFile) {
     return NextResponse.json({ error: "Fotoğraf yok." }, { status: 404 });
   }
 
-  const buffer = await readAvatar(kullanici.avatarFile);
+  const buffer = await readAvatar(avatarFile);
   if (!buffer) {
     // DB'de kayıt var ama dosya yok — veri tutarsızlığı, 404 doğru yanıt.
     return NextResponse.json({ error: "Fotoğraf bulunamadı." }, { status: 404 });

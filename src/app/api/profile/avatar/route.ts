@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
-import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth/guard";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
 import { saveAvatar, deleteAvatar } from "@/lib/storage/avatars";
+import { avatarDosyasiniAyarla, avatarDosyasiniGetir } from "@/features/profile/server/avatar";
 import {
   resimTipiniBelirle,
   tipeGoreUzanti,
@@ -101,21 +101,15 @@ export async function POST(req: Request) {
     );
   }
 
-  const onceki = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { avatarFile: true },
-  });
+  const onceki = await avatarDosyasiniGetir(userId);
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: { avatarFile: storedName },
-  });
+  await avatarDosyasiniAyarla(userId, storedName);
 
   // Eski dosyayı DB güncellendikten SONRA sil: silme başarısız olursa
   // kullanıcı fotoğrafsız kalmasın, yalnızca artık dosya kalsın.
-  if (onceki?.avatarFile) {
+  if (onceki) {
     try {
-      await deleteAvatar(onceki.avatarFile);
+      await deleteAvatar(onceki);
     } catch (error) {
       logger.warn("Eski profil fotoğrafı silinemedi", {
         userId,
@@ -136,19 +130,13 @@ export async function DELETE() {
     return NextResponse.json({ error: "Oturum geçersiz." }, { status: 401 });
   }
 
-  const mevcut = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { avatarFile: true },
-  });
+  const mevcut = await avatarDosyasiniGetir(userId);
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: { avatarFile: null },
-  });
+  await avatarDosyasiniAyarla(userId, null);
 
-  if (mevcut?.avatarFile) {
+  if (mevcut) {
     try {
-      await deleteAvatar(mevcut.avatarFile);
+      await deleteAvatar(mevcut);
     } catch (error) {
       logger.warn("Profil fotoğrafı dosyası silinemedi", {
         userId,
