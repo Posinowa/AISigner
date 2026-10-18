@@ -140,7 +140,7 @@ export async function saveOnboarding(rawData: unknown) {
   }
 
   // 5. Profil değişti → AI özet cache'ini invalidate et
-  revalidateTag(`profile-summary-${userId}`)
+  revalidateTag(`profile-summary-${userId}`, "max")
 
   // Client component zaten window.location.href ile yönlendiriyor,
   // burada redirect() çağırmıyoruz — server action'dan programatik

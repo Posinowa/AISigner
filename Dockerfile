@@ -78,7 +78,7 @@ RUN if [ -z "$NEXT_PUBLIC_APP_URL" ]; then \
     DATABASE_URL="postgresql://build:build@localhost:5432/build?schema=public" \
     AUTH_SECRET="build-time-placeholder-not-used-at-runtime" \
     NEXT_PUBLIC_APP_URL="$NEXT_PUBLIC_APP_URL" \
-    npm run build -- --no-lint
+    npm run build
 
 # --- Çalıştırma --------------------------------------------------------------
 FROM base AS runner
