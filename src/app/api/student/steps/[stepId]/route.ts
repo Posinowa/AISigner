@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { mezunYazmaKapisi } from "@/lib/auth/mezun-politikasi";
-import { prisma } from "@/lib/db";
+import { ogrencisiMi } from "@/features/teams/server/sahiplik";
 import {
-  ATAMA_SAHIPLIK_SELECT,
-  ogrencisiMi,
-} from "@/features/teams/server/sahiplik";
+  ogrenciAdiminiBul,
+  projeDurumunuAyarla,
+  roadmapAdimlariniGetir,
+} from "@/features/roadmap/server/ogrenci-adim";
 import { requireAuth } from "@/lib/auth/guard";
 import { updateStepStatusSchema } from "@/lib/validations/api";
 import { adimDurumunuDegistir } from "@/features/roadmap/server/step-status";
@@ -42,22 +43,7 @@ export async function PATCH(
     const { status: newStatus } = parsed.data;
 
     // Adımı, ilgili roadmap, proje ve öğrenci profili ile birlikte getir
-    const step = await prisma.roadmapStep.findUnique({
-      where: { id: stepId },
-      include: {
-        roadmap: {
-          include: {
-            // #332: Sahiplik bireysel VEYA takım; tek tanımdan gelir.
-            assignedProject: {
-              select: { id: true, status: true, ...ATAMA_SAHIPLIK_SELECT },
-            },
-            steps: {
-              orderBy: { order: "asc" },
-            },
-          },
-        },
-      },
-    });
+    const step = await ogrenciAdiminiBul(stepId);
 
     if (!step) {
       return NextResponse.json({ error: "Adım bulunamadı." }, { status: 404 });
@@ -137,31 +123,20 @@ export async function PATCH(
 
     // Tüm adımlar tamamlandıysa proje durumunu da güncelle
     if (newStatus === "COMPLETED") {
-      const freshSteps = await prisma.roadmapStep.findMany({
-        where: { roadmapId: step.roadmapId },
-      });
+      const freshSteps = await roadmapAdimlariniGetir(step.roadmapId);
       const allDone = freshSteps.every((s) => s.status === "COMPLETED");
 
       if (allDone) {
-        await prisma.assignedProject.update({
-          where: { id: step.roadmap.assignedProjectId },
-          data: { status: "COMPLETED" },
-        });
+        await projeDurumunuAyarla(step.roadmap.assignedProjectId, "COMPLETED");
       } else {
         // En az bir adım devam ediyorsa proje IN_PROGRESS olmalı
-        await prisma.assignedProject.update({
-          where: { id: step.roadmap.assignedProjectId },
-          data: { status: "IN_PROGRESS" },
-        });
+        await projeDurumunuAyarla(step.roadmap.assignedProjectId, "IN_PROGRESS");
       }
     } else if (newStatus === "IN_PROGRESS") {
       // Proje henüz PENDING ise IN_PROGRESS'e çek
       const project = step.roadmap.assignedProject;
       if (project.status === "PENDING") {
-        await prisma.assignedProject.update({
-          where: { id: project.id },
-          data: { status: "IN_PROGRESS" },
-        });
+        await projeDurumunuAyarla(project.id, "IN_PROGRESS");
       }
     }
 
