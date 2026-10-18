@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { authOptions } from "@/lib/auth/nextauth";
-import { prisma } from "@/lib/db";
+import { aiAnalizProfiliniGetir } from "@/features/student/server/ai-analiz-sorgu";
 import { ProfileSummarySection } from "@/features/student/ui/ProfileSummarySection";
 
 export const dynamic = "force-dynamic";
@@ -23,15 +23,7 @@ export default async function AiAnalizPage() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) redirect("/signin");
 
-  const profile = await prisma.studentProfile.findUnique({
-    where: { userId: session.user.id },
-    select: {
-      experienceLevel: true,
-      interests: true,
-      goals: true,
-      availability: true,
-    },
-  });
+  const profile = await aiAnalizProfiliniGetir(session.user.id);
 
   // Profil yoksa analiz edilecek bir şey de yok; panodaki akışın aynısı.
   if (!profile) redirect("/profile-setup");
