@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
-import { mentorunOgrencisiWhere } from "@/features/teams/server/sahiplik";
+import { mentorunOgrencisiProfili } from "@/features/certificate/server/yetki";
 import { requireAuth } from "@/lib/auth/guard";
 import {
   getStudentCertificate,
@@ -24,16 +23,8 @@ export async function GET(
   // #204 IDOR: Mentör yalnızca KENDİ öğrencisinin sertifikasını görebilir (admin hepsini).
   // studentId = öğrencinin User.id'si; M:N atama üzerinden sahiplik doğrulanır.
   if (auth.session.user.role === "MENTOR") {
-    const owns = await prisma.studentProfile.findFirst({
-      // #370: Bireysel VEYA takım bağı. Sertifika BİREYSEL kalıyor (#332) ama
-      // takım mentörü de üyesinin belgesini görebilmeli — göremezse takım
-      // mentörlüğü yarım bir yetki olurdu.
-      where: {
-        userId: studentId,
-        ...mentorunOgrencisiWhere(auth.session.user.id!),
-      },
-      select: { id: true },
-    });
+    // #370: Bireysel VEYA takım bağı (sorgu yetki servisinde).
+    const owns = await mentorunOgrencisiProfili(studentId, auth.session.user.id!);
     if (!owns) {
       return NextResponse.json(
         { error: "Bu öğrencinin sertifikasına erişim yetkiniz yok." },
