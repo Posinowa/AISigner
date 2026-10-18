@@ -5,7 +5,8 @@ import { KodIncelemesiDurumuRozeti } from "@/features/kvkk/ui/KodIncelemesiDurum
 import type { KodIncelemesiDurumu } from "@/features/kvkk/kod-incelemesi-durumu";
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { ArrowLeft, User, Users, Clock, BookOpen, Plus, CheckCircle, AlertCircle, Trash2, Sparkles, Map, Github, Loader2 } from "lucide-react";
+import { PROJE_DURUMU_ETIKETI, ZORLUK_ETIKETI } from "@/lib/ui/proje-durumu";
+import { ArrowLeft, User, Users, BookOpen, Plus, AlertCircle, Trash2, Sparkles, Map, Github, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { experienceLevelLabel } from "@/lib/experience-level";
@@ -104,17 +105,6 @@ type StudentDetail = {
   } | null;
 };
 
-const statusConfig = {
-  PENDING: { label: "Bekliyor", color: "bg-yellow-100 text-yellow-800", icon: Clock },
-  IN_PROGRESS: { label: "Devam Ediyor", color: "bg-blue-100 text-blue-800", icon: AlertCircle },
-  COMPLETED: { label: "Tamamlandı", color: "bg-green-100 text-green-800", icon: CheckCircle }
-};
-
-const difficultyConfig = {
-  EASY: { label: "Kolay", color: "bg-green-100 text-green-800" },
-  MEDIUM: { label: "Orta", color: "bg-yellow-100 text-yellow-800" },
-  HARD: { label: "Zor", color: "bg-red-100 text-red-800" }
-};
 
 export default function StudentDetailPage() {
   const confirm = useConfirm();
@@ -523,8 +513,8 @@ export default function StudentDetailPage() {
               ) : (
                 <div className="space-y-4">
                   {student.studentProfile.assignedProjects.map(project => {
-                    const statusInfo = statusConfig[project.status as keyof typeof statusConfig];
-                    const difficultyInfo = difficultyConfig[project.projectTemplate.difficulty as keyof typeof difficultyConfig];
+                    const statusInfo = PROJE_DURUMU_ETIKETI[project.status as keyof typeof PROJE_DURUMU_ETIKETI];
+                    const difficultyInfo = ZORLUK_ETIKETI[project.projectTemplate.difficulty as keyof typeof ZORLUK_ETIKETI];
                     const StatusIcon = statusInfo.icon;
                     
                     return (
@@ -808,7 +798,7 @@ export default function StudentDetailPage() {
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                   {sortedProjectTemplates.map(template => {
                     const isAssigned = getAssignedProjectIds().includes(template.id);
-                    const difficultyInfo = difficultyConfig[template.difficulty];
+                    const difficultyInfo = ZORLUK_ETIKETI[template.difficulty];
                     const isLoadingThis = assigningId === template.id;
                     const aiRec = aiRecommendations.find(r => r.projectId === template.id);
 
