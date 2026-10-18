@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth/guard";
 import { sendMessageSchema, getMessagesSchema } from "@/lib/validations/api";
 import { createRateLimiter } from "@/lib/rate-limit";
 // #354: Erişim kuralı ortak modülde — "yazıyor..." sinyali aynısını kullanıyor.
 import { verifyConversationAccess } from "@/features/messaging/server/erisim";
+import { konusmaMesajlariniGetir, mesajGonder } from "@/features/messaging/server/mesajlar";
 import { rotaHatasi } from "@/lib/api-hata";
 
 const limiter = createRateLimiter("messages", {
@@ -52,42 +52,9 @@ export async function GET(req: Request) {
   }
 
   try {
-    const messages = await prisma.message.findMany({
-      where: {
-        OR: [
-          { senderId: userId, receiverId: conversationWith },
-          { senderId: conversationWith, receiverId: userId },
-        ],
-      },
-      orderBy: { createdAt: "desc" },
-      take: limit + 1,
-      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-      include: {
-        sender: {
-          select: { id: true, name: true, lastName: true, role: true },
-        },
-      },
-    });
+    const sayfa = await konusmaMesajlariniGetir({ userId, conversationWith, cursor, limit });
 
-    const hasMore = messages.length > limit;
-    const result = hasMore ? messages.slice(0, limit) : messages;
-    const nextCursor = hasMore ? result[result.length - 1].id : null;
-
-    // Okunan gelen mesajları okundu olarak işaretle
-    await prisma.message.updateMany({
-      where: {
-        senderId: conversationWith,
-        receiverId: userId,
-        isRead: false,
-      },
-      data: { isRead: true },
-    });
-
-    return NextResponse.json({
-      messages: result,
-      nextCursor,
-      hasMore,
-    });
+    return NextResponse.json(sayfa);
   } catch (error) {
     rotaHatasi("GET /api/messages error:", error);
     return NextResponse.json(
@@ -145,18 +112,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const message = await prisma.message.create({
-      data: {
-        senderId: userId,
-        receiverId,
-        content,
-      },
-      include: {
-        sender: {
-          select: { id: true, name: true, lastName: true, role: true },
-        },
-      },
-    });
+    const message = await mesajGonder({ senderId: userId, receiverId, content });
 
     return NextResponse.json({ message }, { status: 201 });
   } catch (error) {
