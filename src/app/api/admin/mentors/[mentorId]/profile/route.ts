@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth/guard";
 import { rotaHatasi } from "@/lib/api-hata";
+import { kullaniciRolVeRizasi, mentorBasvuruProfiliniGetir } from "@/features/mentors/server/gorusme-ve-basvuru";
 
 /**
  * GET /api/admin/mentors/[mentorId]/profile
@@ -30,13 +30,10 @@ export async function GET(
   try {
     const { mentorId } = await params;
 
-    const kullanici = await prisma.user.findUnique({
-      where: { id: mentorId },
-      // #352: Rıza durumu da geliyor. Analizin YOKLUĞUNUN iki farklı sebebi
-      // var — "henüz üretilmedi" ve "mentör AI onayı vermedi" — ve admin
-      // bunları ayırt edemezse boş kartı arıza sanar.
-      select: { role: true, aiConsentAt: true },
-    });
+    // #352: Rıza durumu da geliyor. Analizin YOKLUĞUNUN iki farklı sebebi
+    // var — "henüz üretilmedi" ve "mentör AI onayı vermedi" — ve admin
+    // bunları ayırt edemezse boş kartı arıza sanar.
+    const kullanici = await kullaniciRolVeRizasi(mentorId);
 
     if (!kullanici) {
       return NextResponse.json({ error: "Kullanıcı bulunamadı." }, { status: 404 });
@@ -49,35 +46,7 @@ export async function GET(
       );
     }
 
-    const profile = await prisma.mentorProfile.findUnique({
-      where: { userId: mentorId },
-      select: {
-        title: true,
-        company: true,
-        yearsExperience: true,
-        seniority: true,
-        expertise: true,
-        capacity: true,
-        weeklyHours: true,
-        motivation: true,
-        mentoringStyle: true,
-        githubUrl: true,
-        linkedinUrl: true,
-        city: true,
-        updatedAt: true,
-        // #288: Analiz başvuruyla birlikte dönüyor.
-        analysis: {
-          select: {
-            level: true,
-            summary: true,
-            strengths: true,
-            technicalTracks: true,
-            idealStudentProfile: true,
-            matchingNotes: true,
-          },
-        },
-      },
-    });
+    const profile = await mentorBasvuruProfiliniGetir(mentorId);
 
     return NextResponse.json({
       profile,
