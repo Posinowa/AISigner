@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth/guard";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { sendVerificationEmail } from "@/features/auth/server/email-verification";
+import { dogrulamaKullanicisiniGetir } from "@/features/auth/server/dogrulama-kullanicisi";
 
 /**
  * #261: Doğrulama e-postasını yeniden gönderir.
@@ -36,10 +36,7 @@ export async function POST() {
     return NextResponse.json({ error: "Oturum geçersiz." }, { status: 401 });
   }
 
-  const kullanici = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true, email: true, name: true, emailVerified: true },
-  });
+  const kullanici = await dogrulamaKullanicisiniGetir(userId);
 
   if (!kullanici) {
     return NextResponse.json({ error: "Hesap bulunamadı." }, { status: 404 });

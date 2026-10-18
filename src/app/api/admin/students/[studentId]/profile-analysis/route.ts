@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth/guard";
 import { getStoredProfileAnalysis } from "@/features/ai/server/profile-analysis-store";
 import { rotaHatasi } from "@/lib/api-hata";
+import { ogrenciProfiliniGetir } from "@/features/student/server/profil-sorgu";
 
 /**
  * GET /api/admin/students/[studentId]/profile-analysis
@@ -19,10 +19,7 @@ export async function GET(
   try {
     const { studentId } = await params;
 
-    const studentProfile = await prisma.studentProfile.findUnique({
-      where: { userId: studentId },
-      select: { id: true },
-    });
+    const studentProfile = await ogrenciProfiliniGetir(studentId);
 
     if (!studentProfile) {
       return NextResponse.json(

@@ -5,7 +5,7 @@ import { YaklasanGorusme } from "@/features/ofis-saati/ui/YaklasanGorusme";
 import { ogrencininGorebilecegiSlotlar } from "@/features/ofis-saati/server/ofis-saati";
 import { odaktakiAdimIndeksi } from "@/features/roadmap/odak";
 import { OdakKarti } from "@/features/roadmap/ui/OdakKarti";
-import { prisma } from "@/lib/db";
+import { dashboardProfiliniGetir } from "@/features/student/server/dashboard-sorgu";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/nextauth";
 import { Clock, Briefcase, Target, Github, Sparkles, CheckCircle2 } from "lucide-react";
@@ -63,72 +63,7 @@ export default async function StudentDashboardPage() {
     redirect(DURUM_EKRANI);
   }
 
-  const profile = await prisma.studentProfile.findUnique({
-    where: { userId: session.user.id },
-    include: {
-      assignedProjects: {
-        include: {
-          projectTemplate: true,
-          roadmap: {
-            include: {
-              steps: {
-                orderBy: { order: "asc" },
-                // #407: Yorum sayısı LİSTE SORGUSUNDAN geliyor. Adım başına
-                // ayrı istek, uzun bir yol haritasında N+1 üretirdi.
-                include: { _count: { select: { comments: true } } },
-              }
-            }
-          }
-        },
-        orderBy: { createdAt: "desc" },
-      },
-      // #195: M:N — "mentörün var mı?" kontrolü için atamalar.
-      mentorAssignments: { select: { mentorId: true } },
-      // #367: TAKIM ATAMALARI AYRI GELİR.
-      //
-      // `assignedProjects` yalnız `studentProfileId` dolu satırları getiriyor;
-      // takım atamasında o alan NULL (sahiplik `teamId` üzerinden, #332).
-      // Bu olmadan takım üyesi kendi panosunda projesini HİÇ göremiyordu.
-      teamMemberships: {
-        where: { leftAt: null },
-        select: {
-          team: {
-            select: {
-              id: true,
-              name: true,
-              members: {
-                where: { leftAt: null },
-                select: {
-                  role: true,
-                  studentProfile: {
-                    select: { user: { select: { id: true, name: true, lastName: true, email: true } } },
-                  },
-                },
-              },
-              assignedProjects: {
-                include: {
-                  projectTemplate: true,
-                  roadmap: {
-                    include: {
-                      steps: {
-                        orderBy: { order: "asc" },
-                        include: {
-                          assignee: { select: { id: true, name: true, lastName: true, email: true } },
-                          // #407: Yorum sayısı — bireysel sorguyla aynı.
-                          _count: { select: { comments: true } },
-                        },
-                      },
-                    },
-                  },
-                },
-                orderBy: { createdAt: "desc" },
-              },
-            },
-          },
-        },
-      },
-    },
-  });
+  const profile = await dashboardProfiliniGetir(session.user.id);
 
   if (!profile) {
     return (

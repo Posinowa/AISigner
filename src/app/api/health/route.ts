@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { veritabaniniYokla } from "@/features/system/server/veritabani-yoklama";
 import { logger } from "@/lib/logger";
 
 /**
@@ -51,7 +51,7 @@ export async function GET() {
   };
 
   try {
-    await prisma.$queryRaw`SELECT 1`;
+    await veritabaniniYokla();
     return NextResponse.json({ status: "ok", db: "connected", ...govde }, { status: 200 });
   } catch (error) {
     // Hata DETAYI yanıta konmaz (bağlantı dizesi/host sızabilir); yalnız loglanır.

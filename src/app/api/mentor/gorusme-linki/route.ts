@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth/guard";
 import { gorusmeLinkiSchema } from "@/lib/validations/api";
+import { gorusmeLinkiniGetir, gorusmeLinkiniYaz } from "@/features/mentors/server/gorusme-ve-basvuru";
 
 /**
  * Mentörün görüşme bağlantısı (#398).
@@ -25,11 +25,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
   }
 
-  const { count } = await prisma.mentorProfile.updateMany({
-    // Kapsam OTURUMDAN: profil kimliği istemciden alınmıyor.
-    where: { userId: auth.session.user.id! },
-    data: { gorusmeLinki: parsed.data.link || null },
-  });
+  // Kapsam OTURUMDAN: profil kimliği istemciden alınmıyor.
+  const count = await gorusmeLinkiniYaz(auth.session.user.id!, parsed.data.link || null);
 
   if (count === 0) {
     // Mentör profili yalnız başvuru akışında (#287) oluşuyor; seed veya admin
@@ -49,10 +46,7 @@ export async function GET() {
   const auth = await requireAuth("MENTOR");
   if (!auth.authorized) return auth.response;
 
-  const profil = await prisma.mentorProfile.findUnique({
-    where: { userId: auth.session.user.id! },
-    select: { gorusmeLinki: true },
-  });
+  const link = await gorusmeLinkiniGetir(auth.session.user.id!);
 
-  return NextResponse.json({ link: profil?.gorusmeLinki ?? null });
+  return NextResponse.json({ link });
 }

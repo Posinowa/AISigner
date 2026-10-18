@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { prisma } from "@/lib/db";
+import { takilmaBildiriminiYaz } from "@/features/student/server/takilma-bildirimi";
 import { requireAuth } from "@/lib/auth/guard";
 
 /**
@@ -27,11 +27,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
   }
 
-  const { count } = await prisma.studentProfile.updateMany({
-    // Kapsam OTURUMDAN: profil kimliği istemciden alınmıyor.
-    where: { userId: auth.session.user.id! },
-    data: { takilmaBildirimi: parsed.data.acik },
-  });
+  // Kapsam OTURUMDAN: profil kimliği istemciden alınmıyor.
+  const count = await takilmaBildiriminiYaz(auth.session.user.id!, parsed.data.acik);
 
   if (count === 0) {
     return NextResponse.json({ error: "Öğrenci profili bulunamadı." }, { status: 404 });

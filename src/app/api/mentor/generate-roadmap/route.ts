@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { mentoruMu } from "@/features/teams/server/sahiplik";
 import {
-  ATAMA_SAHIPLIK_SELECT,
-  mentoruMu,
-} from "@/features/teams/server/sahiplik";
+  atamaVeYolHaritasi,
+  yolHaritasiOlustur,
+  yolHaritasiniSil,
+} from "@/features/roadmap/server/uretim";
 import { generateRoadmap } from "@/features/ai/server/generate-roadmap";
 import { getStoredProfileAnalysis } from "@/features/ai/server/profile-analysis-store";
 import { tamamlananAdimBasliklari } from "@/features/roadmap/server/gecmis";
@@ -44,18 +45,7 @@ export async function POST(req: Request) {
     const { assignedProjectId } = parsed.data;
 
     // 2. Veritabanından atanmış projeyi ve ona bağlı öğrenci ile şablonu çekiyoruz
-    const assignedProject = await prisma.assignedProject.findUnique({
-      where: { id: assignedProjectId },
-      include: {
-        // #332: Sahiplik bireysel VEYA takım; yetki tek tanımdan gelir.
-        // `generateRoadmap` TAM profili istediği için studentProfile ayrıca
-        // bütünüyle çekiliyor (takım dalı aşağıda erken dönüyor).
-        ...ATAMA_SAHIPLIK_SELECT,
-        studentProfile: { include: { mentorAssignments: { select: { mentorId: true } } } },
-        projectTemplate: true,
-        roadmap: true // Zaten bir yol haritası var mı diye kontrol etmek için
-      }
-    });
+    const assignedProject = await atamaVeYolHaritasi(assignedProjectId);
 
     if (!assignedProject) {
       return NextResponse.json({ error: "Atanmış proje bulunamadı!" }, { status: 404 });
@@ -124,9 +114,7 @@ export async function POST(req: Request) {
           );
         }
         // Eski taslağı temizle, Posilog ile yeniden üret
-        await prisma.roadmap.delete({
-          where: { id: assignedProject.roadmap.id },
-        });
+        await yolHaritasiniSil(assignedProject.roadmap.id);
       } else {
         return NextResponse.json(
           { error: "Bu proje için zaten bir yol haritası oluşturulmuş!" },
@@ -181,25 +169,10 @@ export async function POST(req: Request) {
     );
 
     // 5. 🚀 Prisma Nested Create: Ana Roadmap'i ve ona bağlı tüm adımları tek bir işlemde veritabanına kaydediyoruz
-    const newRoadmap = await prisma.roadmap.create({
-      data: {
-        assignedProjectId: assignedProject.id,
-        title: `${assignedProject.projectTemplate.title} - Öğrenme Rotası`,
-        status: "DRAFT", // Mentör onayına sunmak için önce taslak olarak kaydedilir
-        steps: {
-          create: roadmapStepsData.map((step) => ({
-            order: step.order,
-            title: step.title,
-            description: step.description,
-            estimatedHours: step.estimatedHours,
-            resources: step.resources,
-            status: "TODO"
-          }))
-        }
-      },
-      include: {
-        steps: true // Frontend'e oluşturulan adımları da geri dönüyoruz
-      }
+    const newRoadmap = await yolHaritasiOlustur({
+      assignedProjectId: assignedProject.id,
+      title: `${assignedProject.projectTemplate.title} - Öğrenme Rotası`,
+      adimlar: roadmapStepsData,
     });
 
     return NextResponse.json({ roadmap: newRoadmap }, { status: 200 });

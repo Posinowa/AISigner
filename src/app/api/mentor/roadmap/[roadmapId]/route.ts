@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { mentoruMu } from "@/features/teams/server/sahiplik";
 import {
-  ATAMA_SAHIPLIK_SELECT,
-  mentoruMu,
-} from "@/features/teams/server/sahiplik";
+  yolHaritasiDetayi,
+  yolHaritasiGuncelle,
+  yolHaritasiSahipligi,
+} from "@/features/roadmap/server/adim-yazma";
 import { requireAuth } from "@/lib/auth/guard";
 import { updateRoadmapSchema } from "@/lib/validations/api";
 import { rotaHatasi } from "@/lib/api-hata";
@@ -19,29 +20,7 @@ export async function GET(
   try {
     const { roadmapId } = await params;
 
-    const roadmap = await prisma.roadmap.findUnique({
-      where: { id: roadmapId },
-      include: {
-        steps: {
-          orderBy: { order: "asc" },
-          // #407: Yorum sayısı liste sorgusundan — adım başına ayrı istek N+1 olurdu.
-          include: { _count: { select: { comments: true } } },
-        },
-        // #332: Sahiplik bireysel VEYA takım; yetki tek tanımdan gelir.
-        assignedProject: {
-          select: {
-            ...ATAMA_SAHIPLIK_SELECT,
-            projectTemplate: true,
-            studentProfile: {
-              include: {
-                user: { select: { name: true, lastName: true, email: true } },
-                mentorAssignments: { select: { mentorId: true } },
-              },
-            },
-          },
-        },
-      },
-    });
+    const roadmap = await yolHaritasiDetayi(roadmapId);
 
     if (!roadmap) {
       return NextResponse.json(
@@ -85,17 +64,7 @@ export async function PUT(
     }
 
     // Mentor ownership kontrolü
-    const existingRoadmap = await prisma.roadmap.findUnique({
-      where: { id: roadmapId },
-      include: {
-        assignedProject: {
-          include: {
-            // #332: Sahiplik bireysel VEYA takım.
-            ...ATAMA_SAHIPLIK_SELECT,
-          },
-        },
-      },
-    });
+    const existingRoadmap = await yolHaritasiSahipligi(roadmapId);
 
     if (!existingRoadmap) {
       return NextResponse.json({ error: "Yol haritası bulunamadı!" }, { status: 404 });
@@ -109,20 +78,9 @@ export async function PUT(
       );
     }
 
-    const updateData: Record<string, string> = {};
-    if (parsed.data.title) updateData.title = parsed.data.title;
-    if (parsed.data.status) updateData.status = parsed.data.status;
-
-    const roadmap = await prisma.roadmap.update({
-      where: { id: roadmapId },
-      data: updateData,
-      include: {
-        steps: {
-          orderBy: { order: "asc" },
-          // #407: Yorum sayısı liste sorgusundan — adım başına ayrı istek N+1 olurdu.
-          include: { _count: { select: { comments: true } } },
-        },
-      },
+    const roadmap = await yolHaritasiGuncelle(roadmapId, {
+      title: parsed.data.title,
+      status: parsed.data.status,
     });
 
     return NextResponse.json(roadmap);

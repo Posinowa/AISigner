@@ -7,9 +7,10 @@ import {
   benzersizProjeSayisi,
   taslakYolHaritasiSayisi,
 } from "@/features/mentors/proje-sayaci";
-import { Users, BookOpen, Clock, CheckCircle, AlertCircle, UserCircle2, ChevronRight, Loader2 } from "lucide-react";
+import { Users, BookOpen, CheckCircle, AlertCircle, UserCircle2, ChevronRight, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
+import { PROJE_DURUMU_ETIKETI, ZORLUK_ETIKETI } from "@/lib/ui/proje-durumu";
 import { DogrulanmisRozet } from "@/features/auth/ui/DogrulanmisRozet";
 import { PanelKarsilama } from "@/features/dashboard/ui/PanelKarsilama";
 import { ProfilTamamlaSeridi } from "@/features/dashboard/ui/ProfilTamamlaSeridi";
@@ -84,17 +85,6 @@ const TAKIM_ROL_ETIKETLERI: Record<string, string> = {
   design: "Tasarım",
 };
 
-const statusConfig = {
-  PENDING: { label: "Bekliyor", color: "bg-yellow-100 text-yellow-700", icon: Clock },
-  IN_PROGRESS: { label: "Devam Ediyor", color: "bg-blue-100 text-blue-700", icon: AlertCircle },
-  COMPLETED: { label: "Tamamlandı", color: "bg-emerald-100 text-emerald-700", icon: CheckCircle }
-};
-
-const difficultyConfig = {
-  EASY: { label: "Kolay", color: "bg-emerald-50 text-emerald-700 border border-emerald-200" },
-  MEDIUM: { label: "Orta", color: "bg-amber-50 text-amber-700 border border-amber-200" },
-  HARD: { label: "Zor", color: "bg-red-50 text-red-700 border border-red-200" }
-};
 
 export default function MentorDashboardPage() {
   const { data: session } = useSession();
@@ -407,8 +397,8 @@ export default function MentorDashboardPage() {
                     {student.studentProfile?.assignedProjects && student.studentProfile.assignedProjects.length > 0 && (
                       <div className="mb-4 space-y-1.5">
                         {student.studentProfile.assignedProjects.slice(0, 2).map(project => {
-                          const statusInfo = statusConfig[project.status as keyof typeof statusConfig];
-                          const difficultyInfo = difficultyConfig[project.projectTemplate.difficulty as keyof typeof difficultyConfig];
+                          const statusInfo = PROJE_DURUMU_ETIKETI[project.status as keyof typeof PROJE_DURUMU_ETIKETI];
+                          const difficultyInfo = ZORLUK_ETIKETI[project.projectTemplate.difficulty as keyof typeof ZORLUK_ETIKETI];
                           return (
                             <div key={project.id} className="space-y-2 bg-slate-50 rounded-lg px-3 py-2">
                               <div className="flex items-center justify-between gap-2">

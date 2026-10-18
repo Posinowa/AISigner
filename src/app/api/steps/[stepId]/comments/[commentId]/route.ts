@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { mezunYazmaKapisi } from "@/lib/auth/mezun-politikasi";
-import { prisma } from "@/lib/db";
+import { mentoruMu } from "@/features/teams/server/sahiplik";
+import { adimSahiplikBilgisi } from "@/features/roadmap/server/adim-erisim";
 import {
-  ATAMA_SAHIPLIK_SELECT,
-  mentoruMu,
-} from "@/features/teams/server/sahiplik";
+  yorumuBul,
+  yorumuGuncelle,
+  yorumuSil,
+} from "@/features/messaging/server/adim-yorumlari";
 import { requireAuth } from "@/lib/auth/guard";
 import { updateStepCommentSchema } from "@/lib/validations/api";
 import { rotaHatasi } from "@/lib/api-hata";
@@ -28,9 +30,7 @@ export async function PUT(
   const userId = auth.session.user.id!;
 
   try {
-    const comment = await prisma.stepComment.findUnique({
-      where: { id: commentId },
-    });
+    const comment = await yorumuBul(commentId);
 
     if (!comment) {
       return NextResponse.json({ error: "Yorum bulunamadı." }, { status: 404 });
@@ -58,15 +58,7 @@ export async function PUT(
       );
     }
 
-    const updated = await prisma.stepComment.update({
-      where: { id: commentId },
-      data: { content: parsed.data.content },
-      include: {
-        author: {
-          select: { id: true, name: true, lastName: true, role: true },
-        },
-      },
-    });
+    const updated = await yorumuGuncelle(commentId, parsed.data.content);
 
     return NextResponse.json({ comment: updated });
   } catch (error) {
@@ -97,9 +89,7 @@ export async function DELETE(
   const userId = auth.session.user.id!;
 
   try {
-    const comment = await prisma.stepComment.findUnique({
-      where: { id: commentId },
-    });
+    const comment = await yorumuBul(commentId);
 
     if (!comment) {
       return NextResponse.json({ error: "Yorum bulunamadı." }, { status: 404 });
@@ -112,27 +102,17 @@ export async function DELETE(
 
     // Yorum sahibi silebilir
     if (comment.authorId === userId) {
-      await prisma.stepComment.delete({ where: { id: commentId } });
+      await yorumuSil(commentId);
       return NextResponse.json({ success: true });
     }
 
     // Mentor, kendi öğrencisinin adımındaki herhangi bir yorumu silebilir
-    const step = await prisma.roadmapStep.findUnique({
-      where: { id: stepId },
-      include: {
-        roadmap: {
-          include: {
-            // #332: Sahiplik bireysel VEYA takım; tek tanımdan gelir.
-            assignedProject: { select: ATAMA_SAHIPLIK_SELECT },
-          },
-        },
-      },
-    });
+    const step = await adimSahiplikBilgisi(stepId);
 
     // #195: M:N — öğrencinin mentorlarından biri mi?
     // #195/#332: Mentör = öğrencinin kendi mentörü ya da takımın mentörü.
     if (step && mentoruMu(step.roadmap.assignedProject, userId)) {
-      await prisma.stepComment.delete({ where: { id: commentId } });
+      await yorumuSil(commentId);
       return NextResponse.json({ success: true });
     }
 

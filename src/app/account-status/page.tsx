@@ -3,7 +3,7 @@ import { authOptions } from "@/lib/auth/nextauth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import LogoutButton from "@/components/LogoutButton";
-import { prisma } from "@/lib/db";
+import { ogrenciProfilKaydiniGetir, mentorProfilKaydiniGetir } from "@/features/auth/server/hesap-durumu-sorgu";
 import { Clock, XCircle, UserPen, Sparkles, Award } from "lucide-react";
 import Image from "next/image";
 
@@ -47,19 +47,13 @@ export default async function AccountStatusPage() {
 
   const profile = rejected || isGraduated || mentorBasvurusu
     ? null
-    : await prisma.studentProfile.findUnique({
-        where: { userId: session.user.id },
-        select: { id: true },
-      });
+    : await ogrenciProfilKaydiniGetir(session.user.id);
   const needsProfile = !rejected && !isGraduated && !mentorBasvurusu && !profile;
 
   // #287: Mentörün de dolduracağı bir profil VAR artık. Başvuru soruları
   // olmadan admin onay kararını ad-soyada bakarak veriyordu.
   const mentorProfile = mentorBasvurusu && !rejected
-    ? await prisma.mentorProfile.findUnique({
-        where: { userId: session.user.id },
-        select: { id: true },
-      })
+    ? await mentorProfilKaydiniGetir(session.user.id)
     : null;
   const needsMentorProfile = mentorBasvurusu && !rejected && !mentorProfile;
 

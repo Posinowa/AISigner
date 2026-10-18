@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
-import {
-  ATAMA_SAHIPLIK_SELECT,
-  mentoruMu,
-} from "@/features/teams/server/sahiplik";
+import { mentoruMu } from "@/features/teams/server/sahiplik";
+import { sonaAdimEkle, yolHaritasiSahipligi } from "@/features/roadmap/server/adim-yazma";
 import { requireAuth } from "@/lib/auth/guard";
 import { createStepSchema } from "@/lib/validations/api";
 import { rotaHatasi } from "@/lib/api-hata";
@@ -20,13 +17,7 @@ export async function POST(
     const { roadmapId } = await params;
 
     // Mentor ownership kontrolü
-    const roadmap = await prisma.roadmap.findUnique({
-      where: { id: roadmapId },
-      include: {
-        // #332: Sahiplik bireysel VEYA takım; tek tanımdan gelir.
-        assignedProject: { select: ATAMA_SAHIPLIK_SELECT },
-      },
-    });
+    const roadmap = await yolHaritasiSahipligi(roadmapId);
 
     if (!roadmap) {
       return NextResponse.json({ error: "Yol haritası bulunamadı!" }, { status: 404 });
@@ -49,25 +40,13 @@ export async function POST(
       );
     }
 
-    // Mevcut en yüksek sıra numarasını bul
-    const lastStep = await prisma.roadmapStep.findFirst({
-      where: { roadmapId },
-      orderBy: { order: "desc" },
-    });
-
-    const newOrder = (lastStep?.order ?? 0) + 1;
-
-    const step = await prisma.roadmapStep.create({
-      data: {
-        roadmapId,
-        order: newOrder,
-        title: parsed.data.title,
-        description: parsed.data.description,
-        estimatedHours: parsed.data.estimatedHours || null,
-        resources: parsed.data.resources || [],
-        githubIssueUrl: parsed.data.githubIssueUrl || null,
-        status: "TODO",
-      },
+    // Yeni adım, mevcut en yüksek sıranın bir sonrasına yazılır.
+    const step = await sonaAdimEkle(roadmapId, {
+      title: parsed.data.title,
+      description: parsed.data.description,
+      estimatedHours: parsed.data.estimatedHours || null,
+      resources: parsed.data.resources || [],
+      githubIssueUrl: parsed.data.githubIssueUrl || null,
     });
 
     return NextResponse.json(step, { status: 201 });

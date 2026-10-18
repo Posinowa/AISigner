@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth/guard";
 import { rotaHatasi } from "@/lib/api-hata";
+import { okunmamisMesajSayisi } from "@/features/messaging/server/mesajlar";
 
 /**
  * GET /api/messages/unread-count
@@ -12,12 +12,7 @@ export async function GET() {
   if (!auth.authorized) return auth.response;
 
   try {
-    const count = await prisma.message.count({
-      where: {
-        receiverId: auth.session.user.id!,
-        isRead: false,
-      },
-    });
+    const count = await okunmamisMesajSayisi(auth.session.user.id!);
 
     return NextResponse.json({ unreadCount: count });
   } catch (error) {

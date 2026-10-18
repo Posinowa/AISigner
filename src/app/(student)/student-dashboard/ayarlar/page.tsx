@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { Settings } from "lucide-react";
 import { authOptions } from "@/lib/auth/nextauth";
-import { prisma } from "@/lib/db";
+import { ayarlarProfiliniGetir } from "@/features/student/server/ayarlar-sorgu";
 import { panoErisimineAcik, DURUM_EKRANI } from "@/lib/auth/hesap-durumu";
 import { AvatarUpload } from "@/features/profile/ui/AvatarUpload";
 import { TakilmaBildirimiAyari } from "@/features/radar/ui/TakilmaBildirimiAyari";
@@ -30,10 +30,7 @@ export default async function StudentSettingsPage() {
     redirect(DURUM_EKRANI);
   }
 
-  const profile = await prisma.studentProfile.findUnique({
-    where: { userId: session.user.id },
-    select: { takilmaBildirimi: true },
-  });
+  const profile = await ayarlarProfiliniGetir(session.user.id);
 
   const firstName = session.user.name?.split(" ")[0] ?? "Öğrenci";
   const basHarfler = firstName.slice(0, 2).toUpperCase();

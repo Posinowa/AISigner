@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
 import { mezunYazmaKapisi } from "@/lib/auth/mezun-politikasi";
-import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth/guard";
 import { claimStepSchema } from "@/lib/validations/api";
 import {
-  ATAMA_SAHIPLIK_SELECT,
   erisebilirMi,
   ogrencisiMi,
 } from "@/features/teams/server/sahiplik";
 import { adimiUstlen } from "@/features/teams/server/takim";
+import { adimUstlenmeBilgisi } from "@/features/roadmap/server/ogrenci-adim";
 
 /**
  * Adımı üstlenme / bırakma (#332 Faz 2).
@@ -34,18 +33,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ stepId: 
     return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
   }
 
-  const step = await prisma.roadmapStep.findUnique({
-    where: { id: stepId },
-    select: {
-      id: true,
-      roadmap: {
-        select: {
-          status: true,
-          assignedProject: { select: ATAMA_SAHIPLIK_SELECT },
-        },
-      },
-    },
-  });
+  const step = await adimUstlenmeBilgisi(stepId);
 
   // Yetkisiz için 404: adımın varlığını da sızdırmıyoruz (mevcut uçlarla aynı).
   if (!step || !erisebilirMi(step.roadmap.assignedProject, userId)) {
