@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth/nextauth";
-import { prisma } from "@/lib/db";
+import { profilKurulumKullanicisiniGetir, profilKurulumOgrenciProfiliniGetir } from "@/features/student/server/profil-kurulum-sorgu";
 import OnboardingForm from "@/features/student/ui/OnboardingForm";
 import { listSurveyQuestions } from "@/features/survey/server/survey";
 import type { SurveyQuestionView } from "@/features/survey/answers";
@@ -14,32 +14,11 @@ export default async function ProfileSetupPage() {
 
   // Signup'ta girilen ad/soyad/telefonu User tablosundan çek; onboarding form'unda
   // prefill olarak göster — kullanıcı tekrar girmek zorunda kalmasın.
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { name: true, lastName: true, phone: true },
-  });
+  const user = await profilKurulumKullanicisiniGetir(session.user.id);
 
   // #55: Mevcut StudentProfile varsa (öğrenci daha önce onboarding'i tamamlamışsa)
   // formu boş değil, kayıtlı verilerle önceden doldur.
-  const studentProfile = await prisma.studentProfile.findUnique({
-    where: { userId: session.user.id },
-    select: {
-      birthYear: true,
-      experienceLevel: true,
-      interests: true,
-      goals: true,
-      availability: true,
-      // #289: Genişletilen sorular da prefill edilmeli — yoksa profilini
-      // tekrar açan stajyer bunları BOŞ görüp baştan doldurur.
-      city: true,
-      gitLevel: true,
-      weeklyHours: true,
-      school: true,
-      department: true,
-      classYear: true,
-      englishLevel: true,
-    },
-  });
+  const studentProfile = await profilKurulumOgrenciProfiliniGetir(session.user.id);
 
   // #46: Admin'in tanımladığı aktif anket sorularını göster. Hata olursa form
   // mevcut akışı bozmadan çalışmalı → boş dizi ile devam et.
