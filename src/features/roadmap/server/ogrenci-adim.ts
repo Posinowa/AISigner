@@ -47,3 +47,19 @@ export async function projeDurumunuAyarla(
     data: { status },
   });
 }
+
+/** Adımın üstlenme kararı için gereken alanlar: yol haritası durumu ve sahiplik. */
+export async function adimUstlenmeBilgisi(stepId: string) {
+  return prisma.roadmapStep.findUnique({
+    where: { id: stepId },
+    select: {
+      id: true,
+      roadmap: {
+        select: {
+          status: true,
+          assignedProject: { select: ATAMA_SAHIPLIK_SELECT },
+        },
+      },
+    },
+  });
+}
