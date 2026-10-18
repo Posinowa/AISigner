@@ -511,51 +511,56 @@ export async function setStudentMentors(studentId: string, mentorIds: string[]) 
     }),
   ]);
 
-  /*
-   * #380: Mentör ataması — stajyerin süreci gerçekten burada başlıyor.
-   *
-   * KARŞILIKLI: mentör de yeni öğrencisini öğreniyor. Düşük sıklıkta, yüksek
-   * değerli bir bildirim; e-postaya bağlı.
-   *
-   * ⚠️ Yalnız YENİ eklenen bağlar bildiriliyor. Reconcile her çağrıda tüm
-   * listeyi yazıyor; hepsini bildirmek, listeden tek kişi çıkarıldığında
-   * kalan herkese "yeni mentör atandı" göndermek olurdu.
-   */
+  // #380: Yalnız YENİ eklenen bağlar bildirilir (aşağıdaki yardımcıya bakın).
   const yeniMentorIdler = uniqueMentorIds.filter((id) => !oncekiMentorIdler.has(id));
-  if (yeniMentorIdler.length > 0) {
-    const [ogrenci, mentorlar] = await Promise.all([
-      prisma.user.findUnique({
-        where: { id: studentId },
-        select: { email: true, name: true, lastName: true },
-      }),
-      prisma.user.findMany({
-        where: { id: { in: yeniMentorIdler } },
-        select: { id: true, email: true, name: true, lastName: true },
-      }),
-    ]);
-
-    const ad = (u: { name: string | null; lastName: string | null } | null) =>
-      [u?.name, u?.lastName].filter(Boolean).join(" ") || "Kullanıcı";
-
-    await topluBildirimGonder([
-      {
-        userId: studentId,
-        tur: BILDIRIM_TURLERI.MENTOR_ATANDI,
-        baslik: "Mentörünüz atandı",
-        govde: `Size ${mentorlar.map(ad).join(", ")} mentör olarak atandı.`,
-        link: "/student-dashboard",
-        eposta: ogrenci?.email ?? null,
-      },
-      ...mentorlar.map((m) => ({
-        userId: m.id,
-        tur: BILDIRIM_TURLERI.MENTOR_ATANDI,
-        baslik: "Yeni öğrenciniz var",
-        govde: `${ad(ogrenci)} size stajyer olarak atandı.`,
-        link: `/mentor-dashboard/${studentId}`,
-        eposta: m.email,
-      })),
-    ]);
-  }
+  await mentorAtamaBildirimleriGonder(studentId, yeniMentorIdler);
 
   return { studentProfileId: profile.id, mentorIds: uniqueMentorIds };
+}
+
+/*
+ * #380: Mentör ataması — stajyerin süreci gerçekten burada başlıyor.
+ *
+ * KARŞILIKLI: mentör de yeni öğrencisini öğreniyor. Düşük sıklıkta, yüksek
+ * değerli bir bildirim; e-postaya bağlı.
+ *
+ * ⚠️ Yalnız YENİ eklenen bağlar bildiriliyor. Reconcile her çağrıda tüm
+ * listeyi yazıyor; hepsini bildirmek, listeden tek kişi çıkarıldığında
+ * kalan herkese "yeni mentör atandı" göndermek olurdu.
+ */
+async function mentorAtamaBildirimleriGonder(studentId: string, yeniMentorIdler: string[]) {
+  if (yeniMentorIdler.length === 0) return;
+
+  const [ogrenci, mentorlar] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: studentId },
+      select: { email: true, name: true, lastName: true },
+    }),
+    prisma.user.findMany({
+      where: { id: { in: yeniMentorIdler } },
+      select: { id: true, email: true, name: true, lastName: true },
+    }),
+  ]);
+
+  const ad = (u: { name: string | null; lastName: string | null } | null) =>
+    [u?.name, u?.lastName].filter(Boolean).join(" ") || "Kullanıcı";
+
+  await topluBildirimGonder([
+    {
+      userId: studentId,
+      tur: BILDIRIM_TURLERI.MENTOR_ATANDI,
+      baslik: "Mentörünüz atandı",
+      govde: `Size ${mentorlar.map(ad).join(", ")} mentör olarak atandı.`,
+      link: "/student-dashboard",
+      eposta: ogrenci?.email ?? null,
+    },
+    ...mentorlar.map((m) => ({
+      userId: m.id,
+      tur: BILDIRIM_TURLERI.MENTOR_ATANDI,
+      baslik: "Yeni öğrenciniz var",
+      govde: `${ad(ogrenci)} size stajyer olarak atandı.`,
+      link: `/mentor-dashboard/${studentId}`,
+      eposta: m.email,
+    })),
+  ]);
 }
