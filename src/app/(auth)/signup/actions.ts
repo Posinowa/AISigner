@@ -1,7 +1,7 @@
 
 //AMAÇ:Bu sunucu tarafı fonksiyon, gelen form verisini doğrulayıp kullanıcıyı veritabanına ekler ve kayıt başarılıysa giriş sayfasına yönlendirir.
 "use server"
-import { prisma } from "@/lib/auth/prisma"
+import { emailKayitliMi, kullaniciOlustur } from "@/features/auth/server/kayit"
 import { hash } from "@node-rs/argon2"
 import { signupSchema } from "@/features/auth/models/user"
 import { redirect } from "next/navigation"
@@ -57,8 +57,7 @@ export async function signupAction(
   // DB işlemlerini try/catch ile sarmal — beklenmeyen hatalarda kullanıcıya
   // dump edilen Prisma stack yerine düzgün bir mesaj göster.
   try {
-    const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } })
-    if (existing) return { error: { email: ["Bu email zaten kayıtlı"] } }
+    if (await emailKayitliMi(normalizedEmail)) return { error: { email: ["Bu email zaten kayıtlı"] } }
 
     // #250: Rol istemciden geliyor — beyaz listeyle çözülüyor, tanınmayan
     // her değer stajyere düşüyor. ADMIN hiçbir girdiyle üretilemez.
@@ -69,24 +68,21 @@ export async function signupAction(
     const aiRizasi = formData.get(AI_RIZA_ALANI) === "evet"
 
     const hashedPassword = await hash(password)
-    const yeniKullanici = await prisma.user.create({
-      data: {
-        name: parsed.data.name.trim(),
-        lastName: parsed.data.lastName.trim(),
-        email: normalizedEmail,
-        password: hashedPassword,
-        phone: parsed.data.phone ?? null,
-        role,
-        // Yeni hesap admin onayına kadar PENDING — aktif değildir.
-        // #250: mentör başvurusu da aynı onaydan geçer.
-        accountStatus: "PENDING",
-        // #321: KVKK açık rıza. İşaretlenmediyse null kalır ve AI özellikleri
-        // kapalı olur; kayıt yine tamamlanır (rıza zorunlu tutulamaz).
-        ...(aiRizasi
-          ? { aiConsentAt: new Date(), aiConsentVersion: RIZA_METIN_SURUMU }
-          : {}),
-      },
-      select: { id: true, name: true },
+    const yeniKullanici = await kullaniciOlustur({
+      name: parsed.data.name.trim(),
+      lastName: parsed.data.lastName.trim(),
+      email: normalizedEmail,
+      password: hashedPassword,
+      phone: parsed.data.phone ?? null,
+      role,
+      // Yeni hesap admin onayına kadar PENDING — aktif değildir.
+      // #250: mentör başvurusu da aynı onaydan geçer.
+      accountStatus: "PENDING",
+      // #321: KVKK açık rıza. İşaretlenmediyse null kalır ve AI özellikleri
+      // kapalı olur; kayıt yine tamamlanır (rıza zorunlu tutulamaz).
+      ...(aiRizasi
+        ? { aiConsentAt: new Date(), aiConsentVersion: RIZA_METIN_SURUMU }
+        : {}),
     })
 
     // #247: Doğrulama e-postası. Gönderilemezse kayıt AKIŞI KIRILMAZ —
