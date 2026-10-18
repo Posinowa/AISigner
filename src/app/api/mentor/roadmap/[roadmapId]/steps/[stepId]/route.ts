@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { mentoruMu } from "@/features/teams/server/sahiplik";
 import {
-  ATAMA_SAHIPLIK_SELECT,
-  mentoruMu,
-} from "@/features/teams/server/sahiplik";
+  adimiBul,
+  adimiGuncelle,
+  adimiSil,
+  yolHaritasiSahipligi,
+} from "@/features/roadmap/server/adim-yazma";
 import { requireAuth } from "@/lib/auth/guard";
 import { updateStepSchema } from "@/lib/validations/api";
 import { yenidenNumaralandir } from "@/features/roadmap/server/siralama";
@@ -21,13 +23,7 @@ export async function PUT(
     const { roadmapId, stepId } = await params;
 
     // Mentor ownership kontrolü
-    const roadmap = await prisma.roadmap.findUnique({
-      where: { id: roadmapId },
-      include: {
-        // #332: Sahiplik bireysel VEYA takım; tek tanımdan gelir.
-        assignedProject: { select: ATAMA_SAHIPLIK_SELECT },
-      },
-    });
+    const roadmap = await yolHaritasiSahipligi(roadmapId);
 
     if (!roadmap) {
       return NextResponse.json({ error: "Yol haritası bulunamadı!" }, { status: 404 });
@@ -77,19 +73,14 @@ export async function PUT(
      * yine `roadmapId` ile daraltılarak okunuyor.
      */
     if (Object.keys(safeData).length === 0) {
-      const mevcut = await prisma.roadmapStep.findFirst({
-        where: { id: stepId, roadmapId },
-      });
+      const mevcut = await adimiBul(stepId, roadmapId);
       if (!mevcut) {
         return NextResponse.json({ error: "Adım bulunamadı." }, { status: 404 });
       }
       return NextResponse.json(mevcut);
     }
 
-    const { count } = await prisma.roadmapStep.updateMany({
-      where: { id: stepId, roadmapId },
-      data: safeData,
-    });
+    const count = await adimiGuncelle(stepId, roadmapId, safeData);
 
     // Adım bu yol haritasına ait değilse 404: başkasının adımının VAR OLDUĞU
     // bile sızmasın.
@@ -97,7 +88,7 @@ export async function PUT(
       return NextResponse.json({ error: "Adım bulunamadı." }, { status: 404 });
     }
 
-    const step = await prisma.roadmapStep.findFirst({ where: { id: stepId, roadmapId } });
+    const step = await adimiBul(stepId, roadmapId);
     return NextResponse.json(step);
   } catch (error) {
     rotaHatasi("Step PUT Error:", error);
@@ -120,13 +111,7 @@ export async function DELETE(
     const { roadmapId, stepId } = await params;
 
     // Mentor ownership kontrolü
-    const roadmap = await prisma.roadmap.findUnique({
-      where: { id: roadmapId },
-      include: {
-        // #332: Sahiplik bireysel VEYA takım; tek tanımdan gelir.
-        assignedProject: { select: ATAMA_SAHIPLIK_SELECT },
-      },
-    });
+    const roadmap = await yolHaritasiSahipligi(roadmapId);
 
     if (!roadmap) {
       return NextResponse.json({ error: "Yol haritası bulunamadı!" }, { status: 404 });
@@ -152,10 +137,7 @@ export async function DELETE(
      * hasar iki yol haritasına birden dağılıyordu: adım birinden siliniyor,
      * diğeri yeniden numaralanıyordu.
      */
-    const step = await prisma.roadmapStep.findFirst({
-      where: { id: stepId, roadmapId },
-      select: { status: true },
-    });
+    const step = await adimiBul(stepId, roadmapId);
 
     if (!step) {
       return NextResponse.json({ error: "Adım bulunamadı." }, { status: 404 });
@@ -173,9 +155,7 @@ export async function DELETE(
       );
     }
 
-    const { count } = await prisma.roadmapStep.deleteMany({
-      where: { id: stepId, roadmapId },
-    });
+    const count = await adimiSil(stepId, roadmapId);
 
     // Araya giren bir silme yarışını kaybettiysek sıraya dokunma.
     if (count === 0) {
