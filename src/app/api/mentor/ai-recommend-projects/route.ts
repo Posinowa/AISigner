@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
-import {prisma} from "@/lib/db"; 
 import { recommendProjects } from "@/features/ai/server/project-recommendations";
 import { requireAuth } from "@/lib/auth/guard";
 import { recommendProjectsSchema } from "@/lib/validations/api";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { profilSahibininRizasiVar } from "@/features/kvkk/riza";
 import { projeYukleriniGetir } from "@/features/projects/server/yuk";
-import { mentorunOgrencisiWhere, ogrencininAtamalariWhere } from "@/features/teams/server/sahiplik";
+import {
+  mentorUzmanlikProfili,
+  mentorunOgrencisiProfili,
+  ogrencininAtamalari,
+  oneriSablonHavuzu,
+} from "@/features/ai/server/oneri-sorgu";
 import { rotaHatasi } from "@/lib/api-hata";
 
 const limiter = createRateLimiter("ai-recommend-projects", {
@@ -38,13 +42,8 @@ export async function POST(req: Request) {
 
     const { studentProfileId } = parsed.data;
 
-    const studentProfile = await prisma.studentProfile.findFirst({
-      where: {
-        id: studentProfileId,
-        // #370: bireysel VEYA takım bağı.
-        ...mentorunOgrencisiWhere(auth.session.user.id!),
-      },
-    });
+    // #370: bireysel VEYA takım bağı (sorgu servisinde).
+    const studentProfile = await mentorunOgrencisiProfili(studentProfileId, auth.session.user.id!);
 
     if (!studentProfile) {
       return NextResponse.json(
@@ -81,11 +80,7 @@ export async function POST(req: Request) {
     // tek başına yapabilir. Sertifikadaki karar (#449) bunun TERSİydi ve
     // gerekçesi farklıydı: orada soru "bu kişi ne yaptı", burada "şu an neyle
     // meşgul".
-    const atanmisAtamalar = await prisma.assignedProject.findMany({
-      where: ogrencininAtamalariWhere(studentProfileId),
-      // #503: Tekrarlanabilir şablonlar bu elemeden MUAF.
-      select: { projectTemplateId: true, projectTemplate: { select: { tekrarlanabilir: true } } },
-    });
+    const atanmisAtamalar = await ogrencininAtamalari(studentProfileId);
     // ⚠️ TEKRARLANABİLİR ŞABLON ELENMİYOR (#503). Portfolyo sitesi gibi
     // herkesin yapması beklenen bir iş, zaten atanmış olsa da yeniden
     // önerilebilmeli — aksi halde bayrak yarı çalışırdı: mentör elle
@@ -95,13 +90,7 @@ export async function POST(req: Request) {
       .map((a) => a.projectTemplateId);
 
     const [havuz, yukler] = await Promise.all([
-      prisma.projectTemplate.findMany({
-        where: {
-          // #366: Öneriden türeyen şablonlar başka öğrencilere ÖNERİLMEZ.
-          fromProposal: false,
-          ...(atanmisIdler.length ? { id: { notIn: atanmisIdler } } : {}),
-        },
-      }),
+      oneriSablonHavuzu(atanmisIdler),
       // #499: Şablon başına kaç stajyerin çalıştığı — AI aynı uygunluktaki
       // projelerden az çalışılanı tercih etsin diye prompt'a giriyor.
       projeYukleriniGetir(),
@@ -120,10 +109,7 @@ export async function POST(req: Request) {
 
     // #295: Mentörün kendi uzmanlığı da öneriye giriyor — süpervize
     // edemeyeceği bir projeye yol haritası çizemez.
-    const mentorProfile = await prisma.mentorProfile.findUnique({
-      where: { userId: auth.session.user.id },
-      select: { expertise: true, seniority: true },
-    });
+    const mentorProfile = await mentorUzmanlikProfili(auth.session.user.id);
 
     const recommendations = await recommendProjects(
       studentProfile,
