@@ -3,60 +3,17 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  GitBranch,
-  Clock,
-  AlertTriangle,
-  ExternalLink,
   Loader2,
   RefreshCw,
   FolderGit2,
   Users,
   Layers,
-  Sparkles,
   AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
-import { tarihSaatBicimle } from "@/lib/tarih";
-
-export type StudentAssignmentProgress = {
-  assignmentId: string;
-  studentId: string;
-  studentName: string;
-  // #332/#367: Takım atamasında tek bir öğrenci yok.
-  studentEmail: string | null;
-  experienceLevel: string | null;
-  teamId: string | null;
-  teamMembers: { name: string; role: string }[];
-  // #195: M:N — atanmış mentorlar (0..n).
-  mentors: { id: string; name: string }[];
-  projectTemplateId: string;
-  projectTitle: string;
-  projectDifficulty: string;
-  assignmentStatus: string;
-  githubRepoUrl: string | null;
-  githubStatus: string;
-  provisionedAt: Date | null;
-  /**
-   * #483: kurulum yarıda kalmış (süreç yeniden başlamış). Eşik SUNUCUDA
-   * hesaplanıyor — burada tekrar yazmak kilitteki eşikle ayrışırdı.
-   *
-   * ⚠️ Bu tip sunucudaki `StudentAssignmentProgress`in ELLE TUTULAN
-   * kopyası. Alanı orada ekleyip burada unutmak derleme hatası verdi;
-   * ikisini bir arada tutan tek şey şu an tsc.
-   */
-  kurulumTakildi: boolean;
-  totalSteps: number;
-  completedSteps: number;
-  progressPercentage: number;
-  /** #432: Durakladıysa "10 gündür hareket yok", aksi halde null. */
-  duraklamaMetni: string | null;
-  lastActivity: {
-    title: string;
-    updatedAt: Date;
-  } | null;
-  roadmapId: string | null;
-  roadmapStatus: string | null;
-};
+import type { StudentAssignmentProgress } from "@/features/admin/ui/atama-tipleri";
+import { AtamaSatiri } from "@/features/admin/ui/AtamaSatiri";
+import { GithubOnizlemeModali } from "@/features/admin/ui/GithubOnizlemeModali";
 
 /** #452: Sunucudan gelen sayaçlar. Sunucu modülünü import etmiyoruz —
     `assignment-progress.ts` prisma çekiyor ve istemci paketine sızardı. */
@@ -468,192 +425,13 @@ export default function AdminAssignmentsPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredAssignments.map((item) => (
-                  <tr
+                  <AtamaSatiri
                     key={item.assignmentId}
-                    className="hover:bg-slate-50/60 transition-colors"
-                  >
-                    {/* Öğrenci & Mentör */}
-                    <td className="py-4 px-6">
-                      <div className="flex flex-wrap items-center gap-1.5 font-semibold text-slate-900">
-                        {item.studentName}
-                        {/* #367: Satırın takım mı birey mi olduğu görsel olarak
-                            ayırt edilebilmeli — takımda "öğrenci" sütunu tek bir
-                            kişiyi temsil etmiyor. */}
-                        {item.teamId && (
-                          <span className="rounded-md border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700">
-                            TAKIM
-                          </span>
-                        )}
-                      </div>
-                      {item.teamId ? (
-                        <div className="mt-0.5 text-xs text-slate-500">
-                          {item.teamMembers.length > 0
-                            ? item.teamMembers.map((u) => `${u.name} (${u.role})`).join(" · ")
-                            : "Aktif üye yok"}
-                        </div>
-                      ) : (
-                        <div className="text-xs text-slate-500 mt-0.5">
-                          {item.studentEmail} &bull;{" "}
-                          <span className="font-medium text-slate-600">
-                            {item.experienceLevel}
-                          </span>
-                        </div>
-                      )}
-                      {item.mentors.length > 0 && (
-                        <div className="text-xs text-indigo-600 mt-1 flex items-center gap-1">
-                          <Users className="w-3 h-3" />{" "}
-                          {item.mentors.length > 1 ? "Mentörler" : "Mentör"}:{" "}
-                          {item.mentors.map((m) => m.name).join(", ")}
-                        </div>
-                      )}
-                    </td>
-
-                    {/* Proje */}
-                    <td className="py-4 px-6">
-                      <div className="font-medium text-slate-800">
-                        {item.projectTitle}
-                      </div>
-                      <span
-                        className={`inline-block mt-1 px-2 py-0.5 rounded text-[11px] font-semibold ${
-                          item.projectDifficulty === "EASY"
-                            ? "bg-emerald-50 text-emerald-700"
-                            : item.projectDifficulty === "MEDIUM"
-                            ? "bg-indigo-50 text-indigo-700"
-                            : "bg-primary/5 text-primary"
-                        }`}
-                      >
-                        {item.projectDifficulty}
-                      </span>
-                    </td>
-
-                    {/* Canlı İlerleme Çubuğu */}
-                    <td className="py-4 px-6 min-w-[200px]">
-                      <div className="flex items-center justify-between text-xs font-semibold mb-1">
-                        <span className="text-slate-700">
-                          %{item.progressPercentage}
-                        </span>
-                        <span className="text-slate-400 font-normal">
-                          {item.completedSteps} / {item.totalSteps} Adım
-                        </span>
-                      </div>
-                      <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-primary rounded-full transition-all duration-300"
-                          style={{ width: `${item.progressPercentage}%` }}
-                        />
-                      </div>
-                    </td>
-
-                    {/* Son Aktivite */}
-                    <td className="py-4 px-6 text-xs text-slate-600">
-                      {item.lastActivity ? (
-                        <div>
-                          <div className="font-medium text-slate-800 truncate max-w-[180px]">
-                            {item.lastActivity.title}
-                          </div>
-                          <div className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
-                            <Clock className="w-3 h-3" />
-                            {tarihSaatBicimle(item.lastActivity.updatedAt, {
-                              day: "numeric",
-                              month: "short",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </div>
-
-                          {/* #432: Tarih vardı ama "ne kadar oldu" yoktu — admin
-                              her satırda zihinden gün saymak zorundaydı.
-
-                              ⚠️ SKOR DEĞİL SİNYAL (#331/#397): metin verinin
-                              kendisi, uydurma bir risk yüzdesi değil. Eşik de
-                              analitikteki `SESSIZLIK_GUN` ile AYNI. */}
-                          {item.duraklamaMetni && (
-                            <div className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-amber-700">
-                              <AlertTriangle className="w-3 h-3 shrink-0" />
-                              {item.duraklamaMetni}
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-slate-400 italic">Henüz hareket yok</span>
-                      )}
-                    </td>
-
-                    {/* GitHub Aksiyon */}
-                    <td className="py-4 px-6 text-right">
-                      {item.githubStatus === "PROVISIONING" && !item.kurulumTakildi ? (
-                        // İş arka planda koşuyor. Buton YOK: ikinci bir kurulum
-                        // tetiklemek aynı repoya paralel yazma demek olurdu
-                        // (uç da bunu 400 ile reddediyor).
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-200/60 text-xs font-semibold">
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          Kuruluyor...
-                        </span>
-                      ) : item.githubStatus === "PROVISIONED" && item.githubRepoUrl ? (
-                        <div className="inline-flex items-center gap-2">
-                          <button
-                            onClick={() => handleWorkspaceGuncelle(item.assignmentId)}
-                            disabled={guncellenenId === item.assignmentId}
-                            title="Yol haritasındaki değişiklikleri çalışma alanına aktar"
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:border-slate-300 transition text-xs font-semibold disabled:opacity-60"
-                          >
-                            <RefreshCw
-                              className={`w-3.5 h-3.5 ${guncellenenId === item.assignmentId ? "animate-spin" : ""}`}
-                            />
-                            {guncellenenId === item.assignmentId ? "Güncelleniyor..." : "Güncelle"}
-                          </button>
-                          <a
-                            href={item.githubRepoUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition text-xs font-semibold border border-emerald-200/60"
-                          >
-                            <GitBranch className="w-3.5 h-3.5" />
-                            Repo&apos;ya Git
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
-                        </div>
-                      ) : item.roadmapStatus === "PUBLISHED" || item.totalSteps > 0 ? (
-                        // ERROR: arka plan işi başarısız oldu YA DA süreç
-                        // yeniden başladığı için yarıda kaldı. Kurtarma
-                        // bilinçli olarak elle: admin burada tekrar dener.
-                        // (Kurulum idempotent — tekrar denemek kopya üretmez.)
-                        <button
-                          onClick={() => setSelectedAssignment(item)}
-                          className={
-                            item.githubStatus === "ERROR" || item.kurulumTakildi
-                              ? "inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 text-xs font-semibold transition"
-                              : "inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold transition shadow-sm"
-                          }
-                          title={
-                            item.kurulumTakildi
-                              ? "Kurulum yarıda kalmış (sunucu yeniden başlamış olabilir). Tekrar denemek kopya oluşturmaz."
-                              : item.githubStatus === "ERROR"
-                                ? "Önceki kurulum tamamlanamadı. Tekrar denemek kopya oluşturmaz."
-                                : undefined
-                          }
-                        >
-                          {item.githubStatus === "ERROR" || item.kurulumTakildi ? (
-                            <>
-                              <AlertCircle className="w-3.5 h-3.5" />
-                              {item.kurulumTakildi
-                                ? "Kurulum Yarıda Kaldı — Tekrar Dene"
-                                : "Kurulum Başarısız — Tekrar Dene"}
-                            </>
-                          ) : (
-                            <>
-                              <Sparkles className="w-3.5 h-3.5" />
-                              GitHub Workspace Oluştur
-                            </>
-                          )}
-                        </button>
-                      ) : (
-                        <span className="text-xs text-slate-400 italic">
-                          Mentör Roadmap Bekleniyor
-                        </span>
-                      )}
-                    </td>
-                  </tr>
+                    item={item}
+                    guncellenenId={guncellenenId}
+                    onWorkspaceGuncelle={handleWorkspaceGuncelle}
+                    onSec={(secilen) => setSelectedAssignment(secilen)}
+                  />
                 ))}
               </tbody>
             </table>
@@ -689,94 +467,12 @@ export default function AdminAssignmentsPage() {
 
       {/* GitHub Oluşturma Önizleme Modalı */}
       {selectedAssignment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-5">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-indigo-600" />
-                GitHub Çalışma Alanı Oluştur
-              </h3>
-              <button
-                onClick={() => setSelectedAssignment(null)}
-                className="text-slate-400 hover:text-slate-600 text-sm font-semibold"
-              >
-                Kapat
-              </button>
-            </div>
-
-            <div className="space-y-3 text-sm text-slate-600 bg-slate-50 p-4 rounded-xl border border-slate-200/60">
-              <div>
-                <span className="font-semibold text-slate-900">Hedef Organizasyon:</span>{" "}
-                <span className="text-indigo-600 font-bold">Posinowa</span> (github.com/Posinowa)
-              </div>
-              <div>
-                <span className="font-semibold text-slate-900">Hedef Repo:</span>{" "}
-                <code className="text-xs bg-slate-200 px-1.5 py-0.5 rounded text-slate-800">
-                  Posinowa/aisigner-{(selectedAssignment.studentName || "student").toLowerCase().replace(/[^a-z0-9]/g, "")}-{(selectedAssignment.projectTitle || "project").toLowerCase().replace(/[^a-z0-9]/g, "-")}
-                </code>
-              </div>
-              <div>
-                <span className="font-semibold text-slate-900">Öğrenci:</span>{" "}
-                {selectedAssignment.studentName} ({selectedAssignment.experienceLevel})
-              </div>
-              <div>
-                <span className="font-semibold text-slate-900">Proje:</span>{" "}
-                {selectedAssignment.projectTitle}
-              </div>
-              <div>
-                <span className="font-semibold text-slate-900">Oluşturulacak Faz Sayısı (Milestone):</span>{" "}
-                {selectedAssignment.totalSteps} Faz
-              </div>
-              <div>
-                <span className="font-semibold text-slate-900">Tahmini Açılacak Issue Sayısı:</span>{" "}
-                ~{selectedAssignment.totalSteps * 3} AI Detaylı Issue
-              </div>
-            </div>
-
-            <p className="text-xs text-slate-500">
-              Bu akış, <strong className="text-slate-700">Posinowa</strong> organizasyonu için öğrenciye özel repo, faz (Milestone) ve AI ile detaylandırılmış görev (Issue) yapısını hazırlar.
-            </p>
-
-            {/* #178-1: Bu özellik şu an ÖNİZLEME/simülasyondur — dürüstçe belirtilir. */}
-            <div className="mt-3 flex items-start gap-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
-              <span>
-                <strong>Önizleme:</strong> Bu işlem şu an bir <strong>simülasyondur</strong>. AI görev
-                içerikleri gerçekten üretilip kaydedilir, ancak GitHub&apos;da fiziksel bir repo/issue
-                <strong> oluşturulmaz</strong> — üretilen linkler yer tutucudur. Gerçek GitHub entegrasyonu ayrı olarak planlanmaktadır.
-              </span>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setSelectedAssignment(null)}
-                disabled={isProvisioning}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
-              >
-                İptal
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmProvision}
-                disabled={isProvisioning}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold shadow-md shadow-primary/20 transition disabled:opacity-50"
-              >
-                {isProvisioning ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    Oluşturuluyor...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-3.5 h-3.5" />
-                    Onayla ve GitHub&apos;da Başlat
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
+        <GithubOnizlemeModali
+          selectedAssignment={selectedAssignment}
+          isProvisioning={isProvisioning}
+          onKapat={() => setSelectedAssignment(null)}
+          onOnayla={handleConfirmProvision}
+        />
       )}
     </div>
   );
