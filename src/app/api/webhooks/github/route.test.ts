@@ -29,6 +29,9 @@ vi.mock("@/features/github/server/webhook-isle", () => ({
 }));
 vi.mock("@/features/github/server/teslimat-kaydi", () => ({
   teslimatKayitlariniTemizle: (...a: unknown[]) => temizlikMock(...a),
+  // Kayıt, Prisma çağrısına gider: testler aynı kaydı (benzersizlik dahil) doğrular.
+  teslimatiKaydet: (teslimatId: string, olay: string) =>
+    prismaMock.processedWebhook.create({ data: { deliveryId: teslimatId, event: olay } }),
 }));
 vi.mock("@/features/github/server/pr-inceleme", () => ({
   prAcildiginiIncele: (...a: unknown[]) => incelemeMock(...a),

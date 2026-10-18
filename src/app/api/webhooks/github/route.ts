@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
-import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { getClientIp } from "@/lib/client-ip";
@@ -13,7 +12,7 @@ import {
   issueYenidenAcildiginiIsle,
   pushIsle,
 } from "@/features/github/server/webhook-isle";
-import { teslimatKayitlariniTemizle } from "@/features/github/server/teslimat-kaydi";
+import { teslimatKayitlariniTemizle, teslimatiKaydet } from "@/features/github/server/teslimat-kaydi";
 import { prAcildiginiIncele } from "@/features/github/server/pr-inceleme";
 
 /**
@@ -92,7 +91,7 @@ export async function POST(req: Request) {
   // demek. Sonra atsaydık, iki eşzamanlı teslimat ikisi de kontrolü geçip
   // olayı iki kez işlerdi.
   try {
-    await prisma.processedWebhook.create({ data: { deliveryId: teslimatId, event: olay } });
+    await teslimatiKaydet(teslimatId, olay);
   } catch {
     logger.info("GitHub webhook tekrar teslimatı yok sayıldı", { teslimatId, olay });
     return NextResponse.json({ ok: true, tekrar: true });

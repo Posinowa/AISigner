@@ -48,3 +48,12 @@ export async function teslimatKayitlariniTemizle(): Promise<void> {
     });
   }
 }
+
+/**
+ * Teslimatı işlendi olarak kaydeder. Aynı teslimat daha önce kaydedildiyse
+ * benzersizlik ihlali fırlatır; çağıran bunu "tekrar teslimat" olarak yorumlar.
+ * Kayıt, işlemeden ÖNCE yapılmalı (eşzamanlı teslimatlar için).
+ */
+export async function teslimatiKaydet(teslimatId: string, olay: string): Promise<void> {
+  await prisma.processedWebhook.create({ data: { deliveryId: teslimatId, event: olay } });
+}
