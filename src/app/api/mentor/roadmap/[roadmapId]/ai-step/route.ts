@@ -1,11 +1,8 @@
 import { NextResponse } from "next/server";
 import { guvenliMetin, guvenliListe, veriBlogu } from "@/lib/ai/prompt";
 import { profilSahibininRizasiVar } from "@/features/kvkk/riza";
-import { prisma } from "@/lib/db";
-import {
-  ATAMA_SAHIPLIK_SELECT,
-  mentoruMu,
-} from "@/features/teams/server/sahiplik";
+import { mentoruMu } from "@/features/teams/server/sahiplik";
+import { adimEkle, yolHaritasiVeOgrenci } from "@/features/roadmap/server/uretim";
 import { z } from "zod";
 import { getModel } from "@/lib/ai/gemini-client";
 import { cozVeDogrula } from "@/lib/ai/response";
@@ -73,22 +70,7 @@ export async function POST(
      */
     const customPrompt = rawPrompt ? guvenliMetin(rawPrompt, MAX_PROMPT_LEN) : null;
 
-    const roadmap = await prisma.roadmap.findUnique({
-      where: { id: roadmapId },
-      include: {
-        steps: { orderBy: { order: "asc" } },
-        // #332: Sahiplik bireysel VEYA takım; yetki tek tanımdan gelir.
-        // Prompt'ta öğrenci adı/seviyesi kullanıldığı için profil tümüyle
-        // çekiliyor (takım dalı yukarıda erken dönüyor).
-        assignedProject: {
-          select: {
-            ...ATAMA_SAHIPLIK_SELECT,
-            studentProfile: { include: { user: true, mentorAssignments: { select: { mentorId: true } } } },
-            projectTemplate: true,
-          },
-        },
-      },
-    });
+    const roadmap = await yolHaritasiVeOgrenci(roadmapId);
 
     if (!roadmap) {
       return NextResponse.json({ error: "Yol haritası bulunamadı" }, { status: 404 });
@@ -200,16 +182,13 @@ JSON Formatı (Sadece geçerli bir JSON objesi döndür, başka hiçbir metin ek
       });
     }
 
-    const newStep = await prisma.roadmapStep.create({
-      data: {
-        roadmapId,
-        order: nextOrder,
-        title: aiStepData.title,
-        description: aiStepData.description,
-        estimatedHours: aiStepData.estimatedHours,
-        resources: aiStepData.resources,
-        status: "TODO",
-      },
+    const newStep = await adimEkle({
+      roadmapId,
+      order: nextOrder,
+      title: aiStepData.title,
+      description: aiStepData.description,
+      estimatedHours: aiStepData.estimatedHours,
+      resources: aiStepData.resources,
     });
 
     return NextResponse.json({ step: newStep, message: "Posilog tarafından yeni adım başarıyla üretildi!" });
