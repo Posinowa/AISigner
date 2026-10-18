@@ -6,8 +6,8 @@ import {
   devirTamamlandiMi,
   type OneriHatasi,
 } from "@/features/proposals/server/oneri";
-import { prisma } from "@/lib/db";
 import { rotaHatasi } from "@/lib/api-hata";
+import { oneriDepoBilgisi } from "@/features/proposals/server/oneri-sorgu";
 
 /**
  * Öneriyi karara bağlar (#366).
@@ -85,10 +85,7 @@ export async function GET(
   if (!auth.authorized) return auth.response;
 
   const { proposalId } = await params;
-  const oneri = await prisma.projectProposal.findUnique({
-    where: { id: proposalId },
-    select: { repoUrl: true },
-  });
+  const oneri = await oneriDepoBilgisi(proposalId);
   if (!oneri?.repoUrl) {
     return NextResponse.json({ error: "Bu öneride depo adresi yok." }, { status: 400 });
   }
