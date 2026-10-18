@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { mezunYazmaKapisi } from "@/lib/auth/mezun-politikasi";
-import { prisma } from "@/lib/db";
+import { ogrencisiMi } from "@/features/teams/server/sahiplik";
 import {
-  ATAMA_SAHIPLIK_SELECT,
-  erisebilirMi,
-  ogrencisiMi,
-} from "@/features/teams/server/sahiplik";
+  adimErisimli,
+  adimYorumlariniGetir,
+  adimYorumuEkle,
+} from "@/features/messaging/server/adim-yorumlari";
 import { requireAuth } from "@/lib/auth/guard";
 import { createStepCommentSchema } from "@/lib/validations/api";
 import { createRateLimiter } from "@/lib/rate-limit";
@@ -33,7 +33,7 @@ export async function GET(
 
   try {
     // Adımın varlığını ve erişim yetkisini kontrol et
-    const step = await getStepWithAccess(stepId, userId);
+    const step = await adimErisimli(stepId, userId);
     if (!step) {
       return NextResponse.json(
         { error: "Adım bulunamadı veya erişim yetkiniz yok." },
@@ -41,15 +41,7 @@ export async function GET(
       );
     }
 
-    const comments = await prisma.stepComment.findMany({
-      where: { stepId },
-      orderBy: { createdAt: "asc" },
-      include: {
-        author: {
-          select: { id: true, name: true, lastName: true, role: true },
-        },
-      },
-    });
+    const comments = await adimYorumlariniGetir(stepId);
 
     return NextResponse.json({ comments });
   } catch (error) {
@@ -86,7 +78,7 @@ export async function POST(
 
   try {
     // Adımın varlığını ve erişim yetkisini kontrol et
-    const step = await getStepWithAccess(stepId, userId);
+    const step = await adimErisimli(stepId, userId);
     if (!step) {
       return NextResponse.json(
         { error: "Adım bulunamadı veya erişim yetkiniz yok." },
@@ -117,17 +109,10 @@ export async function POST(
       );
     }
 
-    const comment = await prisma.stepComment.create({
-      data: {
-        stepId,
-        authorId: userId,
-        content: parsed.data.content,
-      },
-      include: {
-        author: {
-          select: { id: true, name: true, lastName: true, role: true },
-        },
-      },
+    const comment = await adimYorumuEkle({
+      stepId,
+      authorId: userId,
+      content: parsed.data.content,
     });
 
     return NextResponse.json({ comment }, { status: 201 });
@@ -138,31 +123,4 @@ export async function POST(
       { status: 500 }
     );
   }
-}
-
-/**
- * Adımın erişim yetkisini kontrol eder.
- * Mentor: Adımın roadmap'inin projesinin öğrencisi kendisine atanmış mı?
- * Öğrenci: Adımın roadmap'inin projesi kendisine ait mi?
- */
-async function getStepWithAccess(stepId: string, userId: string) {
-  const step = await prisma.roadmapStep.findUnique({
-    where: { id: stepId },
-    include: {
-      roadmap: {
-        include: {
-          // #332: Sahiplik bireysel VEYA takım olabilir; tek tanımdan gelir.
-          assignedProject: { select: ATAMA_SAHIPLIK_SELECT },
-        },
-      },
-    },
-  });
-
-  if (!step) return null;
-
-  // #332: Öğrenci = bireysel sahip ya da AKTİF takım üyesi.
-  // Mentör = öğrencinin kendi mentörü (#195) ya da takımın mentörü.
-  if (erisebilirMi(step.roadmap.assignedProject, userId)) return step;
-
-  return null;
 }
