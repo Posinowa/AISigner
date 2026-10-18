@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { mezunYazmaKapisi } from "@/lib/auth/mezun-politikasi";
 import { mentoruMu } from "@/features/teams/server/sahiplik";
+import { adimSahiplikBilgisi } from "@/features/roadmap/server/adim-erisim";
 import {
-  adimSahiplikBilgisi,
   yorumuBul,
   yorumuGuncelle,
   yorumuSil,

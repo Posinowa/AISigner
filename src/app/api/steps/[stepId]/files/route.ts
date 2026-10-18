@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { mezunYazmaKapisi } from "@/lib/auth/mezun-politikasi";
-import { prisma } from "@/lib/db";
+import { ogrencisiMi } from "@/features/teams/server/sahiplik";
+import { adimErisimli } from "@/features/roadmap/server/adim-erisim";
 import {
-  ATAMA_SAHIPLIK_SELECT,
-  erisebilirMi,
-  ogrencisiMi,
-} from "@/features/teams/server/sahiplik";
+  adimDosyalariniGetir,
+  adimDosyaSayisi,
+  adimDosyasiKaydet,
+} from "@/features/files/server/adim-dosyalari";
 import { requireAuth } from "@/lib/auth/guard";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { matchesExtensionSignature } from "@/lib/file-signature";
@@ -70,7 +71,7 @@ export async function GET(
   const userId = auth.session.user.id!;
 
   try {
-    const step = await getStepWithAccess(stepId, userId);
+    const step = await adimErisimli(stepId, userId);
     if (!step) {
       return NextResponse.json(
         { error: "Adım bulunamadı veya erişim yetkiniz yok." },
@@ -78,15 +79,7 @@ export async function GET(
       );
     }
 
-    const files = await prisma.stepFile.findMany({
-      where: { stepId },
-      orderBy: { createdAt: "desc" },
-      include: {
-        uploader: {
-          select: { id: true, name: true, lastName: true, role: true },
-        },
-      },
-    });
+    const files = await adimDosyalariniGetir(stepId);
 
     return NextResponse.json({ files });
   } catch (error) {
@@ -122,7 +115,7 @@ export async function POST(
 
   try {
     // Erişim kontrolü
-    const step = await getStepWithAccess(stepId, userId);
+    const step = await adimErisimli(stepId, userId);
     if (!step) {
       return NextResponse.json(
         { error: "Adım bulunamadı veya erişim yetkiniz yok." },
@@ -145,7 +138,7 @@ export async function POST(
     }
 
     // Bu adıma ait dosya sayısını kontrol et (max 10)
-    const fileCount = await prisma.stepFile.count({ where: { stepId } });
+    const fileCount = await adimDosyaSayisi(stepId);
     if (fileCount >= 10) {
       return NextResponse.json(
         { error: "Bu adıma en fazla 10 dosya yüklenebilir." },
@@ -213,20 +206,13 @@ export async function POST(
     let stepFile;
     try {
       // Veritabanına kaydet
-      stepFile = await prisma.stepFile.create({
-        data: {
-          stepId,
-          uploaderId: userId,
-          fileName: file.name.slice(0, 255), // Max 255 karakter
-          storedName,
-          mimeType,
-          fileSize: file.size,
-        },
-        include: {
-          uploader: {
-            select: { id: true, name: true, lastName: true, role: true },
-          },
-        },
+      stepFile = await adimDosyasiKaydet({
+        stepId,
+        uploaderId: userId,
+        fileName: file.name.slice(0, 255), // Max 255 karakter
+        storedName,
+        mimeType,
+        fileSize: file.size,
       });
     } catch (dbError) {
       // #201: DB insert başarısız olursa storage'daki dosyayı temizle (orphan compensation).
@@ -254,27 +240,4 @@ export async function POST(
       { status: 500 }
     );
   }
-}
-
-/**
- * Adımın erişim yetkisini kontrol eder.
- */
-async function getStepWithAccess(stepId: string, userId: string) {
-  const step = await prisma.roadmapStep.findUnique({
-    where: { id: stepId },
-    include: {
-      roadmap: {
-        include: {
-          // #332: Sahiplik bireysel VEYA takım olabilir; tek tanımdan gelir.
-          assignedProject: { select: ATAMA_SAHIPLIK_SELECT },
-        },
-      },
-    },
-  });
-
-  if (!step) return null;
-
-  // #332: Öğrenci = bireysel sahip ya da AKTİF takım üyesi.
-  // Mentör = öğrencinin kendi mentörü (#195) ya da takımın mentörü.
-  return erisebilirMi(step.roadmap.assignedProject, userId) ? step : null;
 }

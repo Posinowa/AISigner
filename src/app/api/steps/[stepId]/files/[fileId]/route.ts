@@ -1,11 +1,7 @@
 import { NextResponse } from "next/server";
 import { mezunYazmaKapisi } from "@/lib/auth/mezun-politikasi";
-import { prisma } from "@/lib/db";
-import {
-  ATAMA_SAHIPLIK_SELECT,
-  erisebilirMi,
-  mentoruMu,
-} from "@/features/teams/server/sahiplik";
+import { erisebilirMi, mentoruMu } from "@/features/teams/server/sahiplik";
+import { adimDosyasiniBul, adimDosyasiniSil } from "@/features/files/server/adim-dosyalari";
 import { requireAuth } from "@/lib/auth/guard";
 import { readStepFile, deleteStepFile } from "@/lib/storage/step-files";
 import { logger } from "@/lib/logger";
@@ -27,21 +23,7 @@ export async function GET(
   const userId = auth.session.user.id!;
 
   try {
-    const stepFile = await prisma.stepFile.findUnique({
-      where: { id: fileId },
-      include: {
-        step: {
-          include: {
-            roadmap: {
-              include: {
-                // #332: Sahiplik bireysel VEYA takım; tek tanımdan gelir.
-                assignedProject: { select: ATAMA_SAHIPLIK_SELECT },
-              },
-            },
-          },
-        },
-      },
-    });
+    const stepFile = await adimDosyasiniBul(fileId);
 
     if (!stepFile || stepFile.stepId !== stepId) {
       return NextResponse.json(
@@ -116,21 +98,7 @@ export async function DELETE(
   const userRole = auth.session.user.role;
 
   try {
-    const stepFile = await prisma.stepFile.findUnique({
-      where: { id: fileId },
-      include: {
-        step: {
-          include: {
-            roadmap: {
-              include: {
-                // #332: Sahiplik bireysel VEYA takım; tek tanımdan gelir.
-                assignedProject: { select: ATAMA_SAHIPLIK_SELECT },
-              },
-            },
-          },
-        },
-      },
-    });
+    const stepFile = await adimDosyasiniBul(fileId);
 
     if (!stepFile || stepFile.stepId !== stepId) {
       return NextResponse.json(
@@ -153,7 +121,7 @@ export async function DELETE(
     }
 
     // #201: Önce veritabanı kaydını sil (tutarlılık garantisi)
-    await prisma.stepFile.delete({ where: { id: fileId } });
+    await adimDosyasiniSil(fileId);
 
     // #197: GCS veya yerel diskten sil (backend env'e göre)
     try {

@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { mezunYazmaKapisi } from "@/lib/auth/mezun-politikasi";
 import { ogrencisiMi } from "@/features/teams/server/sahiplik";
+import { adimErisimli } from "@/features/roadmap/server/adim-erisim";
 import {
-  adimErisimli,
   adimYorumlariniGetir,
   adimYorumuEkle,
 } from "@/features/messaging/server/adim-yorumlari";

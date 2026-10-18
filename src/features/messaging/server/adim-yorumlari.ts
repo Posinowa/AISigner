@@ -1,6 +1,5 @@
 import "server-only";
 import { prisma } from "@/lib/db";
-import { ATAMA_SAHIPLIK_SELECT, erisebilirMi } from "@/features/teams/server/sahiplik";
 
 /**
  * Adım yorumlarının veri erişimi (`/api/steps/[stepId]/comments`).
@@ -14,32 +13,6 @@ const YORUM_YAZAR_SELECT = {
     select: { id: true, name: true, lastName: true, role: true },
   },
 } as const;
-
-/** Adımı, roadmap'i ve atama sahipliğiyle birlikte getirir (yetki kararı yok). */
-export async function adimSahiplikBilgisi(stepId: string) {
-  return prisma.roadmapStep.findUnique({
-    where: { id: stepId },
-    include: {
-      roadmap: {
-        include: {
-          // #332: Sahiplik bireysel VEYA takım olabilir; tek tanımdan gelir.
-          assignedProject: { select: ATAMA_SAHIPLIK_SELECT },
-        },
-      },
-    },
-  });
-}
-
-/**
- * Adımı ve kullanıcının erişim hakkını birlikte döner; erişim yoksa null.
- * Öğrenci: bireysel sahip ya da AKTİF takım üyesi. Mentör: öğrencinin kendi
- * mentörü (#195) ya da takımın mentörü (#332).
- */
-export async function adimErisimli(stepId: string, userId: string) {
-  const step = await adimSahiplikBilgisi(stepId);
-  if (!step) return null;
-  return erisebilirMi(step.roadmap.assignedProject, userId) ? step : null;
-}
 
 export async function adimYorumlariniGetir(stepId: string) {
   return prisma.stepComment.findMany({
