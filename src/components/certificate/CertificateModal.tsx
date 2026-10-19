@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import type { CertificateData } from "@/features/certificate/server/certificate";
 import { linkedInEkleUrl } from "@/features/certificate/paylasim";
 import { tarihUzunBicimle } from "@/lib/tarih";
+import { sertifikaBelgeHtml, stilKurallariniTopla } from "@/components/certificate/sertifika-belge";
 
 type CertificateModalProps = {
   certificate: CertificateData;
@@ -16,30 +17,6 @@ type CertificateModalProps = {
   onSave?: (data: { mentorNote: string; completionGrade: string }) => Promise<void>;
 };
 
-/**
- * #235: Sayfadaki tum stil kurallarini METIN olarak toplar.
- *
- * Neden `<link rel="stylesheet">` etiketini kopyalamiyoruz: indirilen dosya
- * diske kaydedilip acildiginda `/_next/static/css/...` yolu `file:///_next/...`
- * olarak cozulur, hicbir stil yuklenmez ve sertifika ciplak HTML olarak gorunur.
- * Ayni sekilde yazdirma cercevesinde de ag beklemesi gerekmez.
- *
- * Ayni kaynakli stil sayfalarinin `cssRules` erisimi acik; farkli kaynakli
- * olanlar (varsa) sessizce atlanir.
- */
-function stilKurallariniTopla(): string {
-  let css = "";
-  for (const sayfa of Array.from(document.styleSheets)) {
-    try {
-      for (const kural of Array.from(sayfa.cssRules)) {
-        css += kural.cssText + "\n";
-      }
-    } catch {
-      // farkli kaynakli stil sayfasi — okunamaz, atla
-    }
-  }
-  return css;
-}
 
 const DEFAULT_NOTE_TEMPLATES = [
   "Staj programı boyunca gösterdiği üstün problem çözme yeteneği, disiplin ve teknik yetkinlik ile projelerini başarıyla tamamlamıştır. Kendisini tebrik eder, profesyonel kariyerinde başarılar dileriz.",
@@ -195,61 +172,7 @@ export function CertificateModal({
     try {
       const stylesHtml = `<style>${stilKurallariniTopla()}</style>`;
 
-      const fullHtml = `<!DOCTYPE html>
-<html lang="tr">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Posinowa Staj Başarı Sertifikası - ${certificate.studentName}</title>
-  ${stylesHtml}
-  <style>
-    @page {
-      size: A4 portrait;
-      margin: 8mm;
-    }
-    *, *::before, *::after {
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
-      color-adjust: exact !important;
-    }
-    body {
-      background: #f8fafc;
-      color: #0f172a;
-      margin: 0;
-      padding: 24px 12px;
-      font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
-      display: flex;
-      justify-content: center;
-      align-items: flex-start;
-      min-height: 100vh;
-    }
-    .cert-wrapper {
-      width: 100%;
-      max-width: 900px;
-      margin: 0 auto;
-      background: #ffffff;
-      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-      border-radius: 24px;
-      overflow: hidden;
-    }
-    @media print {
-      body {
-        background: #ffffff !important;
-        padding: 0 !important;
-      }
-      .cert-wrapper {
-        box-shadow: none !important;
-        border-radius: 0 !important;
-      }
-    }
-  </style>
-</head>
-<body>
-  <div class="cert-wrapper">
-    ${printArea.outerHTML}
-  </div>
-</body>
-</html>`;
+      const fullHtml = sertifikaBelgeHtml(certificate.studentName, stylesHtml, printArea.outerHTML);
 
       const safeName = (certificate.studentName || "Stajyer")
         .toLowerCase()
