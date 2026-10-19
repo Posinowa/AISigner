@@ -14,6 +14,12 @@ Hangi hata oluşuyor?
 
 Doğru davranış nasıl olmalı?
 
+## Ortam
+
+* Rol: öğrenci / mentör / admin
+* Tarayıcı ve sürüm:
+* Ortam: yerel / staging / üretim
+
 ## Steps to Reproduce
 
 1. TODO
@@ -52,4 +58,7 @@ Bu issue kapsamında yapılmayacak işler:
 * [ ] İlgili role guard kontrol edildi
 * [ ] Hata / loading / empty state kontrol edildi
 * [ ] Gerekliyse test eklendi veya manuel test adımları yazıldı
+* [ ] Takım atamasında sahiplik kontrol edildi (bireysel + takım, `sahiplik.ts` üzerinden)
+* [ ] Veritabanı migration'ı varsa yıkıcı değil (expand/contract)
+* [ ] Kişisel veri veya AI kullanılıyorsa KVKK rızası kontrol edildi
 * [ ] PR açıklamasında ilgili issue linklendi
