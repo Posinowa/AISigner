@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Üretim bağımlılık denetimi kapısı (#469'un devamı).
  *
