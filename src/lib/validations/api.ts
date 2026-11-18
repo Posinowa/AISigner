@@ -338,11 +338,13 @@ export const matchMentorsSchema = z.object({
 const takimRolEnum = z.enum(["frontend", "backend", "fullstack", "qa", "design"]);
 
 export const createTeamSchema = z.object({
+  // ⚠️ `.trim()` ÖNCE: sonradan kırpınca "     " `min(2)`'yi geçip BOŞ adlı
+  // takım oluşturuyordu (ölçüldü). `createProposalSchema`'daki dersin aynısı.
   name: z
     .string()
+    .trim()
     .min(2, "Takım adı en az 2 karakter olmalı")
-    .max(60, "Takım adı en fazla 60 karakter olabilir")
-    .transform((v) => v.trim()),
+    .max(60, "Takım adı en fazla 60 karakter olabilir"),
 });
 
 export const addTeamMemberSchema = z.object({
