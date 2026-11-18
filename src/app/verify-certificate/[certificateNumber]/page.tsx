@@ -17,6 +17,11 @@ import {
 } from "lucide-react";
 import { verifyCertificate } from "@/features/certificate/server/certificate";
 import { tarihUzunBicimle } from "@/lib/tarih";
+import {
+  SERTIFIKA_PROJE_BASLIGI,
+  projeIlerlemesi,
+  zorlukEtiketi,
+} from "@/features/certificate/proje-ozeti";
 
 type Props = {
   params: Promise<{ certificateNumber: string }>;
@@ -212,12 +217,12 @@ export default async function VerifyCertificatePage({ params }: Props) {
                   </div>
                 </div>
 
-                {/* Tamamlanan Projeler Listesi */}
+                {/* Staj sürecindeki projeler — ilerlemesiyle (proje-ozeti.ts) */}
                 {result.certificate.completedProjects.length > 0 && (
                   <div className="space-y-3">
                     <p className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
                       <Briefcase className="w-3.5 h-3.5 text-indigo-600" />
-                      Staj Sürecinde Tamamlanan Projeler ({result.certificate.completedProjects.length})
+                      {SERTIFIKA_PROJE_BASLIGI} ({result.certificate.completedProjects.length})
                     </p>
                     <div className="space-y-2">
                       {result.certificate.completedProjects.map((p) => (
@@ -227,17 +232,14 @@ export default async function VerifyCertificatePage({ params }: Props) {
                         >
                           <span className="min-w-0 text-slate-900 font-semibold truncate">
                             {p.title}
-                            {/* #449: TAKIM projesi bireysel işmiş gibi
-                                durmamalı. Katkı bireysel ölçüldüğü için
-                                sayı da bu stajyerin kendi adımlarıdır. */}
-                            {p.takimAdi && (
-                              <span className="ml-1.5 font-normal text-slate-500">
-                                · {p.takimAdi} · {p.completedStepsCount} adım katkı
-                              </span>
-                            )}
+                            {/* #449: takım projesi bireysel işmiş gibi durmamalı;
+                                bireyselde de yarım iş "tamamlandı" sanılmamalı. */}
+                            <span className="ml-1.5 font-normal text-slate-500">
+                              · {projeIlerlemesi(p)}
+                            </span>
                           </span>
                           <span className="shrink-0 px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-800">
-                            {p.difficulty}
+                            {zorlukEtiketi(p.difficulty)}
                           </span>
                         </div>
                       ))}

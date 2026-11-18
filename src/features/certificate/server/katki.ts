@@ -167,13 +167,19 @@ export async function sertifikaKapsaminiGetir(
     const adimlar = p.roadmap?.steps ?? [];
     const takimProjesi = Boolean(p.teamId);
 
+    // ⚠️ Hiç adımı olmayan (yol haritası çizilmemiş) proje listelenmez: belgede
+    // "0/0 adım" ile duran bir satır, yapılmış bir işi değil yalnız bir
+    // atamayı gösterir. Adımı olup başlanmamış bireysel proje ise kalır —
+    // ilerlemesiyle birlikte gösterilir (`proje-ozeti.ts`).
+    if (adimlar.length === 0) continue;
+
     const completedStepsCount = takimProjesi
       ? ogrencininKatkisi(adimlar, userId)
       : adimlar.filter((a) => a.status === "COMPLETED").length;
 
     // ⚠️ Katkısı olmayan TAKIM projesi listelenmez: aksi halde belge, öğrencinin
     // hiç dokunmadığı bir işi kendi projesi gibi gösterirdi. Bireysel projede
-    // böyle bir eleme YOK — proje zaten ona atanmış, "başlamamış" da bir durum.
+    // bu eleme YOK — proje zaten ona atanmış; ilerlemesi satırda yazıyor.
     if (takimProjesi && completedStepsCount === 0) continue;
 
     projeler.push({

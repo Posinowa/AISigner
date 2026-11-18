@@ -4,6 +4,11 @@ import { Award, CheckCircle2, Quote, ShieldCheck, Sparkles } from "lucide-react"
 import { POSINOWA_LOGO_DATA_URI } from "@/features/certificate/ui/posinowa-logo";
 import { SertifikaQr } from "@/features/certificate/ui/SertifikaQr";
 import type { CertificateData } from "@/features/certificate/server/certificate";
+import {
+  SERTIFIKA_PROJE_BASLIGI,
+  projeIlerlemesi,
+  zorlukEtiketi,
+} from "@/features/certificate/proje-ozeti";
 
 export type SertifikaGovdesiProps = {
   certificate: CertificateData;
@@ -77,12 +82,12 @@ export function SertifikaGovdesi({
           </div>
         </div>
 
-        {/* Tamamlanan Projeler Listesi */}
+        {/* Staj sürecindeki projeler — ilerlemesiyle (proje-ozeti.ts) */}
         {certificate.completedProjects.length > 0 && (
           <div className="my-5 p-3.5 rounded-xl bg-slate-50/90 border border-slate-200/80 text-xs">
             <p className="font-bold text-slate-700 mb-2 flex items-center gap-1.5">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-              Staj Sürecinde Geliştirilen ve Tamamlanan Projeler:
+              {SERTIFIKA_PROJE_BASLIGI}:
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {certificate.completedProjects.map((p) => (
@@ -92,16 +97,11 @@ export function SertifikaGovdesi({
                 >
                   <span className="min-w-0 truncate text-slate-800 text-xs">
                     {p.title}
-                    {/* #449: Takım projesi olarak işaretli; sayı bu
-                        stajyerin KENDİ katkısı (takımın toplamı değil). */}
-                    {p.takimAdi && (
-                      <span className="text-slate-500">
-                        {" "}· {p.takimAdi} · {p.completedStepsCount} adım
-                      </span>
-                    )}
+                    {/* #449: takımda sayı bu stajyerin KENDİ katkısı. */}
+                    <span className="text-slate-500"> · {projeIlerlemesi(p)}</span>
                   </span>
                   <span className="shrink-0 px-2 py-0.5 rounded text-[10px] font-bold bg-accent text-accent-foreground">
-                    {p.difficulty}
+                    {zorlukEtiketi(p.difficulty)}
                   </span>
                 </div>
               ))}
