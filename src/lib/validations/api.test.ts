@@ -5,6 +5,7 @@ import {
   createStepSchema,
   updateStepSchema,
   updateCertificateSchema,
+  createTeamSchema,
 } from "./api";
 
 const templateBase = {
@@ -240,3 +241,22 @@ describe("updateCertificateSchema (#208)", () => {
   });
 });
 
+describe("createTeamSchema — ad kırpılarak doğrulanır", () => {
+  it("yalnız boşluktan oluşan adı reddeder", () => {
+    expect(createTeamSchema.safeParse({ name: "     " }).success).toBe(false);
+  });
+
+  it("kırpıldıktan sonra 2 karakterden kısa adı reddeder", () => {
+    expect(createTeamSchema.safeParse({ name: "  a  " }).success).toBe(false);
+  });
+
+  it("geçerli adı kırpılmış olarak döndürür", () => {
+    const sonuc = createTeamSchema.safeParse({ name: "  Test Takımı  " });
+    expect(sonuc.success && sonuc.data.name).toBe("Test Takımı");
+  });
+
+  it("60 karakter sınırını kırpılmış uzunluğa uygular", () => {
+    expect(createTeamSchema.safeParse({ name: ` ${"a".repeat(60)} ` }).success).toBe(true);
+    expect(createTeamSchema.safeParse({ name: "a".repeat(61) }).success).toBe(false);
+  });
+});
