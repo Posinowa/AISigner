@@ -268,6 +268,7 @@ export default async function StudentDashboardPage() {
       />
 
       <ProfilTamamlaSeridi
+        rol="STUDENT"
         emailVerified={session.user.emailVerified}
         fotografVar={fotografVar}
         fotografCapasi="/student-dashboard/ayarlar#profil"

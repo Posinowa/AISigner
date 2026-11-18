@@ -20,14 +20,14 @@ import { ProfilTamamlaSeridi } from "./ProfilTamamlaSeridi";
 describe("ProfilTamamlaSeridi — görünürlük", () => {
   it("hiçbir eksik yokken HİÇ basılmaz", () => {
     const { container } = render(
-      <ProfilTamamlaSeridi emailVerified={new Date().toISOString()} fotografVar />,
+      <ProfilTamamlaSeridi rol="STUDENT" emailVerified={new Date().toISOString()} fotografVar />,
     );
 
     expect(container).toBeEmptyDOMElement();
   });
 
   it("yalnızca e-posta eksikse tek madde gösterir", () => {
-    render(<ProfilTamamlaSeridi emailVerified={null} fotografVar />);
+    render(<ProfilTamamlaSeridi rol="STUDENT" emailVerified={null} fotografVar />);
 
     expect(screen.getByText(/doğrulanmadı/i)).toBeInTheDocument();
     expect(screen.queryByText(/Fotoğraf ekle/)).toBeNull();
@@ -35,7 +35,7 @@ describe("ProfilTamamlaSeridi — görünürlük", () => {
 
   it("yalnızca fotoğraf eksikse tek madde gösterir", () => {
     render(
-      <ProfilTamamlaSeridi emailVerified={new Date().toISOString()} fotografVar={false} />,
+      <ProfilTamamlaSeridi rol="STUDENT" emailVerified={new Date().toISOString()} fotografVar={false} />,
     );
 
     expect(screen.getByText("Fotoğraf ekle")).toBeInTheDocument();
@@ -43,7 +43,7 @@ describe("ProfilTamamlaSeridi — görünürlük", () => {
   });
 
   it("ikisi de eksikse ikisini de gösterir", () => {
-    render(<ProfilTamamlaSeridi emailVerified={null} fotografVar={false} />);
+    render(<ProfilTamamlaSeridi rol="STUDENT" emailVerified={null} fotografVar={false} />);
 
     expect(screen.getAllByRole("listitem")).toHaveLength(2);
   });
@@ -54,6 +54,7 @@ describe("ProfilTamamlaSeridi — fotoğraf bağlantısı", () => {
     // Stajyer panelinde sayfa içi çapa, mentörde ayrı bir sayfa.
     render(
       <ProfilTamamlaSeridi
+        rol="MENTOR"
         emailVerified={new Date().toISOString()}
         fotografVar={false}
         fotografCapasi="/profile-setup"
@@ -64,5 +65,20 @@ describe("ProfilTamamlaSeridi — fotoğraf bağlantısı", () => {
       "href",
       "/profile-setup",
     );
+  });
+});
+
+describe("ProfilTamamlaSeridi — role göre metin", () => {
+  it("stajyere mentörünü anar", () => {
+    render(<ProfilTamamlaSeridi rol="STUDENT" emailVerified={new Date().toISOString()} fotografVar={false} />);
+
+    expect(screen.getByText(/mentörün ve ekip seni tanıyamıyor/)).toBeInTheDocument();
+  });
+
+  it("⚠️ mentöre 'mentörün' DEMEZ, stajyerlerini anar", () => {
+    render(<ProfilTamamlaSeridi rol="MENTOR" emailVerified={new Date().toISOString()} fotografVar={false} />);
+
+    expect(screen.getByText(/stajyerlerin seni tanıyamıyor/)).toBeInTheDocument();
+    expect(screen.queryByText(/mentörün/)).toBeNull();
   });
 });

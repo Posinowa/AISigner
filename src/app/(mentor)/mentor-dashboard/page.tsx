@@ -206,6 +206,7 @@ export default function MentorDashboardPage() {
           />
 
           <ProfilTamamlaSeridi
+            rol="MENTOR"
             emailVerified={session?.user?.emailVerified}
             fotografVar={session?.user?.fotografVar === true}
             fotografCapasi="/profile-setup"

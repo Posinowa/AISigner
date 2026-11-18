@@ -13,13 +13,25 @@ import { dogrulandiMi, type DogrulamaDurumu } from "@/features/auth/ui/Dogrulanm
  *
  * Artık şerit hiçbir eksik yokken HİÇ basılmıyor. Görünürlüğü kalıcı değil,
  * duruma bağlı.
+ *
+ * ⚠️ `rol` ZORUNLU: şerit hem stajyer hem mentör panosunda. Metin tek
+ * sabitken mentöre "mentörün seni tanıyamıyor" diyordu (canlı testte
+ * bulundu). Zorunlu olması, yeni bir çağıranın rolü unutmasını tip
+ * denetiminde yakalatıyor.
  */
+const FOTOGRAF_GEREKCESI = {
+  STUDENT: "mentörün ve ekip seni tanıyamıyor",
+  MENTOR: "stajyerlerin seni tanıyamıyor",
+} as const;
+
 export function ProfilTamamlaSeridi({
+  rol,
   emailVerified,
   fotografVar,
   /** Fotoğraf yükleme alanının sayfa içindeki çapası. */
   fotografCapasi = "#profil",
 }: {
+  rol: keyof typeof FOTOGRAF_GEREKCESI;
   emailVerified: DogrulamaDurumu;
   fotografVar: boolean;
   fotografCapasi?: string;
@@ -51,7 +63,7 @@ export function ProfilTamamlaSeridi({
         {fotografEksik ? (
           <li className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-white/70 px-3.5 py-3">
             <span className="text-sm text-slate-700">
-              Profil fotoğrafın yok — mentörün ve ekip seni tanıyamıyor.
+              Profil fotoğrafın yok — {FOTOGRAF_GEREKCESI[rol]}.
             </span>
             <Link
               href={fotografCapasi}
