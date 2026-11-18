@@ -20,7 +20,7 @@ import { createBlobStore } from "./blob";
 const GCS_PREFIX = "steps/";
 
 // Yerel disk yolu (GCS yoksa) — eski davranışla birebir aynı.
-const UPLOAD_DIR = path.join(process.cwd(), "uploads", "steps");
+const UPLOAD_DIR = path.join(/* turbopackIgnore: true */ process.cwd(), "uploads", "steps");
 
 const store = createBlobStore(GCS_PREFIX, UPLOAD_DIR);
 
