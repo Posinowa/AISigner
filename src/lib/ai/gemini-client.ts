@@ -55,7 +55,10 @@ const CREDENTIALS_PATH =
  * GCP ortamlarını (GCE/GKE) da dışlıyordu.
  */
 function kimlikDosyasiYolu(): string | null {
-  const yol = path.resolve(process.cwd(), CREDENTIALS_PATH);
+  // ⚠️ `turbopackIgnore` ŞART: yoksa derleyici `process.cwd()`'yi izleyip proje
+  // kökünün TAMAMINI (.env, gcp-credentials.json, uploads/) `.next/standalone`'a
+  // kopyalıyor. Yol çalışma anında çözülür, derleme izine girmemeli.
+  const yol = path.resolve(/* turbopackIgnore: true */ process.cwd(), CREDENTIALS_PATH);
   return existsSync(yol) ? yol : null;
 }
 

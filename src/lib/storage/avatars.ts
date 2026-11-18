@@ -10,7 +10,7 @@ import path from "path";
 import { createBlobStore } from "./blob";
 
 const GCS_PREFIX = "avatars/";
-const UPLOAD_DIR = path.join(process.cwd(), "uploads", "avatars");
+const UPLOAD_DIR = path.join(/* turbopackIgnore: true */ process.cwd(), "uploads", "avatars");
 
 const store = createBlobStore(GCS_PREFIX, UPLOAD_DIR);
 
