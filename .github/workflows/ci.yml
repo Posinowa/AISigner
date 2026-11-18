@@ -113,8 +113,10 @@ jobs:
           cache: npm
 
       # `npm audit` kurulum gerektirmiyor; lockfile'dan çalışıyor.
+      # Eşik `--audit-level=high` ile aynı; tek fark `scripts/audit-gate.mjs`
+      # içindeki SÜRELİ GHSA istisnaları (düzeltmesi olmayan açıklar).
       - name: Üretim bağımlılıkları — high/critical (BLOKE EDER)
-        run: npm audit --omit=dev --audit-level=high
+        run: node scripts/audit-gate.mjs
 
       - name: Tam tarama (dev dahil) — bilgi amaçlı
         continue-on-error: true
