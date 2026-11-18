@@ -35,6 +35,34 @@ export const HESAP = {
 };
 
 /**
+ * İŞ AKIŞI HESAPLARI (`akislar.spec.ts`) — APPROVED, durumu DEĞİŞTİREN testler.
+ *
+ * ⚠️ SEED HESAPLARINDAN AYRI: testler revizyon ister, adım tamamlar, mezun
+ * eder. Bunu demo hesapları üzerinde yapmak, geliştiricinin panosunu her
+ * koşuda bozardı. Kurulum bu hesapların verisini HER KOŞUDA başlangıç
+ * durumuna geri yazar (`kur.ts` → `akisVerisiniKur`).
+ *
+ * ⚠️ `akisB` BİLEREK yalnız TAKIM üzerinden mentöre bağlı (MentorAssignment
+ * yok): takım körlüğünün (#332) en saf hali. Mentör panosunda görünmüyorsa
+ * sorgu tek yola bakıyor demektir.
+ */
+export const AKIS = {
+  mentor: { email: "e2e-mentor@e2e.local", ad: "E2E Mentör", role: "MENTOR" as const },
+  ogrenciA: { email: "e2e-akis-a@e2e.local", ad: "E2E Akış A", role: "STUDENT" as const },
+  ogrenciB: { email: "e2e-akis-b@e2e.local", ad: "E2E Akış B", role: "STUDENT" as const },
+  mezuniyet: { email: "e2e-mezuniyet@e2e.local", ad: "E2E Mezuniyet", role: "STUDENT" as const },
+};
+
+/** Akış verisinin sabit adları — testler ekranda bunları arar. */
+export const AKIS_VERI = {
+  bireyselSablon: "E2E Bireysel Proje",
+  takimSablon: "E2E Takım Projesi",
+  takimId: "e2e_takim",
+  takimAdi: "E2E Takımı",
+  adimlar: ["e2e_adim_1", "e2e_adim_2", "e2e_adim_3"] as const,
+};
+
+/**
  * Kurulumda oturumu AÇILACAK hesaplar.
  *
  * ⚠️ SEED'İN ONAYLI ÖĞRENCİSİ DE BURADA, ama `E2E_HESAPLARI`'nda DEĞİL:
@@ -50,7 +78,12 @@ export const HESAP = {
  */
 export const OTURUMLAR: { ad: string; email: string }[] = [
   { ad: "ogrenci", email: "student@example.com" },
+  // Seed'in admin'i — oturumu paylaşılır, satırı kurulmaz (öğrenciyle aynı kural).
+  { ad: "admin", email: "admin@example.com" },
   ...E2E_HESAPLARI.map((h) => ({ ad: h.email.replace(/@.*/, "").replace("e2e-", ""), email: h.email })),
+  { ad: "akis-mentor", email: AKIS.mentor.email },
+  { ad: "akis-a", email: AKIS.ogrenciA.email },
+  { ad: "akis-b", email: AKIS.ogrenciB.email },
 ];
 
 /**
