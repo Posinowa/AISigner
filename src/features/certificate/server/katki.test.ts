@@ -132,7 +132,7 @@ describe("sertifikaKapsaminiGetir — projeler (#449)", () => {
     expect(projeler).toHaveLength(0);
   });
 
-  it("⚠️ katkısı olmayan BİREYSEL proje listelenir — başlamamış olmak da bir durum", async () => {
+  it("⚠️ adımı olan ama başlanmamış BİREYSEL proje listelenir — ilerlemesiyle", async () => {
     mockla([atama({ roadmap: { steps: [adim("TODO")] } })]);
 
     const { projeler } = await sertifikaKapsaminiGetir("sp-1", BEN, { epostaDahil: true });
@@ -141,12 +141,20 @@ describe("sertifikaKapsaminiGetir — projeler (#449)", () => {
     expect(projeler[0].completedStepsCount).toBe(0);
   });
 
-  it("yol haritası yoksa çökmez", async () => {
+  it("yol haritası yoksa çökmez ve proje listelenmez", async () => {
     mockla([atama({ roadmap: null })]);
 
     const { projeler } = await sertifikaKapsaminiGetir("sp-1", BEN, { epostaDahil: true });
 
-    expect(projeler[0].totalStepsCount).toBe(0);
+    expect(projeler).toHaveLength(0);
+  });
+
+  it("⚠️ adımı olmayan proje listelenmez — belgede '0/0 adım' satırı olmamalı", async () => {
+    mockla([atama({ roadmap: { steps: [] } })]);
+
+    const { projeler } = await sertifikaKapsaminiGetir("sp-1", BEN, { epostaDahil: true });
+
+    expect(projeler).toHaveLength(0);
   });
 });
 
