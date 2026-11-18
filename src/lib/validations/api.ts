@@ -441,11 +441,14 @@ export const typingSignalSchema = z.object({
  * Gerekçe ZORUNLU ve boş olamaz: gerekçesiz revizyon öğrenciye aynı işi
  * tekrar yaptırır (#366'daki red gerekçesi deseni).
  */
+/** Revizyon gerekçesinin alt sınırı — form da aynı sabiti okur (tek kaynak). */
+export const REVIZYON_GEREKCE_EN_AZ = 10;
+
 export const revizyonIsteSchema = z.object({
   gerekce: z
     .string()
     .trim()
-    .min(10, "Gerekçe en az 10 karakter olmalı")
+    .min(REVIZYON_GEREKCE_EN_AZ, `Gerekçe en az ${REVIZYON_GEREKCE_EN_AZ} karakter olmalı`)
     .max(1000, "Gerekçe en fazla 1000 karakter olabilir"),
 });
 

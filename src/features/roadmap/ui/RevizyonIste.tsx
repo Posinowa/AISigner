@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { Loader2, RotateCcw } from "lucide-react";
+import { REVIZYON_GEREKCE_EN_AZ } from "@/lib/validations/api";
 
 /**
  * Mentör onay kapısı — revizyon isteği (#379).
@@ -27,6 +28,11 @@ export function RevizyonIste({
   const [gonderiliyor, setGonderiliyor] = useState(false);
 
   if (stepStatus !== "COMPLETED") return null;
+
+  // ⚠️ Buton kısa gerekçede pasif; nedeni yazılmazsa mentör neden
+  // gönderemediğini anlamıyordu (canlı testte bulundu).
+  const uzunluk = gerekce.trim().length;
+  const yeterli = uzunluk >= REVIZYON_GEREKCE_EN_AZ;
 
   async function gonder() {
     setGonderiliyor(true);
@@ -76,12 +82,18 @@ export function RevizyonIste({
         onChange={(e) => setGerekce(e.target.value)}
         rows={3}
         maxLength={1000}
+        aria-describedby={`rev-${stepId}-sinir`}
         className="mt-1.5 w-full rounded-md border border-amber-300 bg-white p-2 text-sm focus:border-amber-500 focus:outline-none"
         placeholder="Örn: Testler yazılmamış ve hata durumu ele alınmamış. İkisini tamamlayıp tekrar gönderebilirsin."
       />
-      <p className="mt-1 text-[11px] text-amber-700">
-        Adım &quot;Revizyon istendi&quot; durumuna döner; stajyer yeniden başlatıp
-        düzeltebilir.
+      <p
+        id={`rev-${stepId}-sinir`}
+        aria-live="polite"
+        className={`mt-1 text-[11px] ${yeterli ? "text-amber-700" : "font-medium text-amber-900"}`}
+      >
+        {yeterli
+          ? "Adım \"Revizyon istendi\" durumuna döner; stajyer yeniden başlatıp düzeltebilir."
+          : `En az ${REVIZYON_GEREKCE_EN_AZ} karakter yazın (${uzunluk}/${REVIZYON_GEREKCE_EN_AZ}).`}
       </p>
       <div className="mt-2 flex justify-end gap-2">
         <button
@@ -94,7 +106,7 @@ export function RevizyonIste({
         <button
           type="button"
           onClick={gonder}
-          disabled={gonderiliyor || gerekce.trim().length < 10}
+          disabled={gonderiliyor || !yeterli}
           className="inline-flex items-center gap-1.5 rounded-md bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700 disabled:bg-slate-300"
         >
           {gonderiliyor && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
